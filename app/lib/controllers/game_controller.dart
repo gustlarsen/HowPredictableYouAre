@@ -94,6 +94,9 @@ class GameController extends ChangeNotifier {
 
     audio.soundEnabled = soundEnabled;
     audio.vibrationEnabled = vibrationEnabled;
+    if (soundEnabled) {
+      audio.startMusic();
+    }
 
     _engine = MarkovEngine(enableExtendedHands: showNewHands);
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
@@ -344,6 +347,11 @@ class GameController extends ChangeNotifier {
     soundEnabled = !soundEnabled;
     storage.setSoundEnabled(soundEnabled);
     audio.soundEnabled = soundEnabled;
+    if (soundEnabled) {
+      audio.startMusic();
+    } else {
+      audio.stopMusic();
+    }
     notifyListeners();
   }
 

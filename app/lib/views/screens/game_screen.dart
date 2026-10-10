@@ -10,8 +10,36 @@ import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/help_dialog.dart';
 
-class GameScreen extends StatelessWidget {
+class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    final controller = context.read<GameController>();
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      controller.audio.pauseMusic();
+    } else if (state == AppLifecycleState.resumed) {
+      controller.audio.resumeMusic();
+    }
+  }
 
   void _check100RoundAlert(BuildContext context, GameController controller) {
     if (controller.is100RoundsAlertPending) {

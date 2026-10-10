@@ -81,7 +81,7 @@ class SettingsDialog extends StatelessWidget {
               // Vibration toggle
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Haptic Vibration:'),
+                title: const Text('Vibration:'),
                 value: controller.vibrationEnabled,
                 onChanged: (_) => controller.toggleVibration(),
               ),

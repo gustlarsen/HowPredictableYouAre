@@ -9,12 +9,14 @@ class AudioService {
   bool vibrationEnabled = true;
 
   Future<void> init() async {
-    _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+    try {
+      await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+    } catch (_) {}
   }
 
   void playVibrate() {
     if (vibrationEnabled) {
-      HapticFeedback.mediumImpact();
+      HapticFeedback.vibrate();
     }
   }
 
@@ -39,9 +41,7 @@ class AudioService {
   }
 
   Future<void> playDraw() async {
-    if (vibrationEnabled) {
-      HapticFeedback.lightImpact();
-    }
+    playVibrate();
     if (!soundEnabled) return;
     try {
       await _sfxPlayer.play(AssetSource('audio/draw.mid'));
@@ -53,6 +53,7 @@ class AudioService {
   Future<void> startMusic() async {
     if (!soundEnabled) return;
     try {
+      await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
       await _bgmPlayer.play(AssetSource('audio/Battle.mid'));
     } catch (_) {
       // Graceful fallback
@@ -62,6 +63,23 @@ class AudioService {
   Future<void> stopMusic() async {
     try {
       await _bgmPlayer.stop();
+    } catch (_) {}
+  }
+
+  Future<void> pauseMusic() async {
+    try {
+      await _bgmPlayer.pause();
+    } catch (_) {}
+  }
+
+  Future<void> resumeMusic() async {
+    if (!soundEnabled) return;
+    try {
+      if (_bgmPlayer.state == PlayerState.paused) {
+        await _bgmPlayer.resume();
+      } else if (_bgmPlayer.state != PlayerState.playing) {
+        await startMusic();
+      }
     } catch (_) {}
   }
 
