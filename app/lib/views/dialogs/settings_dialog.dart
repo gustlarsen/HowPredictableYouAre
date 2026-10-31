@@ -9,6 +9,13 @@ class SettingsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, child) => _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
 
@@ -34,7 +41,9 @@ class SettingsDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     'Settings',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -73,9 +82,16 @@ class SettingsDialog extends StatelessWidget {
               // Sound toggle
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Sound Effects & Music:'),
+                title: const Text('Sound Effects:'),
                 value: controller.soundEnabled,
                 onChanged: (_) => controller.toggleSound(),
+              ),
+
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Background Music:'),
+                value: controller.musicEnabled,
+                onChanged: controller.toggleMusic,
               ),
 
               // Vibration toggle
@@ -83,7 +99,7 @@ class SettingsDialog extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Vibration:'),
                 value: controller.vibrationEnabled,
-                onChanged: (_) => controller.toggleVibration(),
+                onChanged: controller.toggleVibration,
               ),
 
               // Animations toggle
@@ -93,27 +109,6 @@ class SettingsDialog extends StatelessWidget {
                 value: controller.animationsEnabled,
                 onChanged: controller.toggleAnimations,
               ),
-
-              if (controller.unlockedReset) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      controller.resetGame();
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Stats and Markov Matrix reset!')),
-                      );
-                    },
-                    icon: const Icon(Icons.refresh, color: Colors.redAccent),
-                    label: Text(
-                      loc.t('string53', fallback: 'RESET GAME STATS'),
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-              ],
 
               const SizedBox(height: 12),
               Align(

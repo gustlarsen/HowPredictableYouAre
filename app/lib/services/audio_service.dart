@@ -1,17 +1,24 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 class AudioService {
-  final AudioPlayer _sfxPlayer = AudioPlayer();
-  final AudioPlayer _bgmPlayer = AudioPlayer();
+  AudioPlayer? _sfxPlayer;
+  AudioPlayer? _bgmPlayer;
 
   bool soundEnabled = true;
+  bool musicEnabled = true;
   bool vibrationEnabled = true;
 
   Future<void> init() async {
+    _sfxPlayer ??= AudioPlayer();
+    _bgmPlayer ??= AudioPlayer();
     try {
-      await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
-    } catch (_) {}
+      await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+      await _bgmPlayer!.setVolume(0.55);
+    } on Exception catch (error) {
+      debugPrint('Could not initialize audio: $error');
+    }
   }
 
   void playVibrate() {
@@ -24,9 +31,9 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      await _sfxPlayer.play(AssetSource('audio/attack.mid'));
-    } catch (_) {
-      // In environments with no midi synth, haptic feedback was provided
+      await _sfxPlayer?.play(AssetSource('audio/attack.wav'));
+    } on Exception catch (error) {
+      debugPrint('Could not play win sound: $error');
     }
   }
 
@@ -34,9 +41,9 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      await _sfxPlayer.play(AssetSource('audio/defeat.mid'));
-    } catch (_) {
-      // Graceful fallback
+      await _sfxPlayer?.play(AssetSource('audio/defeat.wav'));
+    } on Exception catch (error) {
+      debugPrint('Could not play defeat sound: $error');
     }
   }
 
@@ -44,47 +51,53 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      await _sfxPlayer.play(AssetSource('audio/draw.mid'));
-    } catch (_) {
-      // Graceful fallback
+      await _sfxPlayer?.play(AssetSource('audio/draw.wav'));
+    } on Exception catch (error) {
+      debugPrint('Could not play draw sound: $error');
     }
   }
 
   Future<void> startMusic() async {
-    if (!soundEnabled) return;
+    if (!musicEnabled) return;
     try {
-      await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer.play(AssetSource('audio/Battle.mid'));
-    } catch (_) {
-      // Graceful fallback
+      await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
+      await _bgmPlayer?.play(AssetSource('audio/battle.wav'));
+    } on Exception catch (error) {
+      debugPrint('Could not play background music: $error');
     }
   }
 
   Future<void> stopMusic() async {
     try {
-      await _bgmPlayer.stop();
-    } catch (_) {}
+      await _bgmPlayer?.stop();
+    } on Exception catch (error) {
+      debugPrint('Could not stop background music: $error');
+    }
   }
 
   Future<void> pauseMusic() async {
     try {
-      await _bgmPlayer.pause();
-    } catch (_) {}
+      await _bgmPlayer?.pause();
+    } on Exception catch (error) {
+      debugPrint('Could not pause background music: $error');
+    }
   }
 
   Future<void> resumeMusic() async {
-    if (!soundEnabled) return;
+    if (!musicEnabled) return;
     try {
-      if (_bgmPlayer.state == PlayerState.paused) {
-        await _bgmPlayer.resume();
-      } else if (_bgmPlayer.state != PlayerState.playing) {
+      if (_bgmPlayer?.state == PlayerState.paused) {
+        await _bgmPlayer?.resume();
+      } else if (_bgmPlayer?.state != PlayerState.playing) {
         await startMusic();
       }
-    } catch (_) {}
+    } on Exception catch (error) {
+      debugPrint('Could not resume background music: $error');
+    }
   }
 
   void dispose() {
-    _sfxPlayer.dispose();
-    _bgmPlayer.dispose();
+    _sfxPlayer?.dispose();
+    _bgmPlayer?.dispose();
   }
 }

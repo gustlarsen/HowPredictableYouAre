@@ -8,6 +8,13 @@ class ShopDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, child) => _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
 
@@ -25,16 +32,24 @@ class ShopDialog extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.shopping_cart_outlined, color: Colors.amber),
+                      const Icon(
+                        Icons.shopping_cart_outlined,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Upgrades & Shop',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -64,15 +79,18 @@ class ShopDialog extends StatelessWidget {
                       isUnlocked: controller.unlockedReset,
                       isActive: controller.showReset,
                       onUnlock: controller.unlockReset,
-                      onToggle: (v) => controller.showReset = v,
+                      onToggle: controller.toggleShowReset,
                     ),
                     _ShopItemTile(
-                      title: loc.t('string38', fallback: 'Predictability Score'),
+                      title: loc.t(
+                        'string38',
+                        fallback: 'Predictability Score',
+                      ),
                       cost: 150,
                       isUnlocked: controller.unlockedPredictability,
                       isActive: controller.showPredictability,
                       onUnlock: controller.unlockPredictability,
-                      onToggle: (v) => controller.showPredictability = v,
+                      onToggle: controller.toggleShowPredictability,
                     ),
                     _ShopItemTile(
                       title: loc.t('string39', fallback: 'Random Move Button'),
@@ -80,10 +98,13 @@ class ShopDialog extends StatelessWidget {
                       isUnlocked: controller.unlockedRandom,
                       isActive: controller.showRandom,
                       onUnlock: controller.unlockRandom,
-                      onToggle: (v) => controller.showRandom = v,
+                      onToggle: controller.toggleShowRandom,
                     ),
                     _ShopItemTile(
-                      title: loc.t('string40', fallback: 'Show Markov Algorithm'),
+                      title: loc.t(
+                        'string40',
+                        fallback: 'Show Markov Algorithm',
+                      ),
                       cost: 500,
                       isUnlocked: controller.unlockedAlgorithm,
                       isActive: controller.showAlgorithm,
@@ -91,7 +112,10 @@ class ShopDialog extends StatelessWidget {
                       onToggle: controller.toggleShowAlgorithm,
                     ),
                     _ShopItemTile(
-                      title: loc.t('string56', fallback: 'New Hands (Lizard & Spock)'),
+                      title: loc.t(
+                        'string56',
+                        fallback: 'New Hands (Lizard & Spock)',
+                      ),
                       cost: 100,
                       isUnlocked: controller.unlockedNewHands,
                       isActive: controller.showNewHands,
@@ -99,7 +123,10 @@ class ShopDialog extends StatelessWidget {
                       onToggle: controller.toggleShowNewHands,
                     ),
                     _ShopItemTile(
-                      title: loc.t('string41', fallback: 'Your Prediction Hint'),
+                      title: loc.t(
+                        'string41',
+                        fallback: 'Your Prediction Hint',
+                      ),
                       cost: 1000,
                       isUnlocked: controller.unlockedYourPrediction,
                       isActive: controller.showYourPrediction,
@@ -127,9 +154,14 @@ class ShopDialog extends StatelessWidget {
                     // Free diamonds action
                     Card(
                       color: Colors.green.withValues(alpha: 0.12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -138,11 +170,16 @@ class ShopDialog extends StatelessWidget {
                               children: [
                                 Text(
                                   loc.t('string45', fallback: 'Free Diamonds'),
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 const Text(
                                   '+50 💎 bonus',
-                                  style: TextStyle(fontSize: 12, color: Colors.green),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                  ),
                                 ),
                               ],
                             ),
@@ -210,7 +247,9 @@ class _ShopItemTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -221,29 +260,34 @@ class _ShopItemTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
                 Text(
                   isUnlocked ? 'Purchased' : '$cost 💎',
                   style: TextStyle(
                     fontSize: 12,
                     color: isUnlocked ? Colors.green : Colors.amber,
-                    fontWeight: isUnlocked ? FontWeight.normal : FontWeight.bold,
+                    fontWeight: isUnlocked
+                        ? FontWeight.normal
+                        : FontWeight.bold,
                   ),
                 ),
               ],
             ),
           ),
           if (isUnlocked)
-            Switch(
-              value: isActive,
-              onChanged: onToggle,
-            )
+            Switch(value: isActive, onChanged: onToggle)
           else
             ElevatedButton(
               onPressed: onUnlock,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 minimumSize: const Size(60, 32),
               ),
               child: Text('Unlock'),

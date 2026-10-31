@@ -30,6 +30,7 @@ class GameController extends ChangeNotifier {
 
   bool darkMode = true;
   bool soundEnabled = true;
+  bool musicEnabled = true;
   bool vibrationEnabled = true;
   bool animationsEnabled = true;
 
@@ -71,6 +72,7 @@ class GameController extends ChangeNotifier {
 
     darkMode = storage.darkMode;
     soundEnabled = storage.soundEnabled;
+    musicEnabled = storage.musicEnabled;
     vibrationEnabled = storage.vibrationEnabled;
     animationsEnabled = storage.animationsEnabled;
 
@@ -83,18 +85,19 @@ class GameController extends ChangeNotifier {
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
 
-    showReset = storage.showReset || unlockedReset;
-    showPredictability = storage.showPredictability || unlockedPredictability;
-    showRandom = storage.showRandom || unlockedRandom;
+    showReset = storage.showReset;
+    showPredictability = storage.showPredictability;
+    showRandom = storage.showRandom;
     showAlgorithm = storage.showAlgorithm;
-    showNewHands = storage.showNewHands || unlockedNewHands;
+    showNewHands = storage.showNewHands;
     showYourPrediction = storage.showYourPrediction;
     showNextMove = storage.showNextMove;
     showSuggestion = storage.showSuggestion;
 
     audio.soundEnabled = soundEnabled;
+    audio.musicEnabled = musicEnabled;
     audio.vibrationEnabled = vibrationEnabled;
-    if (soundEnabled) {
+    if (musicEnabled) {
       audio.startMusic();
     }
 
@@ -191,10 +194,7 @@ class GameController extends ChangeNotifier {
   }
 
   // Shop Purchases
-  bool purchaseItem({
-    required int cost,
-    required VoidCallback onUnlock,
-  }) {
+  bool purchaseItem({required int cost, required VoidCallback onUnlock}) {
     if (diamonds < cost) {
       audio.playVibrate();
       return false;
@@ -305,6 +305,24 @@ class GameController extends ChangeNotifier {
   }
 
   // Toggles for active unlocks
+  void toggleShowReset(bool val) {
+    showReset = val;
+    storage.setShowReset(val);
+    notifyListeners();
+  }
+
+  void toggleShowPredictability(bool val) {
+    showPredictability = val;
+    storage.setShowPredictability(val);
+    notifyListeners();
+  }
+
+  void toggleShowRandom(bool val) {
+    showRandom = val;
+    storage.setShowRandom(val);
+    notifyListeners();
+  }
+
   void toggleShowAlgorithm(bool val) {
     showAlgorithm = val;
     storage.setShowAlgorithm(val);
@@ -347,7 +365,14 @@ class GameController extends ChangeNotifier {
     soundEnabled = !soundEnabled;
     storage.setSoundEnabled(soundEnabled);
     audio.soundEnabled = soundEnabled;
-    if (soundEnabled) {
+    notifyListeners();
+  }
+
+  void toggleMusic(bool val) {
+    musicEnabled = val;
+    storage.setMusicEnabled(val);
+    audio.musicEnabled = val;
+    if (val) {
       audio.startMusic();
     } else {
       audio.stopMusic();
@@ -355,8 +380,8 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleVibration() {
-    vibrationEnabled = !vibrationEnabled;
+  void toggleVibration(bool val) {
+    vibrationEnabled = val;
     storage.setVibrationEnabled(vibrationEnabled);
     audio.vibrationEnabled = vibrationEnabled;
     notifyListeners();

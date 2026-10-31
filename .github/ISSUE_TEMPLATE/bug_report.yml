@@ -1,0 +1,33 @@
+name: Bug Report
+description: File a bug report to help improve How Predictable You Are
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue!
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How do we reproduce this issue?
+      placeholder: |
+        1. Open the game
+        2. Select move ...
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Which operating system and platform did this occur on? (e.g. Android 14, Windows 11, iOS, Web)
+    validations:
+      required: true
