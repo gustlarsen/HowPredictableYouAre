@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
@@ -43,6 +44,8 @@ class GameController extends ChangeNotifier {
   bool unlockedYourPrediction = false;
   bool unlockedNextMove = false;
   bool unlockedSuggestion = false;
+  bool unlockedAds = false;
+  bool unlockedSourceCode = false;
 
   // Active toggles
   bool showReset = false;
@@ -55,6 +58,8 @@ class GameController extends ChangeNotifier {
   bool showSuggestion = false;
 
   bool is100RoundsAlertPending = false;
+  bool isGiftAvailable = true;
+  Timer? _giftTimer;
 
   GameController({
     required this.storage,
@@ -84,6 +89,8 @@ class GameController extends ChangeNotifier {
     unlockedYourPrediction = storage.unlockedYourPrediction;
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
+    unlockedAds = storage.unlockedAds;
+    unlockedSourceCode = storage.unlockedSourceCode;
 
     showReset = storage.showReset;
     showPredictability = storage.showPredictability;
@@ -207,8 +214,8 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
-  void unlockReset() {
-    purchaseItem(
+  bool unlockReset() {
+    return purchaseItem(
       cost: 100,
       onUnlock: () {
         unlockedReset = true;
@@ -219,8 +226,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockPredictability() {
-    purchaseItem(
+  bool unlockPredictability() {
+    return purchaseItem(
       cost: 150,
       onUnlock: () {
         unlockedPredictability = true;
@@ -231,8 +238,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockRandom() {
-    purchaseItem(
+  bool unlockRandom() {
+    return purchaseItem(
       cost: 300,
       onUnlock: () {
         unlockedRandom = true;
@@ -243,8 +250,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockAlgorithm() {
-    purchaseItem(
+  bool unlockAlgorithm() {
+    return purchaseItem(
       cost: 500,
       onUnlock: () {
         unlockedAlgorithm = true;
@@ -255,8 +262,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockNewHands() {
-    purchaseItem(
+  bool unlockNewHands() {
+    return purchaseItem(
       cost: 100,
       onUnlock: () {
         unlockedNewHands = true;
@@ -268,8 +275,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockYourPrediction() {
-    purchaseItem(
+  bool unlockYourPrediction() {
+    return purchaseItem(
       cost: 1000,
       onUnlock: () {
         unlockedYourPrediction = true;
@@ -280,8 +287,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockNextMove() {
-    purchaseItem(
+  bool unlockNextMove() {
+    return purchaseItem(
       cost: 3000,
       onUnlock: () {
         unlockedNextMove = true;
@@ -292,8 +299,8 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  void unlockSuggestion() {
-    purchaseItem(
+  bool unlockSuggestion() {
+    return purchaseItem(
       cost: 5000,
       onUnlock: () {
         unlockedSuggestion = true;
@@ -302,6 +309,42 @@ class GameController extends ChangeNotifier {
         storage.setShowSuggestion(true);
       },
     );
+  }
+
+  bool unlockAds() {
+    return purchaseItem(
+      cost: 10000,
+      onUnlock: () {
+        unlockedAds = true;
+        storage.setUnlockedAds(true);
+      },
+    );
+  }
+
+  bool unlockSourceCode() {
+    return purchaseItem(
+      cost: 100,
+      onUnlock: () {
+        unlockedSourceCode = true;
+        storage.setUnlockedSourceCode(true);
+      },
+    );
+  }
+
+  /// Gift feature: periodic free diamonds (matching Kodular ButtonGift / Clock1)
+  void claimGift() {
+    if (!isGiftAvailable) return;
+    diamonds += 5;
+    storage.setDiamonds(diamonds);
+    isGiftAvailable = false;
+    audio.playVibrate();
+    notifyListeners();
+
+    _giftTimer?.cancel();
+    _giftTimer = Timer(const Duration(minutes: 1), () {
+      isGiftAvailable = true;
+      notifyListeners();
+    });
   }
 
   // Toggles for active unlocks
@@ -403,5 +446,11 @@ class GameController extends ChangeNotifier {
     diamonds += amount;
     storage.setDiamonds(diamonds);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _giftTimer?.cancel();
+    super.dispose();
   }
 }

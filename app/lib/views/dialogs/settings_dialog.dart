@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 
@@ -99,7 +100,12 @@ class SettingsDialog extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Vibration:'),
                 value: controller.vibrationEnabled,
-                onChanged: controller.toggleVibration,
+                onChanged: (val) {
+                  controller.toggleVibration(val);
+                  if (val) {
+                    HapticFeedback.mediumImpact();
+                  }
+                },
               ),
 
               // Animations toggle

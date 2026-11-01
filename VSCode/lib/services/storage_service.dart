@@ -77,6 +77,13 @@ class StorageService {
   Future<void> setUnlockedSuggestion(bool val) =>
       _prefs.setBool('unlockedSuggestion', val);
 
+  bool get unlockedAds => _prefs.getBool('unlockedAds') ?? false;
+  Future<void> setUnlockedAds(bool val) => _prefs.setBool('unlockedAds', val);
+
+  bool get unlockedSourceCode => _prefs.getBool('unlockedSourceCode') ?? false;
+  Future<void> setUnlockedSourceCode(bool val) =>
+      _prefs.setBool('unlockedSourceCode', val);
+
   // Feature Active Toggles
   bool get showPredictability =>
       _prefs.getBool('showPredictability') ?? unlockedPredictability;

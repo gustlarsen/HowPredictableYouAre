@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -49,10 +50,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (ctx) {
             final loc = controller.localization;
             final tier = controller.evaluationTier;
-            final isGood = controller.percentPredict < 50;
+            final pct = controller.percentPredict;
+
+            String alertTitle;
+            String alertSubtitle;
+            String emoji;
+
+            if (pct == 0) {
+              alertTitle = loc.t('string70', fallback: 'You Won!!!');
+              alertSubtitle = loc.t('string71', fallback: 'You are the Best Predictor Ever!!!');
+              emoji = '👑';
+            } else if (pct < 50) {
+              alertTitle = loc.t('string72', fallback: 'Not so Bad!!!');
+              alertSubtitle = loc.t('string73', fallback: 'Now try to achieve 100%');
+              emoji = '🙂';
+            } else {
+              alertTitle = loc.t('string74', fallback: 'You Lose!!!');
+              alertSubtitle = loc.t('string75', fallback: 'Try harder next time...');
+              emoji = '🙁';
+            }
 
             return AlertDialog(
               shape: RoundedRectangleBorder(
@@ -61,12 +81,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               title: Row(
                 children: [
                   Text(
-                    isGood ? '🎉' : '🤖',
-                    style: const TextStyle(fontSize: 28),
+                    emoji,
+                    style: const TextStyle(fontSize: 32),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isGood ? '100 Rounds Completed!' : 'Evaluation Complete!',
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      alertTitle,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
                   ),
                 ],
               ),
@@ -75,16 +98,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
+                    alertSubtitle,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
                     '${loc.t('string2', fallback: 'You are:')} '
                     '${loc.t(tier.key, fallback: tier.fallbackDescription)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 15,
+                      color: Colors.amber,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'AI Predictability Score: ${controller.percentPredict.toStringAsFixed(1)}%\n'
+                    'AI Predictability Score: ${pct.toStringAsFixed(1)}%\n'
                     'Your Wins: ${controller.userScore} | PC Wins: ${controller.pcScore}',
                     style: const TextStyle(height: 1.4),
                   ),
@@ -92,8 +124,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
               actions: [
                 TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    controller.resetGame();
+                  },
+                  child: Text(
+                    loc.t('string76', fallback: 'TRY AGAIN'),
+                    style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(loc.t('string36', fallback: 'Ok')),
+                  child: Text(loc.t('string77', fallback: 'CONTINUE')),
                 ),
               ],
             );
@@ -138,6 +180,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ),
         centerTitle: true,
         actions: [
+          // Periodic Gift button (matching Kodular ButtonGift / Clock1)
+          if (controller.isGiftAvailable)
+            IconButton(
+              icon: const Text('🎁', style: TextStyle(fontSize: 22)),
+              tooltip: 'Claim Free 5 💎 Gift',
+              onPressed: () {
+                controller.claimGift();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🎁 +5 💎 Gift Claimed!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          // Reset action button in AppBar when unlocked & active
+          if (controller.showReset)
+            IconButton(
+              icon: const Icon(Icons.restart_alt, color: Colors.redAccent),
+              tooltip: loc.t('string53', fallback: 'RESET'),
+              onPressed: () => _confirmReset(context, controller, loc),
+            ),
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Help',
@@ -255,6 +319,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           ),
                           child: Column(
                             children: [
+                              // RESET BUTTON: Positioned prominently ABOVE hand moves (matching Kodular Horizontal_Arrangement12)
+                              if (controller.showReset) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12.0),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.redAccent,
+                                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      onPressed: () => _confirmReset(context, controller, loc),
+                                      icon: const Icon(Icons.restart_alt, color: Colors.redAccent, size: 20),
+                                      label: Text(
+                                        loc.t('string53', fallback: 'RESET').toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+
                               // Extended hands row (Lizard / Spock) if enabled
                               if (controller.showNewHands) ...[
                                 Row(
@@ -262,12 +356,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   children: [
                                     _HandActionButton(
                                       move: HandMove.lizard,
+                                      vibrationEnabled: controller.vibrationEnabled,
                                       onPressed: () =>
                                           controller.playTurn(HandMove.lizard),
                                     ),
                                     const SizedBox(width: 12),
                                     _HandActionButton(
                                       move: HandMove.spock,
+                                      vibrationEnabled: controller.vibrationEnabled,
                                       onPressed: () =>
                                           controller.playTurn(HandMove.spock),
                                     ),
@@ -283,16 +379,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 children: [
                                   _HandActionButton(
                                     move: HandMove.rock,
+                                    vibrationEnabled: controller.vibrationEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.rock),
                                   ),
                                   _HandActionButton(
                                     move: HandMove.paper,
+                                    vibrationEnabled: controller.vibrationEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.paper),
                                   ),
                                   _HandActionButton(
                                     move: HandMove.scissors,
+                                    vibrationEnabled: controller.vibrationEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.scissors),
                                   ),
@@ -305,7 +404,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 SizedBox(
                                   width: double.infinity,
                                   child: OutlinedButton.icon(
-                                    onPressed: controller.playRandom,
+                                    onPressed: () {
+                                      if (controller.vibrationEnabled) {
+                                        HapticFeedback.selectionClick();
+                                      }
+                                      controller.playRandom();
+                                    },
                                     icon: const Icon(
                                       Icons.casino_outlined,
                                       size: 18,
@@ -319,27 +423,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     style: OutlinedButton.styleFrom(
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              if (controller.showReset) ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _confirmReset(context, controller, loc),
-                                    icon: const Icon(
-                                      Icons.restart_alt,
-                                      color: Colors.redAccent,
-                                    ),
-                                    label: Text(
-                                      loc.t('string53', fallback: 'RESET'),
-                                      style: const TextStyle(
-                                        color: Colors.redAccent,
                                       ),
                                     ),
                                   ),
@@ -368,7 +451,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final shouldReset = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Reset game?'),
+        title: Text(localization.t('string53', fallback: 'RESET')),
         content: const Text(
           'This will clear your scores and prediction history.',
         ),
@@ -377,7 +460,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(localization.t('string53', fallback: 'RESET')),
           ),
@@ -387,15 +474,28 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     if (shouldReset == true) {
       controller.resetGame();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Game and prediction matrix have been reset!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 }
 
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
+  final bool vibrationEnabled;
   final VoidCallback onPressed;
 
-  const _HandActionButton({required this.move, required this.onPressed});
+  const _HandActionButton({
+    required this.move,
+    required this.vibrationEnabled,
+    required this.onPressed,
+  });
 
   @override
   State<_HandActionButton> createState() => _HandActionButtonState();
@@ -425,6 +525,9 @@ class _HandActionButtonState extends State<_HandActionButton>
   }
 
   void _handleTap() async {
+    if (widget.vibrationEnabled) {
+      HapticFeedback.selectionClick();
+    }
     await _pressController.forward();
     await _pressController.reverse();
     widget.onPressed();

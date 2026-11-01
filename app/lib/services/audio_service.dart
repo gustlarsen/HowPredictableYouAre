@@ -24,6 +24,7 @@ class AudioService {
   void playVibrate() {
     if (vibrationEnabled) {
       HapticFeedback.vibrate();
+      HapticFeedback.heavyImpact();
     }
   }
 
@@ -61,7 +62,12 @@ class AudioService {
     if (!musicEnabled) return;
     try {
       await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer?.play(AssetSource('audio/battle.wav'));
+      try {
+        await _bgmPlayer?.play(AssetSource('audio/Battle.mid'));
+      } on Exception catch (_) {
+        // Fallback for platforms or environments without native MIDI synthesizer
+        await _bgmPlayer?.play(AssetSource('audio/battle.wav'));
+      }
     } on Exception catch (error) {
       debugPrint('Could not play background music: $error');
     }
