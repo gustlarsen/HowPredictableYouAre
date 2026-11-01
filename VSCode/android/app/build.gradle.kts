@@ -37,6 +37,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    androidResources {
+        noCompress += listOf("mid", "midi", "wav", "mp3")
+    }
 }
 
 flutter {

@@ -81,3 +81,4 @@ ephemeral/
 *.p12
 credentials.json
 secrets.json
+.antigravity/settings.json
