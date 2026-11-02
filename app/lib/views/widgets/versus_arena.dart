@@ -35,7 +35,7 @@ class _VersusArenaState extends State<VersusArena> with SingleTickerProviderStat
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 350),
     );
 
     // Rotation spin for defeated / draw hand, timed to start on impact
@@ -77,7 +77,8 @@ class _VersusArenaState extends State<VersusArena> with SingleTickerProviderStat
       if (widget.animationsEnabled) {
         _animController.forward(from: 0.0);
       } else {
-        _animController.value = 1.0;
+        _animController.stop();
+        _animController.value = 0.0;
       }
     }
   }

@@ -28,6 +28,7 @@ class GameController extends ChangeNotifier {
   int userScore = 0;
   int pcScore = 0;
   int totalRounds = 0;
+  int turnCount = 0;
 
   bool darkMode = true;
   bool soundEnabled = true;
@@ -129,6 +130,7 @@ class GameController extends ChangeNotifier {
   }
 
   void playTurn(HandMove userChoice) {
+    turnCount++;
     currentUserMove = userChoice;
 
     // AI selects its move: if turn 1 or no data yet -> random, otherwise smart choice
@@ -189,6 +191,7 @@ class GameController extends ChangeNotifier {
     userScore = 0;
     pcScore = 0;
     totalRounds = 0;
+    turnCount = 0;
     currentUserMove = null;
     currentComputerMove = null;
     lastUserMove = null;

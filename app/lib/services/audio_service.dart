@@ -28,6 +28,7 @@ class AudioService {
     try {
       await _bgmPlayer!.setAudioContext(audioContext);
       await _sfxPlayer!.setAudioContext(audioContext);
+      await _sfxPlayer!.setPlayerMode(PlayerMode.lowLatency);
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       await _bgmPlayer!.setVolume(0.55);
       await _sfxPlayer!.setVolume(1.0);
@@ -38,8 +39,7 @@ class AudioService {
 
   void playVibrate() {
     if (vibrationEnabled) {
-      HapticFeedback.vibrate();
-      HapticFeedback.heavyImpact();
+      HapticFeedback.lightImpact();
     }
   }
 
@@ -47,12 +47,8 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/attack.wav'));
-      }
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/attack.wav'), mode: PlayerMode.lowLatency);
     } catch (error) {
       debugPrint('Could not play win sound: $error');
     }
@@ -62,12 +58,8 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/defeat.wav'));
-      }
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/defeat.wav'), mode: PlayerMode.lowLatency);
     } catch (error) {
       debugPrint('Could not play defeat sound: $error');
     }
@@ -77,12 +69,8 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/draw.wav'));
-      }
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/draw.wav'), mode: PlayerMode.lowLatency);
     } catch (error) {
       debugPrint('Could not play draw sound: $error');
     }
