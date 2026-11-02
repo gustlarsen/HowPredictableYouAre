@@ -13,7 +13,7 @@ class AudioService {
   Future<void> init() async {
     _sfxPlayer ??= AudioPlayer();
     _bgmPlayer ??= AudioPlayer();
-    const audioContext = AudioContext(
+    final audioContext = AudioContext(
       android: AudioContextAndroid(
         isSpeakerphoneOn: false,
         stayAwake: false,
