@@ -39,7 +39,7 @@ android {
     }
 
     androidResources {
-        noCompress += listOf("mid", "midi", "wav", "mp3")
+        noCompress += listOf("mid", "midi", "mp3")
     }
 }
 

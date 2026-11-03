@@ -47,12 +47,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/attack.wav'));
-      }
+      await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
     } catch (error) {
       debugPrint('Could not play win sound: $error');
     }
@@ -62,12 +57,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/defeat.wav'));
-      }
+      await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
     } catch (error) {
       debugPrint('Could not play defeat sound: $error');
     }
@@ -77,12 +67,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
-      try {
-        await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
-      } catch (_) {
-        await _sfxPlayer?.release();
-        await _sfxPlayer?.play(AssetSource('audio/draw.wav'));
-      }
+      await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
     } catch (error) {
       debugPrint('Could not play draw sound: $error');
     }
@@ -92,15 +77,7 @@ class AudioService {
     if (!musicEnabled) return;
     try {
       await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
-      try {
-        await _bgmPlayer?.play(AssetSource('audio/Battle.mid'));
-      } catch (_) {
-        await _bgmPlayer?.release();
-        await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
-        await _bgmPlayer?.setVolume(0.55);
-        // Fallback to FluidSynth General MIDI rendering of Battle.mid
-        await _bgmPlayer?.play(AssetSource('audio/battle.wav'));
-      }
+      await _bgmPlayer?.play(AssetSource('audio/battle.mid'));
     } catch (error) {
       debugPrint('Could not play background music: $error');
     }
