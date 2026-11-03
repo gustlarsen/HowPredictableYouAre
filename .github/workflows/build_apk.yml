@@ -20,6 +20,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -33,9 +38,13 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Prepare Log Directory
+        run: mkdir -p build_logs
+
       - name: Calculate Incremental Version
         id: version_info
         run: |
+          echo "versioning" > build_logs/phase.txt
           git fetch --tags --force
           LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
           if [ -z "$LATEST_TAG" ]; then
@@ -69,20 +78,29 @@ jobs:
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
+          rm -f build_logs/phase.txt
 
       - name: Install dependencies
         working-directory: VSCode
-        run: flutter pub get
+        run: |
+          echo "dependencies" > ../build_logs/phase.txt
+          flutter pub get 2>&1 | tee ../build_logs/pub_get.log
+          rm -f ../build_logs/phase.txt
 
       - name: Run automated tests
         working-directory: VSCode
-        run: flutter test
+        run: |
+          echo "test" > ../build_logs/phase.txt
+          flutter test 2>&1 | tee ../build_logs/test.log
+          rm -f ../build_logs/phase.txt
 
       - name: Build Android APK
         working-directory: VSCode
         run: |
-          flutter build apk --release --build-name=${{ steps.version_info.outputs.version_name }} --build-number=${{ steps.version_info.outputs.version_code }}
+          echo "build" > ../build_logs/phase.txt
+          flutter build apk --release --build-name=${{ steps.version_info.outputs.version_name }} --build-number=${{ steps.version_info.outputs.version_code }} 2>&1 | tee ../build_logs/build.log
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_name }}
+          rm -f ../build_logs/phase.txt
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -94,10 +112,12 @@ jobs:
 
       - name: Push Incremental Tag
         run: |
+          echo "tag_release" > build_logs/phase.txt
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "${{ steps.version_info.outputs.tag }}"
           git push origin "${{ steps.version_info.outputs.tag }}"
+          rm -f build_logs/phase.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -108,3 +128,32 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send APK to Telegram Channel
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 .github/scripts/telegram_notify.py success \
+            --apk "VSCode/build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_name }}" \
+            --version-name "${{ steps.version_info.outputs.version_name }}" \
+            --version-code "${{ steps.version_info.outputs.version_code }}" \
+            --tag "${{ steps.version_info.outputs.tag }}" \
+            --commit "${{ github.sha }}" \
+            --repo "${{ github.repository }}" \
+            --server-url "${{ github.server_url }}" \
+            --run-id "${{ github.run_id }}"
+
+      - name: Send Failure Notification to Telegram
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 .github/scripts/telegram_notify.py failure \
+            --commit "${{ github.sha }}" \
+            --repo "${{ github.repository }}" \
+            --server-url "${{ github.server_url }}" \
+            --run-id "${{ github.run_id }}" \
+            --actor "${{ github.actor }}"
