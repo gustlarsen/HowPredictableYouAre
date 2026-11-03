@@ -160,6 +160,16 @@ def handle_success(args):
         html.escape(line) for line in raw_summary.splitlines()
     )
 
+    apk_filename = os.path.basename(apk_path)
+    if "arm64" in apk_filename.lower():
+        arch_label = "arm64-v8a (modern Android)"
+    elif "v7a" in apk_filename.lower():
+        arch_label = "armeabi-v7a (legacy 32-bit)"
+    elif "x86" in apk_filename.lower():
+        arch_label = "x86_64 (emulators)"
+    else:
+        arch_label = "Universal"
+
     quota_note = (
         "🤖 <b>Gemini Antigravity Quota:</b>\n"
         "• <b>Weekly Quota:</b> Tracked in Antigravity IDE (Account menu)\n"
@@ -173,9 +183,10 @@ def handle_success(args):
         f"🏷️ <b>Version:</b> <code>{html.escape(args.version_name)}</code> (Build <code>{html.escape(str(args.version_code))}</code>)\n"
         f"🔖 <b>Tag:</b> <code>{html.escape(args.tag)}</code>\n"
         f"🔗 <b>Commit:</b> <a href=\"{commit_url}\">{short_commit}</a>\n"
-        f"📦 <b>Size:</b> {file_size_mb:.2f} MB\n\n"
+        f"📦 <b>Size:</b> {file_size_mb:.2f} MB ({arch_label})\n\n"
         f"📝 <b>Summary of Changes:</b>\n{escaped_summary}\n\n"
-        f"{quota_note}"
+        f"{quota_note}\n\n"
+        f"📥 <a href=\"{release_url}\">Other architectures available on GitHub Releases</a>"
     )
 
     # Telegram limit for documents via Bot API is 50MB
