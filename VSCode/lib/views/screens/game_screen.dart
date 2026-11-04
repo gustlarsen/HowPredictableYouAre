@@ -240,7 +240,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           Positioned.fill(
             child: AnimatedSwitcher(
               duration: controller.animationsEnabled
-                  ? const Duration(milliseconds: 250)
+                  ? const Duration(milliseconds: 600)
                   : Duration.zero,
               child: Image.asset(
                 bgImage,
@@ -520,11 +520,11 @@ class _HandActionButtonState extends State<_HandActionButton>
     super.initState();
     _pressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 60),
-      reverseDuration: const Duration(milliseconds: 60),
+      duration: const Duration(milliseconds: 150),
+      reverseDuration: const Duration(milliseconds: 150),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeOut),
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
     );
   }
 
