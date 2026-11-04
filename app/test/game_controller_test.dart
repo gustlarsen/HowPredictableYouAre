@@ -30,6 +30,16 @@ void main() {
     );
   }
 
+  test('Game starts with 100000 diamonds by default', () async {
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(storage.diamonds, 100000);
+    expect(controller.diamonds, 100000);
+  });
+
   test('Reset purchase unlocks and shows the reset action', () async {
     SharedPreferences.setMockInitialValues({
       'diamonds': 100,

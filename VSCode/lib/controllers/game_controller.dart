@@ -24,7 +24,7 @@ class GameController extends ChangeNotifier {
 
   RoundWinner? lastWinner;
 
-  int diamonds = 0;
+  int diamonds = 100000;
   int userScore = 0;
   int pcScore = 0;
   int totalRounds = 0;
