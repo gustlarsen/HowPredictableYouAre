@@ -99,8 +99,26 @@ jobs:
           flutter test 2>&1 | tee ../build_logs/test.log
           rm -f ../build_logs/phase.txt
 
+      - name: Decode Release Keystore
+        working-directory: VSCode
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -n "$SIGNING_KEY" ]; then
+            echo "$SIGNING_KEY" | base64 --decode > android/app/upload-keystore.jks
+          else
+            echo "::warning::SIGNING_KEY secret is not set; falling back to debug signing."
+          fi
+
       - name: Build Android APK (Optimized & Split ABIs)
         working-directory: VSCode
+        env:
+          KEYSTORE_PATH: upload-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ steps.version_info.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version_info.outputs.version_name }}
         run: |
           echo "build" > ../build_logs/phase.txt
           flutter build apk --release \
@@ -114,6 +132,11 @@ jobs:
           mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_arm32 }}
           mv build/app/outputs/flutter-apk/app-x86_64-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_x86 }}
           rm -f ../build_logs/phase.txt
+
+      - name: Clean Up Release Keystore
+        if: always()
+        working-directory: VSCode
+        run: rm -f android/app/upload-keystore.jks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4

@@ -5,6 +5,24 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keystorePath: String? = System.getenv("KEYSTORE_PATH")
+val keystorePassword: String? = System.getenv("KEYSTORE_PASSWORD")
+val keyAliasValue: String? = System.getenv("KEY_ALIAS")
+val keyPasswordValue: String? = System.getenv("KEY_PASSWORD")
+
+val resolvedKeystoreFile = keystorePath?.takeIf { it.isNotBlank() }?.let { path ->
+    listOfNotNull(
+        file(path),
+        rootProject.file(path),
+        rootProject.projectDir.parentFile?.resolve(path)
+    ).firstOrNull { it.exists() }
+}
+
+val hasReleaseSigning = resolvedKeystoreFile != null &&
+    !keystorePassword.isNullOrBlank() &&
+    !keyAliasValue.isNullOrBlank() &&
+    !keyPasswordValue.isNullOrBlank()
+
 android {
     namespace = "com.gustlarsen.how_predictable"
     compileSdk = flutter.compileSdkVersion
@@ -26,13 +44,28 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: flutter.versionCode
+        versionName = System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() } ?: flutter.versionName
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = resolvedKeystoreFile
+                storePassword = keystorePassword
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -43,7 +76,7 @@ android {
     }
 
     androidResources {
-        noCompress += listOf("mid", "midi", "mp3")
+        noCompress += listOf("mid", "midi", "wav", "mp3")
     }
 }
 
