@@ -40,37 +40,33 @@ class _VersusArenaState extends State<VersusArena>
       duration: const Duration(milliseconds: 2000),
     );
 
-    // Winning hand moves directly over the opponent (0.0 -> 1.0) and smoothly returns (1.0 -> 0.0)
+    // Winning hand takes 1s (0.0 -> 0.5) to move over to the other hand,
+    // and 1s (0.5 -> 1.0) to move back to its starting position.
     _punchAnim = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 42,
+        tween: Tween<double>(begin: 0.0, end: 1.0),
+        weight: 50,
       ),
       TweenSequenceItem(
-        tween: ConstantTween<double>(1.0),
-        weight: 6,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInOutCubic)),
-        weight: 52,
+        tween: Tween<double>(begin: 1.0, end: 0.0),
+        weight: 50,
       ),
     ]).animate(_animController);
 
-    // Opponent makes a 360° rotation once the winning hand arrives directly over it
+    // Beaten hand makes a 360° rotation taking 1s (0.5 -> 1.0),
+    // simultaneous with the winning hand's backward movement.
     _defeatRotationAnim = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
       CurvedAnimation(
         parent: _animController,
-        curve: const Interval(0.36, 0.95, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.5, 1.0, curve: Curves.linear),
       ),
     );
 
-    // Draw 360° rotation for both hands
+    // Draw 360° rotation for both hands (1s)
     _drawRotationAnim = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
       CurvedAnimation(
         parent: _animController,
-        curve: const Interval(0.0, 0.90, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.0, 0.5, curve: Curves.linear),
       ),
     );
 
@@ -237,13 +233,14 @@ class _VersusArenaState extends State<VersusArena>
                                 child: animatedChild,
                               );
                             } else if (pcWins) {
+                              // Left hand beaten: rotate 360° anti-clockwise (negative radians)
                               animatedChild = Transform.rotate(
-                                angle: _defeatRotationAnim.value,
+                                angle: -_defeatRotationAnim.value,
                                 child: animatedChild,
                               );
                             } else if (isDraw) {
                               animatedChild = Transform.rotate(
-                                angle: _drawRotationAnim.value,
+                                angle: -_drawRotationAnim.value,
                                 child: animatedChild,
                               );
                             }
@@ -285,13 +282,14 @@ class _VersusArenaState extends State<VersusArena>
                                 child: animatedChild,
                               );
                             } else if (userWins) {
+                              // Right hand beaten: rotate 360° clockwise (positive radians)
                               animatedChild = Transform.rotate(
-                                angle: -_defeatRotationAnim.value,
+                                angle: _defeatRotationAnim.value,
                                 child: animatedChild,
                               );
                             } else if (isDraw) {
                               animatedChild = Transform.rotate(
-                                angle: -_drawRotationAnim.value,
+                                angle: _drawRotationAnim.value,
                                 child: animatedChild,
                               );
                             }
