@@ -37,12 +37,11 @@ class _VersusArenaState extends State<VersusArena>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 6000),
+      duration: const Duration(milliseconds: 3000),
     );
 
-    // Winning hand takes 3s (0.0 -> 0.5) to move over to the other hand
-    // (matching v1.0.1's ~67 px/s visual speed across the full arena width),
-    // and 3s (0.5 -> 1.0) to move back to its starting position.
+    // Winning hand takes 1500ms (0.0 -> 0.5) to move over to the losing hand,
+    // and 1500ms (0.5 -> 1.0) to move back to its starting position.
     _punchAnim = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: 0.0, end: 1.0),
@@ -54,7 +53,7 @@ class _VersusArenaState extends State<VersusArena>
       ),
     ]).animate(_animController);
 
-    // Beaten hand makes a 360° rotation taking 3s (0.5 -> 1.0),
+    // Losing hand makes a 360° rotation taking 1500ms (0.5 -> 1.0),
     // simultaneous with the winning hand's backward movement.
     _defeatRotationAnim = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
       CurvedAnimation(
@@ -63,7 +62,7 @@ class _VersusArenaState extends State<VersusArena>
       ),
     );
 
-    // Draw 360° rotation for both hands (3s)
+    // Draw 360° rotation for both hands (1500ms)
     _drawRotationAnim = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
       CurvedAnimation(
         parent: _animController,
