@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/models/move.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
@@ -113,11 +114,24 @@ void main() {
     controller.userScore = 10;
     controller.pcScore = 5;
     controller.totalRounds = 15;
+    controller.turnCount = 20;
 
     controller.resetGame();
 
     expect(controller.userScore, 0);
     expect(controller.pcScore, 0);
     expect(controller.totalRounds, 0);
+    expect(controller.turnCount, 0);
+  });
+
+  test('turnCount increments with each played turn even on draws', () async {
+    await createController(resetPreferences: true);
+    expect(controller.turnCount, 0);
+
+    controller.playTurn(HandMove.rock);
+    expect(controller.turnCount, 1);
+
+    controller.playTurn(HandMove.rock);
+    expect(controller.turnCount, 2);
   });
 }

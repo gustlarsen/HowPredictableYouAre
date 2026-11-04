@@ -146,7 +146,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   String _resolveBackgroundImage(GameController controller) {
-    if (controller.totalRounds == 0 || controller.lastWinner == null) {
+    if (controller.turnCount == 0 || controller.lastWinner == null) {
       return 'assets/images/Splash.png';
     }
     switch (controller.lastWinner) {
@@ -543,6 +543,7 @@ class _HandActionButtonState extends State<_HandActionButton>
 
     // Trigger visual scale animation asynchronously only if animations are enabled
     if (widget.animationsEnabled) {
+      _pressController.stop();
       _pressController.forward(from: 0.0).then((_) {
         if (mounted) {
           _pressController.reverse().catchError((_) {});

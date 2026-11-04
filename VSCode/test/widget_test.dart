@@ -35,5 +35,24 @@ void main() {
     expect(find.text('ROCK'), findsOneWidget);
     expect(find.text('PAPER'), findsOneWidget);
     expect(find.text('SCISSORS'), findsOneWidget);
+
+    final controller = tester.element(find.text('How Predictable You Are')).read<GameController>();
+    expect(controller.turnCount, 0);
+
+    // Tap ROCK and verify immediate response without waiting for button animation
+    await tester.tap(find.text('ROCK'));
+    await tester.pump();
+    expect(controller.turnCount, 1);
+
+    // Advance partway through the 2-second animation (e.g., 800ms)
+    await tester.pump(const Duration(milliseconds: 800));
+
+    // Tap ROCK again mid-animation: should immediately increment turnCount and restart animation
+    await tester.tap(find.text('ROCK'));
+    await tester.pump();
+    expect(controller.turnCount, 2);
+
+    // Let the 2-second animation complete
+    await tester.pump(const Duration(milliseconds: 2100));
   });
 }

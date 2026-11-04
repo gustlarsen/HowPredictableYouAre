@@ -28,7 +28,6 @@ class AudioService {
     try {
       await _bgmPlayer!.setAudioContext(audioContext);
       await _sfxPlayer!.setAudioContext(audioContext);
-      await _sfxPlayer!.setPlayerMode(PlayerMode.lowLatency);
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       await _bgmPlayer!.setVolume(0.55);
       await _sfxPlayer!.setVolume(1.0);
@@ -39,7 +38,8 @@ class AudioService {
 
   void playVibrate() {
     if (vibrationEnabled) {
-      HapticFeedback.lightImpact();
+      HapticFeedback.vibrate();
+      HapticFeedback.heavyImpact();
     }
   }
 
@@ -48,7 +48,7 @@ class AudioService {
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
-      await _sfxPlayer?.play(AssetSource('audio/attack.wav'), mode: PlayerMode.lowLatency);
+      await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
     } catch (error) {
       debugPrint('Could not play win sound: $error');
     }
@@ -59,7 +59,7 @@ class AudioService {
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
-      await _sfxPlayer?.play(AssetSource('audio/defeat.wav'), mode: PlayerMode.lowLatency);
+      await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
     } catch (error) {
       debugPrint('Could not play defeat sound: $error');
     }
@@ -70,7 +70,7 @@ class AudioService {
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
-      await _sfxPlayer?.play(AssetSource('audio/draw.wav'), mode: PlayerMode.lowLatency);
+      await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
     } catch (error) {
       debugPrint('Could not play draw sound: $error');
     }
@@ -80,15 +80,7 @@ class AudioService {
     if (!musicEnabled) return;
     try {
       await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
-      try {
-        await _bgmPlayer?.play(AssetSource('audio/Battle.mid'));
-      } catch (_) {
-        await _bgmPlayer?.release();
-        await _bgmPlayer?.setReleaseMode(ReleaseMode.loop);
-        await _bgmPlayer?.setVolume(0.55);
-        // Fallback to FluidSynth General MIDI rendering of Battle.mid
-        await _bgmPlayer?.play(AssetSource('audio/battle.wav'));
-      }
+      await _bgmPlayer?.play(AssetSource('audio/battle.mid'));
     } catch (error) {
       debugPrint('Could not play background music: $error');
     }

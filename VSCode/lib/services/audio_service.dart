@@ -47,6 +47,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
+      await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
     } catch (error) {
       debugPrint('Could not play win sound: $error');
@@ -57,6 +58,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
+      await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
     } catch (error) {
       debugPrint('Could not play defeat sound: $error');
@@ -67,6 +69,7 @@ class AudioService {
     playVibrate();
     if (!soundEnabled) return;
     try {
+      await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
     } catch (error) {
       debugPrint('Could not play draw sound: $error');

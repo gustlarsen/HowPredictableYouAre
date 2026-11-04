@@ -146,7 +146,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   String _resolveBackgroundImage(GameController controller) {
-    if (controller.totalRounds == 0 || controller.lastWinner == null) {
+    if (controller.turnCount == 0 || controller.lastWinner == null) {
       return 'assets/images/Splash.png';
     }
     switch (controller.lastWinner) {
@@ -239,7 +239,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           // Dynamic Background Image with Animated Fade Transition
           Positioned.fill(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 600),
+              duration: controller.animationsEnabled
+                  ? const Duration(milliseconds: 250)
+                  : Duration.zero,
               child: Image.asset(
                 bgImage,
                 key: ValueKey<String>(bgImage),
@@ -290,7 +292,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         winner: controller.lastWinner,
                         localization: loc,
                         animationsEnabled: controller.animationsEnabled,
-                        roundId: controller.totalRounds,
+                        roundId: controller.turnCount,
                       ),
                       const SizedBox(height: 14),
 
@@ -357,6 +359,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     _HandActionButton(
                                       move: HandMove.lizard,
                                       vibrationEnabled: controller.vibrationEnabled,
+                                      animationsEnabled: controller.animationsEnabled,
                                       onPressed: () =>
                                           controller.playTurn(HandMove.lizard),
                                     ),
@@ -364,6 +367,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     _HandActionButton(
                                       move: HandMove.spock,
                                       vibrationEnabled: controller.vibrationEnabled,
+                                      animationsEnabled: controller.animationsEnabled,
                                       onPressed: () =>
                                           controller.playTurn(HandMove.spock),
                                     ),
@@ -380,18 +384,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   _HandActionButton(
                                     move: HandMove.rock,
                                     vibrationEnabled: controller.vibrationEnabled,
+                                    animationsEnabled: controller.animationsEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.rock),
                                   ),
                                   _HandActionButton(
                                     move: HandMove.paper,
                                     vibrationEnabled: controller.vibrationEnabled,
+                                    animationsEnabled: controller.animationsEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.paper),
                                   ),
                                   _HandActionButton(
                                     move: HandMove.scissors,
                                     vibrationEnabled: controller.vibrationEnabled,
+                                    animationsEnabled: controller.animationsEnabled,
                                     onPressed: () =>
                                         controller.playTurn(HandMove.scissors),
                                   ),
@@ -489,11 +496,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
   final bool vibrationEnabled;
+  final bool animationsEnabled;
   final VoidCallback onPressed;
 
   const _HandActionButton({
     required this.move,
     required this.vibrationEnabled,
+    required this.animationsEnabled,
     required this.onPressed,
   });
 
@@ -511,10 +520,11 @@ class _HandActionButtonState extends State<_HandActionButton>
     super.initState();
     _pressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 60),
+      reverseDuration: const Duration(milliseconds: 60),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeOut),
     );
   }
 
@@ -524,13 +534,22 @@ class _HandActionButtonState extends State<_HandActionButton>
     super.dispose();
   }
 
-  void _handleTap() async {
+  void _handleTap() {
     if (widget.vibrationEnabled) {
       HapticFeedback.selectionClick();
     }
-    await _pressController.forward();
-    await _pressController.reverse();
+    // Execute the game turn immediately with zero delay
     widget.onPressed();
+
+    // Trigger visual scale animation asynchronously only if animations are enabled
+    if (widget.animationsEnabled) {
+      _pressController.stop();
+      _pressController.forward(from: 0.0).then((_) {
+        if (mounted) {
+          _pressController.reverse().catchError((_) {});
+        }
+      }).catchError((_) {});
+    }
   }
 
   @override
@@ -538,61 +557,67 @@ class _HandActionButtonState extends State<_HandActionButton>
     final theme = Theme.of(context);
     final hasAsset = widget.move.leftAsset.isNotEmpty;
 
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: InkWell(
-        onTap: _handleTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.5,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
-            ),
+    Widget buttonContent = InkWell(
+      onTap: _handleTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
           ),
-          child: Column(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: hasAsset
-                      ? Image.asset(
-                          widget.move.leftAsset,
-                          width: 36,
-                          height: 36,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            widget.move.emoji,
-                            style: const TextStyle(fontSize: 26),
-                          ),
-                        )
-                      : Text(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: hasAsset
+                    ? Image.asset(
+                        widget.move.leftAsset,
+                        width: 36,
+                        height: 36,
+                        errorBuilder: (context, error, stackTrace) => Text(
                           widget.move.emoji,
                           style: const TextStyle(fontSize: 26),
                         ),
-                ),
+                      )
+                    : Text(
+                        widget.move.emoji,
+                        style: const TextStyle(fontSize: 26),
+                      ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                widget.move.label.toUpperCase(),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  letterSpacing: 0.5,
-                ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.move.label.toUpperCase(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 0.5,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+
+    if (!widget.animationsEnabled) {
+      return buttonContent;
+    }
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: buttonContent,
     );
   }
 }
