@@ -86,21 +86,18 @@ jobs:
           rm -f build_logs/phase.txt
 
       - name: Install dependencies
-        working-directory: VSCode
         run: |
           echo "dependencies" > ../build_logs/phase.txt
           flutter pub get 2>&1 | tee ../build_logs/pub_get.log
           rm -f ../build_logs/phase.txt
 
       - name: Run automated tests
-        working-directory: VSCode
         run: |
           echo "test" > ../build_logs/phase.txt
           flutter test 2>&1 | tee ../build_logs/test.log
           rm -f ../build_logs/phase.txt
 
       - name: Decode Release Keystore
-        working-directory: VSCode
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
@@ -111,7 +108,6 @@ jobs:
           fi
 
       - name: Build Android APK (Optimized & Split ABIs)
-        working-directory: VSCode
         env:
           KEYSTORE_PATH: upload-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -135,14 +131,13 @@ jobs:
 
       - name: Clean Up Release Keystore
         if: always()
-        working-directory: VSCode
         run: rm -f android/app/upload-keystore.jks
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: how-predur-v${{ steps.version_info.outputs.version_code }}-apks
-          path: VSCode/build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -160,7 +155,7 @@ jobs:
         with:
           tag_name: ${{ steps.version_info.outputs.tag }}
           name: Release ${{ steps.version_info.outputs.tag }}
-          files: VSCode/build/app/outputs/flutter-apk/*.apk
+          files: build/app/outputs/flutter-apk/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -172,7 +167,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python3 .github/scripts/telegram_notify.py success \
-            --apk "VSCode/build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_arm64 }}" \
+            --apk "build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_arm64 }}" \
             --version-name "${{ steps.version_info.outputs.version_name }}" \
             --version-code "${{ steps.version_info.outputs.version_code }}" \
             --tag "${{ steps.version_info.outputs.tag }}" \
