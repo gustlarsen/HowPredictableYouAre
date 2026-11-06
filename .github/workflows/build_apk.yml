@@ -87,15 +87,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "dependencies" > build_logs/phase.txt
-          flutter pub get 2>&1 | tee build_logs/pub_get.log
-          rm -f build_logs/phase.txt
+          echo "dependencies" > ../build_logs/phase.txt
+          flutter pub get 2>&1 | tee ../build_logs/pub_get.log
+          rm -f ../build_logs/phase.txt
 
       - name: Run automated tests
         run: |
-          echo "test" > build_logs/phase.txt
-          flutter test 2>&1 | tee build_logs/test.log
-          rm -f build_logs/phase.txt
+          echo "test" > ../build_logs/phase.txt
+          flutter test 2>&1 | tee ../build_logs/test.log
+          rm -f ../build_logs/phase.txt
 
       - name: Decode Release Keystore
         env:
@@ -116,18 +116,18 @@ jobs:
           VERSION_CODE: ${{ steps.version_info.outputs.version_code }}
           VERSION_NAME: ${{ steps.version_info.outputs.version_name }}
         run: |
-          echo "build" > build_logs/phase.txt
+          echo "build" > ../build_logs/phase.txt
           flutter build apk --release \
             --split-per-abi \
             --split-debug-info=build/symbols \
             --obfuscate \
             --build-name=${{ steps.version_info.outputs.version_name }} \
-            --build-number=${{ steps.version_info.outputs.version_code }} 2>&1 | tee build_logs/build.log
+            --build-number=${{ steps.version_info.outputs.version_code }} 2>&1 | tee ../build_logs/build.log
 
           mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_arm64 }}
           mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_arm32 }}
           mv build/app/outputs/flutter-apk/app-x86_64-release.apk build/app/outputs/flutter-apk/${{ steps.version_info.outputs.apk_x86 }}
-          rm -f build_logs/phase.txt
+          rm -f ../build_logs/phase.txt
 
       - name: Clean Up Release Keystore
         if: always()
