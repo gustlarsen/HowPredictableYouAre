@@ -10,7 +10,6 @@ class ScoreHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = controller.localization;
-    final tier = controller.evaluationTier;
 
     return Column(
       children: [
@@ -75,41 +74,6 @@ class ScoreHeader extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // Evaluation Pill / 100-round progress
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${loc.t('string2', fallback: 'You are')}: ',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              Text(
-                loc.t(tier.key, fallback: tier.fallbackDescription),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: controller.totalRounds >= 100 ? Colors.amber : Colors.blueGrey,
-                ),
-              ),
-              if (controller.totalRounds < 100) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '(${controller.totalRounds}/100)',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
-            ],
           ),
         ),
       ],

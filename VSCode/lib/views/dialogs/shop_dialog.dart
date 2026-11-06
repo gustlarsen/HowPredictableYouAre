@@ -269,19 +269,6 @@ class ShopDialog extends StatelessWidget {
                       },
                       onToggle: (_) {},
                     ),
-                    _ShopItemTile(
-                      title: 'Source Code Link',
-                      cost: 100,
-                      isUnlocked: controller.unlockedSourceCode,
-                      isActive: controller.unlockedSourceCode,
-                      enabledLabel: 'Unlocked',
-                      disabledLabel: 'Locked',
-                      onUnlock: () {
-                        final ok = controller.unlockSourceCode();
-                        _handleUnlock(context, 'Source Code', ok);
-                      },
-                      onToggle: (_) {},
-                    ),
 
                     const SizedBox(height: 12),
                     // Free diamonds action

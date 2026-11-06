@@ -50,7 +50,6 @@ class GameController extends ChangeNotifier {
   bool unlockedNextMove = false;
   bool unlockedSuggestion = false;
   bool unlockedAds = false;
-  bool unlockedSourceCode = false;
 
   // Active toggles
   bool showReset = false;
@@ -98,7 +97,6 @@ class GameController extends ChangeNotifier {
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
-    unlockedSourceCode = storage.unlockedSourceCode;
 
     showReset = storage.showReset;
     showPredictability = storage.showPredictability;
@@ -335,16 +333,6 @@ class GameController extends ChangeNotifier {
       onUnlock: () {
         unlockedAds = true;
         storage.setUnlockedAds(true);
-      },
-    );
-  }
-
-  bool unlockSourceCode() {
-    return purchaseItem(
-      cost: 100,
-      onUnlock: () {
-        unlockedSourceCode = true;
-        storage.setUnlockedSourceCode(true);
       },
     );
   }
