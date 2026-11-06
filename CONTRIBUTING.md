@@ -16,7 +16,7 @@ Thank you for your interest in contributing to **How Predictable You Are**! We w
    git clone https://github.com/gustlarsen/HowPredictableYouAre.git
    cd HowPredictableYouAre
    ```
-3. Navigate to either `VSCode` or `app`:
+3. Navigate to `VSCode` (all game development must be done exclusively under `VSCode`; do not create duplicate folders such as `app`):
    ```bash
    cd VSCode
    flutter pub get

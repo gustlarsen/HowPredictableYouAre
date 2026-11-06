@@ -89,7 +89,7 @@ The game uses a discrete first-order **Markov Engine** (`MarkovEngine`):
 HowPredictableYouAre/
 ├── .github/
 │   └── ISSUE_TEMPLATE/     # GitHub issue templates for bug reports & features
-├── VSCode/                 # Modernized Flutter application project
+├── VSCode/                 # Modernized Flutter application project (Single Source of Truth)
 │   ├── android/            # Android platform configuration
 │   ├── assets/             # Audio (wav/mid), images, and localization JSON
 │   ├── ios/                # iOS platform configuration
@@ -97,7 +97,6 @@ HowPredictableYouAre/
 │   ├── test/               # Comprehensive automated test suite
 │   ├── pubspec.yaml        # Flutter dependencies and asset registrations
 │   └── README.md           # VSCode sub-folder workspace documentation
-├── app/                    # Synced Flutter project directory
 ├── Kodular/                # Original MIT App Inventor / Kodular prototype archives (.aia)
 ├── .env.example            # Secrets & configuration template (demonstrating safe handling)
 ├── .gitignore              # Comprehensive Git ignore rules (secrets, build files, caches)

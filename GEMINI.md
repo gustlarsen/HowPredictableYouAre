@@ -1,5 +1,9 @@
 # Workspace Rules & Instructions
 
+## Project Directory Structure (Single Source of Truth)
+- **Always develop the game exclusively under the `VSCode/` folder.**
+- **Do NOT create or recreate an `app/` folder**, and never duplicate the Flutter project files anywhere else in the repository.
+
 ## Mandatory Git Workflow (Every Prompt)
 Upon completing any code, asset, configuration, test, or documentation changes in this repository:
 1. Stage all changes: `git add .` (or specific modified files).
