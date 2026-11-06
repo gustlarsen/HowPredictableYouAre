@@ -74,10 +74,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               emoji = '🙁';
             }
 
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+            return PopScope(
+              canPop: false,
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               title: Row(
                 children: [
                   Text(
@@ -123,22 +125,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ],
               ),
               actions: [
-                TextButton(
+                ElevatedButton(
                   onPressed: () {
                     Navigator.of(ctx).pop();
                     controller.resetGame();
                   },
                   child: Text(
                     loc.t('string76', fallback: 'TRY AGAIN'),
-                    style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(loc.t('string77', fallback: 'CONTINUE')),
-                ),
               ],
-            );
+            ),
+          );
           },
         );
       });
@@ -174,11 +173,33 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'How Predictable You Are',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        centerTitle: false,
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('💎', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 6),
+                Text(
+                  '${controller.diamonds}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        centerTitle: true,
         actions: [
           // Periodic Gift button (matching Kodular ButtonGift / Clock1)
           if (controller.isGiftAvailable)

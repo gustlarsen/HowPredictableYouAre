@@ -14,62 +14,38 @@ class ScoreHeader extends StatelessWidget {
 
     return Column(
       children: [
-        // Top row: Diamonds & Predictability %
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Diamonds Pill
-            Container(
+        // Predictability score (if unlocked / enabled)
+        if (controller.showPredictability) ...[
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.15),
+                color: Colors.purple.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+                border: Border.all(color: Colors.purple.withValues(alpha: 0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('💎', style: TextStyle(fontSize: 16)),
-                  const SizedBox(width: 6),
                   Text(
-                    '${controller.diamonds}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    '${loc.t('string5', fallback: 'Predictability')}: ',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    '${controller.percentPredict.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.purpleAccent,
+                    ),
                   ),
                 ],
               ),
             ),
-
-            // Predictability score (if unlocked / enabled)
-            if (controller.showPredictability)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.purple.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${loc.t('string5', fallback: 'Predictability')}: ',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    Text(
-                      '${controller.percentPredict.toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.purpleAccent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-
-        const SizedBox(height: 10),
+          ),
+          const SizedBox(height: 10),
+        ],
 
         // Scoreboard Card
         Card(

@@ -75,6 +75,9 @@ class GameController extends ChangeNotifier {
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
+    if (totalRounds >= 100) {
+      is100RoundsAlertPending = true;
+    }
 
     darkMode = storage.darkMode;
     soundEnabled = storage.soundEnabled;
@@ -130,6 +133,11 @@ class GameController extends ChangeNotifier {
   }
 
   void playTurn(HandMove userChoice) {
+    if (totalRounds >= 100) {
+      is100RoundsAlertPending = true;
+      notifyListeners();
+      return;
+    }
     turnCount++;
     currentUserMove = userChoice;
 
