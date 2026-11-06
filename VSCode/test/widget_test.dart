@@ -215,4 +215,67 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 375));
   });
+
+  testWidgets('HintsBar displays Random when Markov row is empty and shows all tied moves on tie', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'unlockedYourPrediction': true,
+      'unlockedNextMove': true,
+      'unlockedSuggestion': true,
+      'showYourPrediction': true,
+      'showNextMove': true,
+      'showSuggestion': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Initially, Markov matrix is empty -> all three hint chips show 'Random'
+    expect(find.text('Random'), findsNWidgets(3));
+
+    // After 1st turn (Rock), no transition recorded yet -> still 'Random'
+    controller.playTurn(HandMove.rock);
+    await tester.pump();
+    expect(find.text('Random'), findsNWidgets(3));
+
+    // 2nd turn: Rock -> Paper recorded; lastUserMove is now Paper (row for Paper is still empty -> 'Random')
+    controller.playTurn(HandMove.paper);
+    await tester.pump();
+    expect(find.text('Random'), findsNWidgets(3));
+
+    // 3rd turn: Paper -> Rock recorded; lastUserMove is now Rock (row for Rock has Paper=1)
+    // Now HintsBar should show: Probably: ✋, PC: ✌, Suggestion: ✊
+    controller.playTurn(HandMove.rock);
+    await tester.pump();
+    expect(controller.predictedUserMoves, [HandMove.paper]);
+    expect(controller.pcNextMoves, [HandMove.scissors]);
+    expect(controller.suggestedMoves, [HandMove.rock]);
+
+    // 4th turn: Rock -> Scissors recorded; now Rock has a tie: Paper=1, Scissors=1
+    // Play Rock again on 5th turn so lastUserMove is Rock with tied transitions
+    controller.playTurn(HandMove.scissors);
+    controller.playTurn(HandMove.rock);
+    await tester.pump();
+
+    expect(controller.predictedUserMoves, [HandMove.paper, HandMove.scissors]);
+    expect(controller.pcNextMoves, [HandMove.scissors, HandMove.rock]);
+    expect(controller.suggestedMoves, [HandMove.rock, HandMove.paper]);
+    expect(find.text('✋ ✌'), findsOneWidget);
+    expect(find.text('✌ ✊'), findsOneWidget);
+    expect(find.text('✊ ✋'), findsOneWidget);
+  });
 }

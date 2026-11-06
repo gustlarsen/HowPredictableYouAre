@@ -52,10 +52,42 @@ void main() {
       // Predicts Paper when last move was Rock
       final predicted = engine.predictNextUserMove(HandMove.rock);
       expect(predicted, HandMove.paper);
+      expect(engine.predictNextUserMoves(HandMove.rock), [HandMove.paper]);
 
       // AI counter-move should beat Paper -> Scissors
       final counter = engine.computeSmartChoice(HandMove.rock);
       expect(counter, HandMove.scissors);
+      expect(engine.computeSmartChoices(HandMove.rock), [HandMove.scissors]);
+      expect(engine.computeSuggestions([HandMove.scissors]), [HandMove.rock]);
+    });
+
+    test('Returns empty predictions when Markov table has no recorded transitions for move', () {
+      final engine = MarkovEngine();
+      expect(engine.hasPrediction(null), isFalse);
+      expect(engine.hasPrediction(HandMove.rock), isFalse);
+      expect(engine.predictNextUserMoves(null), isEmpty);
+      expect(engine.predictNextUserMoves(HandMove.rock), isEmpty);
+      expect(engine.computeSmartChoices(HandMove.rock), isEmpty);
+      expect(engine.computeSuggestions([]), isEmpty);
+    });
+
+    test('Returns all tied user moves, corresponding PC moves, and winning suggestions on tie', () {
+      final engine = MarkovEngine();
+      // Record tie from Rock: Rock -> Paper (1) and Rock -> Scissors (1)
+      engine.recordTransition(HandMove.rock, HandMove.paper);
+      engine.recordTransition(HandMove.rock, HandMove.scissors);
+
+      expect(engine.hasPrediction(HandMove.rock), isTrue);
+      final predictedMoves = engine.predictNextUserMoves(HandMove.rock);
+      expect(predictedMoves, [HandMove.paper, HandMove.scissors]);
+
+      // Corresponding PC moves that beat [Paper, Scissors] -> [Scissors, Rock]
+      final pcChoices = engine.computeSmartChoices(HandMove.rock);
+      expect(pcChoices, [HandMove.scissors, HandMove.rock]);
+
+      // Most probable hands that beat PC's [Scissors, Rock] -> [Rock, Paper]
+      final suggestions = engine.computeSuggestions(pcChoices);
+      expect(suggestions, [HandMove.rock, HandMove.paper]);
     });
 
     test('Extended hands (Lizard & Spock) matrix size is 5', () {

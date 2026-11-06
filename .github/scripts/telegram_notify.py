@@ -170,14 +170,6 @@ def handle_success(args):
     else:
         arch_label = "Universal"
 
-    quota_note = (
-        "🤖 <b>Gemini Antigravity Quota:</b>\n"
-        "• <b>Weekly Quota:</b> Tracked in Antigravity IDE (Account menu)\n"
-        "• <b>5-Hour Quota:</b> Tracked in Antigravity IDE (Account menu)\n"
-        "• <b>Argon Quota:</b> Tracked in Antigravity IDE (Account menu)\n"
-        "<i>(CI runners run in cloud isolation without access to local Antigravity session quotas)</i>"
-    )
-
     full_message = (
         f"🚀 <b>New Release: How Predictable You Are</b>\n\n"
         f"🏷️ <b>Version:</b> <code>{html.escape(args.version_name)}</code> (Build <code>{html.escape(str(args.version_code))}</code>)\n"
@@ -185,7 +177,6 @@ def handle_success(args):
         f"🔗 <b>Commit:</b> <a href=\"{commit_url}\">{short_commit}</a>\n"
         f"📦 <b>Size:</b> {file_size_mb:.2f} MB ({arch_label})\n\n"
         f"📝 <b>Summary of Changes:</b>\n{escaped_summary}\n\n"
-        f"{quota_note}\n\n"
         f"📥 <a href=\"{release_url}\">Other architectures available on GitHub Releases</a>"
     )
 

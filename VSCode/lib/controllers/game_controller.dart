@@ -22,6 +22,10 @@ class GameController extends ChangeNotifier {
   HandMove? pcNextMove;
   HandMove? suggestedMove;
 
+  List<HandMove> predictedUserMoves = [];
+  List<HandMove> pcNextMoves = [];
+  List<HandMove> suggestedMoves = [];
+
   RoundWinner? lastWinner;
 
   int diamonds = 100000;
@@ -141,8 +145,8 @@ class GameController extends ChangeNotifier {
     turnCount++;
     currentUserMove = userChoice;
 
-    // AI selects its move: if turn 1 or no data yet -> random, otherwise smart choice
-    if (totalRounds == 0 || lastUserMove == null) {
+    // AI selects its move: if no transition data for lastUserMove yet -> random, otherwise smart choice
+    if (!_engine.hasPrediction(lastUserMove)) {
       currentComputerMove = _engine.getRandomMove();
     } else {
       currentComputerMove = _engine.computeSmartChoice(lastUserMove);
@@ -188,11 +192,13 @@ class GameController extends ChangeNotifier {
   }
 
   void _computeNextHints() {
-    predictedUserMove = _engine.predictNextUserMove(lastUserMove);
-    pcNextMove = _engine.computeSmartChoice(lastUserMove);
-    if (pcNextMove != null) {
-      suggestedMove = _engine.computeSuggestion(pcNextMove!);
-    }
+    predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
+    pcNextMoves = _engine.computeSmartChoices(lastUserMove);
+    suggestedMoves = _engine.computeSuggestions(pcNextMoves);
+
+    predictedUserMove = predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+    pcNextMove = pcNextMoves.isNotEmpty ? pcNextMoves.first : null;
+    suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
   void resetGame() {
@@ -282,6 +288,7 @@ class GameController extends ChangeNotifier {
         storage.setUnlockedNewHands(true);
         storage.setShowNewHands(true);
         _engine = MarkovEngine(enableExtendedHands: true);
+        _computeNextHints();
       },
     );
   }
@@ -405,6 +412,7 @@ class GameController extends ChangeNotifier {
     showNewHands = val;
     storage.setShowNewHands(val);
     _engine = MarkovEngine(enableExtendedHands: val);
+    _computeNextHints();
     notifyListeners();
   }
 

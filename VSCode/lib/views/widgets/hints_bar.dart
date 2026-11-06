@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../models/move.dart';
 
 class HintsBar extends StatelessWidget {
   final GameController controller;
 
   const HintsBar({super.key, required this.controller});
+
+  String _formatMoves(List<HandMove> moves, String randomLabel) {
+    if (moves.isEmpty) {
+      return randomLabel;
+    }
+    return moves.map((m) => m.emoji).join(' ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +22,8 @@ class HintsBar extends StatelessWidget {
         controller.showSuggestion;
 
     if (!hasAnyHint) return const SizedBox.shrink();
+
+    final randomLabel = loc.t('string15', fallback: 'Random');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
@@ -26,21 +36,21 @@ class HintsBar extends StatelessWidget {
             _HintChip(
               icon: Icons.psychology_outlined,
               label: loc.t('string12', fallback: 'Probably you choose:'),
-              value: controller.predictedUserMove?.emoji ?? '?',
+              value: _formatMoves(controller.predictedUserMoves, randomLabel),
               color: Colors.blueAccent,
             ),
           if (controller.showNextMove)
             _HintChip(
               icon: Icons.smart_toy_outlined,
               label: loc.t('string13', fallback: 'PC will choose:'),
-              value: controller.pcNextMove?.emoji ?? '?',
+              value: _formatMoves(controller.pcNextMoves, randomLabel),
               color: Colors.orangeAccent,
             ),
           if (controller.showSuggestion)
             _HintChip(
               icon: Icons.lightbulb_outline,
               label: loc.t('string14', fallback: 'Suggestion:'),
-              value: controller.suggestedMove?.emoji ?? '?',
+              value: _formatMoves(controller.suggestedMoves, randomLabel),
               color: Colors.greenAccent,
             ),
         ],
