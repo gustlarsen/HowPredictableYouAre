@@ -302,6 +302,19 @@ void main() {
     expect(find.text('✋ ✌'), findsOneWidget);
     expect(find.text('✌ ✊'), findsOneWidget);
     expect(find.text('✊ ✋'), findsOneWidget);
+
+    // 6th turn: Rock -> Rock recorded; now all 3 hands are tied for Rock (Rock=1, Paper=1, Scissors=1)
+    // HintsBar must substitute '?' instead of showing all 3 hands
+    controller.playTurn(HandMove.rock);
+    await tester.pump();
+
+    expect(controller.predictedUserMoves, isEmpty);
+    expect(controller.pcNextMoves, isEmpty);
+    expect(controller.suggestedMoves, isEmpty);
+    expect(
+      find.descendant(of: find.byType(HintsBar), matching: find.text('?')),
+      findsNWidgets(3),
+    );
   });
 
   testWidgets('Crystal Ball displays exact pre-selected PC move even when Markov table is empty (Random)', (WidgetTester tester) async {

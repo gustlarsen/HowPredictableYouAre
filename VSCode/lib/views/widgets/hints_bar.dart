@@ -8,7 +8,7 @@ class HintsBar extends StatelessWidget {
   const HintsBar({super.key, required this.controller});
 
   String _formatMoves(List<HandMove> moves) {
-    if (moves.isEmpty) {
+    if (moves.isEmpty || moves.length >= controller.engine.size) {
       return '?';
     }
     return moves.map((m) => m.emoji).join(' ');

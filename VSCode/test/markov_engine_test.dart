@@ -88,6 +88,15 @@ void main() {
       // Most probable hands that beat PC's [Scissors, Rock] -> [Rock, Paper]
       final suggestions = engine.computeSuggestions(pcChoices);
       expect(suggestions, [HandMove.rock, HandMove.paper]);
+
+      // When all 3 active hands are tied (Rock -> Rock, Paper, Scissors each once), return empty so UI displays '?'
+      engine.recordTransition(HandMove.rock, HandMove.rock);
+      expect(engine.predictNextUserMoves(HandMove.rock), isEmpty);
+      expect(engine.computeSmartChoices(HandMove.rock), isEmpty);
+      expect(
+        engine.computeSuggestions([HandMove.rock, HandMove.paper, HandMove.scissors]),
+        isEmpty,
+      );
     });
 
     test('Extended hands (Lizard & Spock) matrix size is 5', () {

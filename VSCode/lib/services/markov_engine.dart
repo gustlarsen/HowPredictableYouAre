@@ -85,6 +85,10 @@ class MarkovEngine {
       }
     }
 
+    if (bestMoves.length >= _activeMoves.length) {
+      return [];
+    }
+
     return bestMoves;
   }
 
@@ -120,6 +124,9 @@ class MarkovEngine {
           choices.add(fallback);
         }
       }
+    }
+    if (choices.length >= _activeMoves.length) {
+      return [];
     }
     return choices;
   }
@@ -176,7 +183,12 @@ class MarkovEngine {
       return [];
     }
 
-    return orderedCandidates.where((c) => winCounts[c] == maxWins).toList();
+    final suggestions =
+        orderedCandidates.where((c) => winCounts[c] == maxWins).toList();
+    if (suggestions.length >= _activeMoves.length) {
+      return [];
+    }
+    return suggestions;
   }
 
   /// Suggests a move for the player to defeat the computer's expected move
