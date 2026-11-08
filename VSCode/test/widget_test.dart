@@ -10,6 +10,7 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
+import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
 void main() {
@@ -615,5 +616,117 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('story_skip_button')), findsOneWidget);
     expect(find.text('Panel 1 / 4'), findsOneWidget);
+  });
+
+  testWidgets('ScoreHeader displays Gauge column inside scoreboard card with green-yellow-red heatmap color', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'unlockedPredictability': true,
+      'showPredictability': false,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // When disabled, Gauge column is not shown
+    expect(find.descendant(of: find.byType(ScoreHeader), matching: find.text('Gauge')), findsNothing);
+
+    // Enable predictability gauge
+    controller.toggleShowPredictability(true);
+    await tester.pump();
+
+    // Gauge column is inside the ScoreHeader Card alongside You, PC, Total
+    final scoreCardFinder = find.descendant(
+      of: find.byType(ScoreHeader),
+      matching: find.byType(Card),
+    );
+    expect(scoreCardFinder, findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('You')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('PC')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('Total')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('Gauge')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('0.0%')), findsOneWidget);
+
+    // Verify heatmap color progression:
+    // 1. User has all wins (0% PC predictability) -> Pure Green
+    controller.userScore = 10;
+    controller.pcScore = 0;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    Text gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('0.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(Colors.green));
+
+    // 2. User has more wins (25% PC predictability) -> Between Green and Yellow
+    controller.userScore = 3;
+    controller.pcScore = 1;
+    controller.totalRounds = 4;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('25.0%')),
+    );
+    expect(
+      gaugeValueText.style?.color,
+      equals(Color.lerp(Colors.green, Colors.yellow, 0.5)),
+    );
+
+    // 3. Draw (50% PC predictability) -> Yellow in the middle
+    controller.userScore = 5;
+    controller.pcScore = 5;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('50.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(Colors.yellow));
+
+    // 4. PC has more wins (75% PC predictability) -> Between Yellow and Red
+    controller.userScore = 1;
+    controller.pcScore = 3;
+    controller.totalRounds = 4;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('75.0%')),
+    );
+    expect(
+      gaugeValueText.style?.color,
+      equals(Color.lerp(Colors.yellow, Colors.red, 0.5)),
+    );
+
+    // 5. PC has all wins (100% PC predictability) -> Pure Red
+    controller.userScore = 0;
+    controller.pcScore = 10;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('100.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(Colors.red));
   });
 }
