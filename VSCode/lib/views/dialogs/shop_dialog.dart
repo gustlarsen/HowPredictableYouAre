@@ -31,10 +31,6 @@ class ShopDialog extends StatelessWidget {
         SnackBar(
           content: Text(loc.t('string79', fallback: 'Not enough Diamonds')),
           duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: '+50 💎',
-            onPressed: () => controller.addFreeDiamonds(50),
-          ),
         ),
       );
     }

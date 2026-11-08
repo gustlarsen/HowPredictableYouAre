@@ -426,4 +426,42 @@ void main() {
     expect(find.text('Crystal Ball:'), findsOneWidget);
     expect(find.text('Crystal Ball+:'), findsNothing);
   });
+
+  testWidgets('Attempting to purchase an item without enough diamonds only shows notification and gives no free diamonds', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 20,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Open Shop dialog
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    // Attempt to unlock the first item (Reset Button, cost: 100) with only 20 diamonds
+    await tester.tap(find.text('Unlock').first);
+    await tester.pump();
+
+    expect(find.text('Not enough Diamonds'), findsOneWidget);
+    expect(find.text('+50 💎'), findsNothing);
+    expect(find.byType(SnackBarAction), findsNothing);
+    expect(controller.diamonds, 20);
+    expect(controller.unlockedReset, isFalse);
+  });
 }
