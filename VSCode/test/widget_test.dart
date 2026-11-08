@@ -314,4 +314,116 @@ void main() {
     await tester.pump();
     expect(controller.currentComputerMove, equals(predictedBeforeTurn));
   });
+
+  testWidgets('Crystal Ball+ store visibility, costs, activation dependency, state restoration, and single main screen display', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 100000,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Open Shop dialog
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    // Scroll down in Shop list to Crystal Ball
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    // Before acquiring Crystal Ball: Crystal Ball costs 20000 and Crystal Ball+ is not shown
+    expect(find.text('Crystal Ball'), findsOneWidget);
+    expect(find.text('20000 💎'), findsOneWidget);
+    expect(find.text('Crystal Ball+'), findsNothing);
+
+    // Unlock Crystal Ball (cost: 20000 -> diamonds: 80000)
+    expect(controller.unlockCrystalBall(), isTrue);
+    expect(controller.diamonds, 80000);
+    expect(controller.unlockedCrystalBall, isTrue);
+    expect(controller.showCrystalBall, isTrue);
+    await tester.pumpAndSettle();
+
+    // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store with cost 50000
+    expect(find.text('Crystal Ball+'), findsOneWidget);
+    expect(find.text('50000 💎'), findsOneWidget);
+
+    // Unlock Crystal Ball+ (cost: 50000 -> diamonds: 30000)
+    expect(controller.unlockCrystalBallPlus(), isTrue);
+    expect(controller.diamonds, 30000);
+    expect(controller.unlockedCrystalBallPlus, isTrue);
+    expect(controller.showCrystalBallPlus, isTrue);
+    await tester.pumpAndSettle();
+
+    // Close Shop dialog and verify main screen shows ONLY ONE crystal ball (Crystal Ball+ result)
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Crystal Ball:'), findsNothing);
+    expect(find.text('Crystal Ball+:'), findsOneWidget);
+
+    final winningMove = controller.crystalBallPlusMove!;
+    final pcMove = controller.crystalBallMove!;
+    expect(winningMove.beats(pcMove), isTrue);
+
+    // Playing the hand shown by Crystal Ball+ beats the PC
+    controller.playTurn(winningMove);
+    await tester.pump();
+    expect(controller.lastWinner, RoundWinner.user);
+
+    // Disable Crystal Ball -> Crystal Ball+ is also deactivated
+    controller.toggleShowCrystalBall(false);
+    await tester.pump();
+    expect(controller.showCrystalBall, isFalse);
+    expect(controller.showCrystalBallPlus, isFalse);
+    expect(find.text('Crystal Ball:'), findsNothing);
+    expect(find.text('Crystal Ball+:'), findsNothing);
+
+    // Crystal Ball+ cannot be activated while Crystal Ball is disabled
+    controller.toggleShowCrystalBallPlus(true);
+    await tester.pump();
+    expect(controller.showCrystalBallPlus, isFalse);
+
+    // Re-enabling Crystal Ball restores Crystal Ball+ to enabled (since it was enabled before)
+    controller.toggleShowCrystalBall(true);
+    await tester.pump();
+    expect(controller.showCrystalBall, isTrue);
+    expect(controller.showCrystalBallPlus, isTrue);
+    expect(find.text('Crystal Ball+:'), findsOneWidget);
+    expect(find.text('Crystal Ball:'), findsNothing);
+
+    // Now disable Crystal Ball+ while Crystal Ball is enabled -> main screen shows Crystal Ball (PC next move)
+    controller.toggleShowCrystalBallPlus(false);
+    await tester.pump();
+    expect(controller.showCrystalBall, isTrue);
+    expect(controller.showCrystalBallPlus, isFalse);
+    expect(find.text('Crystal Ball:'), findsOneWidget);
+    expect(find.text('Crystal Ball+:'), findsNothing);
+
+    // Disable Crystal Ball and then re-enable it -> Crystal Ball+ remains disabled
+    controller.toggleShowCrystalBall(false);
+    expect(controller.showCrystalBall, isFalse);
+    expect(controller.showCrystalBallPlus, isFalse);
+
+    controller.toggleShowCrystalBall(true);
+    await tester.pump();
+    expect(controller.showCrystalBall, isTrue);
+    expect(controller.showCrystalBallPlus, isFalse);
+    expect(find.text('Crystal Ball:'), findsOneWidget);
+    expect(find.text('Crystal Ball+:'), findsNothing);
+  });
 }

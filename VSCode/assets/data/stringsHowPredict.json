@@ -80,6 +80,8 @@
 "en_string79": "Not enough Diamonds",
 "en_string80": "Crystal Ball",
 "en_string81": "Crystal Ball:",
+"en_string82": "Crystal Ball+",
+"en_string83": "Crystal Ball+:",
 
 "pt_string1": "Jogar no menos 100 vezes para ver sua Avaliação",
 "pt_string2": "Você é:",
@@ -162,6 +164,8 @@
 "pt_string79": "Os diamantes não suficientes",
 "pt_string80": "Bola de Cristal",
 "pt_string81": "Bola de Cristal:",
+"pt_string82": "Bola de Cristal+",
+"pt_string83": "Bola de Cristal+:",
 
 "es_string1": "Juega En Del Acueducto 100 Rondas Para Ver Su Evaluación",
 "es_string2": "Usted Está:",
@@ -244,6 +248,8 @@
 "es_string79": "No Hay Suficientes Diamantes",
 "es_string80": "Bola de Cristal",
 "es_string81": "Bola de Cristal:",
+"es_string82": "Bola de Cristal+",
+"es_string83": "Bola de Cristal+:",
 
 "de_string1": "Spielen Sie Bei Leat 100 Runden Ihre Bewertung Zu Sehen",
 "de_string2": "Sie Sind:",
@@ -325,6 +331,8 @@
 "de_string78": "Animationen:",
 "de_string79": "Nicht Genug Diamanten",
 "de_string80": "Kristallkugel",
-"de_string81": "Kristallkugel:"
+"de_string81": "Kristallkugel:",
+"de_string82": "Kristallkugel+",
+"de_string83": "Kristallkugel+:"
 
 }

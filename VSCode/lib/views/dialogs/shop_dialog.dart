@@ -271,7 +271,7 @@ class ShopDialog extends StatelessWidget {
                     ),
                     _ShopItemTile(
                       title: loc.t('string80', fallback: 'Crystal Ball'),
-                      cost: 100000,
+                      cost: 20000,
                       isUnlocked: controller.unlockedCrystalBall,
                       isActive: controller.showCrystalBall,
                       enabledLabel: enabledStr,
@@ -285,6 +285,44 @@ class ShopDialog extends StatelessWidget {
                         _handleToggle(context, loc.t('string80', fallback: 'Crystal Ball'), val);
                       },
                     ),
+                    if (controller.unlockedCrystalBall)
+                      _ShopItemTile(
+                        title: loc.t('string82', fallback: 'Crystal Ball+'),
+                        cost: 50000,
+                        isUnlocked: controller.unlockedCrystalBallPlus,
+                        isActive: controller.showCrystalBallPlus,
+                        isToggleEnabled: controller.showCrystalBall,
+                        enabledLabel: enabledStr,
+                        disabledLabel: disabledStr,
+                        onUnlock: () {
+                          final ok = controller.unlockCrystalBallPlus();
+                          _handleUnlock(
+                            context,
+                            loc.t('string82', fallback: 'Crystal Ball+'),
+                            ok,
+                          );
+                        },
+                        onToggle: (val) {
+                          if (val && !controller.showCrystalBall) {
+                            HapticFeedback.vibrate();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${loc.t('string80', fallback: 'Crystal Ball')}: $disabledStr',
+                                ),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                            return;
+                          }
+                          controller.toggleShowCrystalBallPlus(val);
+                          _handleToggle(
+                            context,
+                            loc.t('string82', fallback: 'Crystal Ball+'),
+                            controller.showCrystalBallPlus,
+                          );
+                        },
+                      ),
 
                     const SizedBox(height: 12),
                     // Free diamonds action
@@ -365,6 +403,7 @@ class _ShopItemTile extends StatelessWidget {
   final int cost;
   final bool isUnlocked;
   final bool isActive;
+  final bool isToggleEnabled;
   final String enabledLabel;
   final String disabledLabel;
   final VoidCallback onUnlock;
@@ -375,6 +414,7 @@ class _ShopItemTile extends StatelessWidget {
     required this.cost,
     required this.isUnlocked,
     required this.isActive,
+    this.isToggleEnabled = true,
     required this.enabledLabel,
     required this.disabledLabel,
     required this.onUnlock,
@@ -399,7 +439,9 @@ class _ShopItemTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: isUnlocked ? () => onToggle(!isActive) : onUnlock,
+          onTap: isUnlocked
+              ? (isToggleEnabled ? () => onToggle(!isActive) : () => onToggle(true))
+              : onUnlock,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
@@ -451,7 +493,7 @@ class _ShopItemTile extends StatelessWidget {
                 if (isUnlocked)
                   Switch(
                     value: isActive,
-                    onChanged: onToggle,
+                    onChanged: isToggleEnabled ? onToggle : null,
                     activeTrackColor: Colors.green,
                   )
                 else

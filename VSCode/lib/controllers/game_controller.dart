@@ -22,6 +22,7 @@ class GameController extends ChangeNotifier {
   HandMove? pcNextMove;
   HandMove? suggestedMove;
   HandMove? crystalBallMove;
+  HandMove? crystalBallPlusMove;
 
   List<HandMove> predictedUserMoves = [];
   List<HandMove> pcNextMoves = [];
@@ -52,6 +53,7 @@ class GameController extends ChangeNotifier {
   bool unlockedSuggestion = false;
   bool unlockedAds = false;
   bool unlockedCrystalBall = false;
+  bool unlockedCrystalBallPlus = false;
 
   // Active toggles
   bool showReset = false;
@@ -63,6 +65,8 @@ class GameController extends ChangeNotifier {
   bool showNextMove = false;
   bool showSuggestion = false;
   bool showCrystalBall = false;
+  bool showCrystalBallPlus = false;
+  bool crystalBallPlusSavedState = false;
 
   bool is100RoundsAlertPending = false;
   bool isGiftAvailable = true;
@@ -101,6 +105,7 @@ class GameController extends ChangeNotifier {
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
     unlockedCrystalBall = storage.unlockedCrystalBall;
+    unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
 
     showReset = storage.showReset;
     showPredictability = storage.showPredictability;
@@ -111,6 +116,9 @@ class GameController extends ChangeNotifier {
     showNextMove = storage.showNextMove;
     showSuggestion = storage.showSuggestion;
     showCrystalBall = storage.showCrystalBall;
+    crystalBallPlusSavedState = storage.crystalBallPlusSavedState;
+    showCrystalBallPlus =
+        showCrystalBall ? storage.showCrystalBallPlus : false;
 
     audio.soundEnabled = soundEnabled;
     audio.musicEnabled = musicEnabled;
@@ -204,6 +212,7 @@ class GameController extends ChangeNotifier {
     } else {
       crystalBallMove = _engine.computeSmartChoice(lastUserMove);
     }
+    crystalBallPlusMove = _engine.computeSuggestion(crystalBallMove!);
 
     predictedUserMove = predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
     pcNextMove = crystalBallMove;
@@ -350,12 +359,30 @@ class GameController extends ChangeNotifier {
 
   bool unlockCrystalBall() {
     return purchaseItem(
-      cost: 100000,
+      cost: 20000,
       onUnlock: () {
         unlockedCrystalBall = true;
         showCrystalBall = true;
         storage.setUnlockedCrystalBall(true);
         storage.setShowCrystalBall(true);
+      },
+    );
+  }
+
+  bool unlockCrystalBallPlus() {
+    if (!unlockedCrystalBall) {
+      audio.playVibrate();
+      return false;
+    }
+    return purchaseItem(
+      cost: 50000,
+      onUnlock: () {
+        unlockedCrystalBallPlus = true;
+        showCrystalBallPlus = showCrystalBall;
+        crystalBallPlusSavedState = showCrystalBall;
+        storage.setUnlockedCrystalBallPlus(true);
+        storage.setShowCrystalBallPlus(showCrystalBallPlus);
+        storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
       },
     );
   }
@@ -420,8 +447,36 @@ class GameController extends ChangeNotifier {
   }
 
   void toggleShowCrystalBall(bool val) {
-    showCrystalBall = val;
-    storage.setShowCrystalBall(val);
+    if (!val) {
+      if (showCrystalBall) {
+        crystalBallPlusSavedState = showCrystalBallPlus;
+        storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
+      }
+      showCrystalBall = false;
+      storage.setShowCrystalBall(false);
+      showCrystalBallPlus = false;
+      storage.setShowCrystalBallPlus(false);
+    } else {
+      showCrystalBall = true;
+      storage.setShowCrystalBall(true);
+      if (unlockedCrystalBallPlus) {
+        showCrystalBallPlus = crystalBallPlusSavedState;
+        storage.setShowCrystalBallPlus(showCrystalBallPlus);
+      }
+    }
+    notifyListeners();
+  }
+
+  void toggleShowCrystalBallPlus(bool val) {
+    if (val && !showCrystalBall) {
+      return;
+    }
+    showCrystalBallPlus = val;
+    storage.setShowCrystalBallPlus(val);
+    if (showCrystalBall) {
+      crystalBallPlusSavedState = val;
+      storage.setCrystalBallPlusSavedState(val);
+    }
     notifyListeners();
   }
 

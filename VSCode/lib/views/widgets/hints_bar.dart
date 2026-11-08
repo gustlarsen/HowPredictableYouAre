@@ -54,7 +54,17 @@ class HintsBar extends StatelessWidget {
               value: _formatMoves(controller.suggestedMoves, randomLabel),
               color: Colors.greenAccent,
             ),
-          if (controller.showCrystalBall && controller.crystalBallMove != null)
+          if (controller.showCrystalBall &&
+              controller.showCrystalBallPlus &&
+              controller.crystalBallPlusMove != null)
+            _HintChip(
+              icon: Icons.auto_awesome,
+              label: loc.t('string83', fallback: 'Crystal Ball+:'),
+              value: controller.crystalBallPlusMove!.emoji,
+              color: Colors.purpleAccent,
+            )
+          else if (controller.showCrystalBall &&
+              controller.crystalBallMove != null)
             _HintChip(
               icon: Icons.auto_awesome,
               label: loc.t('string81', fallback: 'Crystal Ball:'),

@@ -85,11 +85,27 @@ class StorageService {
   Future<void> setUnlockedCrystalBall(bool val) =>
       _prefs.setBool('unlockedCrystalBall', val);
 
+  bool get unlockedCrystalBallPlus =>
+      _prefs.getBool('unlockedCrystalBallPlus') ?? false;
+  Future<void> setUnlockedCrystalBallPlus(bool val) =>
+      _prefs.setBool('unlockedCrystalBallPlus', val);
+
   // Feature Active Toggles
   bool get showCrystalBall =>
       _prefs.getBool('showCrystalBall') ?? unlockedCrystalBall;
   Future<void> setShowCrystalBall(bool val) =>
       _prefs.setBool('showCrystalBall', val);
+
+  bool get showCrystalBallPlus =>
+      _prefs.getBool('showCrystalBallPlus') ??
+      (unlockedCrystalBallPlus && showCrystalBall);
+  Future<void> setShowCrystalBallPlus(bool val) =>
+      _prefs.setBool('showCrystalBallPlus', val);
+
+  bool get crystalBallPlusSavedState =>
+      _prefs.getBool('crystalBallPlusSavedState') ?? showCrystalBallPlus;
+  Future<void> setCrystalBallPlusSavedState(bool val) =>
+      _prefs.setBool('crystalBallPlusSavedState', val);
   bool get showPredictability =>
       _prefs.getBool('showPredictability') ?? unlockedPredictability;
   Future<void> setShowPredictability(bool val) =>
