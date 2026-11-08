@@ -167,11 +167,13 @@ class GameController extends ChangeNotifier {
 
   double get percentPredict {
     if (totalRounds == 0) return 0.0;
-    return (pcScore / totalRounds) * 100.0;
+    return (userScore / totalRounds) * 100.0;
   }
 
   EvaluationTier get evaluationTier {
-    return EvaluationTier.fromPercent(percentPredict, totalRounds);
+    final pcPredictPercent =
+        totalRounds == 0 ? 0.0 : (pcScore / totalRounds) * 100.0;
+    return EvaluationTier.fromPercent(pcPredictPercent, totalRounds);
   }
 
   void playTurn(HandMove userChoice) {

@@ -618,7 +618,7 @@ void main() {
     expect(find.text('Panel 1 / 4'), findsOneWidget);
   });
 
-  testWidgets('ScoreHeader displays Gauge column inside scoreboard card with green-yellow-red heatmap color', (WidgetTester tester) async {
+  testWidgets('ScoreHeader displays Gauge column inside scoreboard card with red-yellow-green heatmap color', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'unlockedPredictability': true,
@@ -663,9 +663,9 @@ void main() {
     expect(find.descendant(of: scoreCardFinder, matching: find.text('0.0%')), findsOneWidget);
 
     // Verify heatmap color progression:
-    // 1. User has all wins (0% PC predictability) -> Pure Green
-    controller.userScore = 10;
-    controller.pcScore = 0;
+    // 1. User has no wins (0% score, bad result) -> Pure Red
+    controller.userScore = 0;
+    controller.pcScore = 10;
     controller.totalRounds = 10;
     controller.notifyListeners();
     await tester.pump();
@@ -673,11 +673,11 @@ void main() {
     Text gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('0.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(Colors.green));
+    expect(gaugeValueText.style?.color, equals(Colors.red));
 
-    // 2. User has more wins (25% PC predictability) -> Between Green and Yellow
-    controller.userScore = 3;
-    controller.pcScore = 1;
+    // 2. PC has more wins (25% score) -> Between Red and Yellow
+    controller.userScore = 1;
+    controller.pcScore = 3;
     controller.totalRounds = 4;
     controller.notifyListeners();
     await tester.pump();
@@ -687,10 +687,10 @@ void main() {
     );
     expect(
       gaugeValueText.style?.color,
-      equals(Color.lerp(Colors.green, Colors.yellow, 0.5)),
+      equals(Color.lerp(Colors.red, Colors.yellow, 0.5)),
     );
 
-    // 3. Draw (50% PC predictability) -> Yellow in the middle
+    // 3. Draw (50% score) -> Yellow in the middle
     controller.userScore = 5;
     controller.pcScore = 5;
     controller.totalRounds = 10;
@@ -702,9 +702,9 @@ void main() {
     );
     expect(gaugeValueText.style?.color, equals(Colors.yellow));
 
-    // 4. PC has more wins (75% PC predictability) -> Between Yellow and Red
-    controller.userScore = 1;
-    controller.pcScore = 3;
+    // 4. User has more wins (75% score) -> Between Yellow and Green
+    controller.userScore = 3;
+    controller.pcScore = 1;
     controller.totalRounds = 4;
     controller.notifyListeners();
     await tester.pump();
@@ -714,12 +714,12 @@ void main() {
     );
     expect(
       gaugeValueText.style?.color,
-      equals(Color.lerp(Colors.yellow, Colors.red, 0.5)),
+      equals(Color.lerp(Colors.yellow, Colors.green, 0.5)),
     );
 
-    // 5. PC has all wins (100% PC predictability) -> Pure Red
-    controller.userScore = 0;
-    controller.pcScore = 10;
+    // 5. User has all wins (100% score, good result) -> Pure Green
+    controller.userScore = 10;
+    controller.pcScore = 0;
     controller.totalRounds = 10;
     controller.notifyListeners();
     await tester.pump();
@@ -727,6 +727,6 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('100.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(Colors.red));
+    expect(gaugeValueText.style?.color, equals(Colors.green));
   });
 }

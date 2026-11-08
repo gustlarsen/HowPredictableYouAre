@@ -6,17 +6,16 @@ class ScoreHeader extends StatelessWidget {
 
   const ScoreHeader({super.key, required this.controller});
 
-  /// Returns a heat-map color interpolating from green (0% predictability,
-  /// user has all wins) through yellow (50% predictability, draw) to red
-  /// (100% predictability, PC has all wins).
+  /// Returns a heat-map color interpolating from red (0%, no wins / bad result)
+  /// through yellow (50%, draw) to green (100%, all wins / good result).
   static Color gaugeColor(double percentPredict) {
     final clamped = percentPredict.clamp(0.0, 100.0);
     if (clamped <= 50.0) {
       final t = clamped / 50.0;
-      return Color.lerp(Colors.green, Colors.yellow, t)!;
+      return Color.lerp(Colors.red, Colors.yellow, t)!;
     } else {
       final t = (clamped - 50.0) / 50.0;
-      return Color.lerp(Colors.yellow, Colors.red, t)!;
+      return Color.lerp(Colors.yellow, Colors.green, t)!;
     }
   }
 

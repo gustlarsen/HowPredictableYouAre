@@ -83,11 +83,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             String alertSubtitle;
             String emoji;
 
-            if (pct == 0) {
+            if (pct == 100) {
               alertTitle = loc.t('string70', fallback: 'You Won!!!');
               alertSubtitle = loc.t('string71', fallback: 'You are the Best Predictor Ever!!!');
               emoji = '👑';
-            } else if (pct < 50) {
+            } else if (pct > 50) {
               alertTitle = loc.t('string72', fallback: 'Not so Bad!!!');
               alertSubtitle = loc.t('string73', fallback: 'Now try to achieve 100%');
               emoji = '🙂';
