@@ -742,4 +742,86 @@ void main() {
     );
     expect(gaugeValueText.style?.color, equals(Colors.green));
   });
+
+  testWidgets('Enabling new hands keeps all 5 hand buttons on the same line with reduced size, and disabling restores classic 3-hand size', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    final rockFinder = find.byKey(const ValueKey('hand_button_rock'));
+    final paperFinder = find.byKey(const ValueKey('hand_button_paper'));
+    final scissorsFinder = find.byKey(const ValueKey('hand_button_scissors'));
+    final lizardFinder = find.byKey(const ValueKey('hand_button_lizard'));
+    final spockFinder = find.byKey(const ValueKey('hand_button_spock'));
+
+    // Initially, only 3 classic hands are shown on the same line
+    expect(rockFinder, findsOneWidget);
+    expect(paperFinder, findsOneWidget);
+    expect(scissorsFinder, findsOneWidget);
+    expect(lizardFinder, findsNothing);
+    expect(spockFinder, findsNothing);
+
+    final classicRockSize = tester.getSize(rockFinder);
+    final classicPaperSize = tester.getSize(paperFinder);
+    final classicScissorsSize = tester.getSize(scissorsFinder);
+    final classicCenterY = tester.getCenter(rockFinder).dy;
+    expect(tester.getCenter(paperFinder).dy, equals(classicCenterY));
+    expect(tester.getCenter(scissorsFinder).dy, equals(classicCenterY));
+
+    // Activate New Hands (5 hands total)
+    expect(controller.unlockNewHands(), isTrue);
+    await tester.pump();
+
+    expect(rockFinder, findsOneWidget);
+    expect(paperFinder, findsOneWidget);
+    expect(scissorsFinder, findsOneWidget);
+    expect(lizardFinder, findsOneWidget);
+    expect(spockFinder, findsOneWidget);
+
+    // All 5 hand buttons must stay on the same horizontal line (identical center Y)
+    final fiveHandsCenterY = tester.getCenter(rockFinder).dy;
+    expect(tester.getCenter(paperFinder).dy, equals(fiveHandsCenterY));
+    expect(tester.getCenter(scissorsFinder).dy, equals(fiveHandsCenterY));
+    expect(tester.getCenter(lizardFinder).dy, equals(fiveHandsCenterY));
+    expect(tester.getCenter(spockFinder).dy, equals(fiveHandsCenterY));
+
+    // All 5 hand buttons are reduced in size compared to the classic 3-hand size
+    final compactRockSize = tester.getSize(rockFinder);
+    final compactPaperSize = tester.getSize(paperFinder);
+    final compactScissorsSize = tester.getSize(scissorsFinder);
+    expect(compactRockSize.width, lessThan(classicRockSize.width));
+    expect(compactRockSize.height, lessThan(classicRockSize.height));
+    expect(compactPaperSize.width, lessThan(classicPaperSize.width));
+    expect(compactPaperSize.height, lessThan(classicPaperSize.height));
+    expect(compactScissorsSize.width, lessThan(classicScissorsSize.width));
+    expect(compactScissorsSize.height, lessThan(classicScissorsSize.height));
+
+    // Deactivate New Hands -> 3 classic hands restore their exact old size
+    controller.toggleShowNewHands(false);
+    await tester.pump();
+
+    expect(lizardFinder, findsNothing);
+    expect(spockFinder, findsNothing);
+    expect(tester.getSize(rockFinder), equals(classicRockSize));
+    expect(tester.getSize(paperFinder), equals(classicPaperSize));
+    expect(tester.getSize(scissorsFinder), equals(classicScissorsSize));
+  });
 }

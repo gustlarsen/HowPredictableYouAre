@@ -366,57 +366,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           ),
                           child: Column(
                             children: [
-                              // Extended hands row (Lizard / Spock) if enabled
-                              if (controller.showNewHands) ...[
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _HandActionButton(
-                                      move: HandMove.lizard,
-                                      vibrationEnabled: controller.vibrationEnabled,
-                                      animationsEnabled: controller.animationsEnabled,
-                                      onPressed: () =>
-                                          controller.playTurn(HandMove.lizard),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    _HandActionButton(
-                                      move: HandMove.spock,
-                                      vibrationEnabled: controller.vibrationEnabled,
-                                      animationsEnabled: controller.animationsEnabled,
-                                      onPressed: () =>
-                                          controller.playTurn(HandMove.spock),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-
-                              // Standard RPS moves row
+                              // Hand move buttons (single row for 3 classic or all 5 hands)
                               Row(
+                                key: const ValueKey('hand_buttons_row'),
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceEvenly,
                                 children: [
-                                  _HandActionButton(
-                                    move: HandMove.rock,
-                                    vibrationEnabled: controller.vibrationEnabled,
-                                    animationsEnabled: controller.animationsEnabled,
-                                    onPressed: () =>
-                                        controller.playTurn(HandMove.rock),
-                                  ),
-                                  _HandActionButton(
-                                    move: HandMove.paper,
-                                    vibrationEnabled: controller.vibrationEnabled,
-                                    animationsEnabled: controller.animationsEnabled,
-                                    onPressed: () =>
-                                        controller.playTurn(HandMove.paper),
-                                  ),
-                                  _HandActionButton(
-                                    move: HandMove.scissors,
-                                    vibrationEnabled: controller.vibrationEnabled,
-                                    animationsEnabled: controller.animationsEnabled,
-                                    onPressed: () =>
-                                        controller.playTurn(HandMove.scissors),
-                                  ),
+                                  for (final move in [
+                                    HandMove.rock,
+                                    HandMove.paper,
+                                    HandMove.scissors,
+                                    if (controller.showNewHands) ...[
+                                      HandMove.lizard,
+                                      HandMove.spock,
+                                    ],
+                                  ])
+                                    _HandActionButton(
+                                      key: ValueKey('hand_button_${move.name}'),
+                                      move: move,
+                                      compact: controller.showNewHands,
+                                      vibrationEnabled:
+                                          controller.vibrationEnabled,
+                                      animationsEnabled:
+                                          controller.animationsEnabled,
+                                      onPressed: () =>
+                                          controller.playTurn(move),
+                                    ),
                                 ],
                               ),
 
@@ -510,12 +485,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
+  final bool compact;
   final bool vibrationEnabled;
   final bool animationsEnabled;
   final VoidCallback onPressed;
 
   const _HandActionButton({
+    super.key,
     required this.move,
+    this.compact = false,
     required this.vibrationEnabled,
     required this.animationsEnabled,
     required this.onPressed,
@@ -571,17 +549,31 @@ class _HandActionButtonState extends State<_HandActionButton>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasAsset = widget.move.leftAsset.isNotEmpty;
+    final compact = widget.compact;
+
+    final horizontalPadding = compact ? 6.0 : 14.0;
+    final verticalPadding = compact ? 8.0 : 10.0;
+    final borderRadius = compact ? 12.0 : 16.0;
+    final circleSize = compact ? 38.0 : 52.0;
+    final imageSize = compact ? 26.0 : 36.0;
+    final emojiFontSize = compact ? 20.0 : 26.0;
+    final labelSpacing = compact ? 4.0 : 6.0;
+    final labelFontSize = compact ? 9.5 : 12.0;
+    final letterSpacing = compact ? 0.2 : 0.5;
 
     Widget buttonContent = InkWell(
       onTap: _handleTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding,
+          vertical: verticalPadding,
+        ),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.5,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: theme.colorScheme.outline.withValues(alpha: 0.2),
           ),
@@ -589,8 +581,8 @@ class _HandActionButtonState extends State<_HandActionButton>
         child: Column(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: circleSize,
+              height: circleSize,
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
@@ -599,26 +591,26 @@ class _HandActionButtonState extends State<_HandActionButton>
                 child: hasAsset
                     ? Image.asset(
                         widget.move.leftAsset,
-                        width: 36,
-                        height: 36,
+                        width: imageSize,
+                        height: imageSize,
                         errorBuilder: (context, error, stackTrace) => Text(
                           widget.move.emoji,
-                          style: const TextStyle(fontSize: 26),
+                          style: TextStyle(fontSize: emojiFontSize),
                         ),
                       )
                     : Text(
                         widget.move.emoji,
-                        style: const TextStyle(fontSize: 26),
+                        style: TextStyle(fontSize: emojiFontSize),
                       ),
               ),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: labelSpacing),
             Text(
               widget.move.label.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
-                letterSpacing: 0.5,
+                fontSize: labelFontSize,
+                letterSpacing: letterSpacing,
               ),
             ),
           ],
