@@ -138,6 +138,56 @@ class StorageService {
   bool get showReset => _prefs.getBool('showReset') ?? unlockedReset;
   Future<void> setShowReset(bool val) => _prefs.setBool('showReset', val);
 
+  // Story Cutscene Persistence Flags
+  bool get hasSeenStoryIntro =>
+      _prefs.getBool('has_seen_story_intro') ?? false;
+  Future<void> setHasSeenStoryIntro(bool val) =>
+      _prefs.setBool('has_seen_story_intro', val);
+
+  bool get hasSeenStoryReset =>
+      _prefs.getBool('has_seen_story_reset') ?? false;
+  Future<void> setHasSeenStoryReset(bool val) =>
+      _prefs.setBool('has_seen_story_reset', val);
+
+  bool get hasSeenStoryPredictability =>
+      _prefs.getBool('has_seen_story_predictability') ?? false;
+  Future<void> setHasSeenStoryPredictability(bool val) =>
+      _prefs.setBool('has_seen_story_predictability', val);
+
+  bool get hasSeenStoryRandom =>
+      _prefs.getBool('has_seen_story_random') ?? false;
+  Future<void> setHasSeenStoryRandom(bool val) =>
+      _prefs.setBool('has_seen_story_random', val);
+
+  bool get hasSeenStoryAlgorithm =>
+      _prefs.getBool('has_seen_story_algorithm') ?? false;
+  Future<void> setHasSeenStoryAlgorithm(bool val) =>
+      _prefs.setBool('has_seen_story_algorithm', val);
+
+  bool get hasSeenStoryYourPrediction =>
+      _prefs.getBool('has_seen_story_your_prediction') ?? false;
+  Future<void> setHasSeenStoryYourPrediction(bool val) =>
+      _prefs.setBool('has_seen_story_your_prediction', val);
+
+  bool get hasSeenStoryPcNextMove =>
+      _prefs.getBool('has_seen_story_pc_next_move') ?? false;
+  Future<void> setHasSeenStoryPcNextMove(bool val) =>
+      _prefs.setBool('has_seen_story_pc_next_move', val);
+
+  bool get hasSeenStorySuggestion =>
+      _prefs.getBool('has_seen_story_suggestion') ?? false;
+  Future<void> setHasSeenStorySuggestion(bool val) =>
+      _prefs.setBool('has_seen_story_suggestion', val);
+
+  bool get hasSeenStoryCrystalBall =>
+      _prefs.getBool('has_seen_story_crystal_ball') ?? false;
+  Future<void> setHasSeenStoryCrystalBall(bool val) =>
+      _prefs.setBool('has_seen_story_crystal_ball', val);
+
+  bool hasSeenStory(String prefsKey) => _prefs.getBool(prefsKey) ?? false;
+  Future<void> setHasSeenStory(String prefsKey, bool val) =>
+      _prefs.setBool(prefsKey, val);
+
   // Markov Matrix Persistence
   List<List<int>>? getMarkovMatrix(int size) {
     final str = _prefs.getString('markov_matrix_$size');

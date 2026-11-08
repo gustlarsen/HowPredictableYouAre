@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
+import 'story_dialog.dart';
 
 class ShopDialog extends StatelessWidget {
   final GameController controller;
@@ -25,6 +26,14 @@ class ShopDialog extends StatelessWidget {
           duration: const Duration(seconds: 2),
         ),
       );
+      final pendingStory = controller.consumePendingStory();
+      if (pendingStory != null) {
+        StoryDialog.show(
+          context,
+          chapter: pendingStory,
+          controller: controller,
+        );
+      }
     } else {
       HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(

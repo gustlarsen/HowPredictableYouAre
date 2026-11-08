@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/models/move.dart';
+import 'package:how_predictable/models/story_chapter.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
@@ -145,7 +146,7 @@ void main() {
     expect(controller.turnCount, 2);
   });
 
-  test('Crystal Ball purchase costs 100000 diamonds and can be toggled', () async {
+  test('Crystal Ball purchase costs 20000 diamonds and can be toggled', () async {
     SharedPreferences.setMockInitialValues({
       'diamonds': 100000,
       'musicEnabled': false,
@@ -157,7 +158,7 @@ void main() {
 
     final ok = controller.unlockCrystalBall();
     expect(ok, isTrue);
-    expect(controller.diamonds, 0);
+    expect(controller.diamonds, 80000);
     expect(controller.unlockedCrystalBall, isTrue);
     expect(controller.showCrystalBall, isTrue);
     expect(storage.unlockedCrystalBall, isTrue);
@@ -166,6 +167,113 @@ void main() {
     controller.toggleShowCrystalBall(false);
     expect(controller.showCrystalBall, isFalse);
     expect(storage.showCrystalBall, isFalse);
+  });
+
+  test('Intro story flag triggers on first launch and persists so it only appears once', () async {
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(storage.hasSeenStoryIntro, isFalse);
+    expect(controller.hasSeenStoryIntro, isFalse);
+    expect(controller.pendingStoryChapter, StoryChapter.intro);
+
+    final consumed = controller.consumePendingStory(StoryChapter.intro);
+    expect(consumed, StoryChapter.intro);
+    expect(controller.hasSeenStoryIntro, isTrue);
+    expect(storage.hasSeenStoryIntro, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // Subsequent app launch should not re-trigger intro story
+    await createController();
+    expect(controller.hasSeenStoryIntro, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
+  });
+
+  test('All 8 shop story chapters trigger on first unlock, persist flags, and do not re-trigger on toggle', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 100000,
+      'musicEnabled': false,
+      'has_seen_story_intro': true,
+    });
+    await createController();
+
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 1. Reset Button
+    expect(storage.hasSeenStoryReset, isFalse);
+    expect(controller.isStoryChapterUnlocked(StoryChapter.resetButton), isFalse);
+    expect(controller.unlockReset(), isTrue);
+    expect(storage.hasSeenStoryReset, isTrue);
+    expect(controller.isStoryChapterUnlocked(StoryChapter.resetButton), isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.resetButton);
+    controller.toggleShowReset(false);
+    controller.toggleShowReset(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 2. Predictability Score
+    expect(storage.hasSeenStoryPredictability, isFalse);
+    expect(controller.unlockPredictability(), isTrue);
+    expect(storage.hasSeenStoryPredictability, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.predictabilityScore);
+    controller.toggleShowPredictability(false);
+    controller.toggleShowPredictability(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 3. Random Button
+    expect(storage.hasSeenStoryRandom, isFalse);
+    expect(controller.unlockRandom(), isTrue);
+    expect(storage.hasSeenStoryRandom, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.randomButton);
+    controller.toggleShowRandom(false);
+    controller.toggleShowRandom(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 4. Show Algorithm
+    expect(storage.hasSeenStoryAlgorithm, isFalse);
+    expect(controller.unlockAlgorithm(), isTrue);
+    expect(storage.hasSeenStoryAlgorithm, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.showAlgorithm);
+    controller.toggleShowAlgorithm(false);
+    controller.toggleShowAlgorithm(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 5. Your Prediction
+    expect(storage.hasSeenStoryYourPrediction, isFalse);
+    expect(controller.unlockYourPrediction(), isTrue);
+    expect(storage.hasSeenStoryYourPrediction, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.yourPrediction);
+    controller.toggleShowYourPrediction(false);
+    controller.toggleShowYourPrediction(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 6. PC Next Move
+    expect(storage.hasSeenStoryPcNextMove, isFalse);
+    expect(controller.unlockNextMove(), isTrue);
+    expect(storage.hasSeenStoryPcNextMove, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.pcNextMove);
+    controller.toggleShowNextMove(false);
+    controller.toggleShowNextMove(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 7. Suggestion
+    expect(storage.hasSeenStorySuggestion, isFalse);
+    expect(controller.unlockSuggestion(), isTrue);
+    expect(storage.hasSeenStorySuggestion, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.suggestion);
+    controller.toggleShowSuggestion(false);
+    controller.toggleShowSuggestion(true);
+    expect(controller.pendingStoryChapter, isNull);
+
+    // 8. Crystal Ball
+    expect(storage.hasSeenStoryCrystalBall, isFalse);
+    expect(controller.unlockCrystalBall(), isTrue);
+    expect(storage.hasSeenStoryCrystalBall, isTrue);
+    expect(controller.consumePendingStory(), StoryChapter.crystalBall);
+    controller.toggleShowCrystalBall(false);
+    controller.toggleShowCrystalBall(true);
+    expect(controller.pendingStoryChapter, isNull);
   });
 
   test('PC move is pre-selected before user plays turn and matches crystalBallMove', () async {

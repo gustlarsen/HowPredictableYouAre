@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
+import '../../models/story_chapter.dart';
 import '../../services/localization_service.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
@@ -11,6 +12,8 @@ import '../widgets/markov_matrix_view.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/help_dialog.dart';
+import '../dialogs/story_dialog.dart';
+import '../dialogs/story_gallery_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -20,6 +23,8 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
+  bool _isIntroDialogScheduled = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +46,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       controller.audio.pauseMusic();
     } else if (state == AppLifecycleState.resumed) {
       controller.audio.resumeMusic();
+    }
+  }
+
+  void _checkIntroStory(BuildContext context, GameController controller) {
+    if (!_isIntroDialogScheduled &&
+        controller.pendingStoryChapter == StoryChapter.intro &&
+        !controller.hasSeenStoryIntro) {
+      _isIntroDialogScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final introChapter = controller.consumePendingStory(StoryChapter.intro);
+        if (introChapter != null) {
+          StoryDialog.show(
+            context,
+            chapter: introChapter,
+            controller: controller,
+          );
+        }
+      });
     }
   }
 
@@ -166,6 +190,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     final loc = controller.localization;
     final bgImage = _resolveBackgroundImage(controller);
 
+    _checkIntroStory(context, controller);
     _check100RoundAlert(context, controller);
 
     return Scaffold(
@@ -223,6 +248,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               tooltip: loc.t('string53', fallback: 'RESET'),
               onPressed: () => _confirmReset(context, controller, loc),
             ),
+          IconButton(
+            key: const ValueKey('appbar_story_gallery_button'),
+            icon: const Icon(Icons.auto_stories_outlined),
+            tooltip: loc.t('story_gallery_title', fallback: 'Story Memories'),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => StoryGalleryDialog(controller: controller),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Help',

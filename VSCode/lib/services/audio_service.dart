@@ -76,6 +76,20 @@ class AudioService {
     }
   }
 
+  /// Plays a soft magical chime/transmutation audio effect when a comic cutscene opens.
+  Future<void> playStoryChime() async {
+    if (vibrationEnabled) {
+      HapticFeedback.selectionClick();
+    }
+    if (!soundEnabled) return;
+    try {
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/chime.wav'));
+    } catch (error) {
+      debugPrint('Could not play story chime sound: $error');
+    }
+  }
+
   Future<void> startMusic() async {
     if (!musicEnabled) return;
     try {

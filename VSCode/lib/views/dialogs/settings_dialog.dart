@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
+import 'story_gallery_dialog.dart';
 
 class SettingsDialog extends StatelessWidget {
   final GameController controller;
@@ -114,6 +115,44 @@ class SettingsDialog extends StatelessWidget {
                 title: const Text('Animations:'),
                 value: controller.animationsEnabled,
                 onChanged: controller.toggleAnimations,
+              ),
+
+              const Divider(height: 20),
+
+              // Story Memories / Lore Gallery button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('settings_story_memories_button'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.amber,
+                    side: BorderSide(
+                      color: Colors.amber.withValues(alpha: 0.55),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (controller.vibrationEnabled) {
+                      HapticFeedback.selectionClick();
+                    }
+                    showDialog(
+                      context: context,
+                      builder: (_) =>
+                          StoryGalleryDialog(controller: controller),
+                    );
+                  },
+                  icon: const Icon(Icons.auto_stories_outlined, size: 20),
+                  label: Text(
+                    loc.t('story_gallery_title', fallback: 'Story Memories'),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 12),

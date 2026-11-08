@@ -15,7 +15,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('App smoke test loads GameScreen and displays diamonds in AppBar', (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+    });
     final storage = StorageService();
     await storage.init();
 
@@ -45,7 +47,7 @@ void main() {
     expect(controller.turnCount, 0);
 
     // Tap ROCK and verify immediate response without waiting for button animation
-    await tester.tap(find.text('ROCK'));
+    await tester.tap(find.text('ROCK').last);
     await tester.pump();
     expect(controller.turnCount, 1);
 
@@ -53,7 +55,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
 
     // Tap ROCK again mid-animation: should immediately increment turnCount and restart animation
-    await tester.tap(find.text('ROCK'));
+    await tester.tap(find.text('ROCK').last);
     await tester.pump();
     expect(controller.turnCount, 2);
 
@@ -218,6 +220,7 @@ void main() {
 
   testWidgets('HintsBar displays Random when Markov row is empty and shows all tied moves on tie', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
       'unlockedYourPrediction': true,
       'unlockedNextMove': true,
       'unlockedSuggestion': true,
@@ -281,6 +284,7 @@ void main() {
 
   testWidgets('Crystal Ball displays exact pre-selected PC move even when Markov table is empty (Random)', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
       'unlockedCrystalBall': true,
       'showCrystalBall': true,
       'animationsEnabled': false,
@@ -317,6 +321,7 @@ void main() {
 
   testWidgets('Crystal Ball+ store visibility, costs, activation dependency, state restoration, and single main screen display', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
       'diamonds': 100000,
       'animationsEnabled': false,
     });
@@ -356,6 +361,10 @@ void main() {
     expect(controller.diamonds, 80000);
     expect(controller.unlockedCrystalBall, isTrue);
     expect(controller.showCrystalBall, isTrue);
+    await tester.pumpAndSettle();
+
+    // Scroll down further to reveal the newly added Crystal Ball+ tile in the ListView
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
     await tester.pumpAndSettle();
 
     // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store with cost 50000
@@ -429,6 +438,7 @@ void main() {
 
   testWidgets('Attempting to purchase an item without enough diamonds only shows notification and gives no free diamonds', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
       'diamonds': 20,
       'animationsEnabled': false,
     });
@@ -463,5 +473,126 @@ void main() {
     expect(find.byType(SnackBarAction), findsNothing);
     expect(controller.diamonds, 20);
     expect(controller.unlockedReset, isFalse);
+  });
+
+  testWidgets('Intro comic cutscene opens automatically on first launch, advances panels, and persists has_seen_story_intro', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Intro comic cutscene should be open automatically
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
+    expect(find.text('Panel 1 / 4'), findsOneWidget);
+    expect(storage.hasSeenStoryIntro, isTrue);
+
+    // Tap Next through panels 2, 3, 4
+    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 2 / 4'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 3 / 4'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 4 / 4'), findsOneWidget);
+
+    // Final tap on Continue closes the cutscene
+    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.pumpAndSettle();
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+  });
+
+  testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'diamonds': 1000,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Open ShopDialog and unlock Reset Button (first item)
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Unlock').first);
+    await tester.pumpAndSettle();
+
+    // Reset Button comic cutscene should open immediately
+    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsOneWidget);
+    expect(storage.hasSeenStoryReset, isTrue);
+
+    // Skip the cutscene
+    await tester.tap(find.byKey(const ValueKey('story_skip_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+
+    // Toggling the Reset switch off and on in the shop should NOT re-trigger the comic
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+
+    // Close ShopDialog
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    // Open SettingsDialog and open Story Memories gallery
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('settings_story_memories_button')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('settings_story_memories_button')));
+    await tester.pumpAndSettle();
+
+    // Prologue and Reset Button chapters are unlocked (2 / 9), while Predictability Score is still locked
+    expect(find.text('2 / 9'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_reset')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsOneWidget);
+
+    // Tap the unlocked Reset chapter in Story Gallery to replay its comic
+    await tester.tap(find.byKey(const ValueKey('story_gallery_item_reset')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('story_skip_button')), findsOneWidget);
+    expect(find.text('Panel 1 / 4'), findsOneWidget);
   });
 }
