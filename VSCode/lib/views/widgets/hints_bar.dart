@@ -7,9 +7,9 @@ class HintsBar extends StatelessWidget {
 
   const HintsBar({super.key, required this.controller});
 
-  String _formatMoves(List<HandMove> moves, String randomLabel) {
+  String _formatMoves(List<HandMove> moves) {
     if (moves.isEmpty) {
-      return randomLabel;
+      return '?';
     }
     return moves.map((m) => m.emoji).join(' ');
   }
@@ -24,8 +24,6 @@ class HintsBar extends StatelessWidget {
 
     if (!hasAnyHint) return const SizedBox.shrink();
 
-    final randomLabel = loc.t('string15', fallback: 'Random');
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Wrap(
@@ -36,22 +34,22 @@ class HintsBar extends StatelessWidget {
           if (controller.showYourPrediction)
             _HintChip(
               icon: Icons.psychology_outlined,
-              label: loc.t('string12', fallback: 'Probably you choose:'),
-              value: _formatMoves(controller.predictedUserMoves, randomLabel),
+              label: loc.t('string12', fallback: 'You will Chose:'),
+              value: _formatMoves(controller.predictedUserMoves),
               color: Colors.blueAccent,
             ),
           if (controller.showNextMove)
             _HintChip(
               icon: Icons.smart_toy_outlined,
-              label: loc.t('string13', fallback: 'PC will choose:'),
-              value: _formatMoves(controller.pcNextMoves, randomLabel),
+              label: loc.t('string13', fallback: 'PC will Chose:'),
+              value: _formatMoves(controller.pcNextMoves),
               color: Colors.orangeAccent,
             ),
           if (controller.showSuggestion)
             _HintChip(
               icon: Icons.lightbulb_outline,
               label: loc.t('string14', fallback: 'Suggestion:'),
-              value: _formatMoves(controller.suggestedMoves, randomLabel),
+              value: _formatMoves(controller.suggestedMoves),
               color: Colors.greenAccent,
             ),
           if (controller.showCrystalBall &&

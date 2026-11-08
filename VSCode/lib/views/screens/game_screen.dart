@@ -13,7 +13,6 @@ import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/help_dialog.dart';
 import '../dialogs/story_dialog.dart';
-import '../dialogs/story_gallery_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -249,17 +248,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               onPressed: () => _confirmReset(context, controller, loc),
             ),
           IconButton(
-            key: const ValueKey('appbar_story_gallery_button'),
-            icon: const Icon(Icons.auto_stories_outlined),
-            tooltip: loc.t('story_gallery_title', fallback: 'Story Memories'),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => StoryGalleryDialog(controller: controller),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Help',
             onPressed: () {
@@ -378,36 +366,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           ),
                           child: Column(
                             children: [
-                              // RESET BUTTON: Positioned prominently ABOVE hand moves (matching Kodular Horizontal_Arrangement12)
-                              if (controller.showReset) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12.0),
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.redAccent,
-                                        side: const BorderSide(color: Colors.redAccent, width: 1.5),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                      ),
-                                      onPressed: () => _confirmReset(context, controller, loc),
-                                      icon: const Icon(Icons.restart_alt, color: Colors.redAccent, size: 20),
-                                      label: Text(
-                                        loc.t('string53', fallback: 'RESET').toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.redAccent,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.0,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-
                               // Extended hands row (Lizard / Spock) if enabled
                               if (controller.showNewHands) ...[
                                 Row(

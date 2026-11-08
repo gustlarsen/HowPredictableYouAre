@@ -9,6 +9,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
 void main() {
@@ -218,9 +219,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 375));
   });
 
-  testWidgets('HintsBar displays Random when Markov row is empty and shows all tied moves on tie', (WidgetTester tester) async {
+  testWidgets('HintsBar displays ? when Markov row is empty and shows all tied moves on tie', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
+      'unlockedReset': true,
+      'showReset': true,
       'unlockedYourPrediction': true,
       'unlockedNextMove': true,
       'unlockedSuggestion': true,
@@ -247,18 +250,36 @@ void main() {
       ),
     );
 
-    // Initially, Markov matrix is empty -> all three hint chips show 'Random'
-    expect(find.text('Random'), findsNWidgets(3));
+    // Verify updated labels and single AppBar reset button
+    expect(find.text('You will Chose:'), findsOneWidget);
+    expect(find.text('PC will Chose:'), findsOneWidget);
+    expect(find.text('PC Chose'), findsOneWidget);
+    expect(find.text('The winner of this round:'), findsOneWidget);
+    expect(find.text('The winner of this round::'), findsNothing);
+    expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+    expect(find.byKey(const ValueKey('appbar_story_gallery_button')), findsNothing);
 
-    // After 1st turn (Rock), no transition recorded yet -> still 'Random'
+    // Initially, Markov matrix is empty -> all three hint chips show '?'
+    expect(
+      find.descendant(of: find.byType(HintsBar), matching: find.text('?')),
+      findsNWidgets(3),
+    );
+
+    // After 1st turn (Rock), no transition recorded yet -> still '?'
     controller.playTurn(HandMove.rock);
     await tester.pump();
-    expect(find.text('Random'), findsNWidgets(3));
+    expect(
+      find.descendant(of: find.byType(HintsBar), matching: find.text('?')),
+      findsNWidgets(3),
+    );
 
-    // 2nd turn: Rock -> Paper recorded; lastUserMove is now Paper (row for Paper is still empty -> 'Random')
+    // 2nd turn: Rock -> Paper recorded; lastUserMove is now Paper (row for Paper is still empty -> '?')
     controller.playTurn(HandMove.paper);
     await tester.pump();
-    expect(find.text('Random'), findsNWidgets(3));
+    expect(
+      find.descendant(of: find.byType(HintsBar), matching: find.text('?')),
+      findsNWidgets(3),
+    );
 
     // 3rd turn: Paper -> Rock recorded; lastUserMove is now Rock (row for Rock has Paper=1)
     // Now HintsBar should show: Probably: ✋, PC: ✌, Suggestion: ✊

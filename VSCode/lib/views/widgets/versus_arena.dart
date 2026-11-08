@@ -262,7 +262,7 @@ class _VersusArenaState extends State<VersusArena>
                   child: _MoveCard(
                     label: widget.localization.t(
                       'string52',
-                      fallback: 'PC Chose:',
+                      fallback: 'PC Chose',
                     ),
                     move: widget.computerMove,
                     isLeft: false,
@@ -325,7 +325,10 @@ class _VersusArenaState extends State<VersusArena>
             runSpacing: 4,
             children: [
               Text(
-                '${widget.localization.t('string10', fallback: 'Winner')}:',
+                widget.localization.t(
+                  'string10',
+                  fallback: 'The winner of this round:',
+                ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
                   color: Colors.grey.shade400,
