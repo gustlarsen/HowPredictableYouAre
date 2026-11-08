@@ -21,6 +21,7 @@ class GameController extends ChangeNotifier {
   HandMove? predictedUserMove;
   HandMove? pcNextMove;
   HandMove? suggestedMove;
+  HandMove? crystalBallMove;
 
   List<HandMove> predictedUserMoves = [];
   List<HandMove> pcNextMoves = [];
@@ -50,6 +51,7 @@ class GameController extends ChangeNotifier {
   bool unlockedNextMove = false;
   bool unlockedSuggestion = false;
   bool unlockedAds = false;
+  bool unlockedCrystalBall = false;
 
   // Active toggles
   bool showReset = false;
@@ -60,6 +62,7 @@ class GameController extends ChangeNotifier {
   bool showYourPrediction = false;
   bool showNextMove = false;
   bool showSuggestion = false;
+  bool showCrystalBall = false;
 
   bool is100RoundsAlertPending = false;
   bool isGiftAvailable = true;
@@ -97,6 +100,7 @@ class GameController extends ChangeNotifier {
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
+    unlockedCrystalBall = storage.unlockedCrystalBall;
 
     showReset = storage.showReset;
     showPredictability = storage.showPredictability;
@@ -106,6 +110,7 @@ class GameController extends ChangeNotifier {
     showYourPrediction = storage.showYourPrediction;
     showNextMove = storage.showNextMove;
     showSuggestion = storage.showSuggestion;
+    showCrystalBall = storage.showCrystalBall;
 
     audio.soundEnabled = soundEnabled;
     audio.musicEnabled = musicEnabled;
@@ -143,12 +148,11 @@ class GameController extends ChangeNotifier {
     turnCount++;
     currentUserMove = userChoice;
 
-    // AI selects its move: if no transition data for lastUserMove yet -> random, otherwise smart choice
-    if (!_engine.hasPrediction(lastUserMove)) {
-      currentComputerMove = _engine.getRandomMove();
-    } else {
-      currentComputerMove = _engine.computeSmartChoice(lastUserMove);
-    }
+    // AI uses the move already pre-computed before the user chose their hand
+    currentComputerMove = crystalBallMove ??
+        (!_engine.hasPrediction(lastUserMove)
+            ? _engine.getRandomMove()
+            : _engine.computeSmartChoice(lastUserMove));
 
     // Determine round outcome
     if (currentUserMove == currentComputerMove) {
@@ -194,8 +198,15 @@ class GameController extends ChangeNotifier {
     pcNextMoves = _engine.computeSmartChoices(lastUserMove);
     suggestedMoves = _engine.computeSuggestions(pcNextMoves);
 
+    // Pre-decide the exact PC move (Markov counter or random fallback) before the user chooses a hand
+    if (!_engine.hasPrediction(lastUserMove)) {
+      crystalBallMove = _engine.getRandomMove();
+    } else {
+      crystalBallMove = _engine.computeSmartChoice(lastUserMove);
+    }
+
     predictedUserMove = predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-    pcNextMove = pcNextMoves.isNotEmpty ? pcNextMoves.first : null;
+    pcNextMove = crystalBallMove;
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
@@ -337,6 +348,18 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  bool unlockCrystalBall() {
+    return purchaseItem(
+      cost: 100000,
+      onUnlock: () {
+        unlockedCrystalBall = true;
+        showCrystalBall = true;
+        storage.setUnlockedCrystalBall(true);
+        storage.setShowCrystalBall(true);
+      },
+    );
+  }
+
   /// Gift feature: periodic free diamonds (matching Kodular ButtonGift / Clock1)
   void claimGift() {
     if (!isGiftAvailable) return;
@@ -393,6 +416,12 @@ class GameController extends ChangeNotifier {
   void toggleShowSuggestion(bool val) {
     showSuggestion = val;
     storage.setShowSuggestion(val);
+    notifyListeners();
+  }
+
+  void toggleShowCrystalBall(bool val) {
+    showCrystalBall = val;
+    storage.setShowCrystalBall(val);
     notifyListeners();
   }
 

@@ -278,4 +278,40 @@ void main() {
     expect(find.text('✌ ✊'), findsOneWidget);
     expect(find.text('✊ ✋'), findsOneWidget);
   });
+
+  testWidgets('Crystal Ball displays exact pre-selected PC move even when Markov table is empty (Random)', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'unlockedCrystalBall': true,
+      'showCrystalBall': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Before first move, Markov table is empty, yet Crystal Ball already predicts the exact random PC move
+    final predictedBeforeTurn = controller.crystalBallMove;
+    expect(predictedBeforeTurn, isNotNull);
+    expect(find.text('Crystal Ball:'), findsOneWidget);
+    expect(find.text(predictedBeforeTurn!.emoji), findsWidgets);
+
+    // When the user plays a hand, the PC plays the exact move shown in the Crystal Ball
+    await tester.tap(find.text('ROCK'));
+    await tester.pump();
+    expect(controller.currentComputerMove, equals(predictedBeforeTurn));
+  });
 }

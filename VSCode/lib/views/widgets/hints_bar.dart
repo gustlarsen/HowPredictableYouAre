@@ -19,7 +19,8 @@ class HintsBar extends StatelessWidget {
     final loc = controller.localization;
     final hasAnyHint = controller.showYourPrediction ||
         controller.showNextMove ||
-        controller.showSuggestion;
+        controller.showSuggestion ||
+        controller.showCrystalBall;
 
     if (!hasAnyHint) return const SizedBox.shrink();
 
@@ -52,6 +53,13 @@ class HintsBar extends StatelessWidget {
               label: loc.t('string14', fallback: 'Suggestion:'),
               value: _formatMoves(controller.suggestedMoves, randomLabel),
               color: Colors.greenAccent,
+            ),
+          if (controller.showCrystalBall && controller.crystalBallMove != null)
+            _HintChip(
+              icon: Icons.auto_awesome,
+              label: loc.t('string81', fallback: 'Crystal Ball:'),
+              value: controller.crystalBallMove!.emoji,
+              color: Colors.purpleAccent,
             ),
         ],
       ),

@@ -269,6 +269,22 @@ class ShopDialog extends StatelessWidget {
                       },
                       onToggle: (_) {},
                     ),
+                    _ShopItemTile(
+                      title: loc.t('string80', fallback: 'Crystal Ball'),
+                      cost: 100000,
+                      isUnlocked: controller.unlockedCrystalBall,
+                      isActive: controller.showCrystalBall,
+                      enabledLabel: enabledStr,
+                      disabledLabel: disabledStr,
+                      onUnlock: () {
+                        final ok = controller.unlockCrystalBall();
+                        _handleUnlock(context, loc.t('string80', fallback: 'Crystal Ball'), ok);
+                      },
+                      onToggle: (val) {
+                        controller.toggleShowCrystalBall(val);
+                        _handleToggle(context, loc.t('string80', fallback: 'Crystal Ball'), val);
+                      },
+                    ),
 
                     const SizedBox(height: 12),
                     // Free diamonds action

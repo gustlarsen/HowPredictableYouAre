@@ -80,7 +80,16 @@ class StorageService {
   bool get unlockedAds => _prefs.getBool('unlockedAds') ?? false;
   Future<void> setUnlockedAds(bool val) => _prefs.setBool('unlockedAds', val);
 
+  bool get unlockedCrystalBall =>
+      _prefs.getBool('unlockedCrystalBall') ?? false;
+  Future<void> setUnlockedCrystalBall(bool val) =>
+      _prefs.setBool('unlockedCrystalBall', val);
+
   // Feature Active Toggles
+  bool get showCrystalBall =>
+      _prefs.getBool('showCrystalBall') ?? unlockedCrystalBall;
+  Future<void> setShowCrystalBall(bool val) =>
+      _prefs.setBool('showCrystalBall', val);
   bool get showPredictability =>
       _prefs.getBool('showPredictability') ?? unlockedPredictability;
   Future<void> setShowPredictability(bool val) =>

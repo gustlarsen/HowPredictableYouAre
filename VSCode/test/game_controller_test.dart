@@ -144,4 +144,46 @@ void main() {
     controller.playTurn(HandMove.rock);
     expect(controller.turnCount, 2);
   });
+
+  test('Crystal Ball purchase costs 100000 diamonds and can be toggled', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 100000,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.unlockedCrystalBall, isFalse);
+    expect(controller.showCrystalBall, isFalse);
+
+    final ok = controller.unlockCrystalBall();
+    expect(ok, isTrue);
+    expect(controller.diamonds, 0);
+    expect(controller.unlockedCrystalBall, isTrue);
+    expect(controller.showCrystalBall, isTrue);
+    expect(storage.unlockedCrystalBall, isTrue);
+    expect(storage.showCrystalBall, isTrue);
+
+    controller.toggleShowCrystalBall(false);
+    expect(controller.showCrystalBall, isFalse);
+    expect(storage.showCrystalBall, isFalse);
+  });
+
+  test('PC move is pre-selected before user plays turn and matches crystalBallMove', () async {
+    await createController(resetPreferences: true);
+
+    for (final userChoice in [
+      HandMove.rock,
+      HandMove.paper,
+      HandMove.scissors,
+      HandMove.rock,
+      HandMove.paper,
+    ]) {
+      final preselectedPcMove = controller.crystalBallMove;
+      expect(preselectedPcMove, isNotNull);
+
+      controller.playTurn(userChoice);
+
+      expect(controller.currentComputerMove, equals(preselectedPcMove));
+    }
+  });
 }
