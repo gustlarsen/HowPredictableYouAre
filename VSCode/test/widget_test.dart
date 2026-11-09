@@ -538,21 +538,58 @@ void main() {
     expect(find.text('Panel 1 / 4'), findsOneWidget);
     expect(storage.hasSeenStoryIntro, isTrue);
 
-    // Tap Next through panels 2, 3, 4
-    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    // No speech bubbles over the comic image; only the dialogue text box below
+    expect(find.byKey(const ValueKey('comic_bubble_0')), findsNothing);
+    expect(find.byKey(const ValueKey('story_active_dialogue_text')), findsOneWidget);
+
+    // Back button with left arrow is at the left side of the Next button
+    final backBtnFinder = find.byKey(const ValueKey('story_back_button'));
+    final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
+    expect(backBtnFinder, findsOneWidget);
+    expect(nextBtnFinder, findsOneWidget);
+    expect(
+      find.descendant(of: backBtnFinder, matching: find.byIcon(Icons.arrow_back_rounded)),
+      findsOneWidget,
+    );
+    expect(
+      tester.getCenter(backBtnFinder).dx,
+      lessThan(tester.getCenter(nextBtnFinder).dx),
+    );
+
+    // Slide finger to the left on dialogue box -> moves forward to Panel 2
+    await tester.drag(find.byKey(const ValueKey('story_dialogue_box')), const Offset(-120, 0));
     await tester.pumpAndSettle();
     expect(find.text('Panel 2 / 4'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    // Slide finger to the right on dialogue box -> rewinds to Panel 1
+    await tester.drag(find.byKey(const ValueKey('story_dialogue_box')), const Offset(120, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 1 / 4'), findsOneWidget);
+
+    // Tap Next to Panel 2, then tap Back button -> rewinds to Panel 1
+    await tester.tap(nextBtnFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 2 / 4'), findsOneWidget);
+
+    await tester.tap(backBtnFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 1 / 4'), findsOneWidget);
+
+    // Tap Next through panels 2, 3, 4
+    await tester.tap(nextBtnFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 2 / 4'), findsOneWidget);
+
+    await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(find.text('Panel 3 / 4'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(find.text('Panel 4 / 4'), findsOneWidget);
 
     // Final tap on Continue closes the cutscene
-    await tester.tap(find.byKey(const ValueKey('story_next_button')));
+    await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
   });
@@ -623,6 +660,20 @@ void main() {
     expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
     expect(find.byKey(const ValueKey('story_gallery_item_reset')), findsOneWidget);
     expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsOneWidget);
+
+    // Verify Story Memories layout: chapter name is above thumbnail and read button,
+    // and thumbnail and read button are in the same horizontal line
+    final introTitleFinder = find.text("Prologue: The Master Hand's Shadow");
+    final introThumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro'));
+    final introReadBtnFinder = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
+    expect(
+      tester.getBottomLeft(introTitleFinder).dy,
+      lessThan(tester.getTopLeft(introThumbFinder).dy),
+    );
+    expect(
+      tester.getCenter(introThumbFinder).dy,
+      equals(tester.getCenter(introReadBtnFinder).dy),
+    );
 
     // Tap the unlocked Reset chapter in Story Gallery to replay its comic
     await tester.tap(find.byKey(const ValueKey('story_gallery_item_reset')));

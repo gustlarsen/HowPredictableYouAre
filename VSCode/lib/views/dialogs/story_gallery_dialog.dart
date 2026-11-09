@@ -223,95 +223,43 @@ class _StoryChapterCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Row(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Thumbnail or Mysterious Silhouette
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 64,
-                    height: 76,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ColorFiltered(
-                          colorFilter: isUnlocked
-                              ? const ColorFilter.mode(
-                                  Colors.transparent,
-                                  BlendMode.dst,
-                                )
-                              : _silhouetteFilter,
-                          child: Image.asset(
-                            chapter.assetPath,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                              color: const Color(0xFF1A1D26),
-                              child: Icon(
-                                chapter.icon,
-                                color:
-                                    isUnlocked ? Colors.amber : Colors.white24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!isUnlocked)
-                          Container(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            child: const Center(
-                              child: Icon(
-                                Icons.lock_outline_rounded,
-                                color: Colors.white54,
-                                size: 26,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Chapter Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isUnlocked
-                                  ? Colors.amber.withValues(alpha: 0.2)
-                                  : Colors.white10,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '#$chapterNumber',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    isUnlocked ? Colors.amber : Colors.white54,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            isUnlocked ? chapter.icon : Icons.help_outline,
-                            size: 15,
-                            color: isUnlocked ? Colors.amber : Colors.grey,
-                          ),
-                        ],
+                // Chapter Details above the thumbnail and read button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
+                      decoration: BoxDecoration(
+                        color: isUnlocked
+                            ? Colors.amber.withValues(alpha: 0.2)
+                            : Colors.white10,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '#$chapterNumber',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isUnlocked ? Colors.amber : Colors.white54,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      isUnlocked ? chapter.icon : Icons.help_outline,
+                      size: 15,
+                      color: isUnlocked ? Colors.amber : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
                         chapterTitle,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -323,65 +271,124 @@ class _StoryChapterCard extends StatelessWidget {
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isUnlocked
-                              ? Colors.amber.shade300
-                              : theme.colorScheme.onSurfaceVariant.withValues(
-                                  alpha: 0.65,
-                                ),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-
-                // Action Icon / Button
-                if (isUnlocked)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.menu_book_rounded,
-                          size: 16,
-                          color: Colors.amber,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          replayLabel,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber,
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isUnlocked
+                        ? Colors.amber.shade300
+                        : theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.65,
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Icon(
-                      Icons.lock_rounded,
-                      color: Colors.grey,
-                      size: 20,
-                    ),
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+
+                // Thumbnail and Read Button in the same line
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Thumbnail or Mysterious Silhouette
+                    ClipRRect(
+                      key: ValueKey('story_gallery_thumb_${chapter.id}'),
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 64,
+                        height: 76,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColorFiltered(
+                              colorFilter: isUnlocked
+                                  ? const ColorFilter.mode(
+                                      Colors.transparent,
+                                      BlendMode.dst,
+                                    )
+                                  : _silhouetteFilter,
+                              child: Image.asset(
+                                chapter.assetPath,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.topCenter,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  color: const Color(0xFF1A1D26),
+                                  child: Icon(
+                                    chapter.icon,
+                                    color: isUnlocked
+                                        ? Colors.amber
+                                        : Colors.white24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (!isUnlocked)
+                              Container(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.lock_outline_rounded,
+                                    color: Colors.white54,
+                                    size: 26,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Action Icon / Button
+                    if (isUnlocked)
+                      Container(
+                        key: ValueKey('story_gallery_read_btn_${chapter.id}'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.menu_book_rounded,
+                              size: 16,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              replayLabel,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        key: ValueKey('story_gallery_lock_icon_${chapter.id}'),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),

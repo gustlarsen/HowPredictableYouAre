@@ -336,6 +336,7 @@
 "de_string83": "Kristallkugel+:",
 
 "en_story_skip": "Skip",
+"en_story_back": "Back",
 "en_story_next": "Next",
 "en_story_tap_continue": "Tap to Continue",
 "en_story_finish": "Continue",
@@ -398,6 +399,7 @@
 "en_story_crystal_ball_p4": "Behold the Crystal Ball! No longer a mere guess—it reveals Master Hand's exact move before you play!",
 
 "pt_story_skip": "Pular",
+"pt_story_back": "Voltar",
 "pt_story_next": "Próximo",
 "pt_story_tap_continue": "Toque para Continuar",
 "pt_story_finish": "Continuar",
@@ -460,6 +462,7 @@
 "pt_story_crystal_ball_p4": "Contemple a Bola de Cristal! Não é mais um palpite—ela revela a jogada exata da Mão Mestre antes de você jogar!",
 
 "es_story_skip": "Saltar",
+"es_story_back": "Atrás",
 "es_story_next": "Siguiente",
 "es_story_tap_continue": "Toca para Continuar",
 "es_story_finish": "Continuar",
@@ -522,6 +525,7 @@
 "es_story_crystal_ball_p4": "¡Contempla la Bola de Cristal! Ya no es una suposición: ¡revela la jugada exacta antes de que juegues!",
 
 "de_story_skip": "Überspringen",
+"de_story_back": "Zurück",
 "de_story_next": "Weiter",
 "de_story_tap_continue": "Tippen zum Fortfahren",
 "de_story_finish": "Weiter",

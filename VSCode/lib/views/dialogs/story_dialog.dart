@@ -65,6 +65,7 @@ class _StoryDialogState extends State<StoryDialog> {
 
   int _currentPanelIndex = 0;
   int _revealedCharCount = 0;
+  double _horizontalDragDelta = 0.0;
   Timer? _typewriterTimer;
 
   List<StoryPanelData> get _panels => widget.chapter.panels;
@@ -89,6 +90,8 @@ class _StoryDialogState extends State<StoryDialog> {
     final fullText = _localizedPanelText(_activePanel);
     return _revealedCharCount >= fullText.length;
   }
+
+  bool get _isFirstPanel => _currentPanelIndex <= 0;
 
   bool get _isLastPanel => _currentPanelIndex >= _panels.length - 1;
 
@@ -174,12 +177,30 @@ class _StoryDialogState extends State<StoryDialog> {
     _advanceOrClose();
   }
 
+  void _handleBackButtonTap() {
+    if (_isFirstPanel) return;
+    widget.controller.audio.playTapVibrate();
+    _rewindPanel();
+  }
+
   void _handleNextButtonTap() {
     widget.controller.audio.playTapVibrate();
     _advanceOrClose();
   }
 
-  void _advanceOrClose() {
+  void _rewindPanel() {
+    if (!_isFirstPanel) {
+      setState(() {
+        _currentPanelIndex--;
+      });
+      _startTypewriterForCurrentPanel();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToPanel(_currentPanelIndex);
+      });
+    }
+  }
+
+  void _advancePanelOnly() {
     if (!_isLastPanel) {
       setState(() {
         _currentPanelIndex++;
@@ -188,9 +209,41 @@ class _StoryDialogState extends State<StoryDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToPanel(_currentPanelIndex);
       });
+    }
+  }
+
+  void _advanceOrClose() {
+    if (!_isLastPanel) {
+      _advancePanelOnly();
     } else {
       _closeCutscene();
     }
+  }
+
+  void _handleDialogueHorizontalDragStart(DragStartDetails details) {
+    _horizontalDragDelta = 0.0;
+  }
+
+  void _handleDialogueHorizontalDragUpdate(DragUpdateDetails details) {
+    _horizontalDragDelta += details.primaryDelta ?? 0.0;
+  }
+
+  void _handleDialogueHorizontalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0.0;
+    if (_horizontalDragDelta > 24 || velocity > 150) {
+      // Sliding finger to the right -> rewind to previous panel
+      if (!_isFirstPanel) {
+        widget.controller.audio.playTapVibrate();
+        _rewindPanel();
+      }
+    } else if (_horizontalDragDelta < -24 || velocity < -150) {
+      // Sliding finger to the left -> move forward to next panel
+      if (!_isLastPanel) {
+        widget.controller.audio.playTapVibrate();
+        _advancePanelOnly();
+      }
+    }
+    _horizontalDragDelta = 0.0;
   }
 
   void _closeCutscene() {
@@ -208,6 +261,7 @@ class _StoryDialogState extends State<StoryDialog> {
       fallback: widget.chapter.fallbackTitle,
     );
     final skipLabel = loc.t('story_skip', fallback: 'Skip');
+    final backLabel = loc.t('story_back', fallback: 'Back');
     final nextLabel = loc.t('story_next', fallback: 'Next');
     final tapContinueLabel = loc.t(
       'story_tap_continue',
@@ -375,23 +429,15 @@ class _StoryDialogState extends State<StoryDialog> {
                                         ),
                                       ),
 
-                                      // 4 Scene Panel Overlays + Dynamic Speech Bubbles
+                                      // 4 Scene Panel Overlays (No speech bubbles over the artwork)
                                       Column(
                                         children: List.generate(
                                           _panels.length,
                                           (index) {
-                                            final panel = _panels[index];
                                             final isRevealed =
                                                 index <= _currentPanelIndex;
                                             final isActive =
                                                 index == _currentPanelIndex;
-                                            final fullPanelText =
-                                                _localizedPanelText(panel);
-                                            final bubbleText = isActive
-                                                ? visibleActiveText
-                                                : fullPanelText;
-                                            final speaker =
-                                                _localizedSpeaker(panel);
 
                                             return Expanded(
                                               child: AnimatedContainer(
@@ -418,27 +464,8 @@ class _StoryDialogState extends State<StoryDialog> {
                                                         )
                                                       : null,
                                                 ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 8,
-                                                ),
                                                 child: isRevealed
-                                                    ? Align(
-                                                        alignment: panel
-                                                            .bubbleAlignment,
-                                                        child:
-                                                            _ComicSpeechBubble(
-                                                          key: ValueKey(
-                                                            'comic_bubble_$index',
-                                                          ),
-                                                          speaker: speaker,
-                                                          text: bubbleText,
-                                                          isActive: isActive,
-                                                          tailOnLeft:
-                                                              panel.tailOnLeft,
-                                                        ),
-                                                      )
+                                                    ? const SizedBox.expand()
                                                     : Center(
                                                         child: Icon(
                                                           Icons
@@ -467,76 +494,82 @@ class _StoryDialogState extends State<StoryDialog> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Bottom Control Bar: Active Dialogue Box + Stylized "Next / Tap to Continue" Indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF14161F).withValues(alpha: 0.96),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.35),
+                  // Bottom Control Bar: Swipeable Active Dialogue Box + Back & Next Buttons
+                  GestureDetector(
+                    key: const ValueKey('story_dialogue_box'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _handleCanvasTap,
+                    onHorizontalDragStart: _handleDialogueHorizontalDragStart,
+                    onHorizontalDragUpdate: _handleDialogueHorizontalDragUpdate,
+                    onHorizontalDragEnd: _handleDialogueHorizontalDragEnd,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
                       ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Active speaker & typewriter dialogue preview for effortless reading on any screen size
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _localizedSpeaker(activePanel).toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 10,
-                                  letterSpacing: 0.6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF14161F).withValues(alpha: 0.96),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Active speaker & panel progress dots
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _localizedSpeaker(activePanel).toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10,
+                                    letterSpacing: 0.6,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const Spacer(),
-                            // Panel progress dots
-                            Row(
-                              children: List.generate(_panels.length, (i) {
-                                final selected = i == _currentPanelIndex;
-                                final passed = i < _currentPanelIndex;
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 3),
-                                  width: selected ? 18 : 7,
-                                  height: 7,
-                                  decoration: BoxDecoration(
-                                    color: selected
-                                        ? Colors.amber
-                                        : (passed
-                                            ? Colors.amber.withValues(
-                                                alpha: 0.45,
-                                              )
-                                            : Colors.white24),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: _handleCanvasTap,
-                          child: SizedBox(
+                              const Spacer(),
+                              // Panel progress dots
+                              Row(
+                                children: List.generate(_panels.length, (i) {
+                                  final selected = i == _currentPanelIndex;
+                                  final passed = i < _currentPanelIndex;
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
+                                    width: selected ? 18 : 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? Colors.amber
+                                          : (passed
+                                              ? Colors.amber.withValues(
+                                                  alpha: 0.45,
+                                                )
+                                              : Colors.white24),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
                             width: double.infinity,
                             child: Text(
                               visibleActiveText,
@@ -549,14 +582,11 @@ class _StoryDialogState extends State<StoryDialog> {
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: GestureDetector(
-                                onTap: _handleCanvasTap,
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -580,39 +610,78 @@ class _StoryDialogState extends State<StoryDialog> {
                                   ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton.icon(
-                              key: const ValueKey('story_next_button'),
-                              onPressed: _handleNextButtonTap,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                              const SizedBox(width: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ElevatedButton.icon(
+                                    key: const ValueKey('story_back_button'),
+                                    onPressed: _isFirstPanel
+                                        ? null
+                                        : _handleBackButtonTap,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white.withValues(
+                                        alpha: 0.14,
+                                      ),
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor:
+                                          Colors.white.withValues(alpha: 0.05),
+                                      disabledForegroundColor: Colors.white38,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.arrow_back_rounded,
+                                      size: 17,
+                                    ),
+                                    label: Text(
+                                      backLabel,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    key: const ValueKey('story_next_button'),
+                                    onPressed: _handleNextButtonTap,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: Icon(
+                                      _isLastPanel
+                                          ? Icons.check_circle_outline
+                                          : Icons.arrow_forward_rounded,
+                                      size: 17,
+                                    ),
+                                    label: Text(
+                                      _isLastPanel ? finishLabel : nextLabel,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              icon: Icon(
-                                _isLastPanel
-                                    ? Icons.check_circle_outline
-                                    : Icons.arrow_forward_rounded,
-                                size: 17,
-                              ),
-                              label: Text(
-                                _isLastPanel ? finishLabel : nextLabel,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -622,138 +691,6 @@ class _StoryDialogState extends State<StoryDialog> {
         ),
       ),
     );
-  }
-}
-
-class _ComicSpeechBubble extends StatelessWidget {
-  final String speaker;
-  final String text;
-  final bool isActive;
-  final bool tailOnLeft;
-
-  const _ComicSpeechBubble({
-    super.key,
-    required this.speaker,
-    required this.text,
-    required this.isActive,
-    required this.tailOnLeft,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 280),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment:
-            tailOnLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: isActive ? 0.96 : 0.88),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF11131A),
-                width: isActive ? 2.2 : 1.6,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: 6,
-                  offset: const Offset(2, 3),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  speaker.toUpperCase(),
-                  style: TextStyle(
-                    color: Colors.deepOrange.shade800,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 9,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  text,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF11131A),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10.5,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: CustomPaint(
-              size: const Size(14, 8),
-              painter: _BubbleTailPainter(
-                tailOnLeft: tailOnLeft,
-                fillColor:
-                    Colors.white.withValues(alpha: isActive ? 0.96 : 0.88),
-                borderColor: const Color(0xFF11131A),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BubbleTailPainter extends CustomPainter {
-  final bool tailOnLeft;
-  final Color fillColor;
-  final Color borderColor;
-
-  const _BubbleTailPainter({
-    required this.tailOnLeft,
-    required this.fillColor,
-    required this.borderColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..strokeWidth = 1.8
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    if (tailOnLeft) {
-      path.moveTo(0, 0);
-      path.lineTo(size.width * 0.3, size.height);
-      path.lineTo(size.width, 0);
-    } else {
-      path.moveTo(0, 0);
-      path.lineTo(size.width * 0.7, size.height);
-      path.lineTo(size.width, 0);
-    }
-    path.close();
-
-    canvas.drawPath(path, fillPaint);
-    canvas.drawPath(path, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) {
-    return oldDelegate.tailOnLeft != tailOnLeft ||
-        oldDelegate.fillColor != fillColor ||
-        oldDelegate.borderColor != borderColor;
   }
 }
 
