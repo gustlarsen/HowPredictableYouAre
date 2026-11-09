@@ -59,6 +59,65 @@ class ShopDialog extends StatelessWidget {
     );
   }
 
+  Future<bool> _confirmResetForNewHands(BuildContext context) async {
+    final loc = controller.localization;
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(loc.t('string53', fallback: 'RESET')),
+        content: const Text(
+          'This will clear your scores and prediction history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(loc.t('string53', fallback: 'RESET')),
+          ),
+        ],
+      ),
+    );
+    return shouldReset == true;
+  }
+
+  Future<void> _handleNewHandsUnlock(BuildContext context) async {
+    final title = controller.localization.t(
+      'string56',
+      fallback: 'New Hands (Lizard & Spock)',
+    );
+    if (controller.diamonds < 100) {
+      final ok = controller.unlockNewHands();
+      _handleUnlock(context, title, ok);
+      return;
+    }
+    if (controller.hasGameStarted) {
+      final confirmed = await _confirmResetForNewHands(context);
+      if (!confirmed || !context.mounted) return;
+    }
+    final ok = controller.unlockNewHands();
+    _handleUnlock(context, title, ok);
+  }
+
+  Future<void> _handleNewHandsToggle(BuildContext context, bool val) async {
+    final title = controller.localization.t(
+      'string56',
+      fallback: 'New Hands (Lizard & Spock)',
+    );
+    if (controller.hasGameStarted) {
+      final confirmed = await _confirmResetForNewHands(context);
+      if (!confirmed || !context.mounted) return;
+    }
+    controller.toggleShowNewHands(val);
+    _handleToggle(context, title, val);
+  }
+
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
@@ -201,14 +260,8 @@ class ShopDialog extends StatelessWidget {
                       isActive: controller.showNewHands,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
-                      onUnlock: () {
-                        final ok = controller.unlockNewHands();
-                        _handleUnlock(context, loc.t('string56', fallback: 'New Hands (Lizard & Spock)'), ok);
-                      },
-                      onToggle: (val) {
-                        controller.toggleShowNewHands(val);
-                        _handleToggle(context, loc.t('string56', fallback: 'New Hands (Lizard & Spock)'), val);
-                      },
+                      onUnlock: () => _handleNewHandsUnlock(context),
+                      onToggle: (val) => _handleNewHandsToggle(context, val),
                     ),
                     _ShopItemTile(
                       title: loc.t(

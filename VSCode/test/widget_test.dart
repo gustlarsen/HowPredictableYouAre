@@ -824,4 +824,103 @@ void main() {
     expect(tester.getSize(paperFinder), equals(classicPaperSize));
     expect(tester.getSize(scissorsFinder), equals(classicScissorsSize));
   });
+
+  testWidgets('Enabling/disabling New Hands prompts to reset game only when a hand has been chosen, supporting cancel and confirm', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'unlockedNewHands': true,
+      'showNewHands': false,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // 1. At the beginning of the game (no hand chosen yet):
+    // Toggling New Hands in ShopDialog does NOT ask to reset the game
+    expect(controller.hasGameStarted, isFalse);
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.pumpAndSettle();
+
+    // No RESET confirmation dialog should appear; New Hands is enabled immediately
+    expect(find.text('This will clear your scores and prediction history.'), findsNothing);
+    expect(controller.showNewHands, isTrue);
+
+    // Disabling New Hands while still at the beginning also does NOT ask to reset
+    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.pumpAndSettle();
+    expect(find.text('This will clear your scores and prediction history.'), findsNothing);
+    expect(controller.showNewHands, isFalse);
+
+    // Close ShopDialog and play a hand so the game is no longer at the beginning
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ROCK'));
+    await tester.pumpAndSettle();
+    expect(controller.turnCount, 1);
+    expect(controller.hasGameStarted, isTrue);
+
+    // 2. Open ShopDialog and press New Hands to enable it while game is in progress
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.pumpAndSettle();
+
+    // Reset confirmation dialog must appear
+    expect(find.text('This will clear your scores and prediction history.'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('RESET'), findsOneWidget);
+
+    // 3. Cancel the dialog -> keeps the current game and keeps 3 hands (showNewHands == false)
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(controller.showNewHands, isFalse);
+    expect(controller.turnCount, 1);
+    expect(controller.currentUserMove, HandMove.rock);
+    expect(controller.hasGameStarted, isTrue);
+
+    // 4. Press New Hands again and confirm RESET -> enables 5 hands AND resets the game
+    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.pumpAndSettle();
+    expect(find.text('This will clear your scores and prediction history.'), findsOneWidget);
+
+    await tester.tap(find.text('RESET'));
+    await tester.pumpAndSettle();
+
+    expect(controller.showNewHands, isTrue);
+    expect(controller.turnCount, 0);
+    expect(controller.totalRounds, 0);
+    expect(controller.userScore, 0);
+    expect(controller.pcScore, 0);
+    expect(controller.currentUserMove, isNull);
+    expect(controller.lastUserMove, isNull);
+    expect(controller.hasGameStarted, isFalse);
+
+    // 5. Since the game was just reset and no hand has been chosen yet,
+    // disabling New Hands now does NOT ask to reset the game
+    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.pumpAndSettle();
+    expect(find.text('This will clear your scores and prediction history.'), findsNothing);
+    expect(controller.showNewHands, isFalse);
+  });
 }

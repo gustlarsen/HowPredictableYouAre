@@ -165,6 +165,15 @@ class GameController extends ChangeNotifier {
 
   MarkovEngine get engine => _engine;
 
+  bool get hasGameStarted =>
+      turnCount > 0 ||
+      totalRounds > 0 ||
+      userScore > 0 ||
+      pcScore > 0 ||
+      currentUserMove != null ||
+      lastUserMove != null ||
+      _engine.matrix.any((row) => row.any((count) => count > 0));
+
   double get percentPredict {
     if (totalRounds == 0) return 0.0;
     return (userScore / totalRounds) * 100.0;
@@ -257,6 +266,7 @@ class GameController extends ChangeNotifier {
     currentComputerMove = null;
     lastUserMove = null;
     lastWinner = null;
+    is100RoundsAlertPending = false;
     _engine.reset();
 
     storage.clearGameStats();
@@ -447,7 +457,7 @@ class GameController extends ChangeNotifier {
         storage.setUnlockedNewHands(true);
         storage.setShowNewHands(true);
         _engine = MarkovEngine(enableExtendedHands: true);
-        _computeNextHints();
+        resetGame();
       },
     );
   }
@@ -629,8 +639,7 @@ class GameController extends ChangeNotifier {
     showNewHands = val;
     storage.setShowNewHands(val);
     _engine = MarkovEngine(enableExtendedHands: val);
-    _computeNextHints();
-    notifyListeners();
+    resetGame();
   }
 
   // Settings

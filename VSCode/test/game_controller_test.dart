@@ -294,4 +294,36 @@ void main() {
       expect(controller.currentComputerMove, equals(preselectedPcMove));
     }
   });
+
+  test('hasGameStarted reflects whether any hand has been chosen and resets on toggleShowNewHands', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 500,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.hasGameStarted, isFalse);
+
+    controller.playTurn(HandMove.rock);
+    expect(controller.hasGameStarted, isTrue);
+
+    expect(controller.unlockNewHands(), isTrue);
+    expect(controller.showNewHands, isTrue);
+    expect(controller.hasGameStarted, isFalse);
+    expect(controller.turnCount, 0);
+    expect(controller.totalRounds, 0);
+    expect(controller.currentUserMove, isNull);
+    expect(controller.lastUserMove, isNull);
+
+    controller.playTurn(HandMove.lizard);
+    expect(controller.hasGameStarted, isTrue);
+
+    controller.toggleShowNewHands(false);
+    expect(controller.showNewHands, isFalse);
+    expect(controller.hasGameStarted, isFalse);
+    expect(controller.turnCount, 0);
+    expect(controller.totalRounds, 0);
+    expect(controller.currentUserMove, isNull);
+    expect(controller.lastUserMove, isNull);
+  });
 }
