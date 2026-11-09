@@ -38,13 +38,30 @@ class AudioService {
 
   void playVibrate() {
     if (vibrationEnabled) {
-      HapticFeedback.vibrate();
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void playWinVibrate() {
+    if (vibrationEnabled) {
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  void playDefeatVibrate() {
+    if (vibrationEnabled) {
       HapticFeedback.heavyImpact();
     }
   }
 
+  void playDrawVibrate() {
+    if (vibrationEnabled) {
+      HapticFeedback.selectionClick();
+    }
+  }
+
   Future<void> playWin() async {
-    playVibrate();
+    playWinVibrate();
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
@@ -55,7 +72,7 @@ class AudioService {
   }
 
   Future<void> playDefeat() async {
-    playVibrate();
+    playDefeatVibrate();
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
@@ -66,7 +83,7 @@ class AudioService {
   }
 
   Future<void> playDraw() async {
-    playVibrate();
+    playDrawVibrate();
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
