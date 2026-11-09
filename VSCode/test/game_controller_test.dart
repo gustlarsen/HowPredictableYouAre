@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
@@ -81,16 +82,41 @@ void main() {
   );
 
   test(
-    'Vibration is enabled by default and follows the saved setting',
+    'Vibration is enabled by default, invokes native vibrator channel with Kodular durations, and respects disabled setting',
     () async {
+      final recordedDurations = <int>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(AudioService.vibratorChannel, (
+            MethodCall methodCall,
+          ) async {
+            if (methodCall.method == 'vibrate') {
+              final args = methodCall.arguments as Map<dynamic, dynamic>;
+              recordedDurations.add(args['duration'] as int);
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(AudioService.vibratorChannel, null);
+      });
+
       await createController(resetPreferences: true);
 
       expect(controller.vibrationEnabled, isTrue);
       expect(audio.vibrationEnabled, isTrue);
 
+      await audio.vibrate(durationMs: AudioService.winVibrationDurationMs);
+      await audio.vibrate(durationMs: AudioService.drawVibrationDurationMs);
+      await audio.vibrate(durationMs: AudioService.defeatVibrationDurationMs);
+      expect(recordedDurations, [100, 250, 500]);
+
+      recordedDurations.clear();
       controller.toggleVibration(false);
       expect(controller.vibrationEnabled, isFalse);
       expect(audio.vibrationEnabled, isFalse);
+
+      await audio.vibrate(durationMs: AudioService.defeatVibrationDurationMs);
+      expect(recordedDurations, isEmpty);
     },
   );
 

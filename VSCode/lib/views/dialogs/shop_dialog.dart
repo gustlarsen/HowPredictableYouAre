@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import 'story_dialog.dart';
 
@@ -19,7 +18,7 @@ class ShopDialog extends StatelessWidget {
   void _handleUnlock(BuildContext context, String title, bool success) {
     final loc = controller.localization;
     if (success) {
-      HapticFeedback.mediumImpact();
+      controller.audio.playWinVibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$title: Unlocked and Enabled!'),
@@ -35,7 +34,6 @@ class ShopDialog extends StatelessWidget {
         );
       }
     } else {
-      HapticFeedback.vibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(loc.t('string79', fallback: 'Not enough Diamonds')),
@@ -46,7 +44,7 @@ class ShopDialog extends StatelessWidget {
   }
 
   void _handleToggle(BuildContext context, String title, bool enabled) {
-    HapticFeedback.selectionClick();
+    controller.audio.playTapVibrate();
     final loc = controller.localization;
     final statusText = enabled
         ? loc.t('string49', fallback: 'Enabled')
@@ -362,7 +360,7 @@ class ShopDialog extends StatelessWidget {
                         },
                         onToggle: (val) {
                           if (val && !controller.showCrystalBall) {
-                            HapticFeedback.vibrate();
+                            controller.audio.playVibrate();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(

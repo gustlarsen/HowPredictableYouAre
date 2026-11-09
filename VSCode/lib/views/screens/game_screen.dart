@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -385,8 +384,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                       key: ValueKey('hand_button_${move.name}'),
                                       move: move,
                                       compact: controller.showNewHands,
-                                      vibrationEnabled:
-                                          controller.vibrationEnabled,
                                       animationsEnabled:
                                           controller.animationsEnabled,
                                       onPressed: () =>
@@ -401,12 +398,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 SizedBox(
                                   width: double.infinity,
                                   child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      if (controller.vibrationEnabled) {
-                                        HapticFeedback.selectionClick();
-                                      }
-                                      controller.playRandom();
-                                    },
+                                    onPressed: controller.playRandom,
                                     icon: const Icon(
                                       Icons.casino_outlined,
                                       size: 18,
@@ -486,7 +478,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
   final bool compact;
-  final bool vibrationEnabled;
   final bool animationsEnabled;
   final VoidCallback onPressed;
 
@@ -494,7 +485,6 @@ class _HandActionButton extends StatefulWidget {
     super.key,
     required this.move,
     this.compact = false,
-    required this.vibrationEnabled,
     required this.animationsEnabled,
     required this.onPressed,
   });
@@ -528,9 +518,6 @@ class _HandActionButtonState extends State<_HandActionButton>
   }
 
   void _handleTap() {
-    if (widget.vibrationEnabled) {
-      HapticFeedback.selectionClick();
-    }
     // Execute the game turn immediately with zero delay
     widget.onPressed();
 

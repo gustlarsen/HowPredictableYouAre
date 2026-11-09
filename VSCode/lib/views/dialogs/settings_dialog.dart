@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import 'story_gallery_dialog.dart';
@@ -104,7 +103,7 @@ class SettingsDialog extends StatelessWidget {
                 onChanged: (val) {
                   controller.toggleVibration(val);
                   if (val) {
-                    HapticFeedback.mediumImpact();
+                    controller.audio.playVibrate();
                   }
                 },
               ),
@@ -138,9 +137,7 @@ class SettingsDialog extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    if (controller.vibrationEnabled) {
-                      HapticFeedback.selectionClick();
-                    }
+                    controller.audio.playTapVibrate();
                     showDialog(
                       context: context,
                       builder: (_) =>

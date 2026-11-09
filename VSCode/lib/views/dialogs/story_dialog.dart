@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
 
@@ -162,9 +161,7 @@ class _StoryDialogState extends State<StoryDialog> {
   }
 
   void _handleCanvasTap() {
-    if (widget.controller.vibrationEnabled) {
-      HapticFeedback.selectionClick();
-    }
+    widget.controller.audio.playTapVibrate();
 
     if (!_isCurrentPanelTextComplete) {
       _typewriterTimer?.cancel();
@@ -178,9 +175,7 @@ class _StoryDialogState extends State<StoryDialog> {
   }
 
   void _handleNextButtonTap() {
-    if (widget.controller.vibrationEnabled) {
-      HapticFeedback.selectionClick();
-    }
+    widget.controller.audio.playTapVibrate();
     _advanceOrClose();
   }
 
@@ -297,9 +292,7 @@ class _StoryDialogState extends State<StoryDialog> {
                         TextButton.icon(
                           key: const ValueKey('story_skip_button'),
                           onPressed: () {
-                            if (widget.controller.vibrationEnabled) {
-                              HapticFeedback.selectionClick();
-                            }
+                            widget.controller.audio.playTapVibrate();
                             _closeCutscene();
                           },
                           style: TextButton.styleFrom(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
 import 'story_dialog.dart';
@@ -135,9 +134,7 @@ class StoryGalleryDialog extends StatelessWidget {
                       subtitle: isUnlocked ? itemName : '$itemName • $lockedHint',
                       replayLabel: replayLabel,
                       onTap: () {
-                        if (controller.vibrationEnabled) {
-                          HapticFeedback.selectionClick();
-                        }
+                        controller.audio.playTapVibrate();
                         if (isUnlocked) {
                           StoryDialog.show(
                             context,

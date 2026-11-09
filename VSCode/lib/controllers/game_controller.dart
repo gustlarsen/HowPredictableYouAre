@@ -188,6 +188,7 @@ class GameController extends ChangeNotifier {
   void playTurn(HandMove userChoice) {
     if (totalRounds >= 100) {
       is100RoundsAlertPending = true;
+      audio.playVibrate();
       notifyListeners();
       return;
     }

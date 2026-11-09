@@ -3,6 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 class AudioService {
+  static const MethodChannel vibratorChannel = MethodChannel(
+    'com.gustlarsen.how_predictable/vibrator',
+  );
+
+  static const int winVibrationDurationMs = 100;
+  static const int drawVibrationDurationMs = 250;
+  static const int defeatVibrationDurationMs = 500;
+  static const int defaultVibrationDurationMs = 100;
+  static const int tapVibrationDurationMs = 40;
+
   AudioPlayer? _sfxPlayer;
   AudioPlayer? _bgmPlayer;
 
@@ -36,28 +46,67 @@ class AudioService {
     }
   }
 
-  void playVibrate() {
-    if (vibrationEnabled) {
-      HapticFeedback.mediumImpact();
+  Future<void> vibrate({
+    int durationMs = defaultVibrationDurationMs,
+    Future<void> Function()? fallback,
+  }) async {
+    if (!vibrationEnabled) return;
+    try {
+      await vibratorChannel.invokeMethod<void>('vibrate', {
+        'duration': durationMs,
+      });
+    } on MissingPluginException {
+      try {
+        if (fallback != null) {
+          await fallback();
+        } else {
+          await HapticFeedback.vibrate();
+        }
+      } catch (_) {}
+    } catch (_) {
+      try {
+        if (fallback != null) {
+          await fallback();
+        } else {
+          await HapticFeedback.vibrate();
+        }
+      } catch (_) {}
     }
+  }
+
+  void playVibrate({int durationMs = defaultVibrationDurationMs}) {
+    vibrate(
+      durationMs: durationMs,
+      fallback: HapticFeedback.mediumImpact,
+    );
+  }
+
+  void playTapVibrate() {
+    vibrate(
+      durationMs: tapVibrationDurationMs,
+      fallback: HapticFeedback.selectionClick,
+    );
   }
 
   void playWinVibrate() {
-    if (vibrationEnabled) {
-      HapticFeedback.lightImpact();
-    }
+    vibrate(
+      durationMs: winVibrationDurationMs,
+      fallback: HapticFeedback.lightImpact,
+    );
   }
 
   void playDefeatVibrate() {
-    if (vibrationEnabled) {
-      HapticFeedback.heavyImpact();
-    }
+    vibrate(
+      durationMs: defeatVibrationDurationMs,
+      fallback: HapticFeedback.heavyImpact,
+    );
   }
 
   void playDrawVibrate() {
-    if (vibrationEnabled) {
-      HapticFeedback.selectionClick();
-    }
+    vibrate(
+      durationMs: drawVibrationDurationMs,
+      fallback: HapticFeedback.mediumImpact,
+    );
   }
 
   Future<void> playWin() async {
@@ -95,9 +144,7 @@ class AudioService {
 
   /// Plays a soft magical chime/transmutation audio effect when a comic cutscene opens.
   Future<void> playStoryChime() async {
-    if (vibrationEnabled) {
-      HapticFeedback.selectionClick();
-    }
+    playTapVibrate();
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
