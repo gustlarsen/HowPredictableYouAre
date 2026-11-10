@@ -9,7 +9,7 @@ class StorageService {
   }
 
   // Currency & Scores
-  int get diamonds => _prefs.getInt('diamonds') ?? 100000;
+  int get diamonds => _prefs.getInt('diamonds') ?? 0;
   Future<void> setDiamonds(int val) => _prefs.setInt('diamonds', val);
 
   int get userScore => _prefs.getInt('userScore') ?? 0;

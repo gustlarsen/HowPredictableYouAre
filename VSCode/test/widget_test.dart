@@ -40,7 +40,7 @@ void main() {
     );
 
     expect(find.text('How Predictable You Are'), findsNothing);
-    expect(find.descendant(of: find.byType(AppBar), matching: find.text('100000')), findsOneWidget);
+    expect(find.descendant(of: find.byType(AppBar), matching: find.text('0')), findsOneWidget);
     expect(find.text('ROCK'), findsOneWidget);
     expect(find.text('PAPER'), findsOneWidget);
     expect(find.text('SCISSORS'), findsOneWidget);
