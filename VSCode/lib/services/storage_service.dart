@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/move.dart';
 
 class StorageService {
   late SharedPreferences _prefs;
@@ -184,6 +185,39 @@ class StorageService {
   Future<void> setHasSeenStory(String prefsKey, bool val) =>
       _prefs.setBool(prefsKey, val);
 
+  // Last Played Hands Persistence
+  HandMove? get lastUserMove {
+    final id = _prefs.getInt('last_user_move');
+    if (id == null) return null;
+    for (final move in HandMove.values) {
+      if (move.id == id) return move;
+    }
+    return null;
+  }
+
+  Future<void> setLastUserMove(HandMove? move) {
+    if (move == null) {
+      return _prefs.remove('last_user_move');
+    }
+    return _prefs.setInt('last_user_move', move.id);
+  }
+
+  HandMove? get lastComputerMove {
+    final id = _prefs.getInt('last_computer_move');
+    if (id == null) return null;
+    for (final move in HandMove.values) {
+      if (move.id == id) return move;
+    }
+    return null;
+  }
+
+  Future<void> setLastComputerMove(HandMove? move) {
+    if (move == null) {
+      return _prefs.remove('last_computer_move');
+    }
+    return _prefs.setInt('last_computer_move', move.id);
+  }
+
   // Markov Matrix Persistence
   List<List<int>>? getMarkovMatrix(int size) {
     final str = _prefs.getString('markov_matrix_$size');
@@ -207,6 +241,8 @@ class StorageService {
     await setUserScore(0);
     await setPcScore(0);
     await setTotal(0);
+    await _prefs.remove('last_user_move');
+    await _prefs.remove('last_computer_move');
     await _prefs.remove('markov_matrix_3');
     await _prefs.remove('markov_matrix_5');
   }

@@ -427,4 +427,49 @@ void main() {
     expect(controller.unlockedCrystalBallPlus, isTrue);
     expect(controller.showCrystalBallPlus, isFalse);
   });
+
+  test('Last played hands are saved on playTurn, restored on app reopen, and cleared on resetGame', () async {
+    await createController(resetPreferences: true);
+
+    expect(controller.currentUserMove, isNull);
+    expect(controller.currentComputerMove, isNull);
+    expect(controller.lastUserMove, isNull);
+    expect(controller.lastWinner, isNull);
+    expect(storage.lastUserMove, isNull);
+    expect(storage.lastComputerMove, isNull);
+
+    controller.playTurn(HandMove.paper);
+    final savedPcMove = controller.currentComputerMove;
+    final savedWinner = controller.lastWinner;
+
+    expect(controller.currentUserMove, HandMove.paper);
+    expect(savedPcMove, isNotNull);
+    expect(savedWinner, isNotNull);
+    expect(storage.lastUserMove, HandMove.paper);
+    expect(storage.lastComputerMove, savedPcMove);
+
+    // Reopen app (new controller instance loading from persisted storage)
+    await createController();
+
+    expect(controller.currentUserMove, HandMove.paper);
+    expect(controller.currentComputerMove, savedPcMove);
+    expect(controller.lastUserMove, HandMove.paper);
+    expect(controller.lastWinner, savedWinner);
+
+    // Resetting the game clears the saved hands
+    controller.resetGame();
+    expect(controller.currentUserMove, isNull);
+    expect(controller.currentComputerMove, isNull);
+    expect(controller.lastUserMove, isNull);
+    expect(controller.lastWinner, isNull);
+    expect(storage.lastUserMove, isNull);
+    expect(storage.lastComputerMove, isNull);
+
+    // Reopening after reset keeps hands empty
+    await createController();
+    expect(controller.currentUserMove, isNull);
+    expect(controller.currentComputerMove, isNull);
+    expect(controller.lastUserMove, isNull);
+    expect(controller.lastWinner, isNull);
+  });
 }

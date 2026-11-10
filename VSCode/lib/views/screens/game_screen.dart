@@ -167,7 +167,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   String _resolveBackgroundImage(GameController controller) {
-    if (controller.turnCount == 0 || controller.lastWinner == null) {
+    if (controller.lastWinner == null) {
       return 'assets/images/Splash.png';
     }
     switch (controller.lastWinner) {

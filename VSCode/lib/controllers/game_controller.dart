@@ -160,6 +160,31 @@ class GameController extends ChangeNotifier {
       _engine.setMatrix(savedMatrix);
     }
 
+    currentUserMove = storage.lastUserMove;
+    currentComputerMove = storage.lastComputerMove;
+    if (!showNewHands) {
+      if (currentUserMove == HandMove.lizard ||
+          currentUserMove == HandMove.spock) {
+        currentUserMove = null;
+      }
+      if (currentComputerMove == HandMove.lizard ||
+          currentComputerMove == HandMove.spock) {
+        currentComputerMove = null;
+      }
+    }
+    if (currentUserMove == null || currentComputerMove == null) {
+      currentUserMove = null;
+      currentComputerMove = null;
+      lastWinner = null;
+    } else if (currentUserMove == currentComputerMove) {
+      lastWinner = RoundWinner.draw;
+    } else if (currentUserMove!.beats(currentComputerMove!)) {
+      lastWinner = RoundWinner.user;
+    } else {
+      lastWinner = RoundWinner.computer;
+    }
+    lastUserMove = currentUserMove;
+
     _computeNextHints();
   }
 
@@ -226,6 +251,8 @@ class GameController extends ChangeNotifier {
     _engine.recordTransition(lastUserMove, currentUserMove!);
     storage.setMarkovMatrix(_engine.matrix);
     lastUserMove = currentUserMove;
+    storage.setLastUserMove(currentUserMove);
+    storage.setLastComputerMove(currentComputerMove);
 
     if (totalRounds == 100) {
       is100RoundsAlertPending = true;

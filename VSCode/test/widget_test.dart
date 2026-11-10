@@ -992,4 +992,69 @@ void main() {
     expect(find.text('This will clear your scores and prediction history.'), findsNothing);
     expect(controller.showNewHands, isFalse);
   });
+
+  testWidgets('Last played hands are displayed in VersusArena when reopening the app', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final firstController = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: firstController,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Play a hand (Paper)
+    await tester.tap(find.byKey(const ValueKey('hand_button_paper')));
+    await tester.pumpAndSettle();
+
+    final playedPcMove = firstController.currentComputerMove!;
+    expect(firstController.currentUserMove, HandMove.paper);
+
+    // Simulate reopening the app with a fresh GameController reading from storage
+    final reopenedStorage = StorageService();
+    await reopenedStorage.init();
+    final reopenedController = GameController(
+      storage: reopenedStorage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: reopenedController,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(reopenedController.currentUserMove, HandMove.paper);
+    expect(reopenedController.currentComputerMove, playedPcMove);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('user_card')),
+        matching: find.text('PAPER'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('pc_card')),
+        matching: find.text(playedPcMove.label.toUpperCase()),
+      ),
+      findsOneWidget,
+    );
+  });
 }
