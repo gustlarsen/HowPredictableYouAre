@@ -402,9 +402,9 @@ class GameController extends ChangeNotifier {
       cost: 100,
       onUnlock: () {
         unlockedReset = true;
-        showReset = true;
+        showReset = false;
         storage.setUnlockedReset(true);
-        storage.setShowReset(true);
+        storage.setShowReset(false);
         _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
       },
     );
@@ -415,9 +415,9 @@ class GameController extends ChangeNotifier {
       cost: 150,
       onUnlock: () {
         unlockedPredictability = true;
-        showPredictability = true;
+        showPredictability = false;
         storage.setUnlockedPredictability(true);
-        storage.setShowPredictability(true);
+        storage.setShowPredictability(false);
         _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
       },
     );
@@ -428,9 +428,9 @@ class GameController extends ChangeNotifier {
       cost: 300,
       onUnlock: () {
         unlockedRandom = true;
-        showRandom = true;
+        showRandom = false;
         storage.setUnlockedRandom(true);
-        storage.setShowRandom(true);
+        storage.setShowRandom(false);
         _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
       },
     );
@@ -441,9 +441,9 @@ class GameController extends ChangeNotifier {
       cost: 500,
       onUnlock: () {
         unlockedAlgorithm = true;
-        showAlgorithm = true;
+        showAlgorithm = false;
         storage.setUnlockedAlgorithm(true);
-        storage.setShowAlgorithm(true);
+        storage.setShowAlgorithm(false);
         _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
       },
     );
@@ -454,11 +454,9 @@ class GameController extends ChangeNotifier {
       cost: 100,
       onUnlock: () {
         unlockedNewHands = true;
-        showNewHands = true;
+        showNewHands = false;
         storage.setUnlockedNewHands(true);
-        storage.setShowNewHands(true);
-        _engine = MarkovEngine(enableExtendedHands: true);
-        resetGame();
+        storage.setShowNewHands(false);
       },
     );
   }
@@ -468,9 +466,9 @@ class GameController extends ChangeNotifier {
       cost: 1000,
       onUnlock: () {
         unlockedYourPrediction = true;
-        showYourPrediction = true;
+        showYourPrediction = false;
         storage.setUnlockedYourPrediction(true);
-        storage.setShowYourPrediction(true);
+        storage.setShowYourPrediction(false);
         _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
       },
     );
@@ -481,9 +479,9 @@ class GameController extends ChangeNotifier {
       cost: 3000,
       onUnlock: () {
         unlockedNextMove = true;
-        showNextMove = true;
+        showNextMove = false;
         storage.setUnlockedNextMove(true);
-        storage.setShowNextMove(true);
+        storage.setShowNextMove(false);
         _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
       },
     );
@@ -494,9 +492,9 @@ class GameController extends ChangeNotifier {
       cost: 5000,
       onUnlock: () {
         unlockedSuggestion = true;
-        showSuggestion = true;
+        showSuggestion = false;
         storage.setUnlockedSuggestion(true);
-        storage.setShowSuggestion(true);
+        storage.setShowSuggestion(false);
         _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
       },
     );
@@ -517,9 +515,9 @@ class GameController extends ChangeNotifier {
       cost: 20000,
       onUnlock: () {
         unlockedCrystalBall = true;
-        showCrystalBall = true;
+        showCrystalBall = false;
         storage.setUnlockedCrystalBall(true);
-        storage.setShowCrystalBall(true);
+        storage.setShowCrystalBall(false);
         _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
       },
     );
@@ -534,11 +532,11 @@ class GameController extends ChangeNotifier {
       cost: 50000,
       onUnlock: () {
         unlockedCrystalBallPlus = true;
-        showCrystalBallPlus = showCrystalBall;
-        crystalBallPlusSavedState = showCrystalBall;
+        showCrystalBallPlus = false;
+        crystalBallPlusSavedState = false;
         storage.setUnlockedCrystalBallPlus(true);
-        storage.setShowCrystalBallPlus(showCrystalBallPlus);
-        storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
+        storage.setShowCrystalBallPlus(false);
+        storage.setCrystalBallPlusSavedState(false);
       },
     );
   }

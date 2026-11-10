@@ -91,14 +91,12 @@ class StorageService {
       _prefs.setBool('unlockedCrystalBallPlus', val);
 
   // Feature Active Toggles
-  bool get showCrystalBall =>
-      _prefs.getBool('showCrystalBall') ?? unlockedCrystalBall;
+  bool get showCrystalBall => _prefs.getBool('showCrystalBall') ?? false;
   Future<void> setShowCrystalBall(bool val) =>
       _prefs.setBool('showCrystalBall', val);
 
   bool get showCrystalBallPlus =>
-      _prefs.getBool('showCrystalBallPlus') ??
-      (unlockedCrystalBallPlus && showCrystalBall);
+      _prefs.getBool('showCrystalBallPlus') ?? false;
   Future<void> setShowCrystalBallPlus(bool val) =>
       _prefs.setBool('showCrystalBallPlus', val);
 
@@ -107,35 +105,33 @@ class StorageService {
   Future<void> setCrystalBallPlusSavedState(bool val) =>
       _prefs.setBool('crystalBallPlusSavedState', val);
   bool get showPredictability =>
-      _prefs.getBool('showPredictability') ?? unlockedPredictability;
+      _prefs.getBool('showPredictability') ?? false;
   Future<void> setShowPredictability(bool val) =>
       _prefs.setBool('showPredictability', val);
 
-  bool get showAlgorithm =>
-      _prefs.getBool('showAlgorithm') ?? unlockedAlgorithm;
+  bool get showAlgorithm => _prefs.getBool('showAlgorithm') ?? false;
   Future<void> setShowAlgorithm(bool val) =>
       _prefs.setBool('showAlgorithm', val);
 
   bool get showYourPrediction =>
-      _prefs.getBool('showYourPrediction') ?? unlockedYourPrediction;
+      _prefs.getBool('showYourPrediction') ?? false;
   Future<void> setShowYourPrediction(bool val) =>
       _prefs.setBool('showYourPrediction', val);
 
-  bool get showNextMove => _prefs.getBool('showNextMove') ?? unlockedNextMove;
+  bool get showNextMove => _prefs.getBool('showNextMove') ?? false;
   Future<void> setShowNextMove(bool val) => _prefs.setBool('showNextMove', val);
 
-  bool get showSuggestion =>
-      _prefs.getBool('showSuggestion') ?? unlockedSuggestion;
+  bool get showSuggestion => _prefs.getBool('showSuggestion') ?? false;
   Future<void> setShowSuggestion(bool val) =>
       _prefs.setBool('showSuggestion', val);
 
-  bool get showNewHands => _prefs.getBool('showNewHands') ?? unlockedNewHands;
+  bool get showNewHands => _prefs.getBool('showNewHands') ?? false;
   Future<void> setShowNewHands(bool val) => _prefs.setBool('showNewHands', val);
 
-  bool get showRandom => _prefs.getBool('showRandom') ?? unlockedRandom;
+  bool get showRandom => _prefs.getBool('showRandom') ?? false;
   Future<void> setShowRandom(bool val) => _prefs.setBool('showRandom', val);
 
-  bool get showReset => _prefs.getBool('showReset') ?? unlockedReset;
+  bool get showReset => _prefs.getBool('showReset') ?? false;
   Future<void> setShowReset(bool val) => _prefs.setBool('showReset', val);
 
   // Story Cutscene Persistence Flags

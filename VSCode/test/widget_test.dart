@@ -391,10 +391,15 @@ void main() {
     expect(find.text('20000 💎'), findsOneWidget);
     expect(find.text('Crystal Ball+'), findsNothing);
 
-    // Unlock Crystal Ball (cost: 20000 -> diamonds: 80000)
+    // Unlock Crystal Ball (cost: 20000 -> diamonds: 80000); remains disabled on purchase
     expect(controller.unlockCrystalBall(), isTrue);
     expect(controller.diamonds, 80000);
     expect(controller.unlockedCrystalBall, isTrue);
+    expect(controller.showCrystalBall, isFalse);
+    await tester.pumpAndSettle();
+
+    // User enables Crystal Ball
+    controller.toggleShowCrystalBall(true);
     expect(controller.showCrystalBall, isTrue);
     await tester.pumpAndSettle();
 
@@ -406,10 +411,15 @@ void main() {
     expect(find.text('Crystal Ball+'), findsOneWidget);
     expect(find.text('50000 💎'), findsOneWidget);
 
-    // Unlock Crystal Ball+ (cost: 50000 -> diamonds: 30000)
+    // Unlock Crystal Ball+ (cost: 50000 -> diamonds: 30000); remains disabled on purchase
     expect(controller.unlockCrystalBallPlus(), isTrue);
     expect(controller.diamonds, 30000);
     expect(controller.unlockedCrystalBallPlus, isTrue);
+    expect(controller.showCrystalBallPlus, isFalse);
+    await tester.pumpAndSettle();
+
+    // User enables Crystal Ball+
+    controller.toggleShowCrystalBallPlus(true);
     expect(controller.showCrystalBallPlus, isTrue);
     await tester.pumpAndSettle();
 
@@ -837,8 +847,16 @@ void main() {
     expect(tester.getCenter(paperFinder).dy, equals(classicCenterY));
     expect(tester.getCenter(scissorsFinder).dy, equals(classicCenterY));
 
-    // Activate New Hands (5 hands total)
+    // Purchase New Hands -> remains disabled until user enables it
+    controller.addFreeDiamonds(100);
     expect(controller.unlockNewHands(), isTrue);
+    expect(controller.showNewHands, isFalse);
+    await tester.pump();
+    expect(lizardFinder, findsNothing);
+    expect(spockFinder, findsNothing);
+
+    // Enable New Hands (5 hands total)
+    controller.toggleShowNewHands(true);
     await tester.pump();
 
     expect(rockFinder, findsOneWidget);

@@ -42,7 +42,7 @@ void main() {
     expect(controller.diamonds, 0);
   });
 
-  test('Reset purchase unlocks and shows the reset action', () async {
+  test('Reset purchase unlocks the reset action without automatically enabling it', () async {
     SharedPreferences.setMockInitialValues({
       'diamonds': 100,
       'musicEnabled': false,
@@ -53,8 +53,12 @@ void main() {
 
     expect(controller.diamonds, 0);
     expect(controller.unlockedReset, isTrue);
-    expect(controller.showReset, isTrue);
+    expect(controller.showReset, isFalse);
     expect(storage.unlockedReset, isTrue);
+    expect(storage.showReset, isFalse);
+
+    controller.toggleShowReset(true);
+    expect(controller.showReset, isTrue);
     expect(storage.showReset, isTrue);
   });
 
@@ -68,6 +72,17 @@ void main() {
       await createController();
 
       controller.unlockReset();
+      expect(controller.unlockedReset, isTrue);
+      expect(controller.showReset, isFalse);
+
+      controller.toggleShowReset(true);
+      expect(controller.showReset, isTrue);
+      expect(storage.showReset, isTrue);
+
+      await createController();
+      expect(controller.unlockedReset, isTrue);
+      expect(controller.showReset, isTrue);
+
       controller.toggleShowReset(false);
 
       expect(controller.unlockedReset, isTrue);
@@ -172,7 +187,7 @@ void main() {
     expect(controller.turnCount, 2);
   });
 
-  test('Crystal Ball purchase costs 20000 diamonds and can be toggled', () async {
+  test('Crystal Ball purchase costs 20000 diamonds, starts disabled, and can be toggled', () async {
     SharedPreferences.setMockInitialValues({
       'diamonds': 100000,
       'musicEnabled': false,
@@ -186,8 +201,12 @@ void main() {
     expect(ok, isTrue);
     expect(controller.diamonds, 80000);
     expect(controller.unlockedCrystalBall, isTrue);
-    expect(controller.showCrystalBall, isTrue);
+    expect(controller.showCrystalBall, isFalse);
     expect(storage.unlockedCrystalBall, isTrue);
+    expect(storage.showCrystalBall, isFalse);
+
+    controller.toggleShowCrystalBall(true);
+    expect(controller.showCrystalBall, isTrue);
     expect(storage.showCrystalBall, isTrue);
 
     controller.toggleShowCrystalBall(false);
@@ -333,7 +352,15 @@ void main() {
     controller.playTurn(HandMove.rock);
     expect(controller.hasGameStarted, isTrue);
 
+    // Purchasing New Hands does NOT automatically enable it or reset the game
     expect(controller.unlockNewHands(), isTrue);
+    expect(controller.unlockedNewHands, isTrue);
+    expect(controller.showNewHands, isFalse);
+    expect(controller.hasGameStarted, isTrue);
+    expect(controller.turnCount, 1);
+
+    // Enabling New Hands activates 5 hands and resets the game
+    controller.toggleShowNewHands(true);
     expect(controller.showNewHands, isTrue);
     expect(controller.hasGameStarted, isFalse);
     expect(controller.turnCount, 0);
@@ -351,5 +378,53 @@ void main() {
     expect(controller.totalRounds, 0);
     expect(controller.currentUserMove, isNull);
     expect(controller.lastUserMove, isNull);
+  });
+
+  test('Purchasing any store item leaves it disabled until the user explicitly enables it', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 200000,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.unlockReset(), isTrue);
+    expect(controller.unlockedReset, isTrue);
+    expect(controller.showReset, isFalse);
+
+    expect(controller.unlockPredictability(), isTrue);
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.showPredictability, isFalse);
+
+    expect(controller.unlockRandom(), isTrue);
+    expect(controller.unlockedRandom, isTrue);
+    expect(controller.showRandom, isFalse);
+
+    expect(controller.unlockAlgorithm(), isTrue);
+    expect(controller.unlockedAlgorithm, isTrue);
+    expect(controller.showAlgorithm, isFalse);
+
+    expect(controller.unlockNewHands(), isTrue);
+    expect(controller.unlockedNewHands, isTrue);
+    expect(controller.showNewHands, isFalse);
+
+    expect(controller.unlockYourPrediction(), isTrue);
+    expect(controller.unlockedYourPrediction, isTrue);
+    expect(controller.showYourPrediction, isFalse);
+
+    expect(controller.unlockNextMove(), isTrue);
+    expect(controller.unlockedNextMove, isTrue);
+    expect(controller.showNextMove, isFalse);
+
+    expect(controller.unlockSuggestion(), isTrue);
+    expect(controller.unlockedSuggestion, isTrue);
+    expect(controller.showSuggestion, isFalse);
+
+    expect(controller.unlockCrystalBall(), isTrue);
+    expect(controller.unlockedCrystalBall, isTrue);
+    expect(controller.showCrystalBall, isFalse);
+
+    expect(controller.unlockCrystalBallPlus(), isTrue);
+    expect(controller.unlockedCrystalBallPlus, isTrue);
+    expect(controller.showCrystalBallPlus, isFalse);
   });
 }

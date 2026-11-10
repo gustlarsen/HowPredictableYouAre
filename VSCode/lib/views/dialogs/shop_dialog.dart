@@ -21,7 +21,7 @@ class ShopDialog extends StatelessWidget {
       controller.audio.playWinVibrate();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$title: Unlocked and Enabled!'),
+          content: Text('$title: Unlocked!'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -85,20 +85,11 @@ class ShopDialog extends StatelessWidget {
     return shouldReset == true;
   }
 
-  Future<void> _handleNewHandsUnlock(BuildContext context) async {
+  void _handleNewHandsUnlock(BuildContext context) {
     final title = controller.localization.t(
       'string56',
       fallback: 'New Hands (Lizard & Spock)',
     );
-    if (controller.diamonds < 100) {
-      final ok = controller.unlockNewHands();
-      _handleUnlock(context, title, ok);
-      return;
-    }
-    if (controller.hasGameStarted) {
-      final confirmed = await _confirmResetForNewHands(context);
-      if (!confirmed || !context.mounted) return;
-    }
     final ok = controller.unlockNewHands();
     _handleUnlock(context, title, ok);
   }
