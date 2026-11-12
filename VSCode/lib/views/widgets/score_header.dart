@@ -10,7 +10,10 @@ class ScoreHeader extends StatelessWidget {
   /// through yellow (50%, draw) to green (100%, all wins / good result).
   static Color gaugeColor(double percentPredict) {
     final clamped = percentPredict.clamp(0.0, 100.0);
-    if (clamped <= 50.0) {
+    if (clamped <= 0.0) return Colors.red;
+    if (clamped == 50.0) return Colors.yellow;
+    if (clamped >= 100.0) return Colors.green;
+    if (clamped < 50.0) {
       final t = clamped / 50.0;
       return Color.lerp(Colors.red, Colors.yellow, t)!;
     } else {

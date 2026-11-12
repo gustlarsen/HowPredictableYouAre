@@ -237,13 +237,15 @@ class StorageService {
     return _prefs.setString('markov_matrix_$size', json.encode(matrix));
   }
 
-  Future<void> clearGameStats() async {
-    await setUserScore(0);
-    await setPcScore(0);
-    await setTotal(0);
-    await _prefs.remove('last_user_move');
-    await _prefs.remove('last_computer_move');
-    await _prefs.remove('markov_matrix_3');
-    await _prefs.remove('markov_matrix_5');
+  Future<void> clearGameStats() {
+    return Future.wait([
+      setUserScore(0),
+      setPcScore(0),
+      setTotal(0),
+      _prefs.remove('last_user_move'),
+      _prefs.remove('last_computer_move'),
+      _prefs.remove('markov_matrix_3'),
+      _prefs.remove('markov_matrix_5'),
+    ]);
   }
 }

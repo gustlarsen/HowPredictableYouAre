@@ -955,9 +955,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Reset confirmation dialog must appear
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('This will clear your scores and prediction history.'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('RESET'), findsOneWidget);
+    expect(find.text('RESET'), findsNWidgets(2));
+    expect(find.widgetWithText(ElevatedButton, 'RESET'), findsOneWidget);
 
     // 3. Cancel the dialog -> keeps the current game and keeps 3 hands (showNewHands == false)
     await tester.tap(find.text('Cancel'));
@@ -973,7 +975,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('This will clear your scores and prediction history.'), findsOneWidget);
 
-    await tester.tap(find.text('RESET'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'RESET'));
     await tester.pumpAndSettle();
 
     expect(controller.showNewHands, isTrue);

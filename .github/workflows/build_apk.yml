@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -36,6 +36,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: '3.47.9'
           cache: true
 
       - name: Prepare Log Directory
@@ -91,6 +92,7 @@ jobs:
       - name: Install dependencies
         working-directory: VSCode
         run: |
+          set -o pipefail
           echo "dependencies" > ../build_logs/phase.txt
           flutter pub get 2>&1 | tee ../build_logs/pub_get.log
           rm -f ../build_logs/phase.txt
@@ -98,6 +100,7 @@ jobs:
       - name: Run automated tests
         working-directory: VSCode
         run: |
+          set -o pipefail
           echo "test" > ../build_logs/phase.txt
           flutter test 2>&1 | tee ../build_logs/test.log
           rm -f ../build_logs/phase.txt
@@ -123,6 +126,7 @@ jobs:
           VERSION_CODE: ${{ steps.version_info.outputs.version_code }}
           VERSION_NAME: ${{ steps.version_info.outputs.version_name }}
         run: |
+          set -o pipefail
           echo "build" > ../build_logs/phase.txt
           flutter build apk --release \
             --split-per-abi \
