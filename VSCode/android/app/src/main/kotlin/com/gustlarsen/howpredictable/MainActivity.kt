@@ -1,4 +1,4 @@
-package com.gustlarsen.how_predictable
+package com.gustlarsen.howpredictable
 
 import android.content.Context
 import android.os.Build
@@ -12,7 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val CHANNEL = "com.gustlarsen.how_predictable/vibrator"
+        private const val CHANNEL = "com.gustlarsen.howpredictable/vibrator"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

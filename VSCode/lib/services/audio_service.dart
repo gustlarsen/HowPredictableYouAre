@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 class AudioService {
   static const MethodChannel vibratorChannel = MethodChannel(
-    'com.gustlarsen.how_predictable/vibrator',
+    'com.gustlarsen.howpredictable/vibrator',
   );
 
   static const int winVibrationDurationMs = 100;

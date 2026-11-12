@@ -16,5 +16,5 @@
 -keep class io.flutter.plugins.sharedpreferences.** { *; }
 
 # App MainActivity & MethodChannel handlers
--keep class com.gustlarsen.how_predictable.** { *; }
+-keep class com.gustlarsen.howpredictable.** { *; }
 
