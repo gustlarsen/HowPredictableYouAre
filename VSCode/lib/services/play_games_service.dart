@@ -127,6 +127,15 @@ class CloudSaveData {
   final int? lastComputerMoveId;
   final List<List<int>>? markovMatrix3;
   final List<List<int>>? markovMatrix5;
+
+  // Per-Account Settings
+  final String language;
+  final bool darkMode;
+  final bool soundEnabled;
+  final bool musicEnabled;
+  final bool vibrationEnabled;
+  final bool animationsEnabled;
+
   final int updatedAtMillis;
 
   const CloudSaveData({
@@ -169,6 +178,12 @@ class CloudSaveData {
     this.lastComputerMoveId,
     this.markovMatrix3,
     this.markovMatrix5,
+    this.language = 'en',
+    this.darkMode = true,
+    this.soundEnabled = true,
+    this.musicEnabled = true,
+    this.vibrationEnabled = true,
+    this.animationsEnabled = true,
     this.updatedAtMillis = 0,
   });
 
@@ -294,6 +309,12 @@ class CloudSaveData {
       lastComputerMoveId: lastComputerMoveId ?? local.lastComputerMoveId,
       markovMatrix3: markovMatrix3 ?? local.markovMatrix3,
       markovMatrix5: markovMatrix5 ?? local.markovMatrix5,
+      language: language,
+      darkMode: darkMode,
+      soundEnabled: soundEnabled,
+      musicEnabled: musicEnabled,
+      vibrationEnabled: vibrationEnabled,
+      animationsEnabled: animationsEnabled,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -339,6 +360,12 @@ class CloudSaveData {
       lastComputerMoveId: storage.lastComputerMove?.id,
       markovMatrix3: storage.getMarkovMatrix(3),
       markovMatrix5: storage.getMarkovMatrix(5),
+      language: storage.language,
+      darkMode: storage.darkMode,
+      soundEnabled: storage.soundEnabled,
+      musicEnabled: storage.musicEnabled,
+      vibrationEnabled: storage.vibrationEnabled,
+      animationsEnabled: storage.animationsEnabled,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -348,6 +375,13 @@ class CloudSaveData {
     await storage.setUserScore(userScore);
     await storage.setPcScore(pcScore);
     await storage.setTotal(total);
+
+    await storage.setLanguage(language);
+    await storage.setDarkMode(darkMode);
+    await storage.setSoundEnabled(soundEnabled);
+    await storage.setMusicEnabled(musicEnabled);
+    await storage.setVibrationEnabled(vibrationEnabled);
+    await storage.setAnimationsEnabled(animationsEnabled);
 
     await storage.setUnlockedReset(unlockedReset);
     await storage.setUnlockedPredictability(unlockedPredictability);
@@ -450,6 +484,12 @@ class CloudSaveData {
       'lastComputerMoveId': lastComputerMoveId,
       'markovMatrix3': markovMatrix3,
       'markovMatrix5': markovMatrix5,
+      'language': language,
+      'darkMode': darkMode,
+      'soundEnabled': soundEnabled,
+      'musicEnabled': musicEnabled,
+      'vibrationEnabled': vibrationEnabled,
+      'animationsEnabled': animationsEnabled,
       'updatedAtMillis': updatedAtMillis,
     };
   }
@@ -513,6 +553,12 @@ class CloudSaveData {
       lastComputerMoveId: (map['lastComputerMoveId'] as num?)?.toInt(),
       markovMatrix3: _parseMatrix(map['markovMatrix3'], 3),
       markovMatrix5: _parseMatrix(map['markovMatrix5'], 5),
+      language: (map['language'] as String?) ?? 'en',
+      darkMode: map['darkMode'] as bool? ?? true,
+      soundEnabled: map['soundEnabled'] as bool? ?? true,
+      musicEnabled: map['musicEnabled'] as bool? ?? true,
+      vibrationEnabled: map['vibrationEnabled'] as bool? ?? true,
+      animationsEnabled: map['animationsEnabled'] as bool? ?? true,
       updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ?? 0,
     );
   }
@@ -621,7 +667,7 @@ class PlayGamesService extends ChangeNotifier {
       notifyListeners();
 
       if (playerChanged) {
-        await storage.clearGameplayProgress();
+        await storage.clearGameplayProgress(includeSettings: true);
         onCloudDataRestored?.call();
         await loadAndResolveCloudSave(isAccountSwitch: true);
       } else {
@@ -635,12 +681,12 @@ class PlayGamesService extends ChangeNotifier {
   }
 
   /// Loads the saved game from Google Play Saved Games (`GamesServices.loadGame`).
-  /// When [isAccountSwitch] is true, local gameplay progress has already been
-  /// wiped for the new playerID, so any existing cloud save for the new playerID
-  /// is applied directly (or defaults to 0 if none exists).
-  /// Otherwise, merges/restores cloud data over local data ONLY if the cloud save
-  /// holds a higher progression state or diamond count; if local data has higher
-  /// progression, pushes the local state to cloud.
+  /// When [isAccountSwitch] is true, local gameplay progress and settings have
+  /// already been reset for the new playerID, so any existing cloud save for the
+  /// new playerID is applied directly (or defaults if none exists).
+  /// Otherwise, merges/restores cloud data over local data if the cloud save
+  /// holds a higher (or equal) progression state or diamond count; if local data
+  /// has higher progression, pushes the local state to cloud.
   Future<bool> loadAndResolveCloudSave({bool isAccountSwitch = false}) async {
     if (!_isSignedIn) {
       _syncStatus = CloudSyncStatus.offline;
@@ -666,7 +712,7 @@ class PlayGamesService extends ChangeNotifier {
             if (fetchedName != null && fetchedName.trim().isNotEmpty) {
               _playerName = fetchedName.trim();
             }
-            await storage.clearGameplayProgress();
+            await storage.clearGameplayProgress(includeSettings: true);
             onCloudDataRestored?.call();
           }
         }
@@ -697,6 +743,12 @@ class PlayGamesService extends ChangeNotifier {
           data: localData.toJsonString(),
           name: saveSlotName,
         );
+      } else if (cloudData != null) {
+        // Equal progression/diamonds: apply cloud save (including account settings)
+        final merged = cloudData.mergeOverLocal(localData);
+        await merged.applyToStorage(storage);
+        restoredFromCloud = true;
+        onCloudDataRestored?.call();
       }
 
       _syncStatus = CloudSyncStatus.synced;

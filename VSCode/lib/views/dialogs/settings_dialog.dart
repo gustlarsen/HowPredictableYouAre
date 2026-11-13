@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
@@ -41,13 +40,6 @@ class SettingsDialog extends StatelessWidget {
     );
   }
 
-  Future<void> _handleCopyPlayerId(BuildContext context, String playerId) async {
-    controller.audio.playTapVibrate();
-    await Clipboard.setData(ClipboardData(text: playerId));
-    if (!context.mounted) return;
-    _showDiscreetSnackBar(context, 'Player ID copied: $playerId');
-  }
-
   Future<void> _handleManualSync(BuildContext context) async {
     controller.audio.playTapVibrate();
     final ok = await controller.playGames.saveCloudData();
@@ -56,6 +48,62 @@ class SettingsDialog extends StatelessWidget {
       context,
       ok ? 'Cloud save synced!' : 'Cloud sync unavailable (Offline)',
     );
+  }
+
+  Future<void> _confirmResetAllProgress(BuildContext context) async {
+    controller.audio.playTapVibrate();
+    final loc = controller.localization;
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          loc.t(
+            'reset_all_progress_title',
+            fallback: 'Reset All Progress?',
+          ),
+        ),
+        content: Text(
+          loc.t(
+            'reset_all_progress_message',
+            fallback:
+                'This will permanently delete all your diamonds, shop upgrades, scores, and prediction history so you can start fresh. This action cannot be undone.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('cancel_reset_progress_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              loc.t('reset_all_progress_cancel', fallback: 'Cancel'),
+            ),
+          ),
+          ElevatedButton(
+            key: const ValueKey('confirm_reset_progress_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              loc.t('reset_all_progress', fallback: 'Reset All Progress'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReset == true) {
+      await controller.resetAllProgress();
+      if (!context.mounted) return;
+      _showDiscreetSnackBar(
+        context,
+        loc.t(
+          'reset_all_progress_done',
+          fallback: 'All progress has been reset!',
+        ),
+      );
+    }
   }
 
   Widget _buildDialog(BuildContext context) {
@@ -105,7 +153,6 @@ class SettingsDialog extends StatelessWidget {
                       _PlayerProfileSection(
                         playGames: controller.playGames,
                         onSignIn: () => _handleSignIn(context),
-                        onCopyPlayerId: (id) => _handleCopyPlayerId(context, id),
                         onManualSync: () => _handleManualSync(context),
                       ),
 
@@ -230,6 +277,40 @@ class SettingsDialog extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+
+                      // Reset All Progress button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('settings_reset_progress_button'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: BorderSide(
+                              color: Colors.redAccent.withValues(alpha: 0.55),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 9,
+                              horizontal: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () => _confirmResetAllProgress(context),
+                          icon: const Icon(
+                            Icons.delete_forever_outlined,
+                            size: 18,
+                          ),
+                          label: Text(
+                            loc.t(
+                              'reset_all_progress',
+                              fallback: 'Reset All Progress',
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -254,13 +335,11 @@ class SettingsDialog extends StatelessWidget {
 class _PlayerProfileSection extends StatelessWidget {
   final PlayGamesService playGames;
   final VoidCallback onSignIn;
-  final ValueChanged<String> onCopyPlayerId;
   final VoidCallback onManualSync;
 
   const _PlayerProfileSection({
     required this.playGames,
     required this.onSignIn,
-    required this.onCopyPlayerId,
     required this.onManualSync,
   });
 
@@ -406,38 +485,16 @@ class _PlayerProfileSection extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'ID: ${playGames.playerID ?? "Unknown"}',
-                                key: const ValueKey('play_games_player_id'),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontFamily: 'monospace',
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              key: const ValueKey('play_games_copy_id_button'),
-                              borderRadius: BorderRadius.circular(6),
-                              onTap: () => onCopyPlayerId(
-                                playGames.playerID ?? '',
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(3.0),
-                                child: Icon(
-                                  Icons.copy_rounded,
-                                  size: 13,
-                                  color: Colors.amber.shade300,
-                                ),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'ID: ${playGames.playerID ?? "Unknown"}',
+                          key: const ValueKey('play_games_player_id'),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

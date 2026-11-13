@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,16 +101,9 @@ void main() {
     );
 
     test(
-      'Multi-account Cloud Save isolation: wipes local gameplay progress (preserving UI settings) when active playerID changes and loads new account save or defaults to 0',
+      'Multi-account Cloud Save isolation: isolates both gameplay progress and settings per account when active playerID changes',
       () async {
-        // Start with custom UI settings (language 'pt', soundEnabled false, darkMode false)
         SharedPreferences.setMockInitialValues({
-          'language': 'pt',
-          'soundEnabled': false,
-          'musicEnabled': false,
-          'vibrationEnabled': false,
-          'darkMode': false,
-          'animationsEnabled': false,
           'has_seen_story_intro': true,
         });
         final storage = StorageService();
@@ -139,6 +131,12 @@ void main() {
             [1, 5, 2],
             [3, 1, 6],
           ],
+          language: 'pt',
+          darkMode: false,
+          soundEnabled: false,
+          musicEnabled: false,
+          vibrationEnabled: false,
+          animationsEnabled: false,
         );
 
         final fakeClient = FakePlayGamesClient(
@@ -178,6 +176,14 @@ void main() {
         expect(controller.currentUserMove, HandMove.scissors);
         expect(controller.currentComputerMove, HandMove.paper);
         expect(controller.engine.matrix[0], [4, 2, 1]);
+        // Account 1's cloud settings are applied
+        expect(storage.language, 'pt');
+        expect(localization.currentLanguage, 'pt');
+        expect(controller.darkMode, isFalse);
+        expect(controller.soundEnabled, isFalse);
+        expect(controller.musicEnabled, isFalse);
+        expect(controller.vibrationEnabled, isFalse);
+        expect(controller.animationsEnabled, isFalse);
 
         // 2. Switch accounts in OS / Google Play Games app to Account 2 ('player_002'),
         // which has NO cloud save (null), and return to the game (AppLifecycleState.resumed)
@@ -218,17 +224,17 @@ void main() {
           [0, 0, 0],
         ]);
 
-        // UI settings (language, sound, dark mode, vibration, animations) must be preserved
-        expect(storage.language, 'pt');
-        expect(localization.currentLanguage, 'pt');
-        expect(controller.soundEnabled, isFalse);
-        expect(controller.musicEnabled, isFalse);
-        expect(controller.vibrationEnabled, isFalse);
-        expect(controller.darkMode, isFalse);
-        expect(controller.animationsEnabled, isFalse);
+        // UI settings must also be isolated and reset to fresh defaults for Account 2
+        expect(storage.language, 'en');
+        expect(localization.currentLanguage, 'en');
+        expect(controller.soundEnabled, isTrue);
+        expect(controller.musicEnabled, isTrue);
+        expect(controller.vibrationEnabled, isTrue);
+        expect(controller.darkMode, isTrue);
+        expect(controller.animationsEnabled, isTrue);
 
         // 3. Switch in OS / Google Play Games app to Account 3 ('player_003'),
-        // which has its own cloud save with 220 diamonds and unlockedRandom
+        // which has its own cloud save with 220 diamonds, unlockedRandom, and 'es' settings
         final account3Save = CloudSaveData(
           diamonds: 220,
           userScore: 8,
@@ -243,6 +249,12 @@ void main() {
             [0, 3, 1],
             [2, 2, 0],
           ],
+          language: 'es',
+          darkMode: true,
+          soundEnabled: true,
+          musicEnabled: false,
+          vibrationEnabled: false,
+          animationsEnabled: true,
         );
         fakeClient.mockPlayerName = 'ThirdAccount';
         fakeClient.mockPlayerId = 'player_003';
@@ -268,8 +280,15 @@ void main() {
         expect(controller.currentUserMove, HandMove.rock);
         expect(controller.currentComputerMove, HandMove.scissors);
         expect(controller.engine.matrix[1], [0, 3, 1]);
+        expect(storage.language, 'es');
+        expect(localization.currentLanguage, 'es');
+        expect(controller.darkMode, isTrue);
+        expect(controller.soundEnabled, isTrue);
+        expect(controller.musicEnabled, isFalse);
+        expect(controller.vibrationEnabled, isFalse);
+        expect(controller.animationsEnabled, isTrue);
 
-        // 4. Switch back to Account 1 ('player_001') -> restores Account 1's 650 diamonds & unlocks
+        // 4. Switch back to Account 1 ('player_001') -> restores Account 1's 650 diamonds, unlocks, & 'pt' settings
         fakeClient.mockPlayerName = 'PlayerOne';
         fakeClient.mockPlayerId = 'player_001';
 
@@ -285,6 +304,13 @@ void main() {
         expect(controller.unlockedAlgorithm, isTrue);
         expect(controller.unlockedRandom, isFalse);
         expect(controller.engine.matrix[0], [4, 2, 1]);
+        expect(storage.language, 'pt');
+        expect(localization.currentLanguage, 'pt');
+        expect(controller.darkMode, isFalse);
+        expect(controller.soundEnabled, isFalse);
+        expect(controller.musicEnabled, isFalse);
+        expect(controller.vibrationEnabled, isFalse);
+        expect(controller.animationsEnabled, isFalse);
       },
     );
 
@@ -457,28 +483,28 @@ void main() {
         expect(fakeClient.saveCallCount, equals(initialSaves + 3));
         syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
         expect(syncedData.diamonds, 455);
+
+        // 4. Changing settings triggers cloud saves for the signed-in account
+        controller.setLanguage('de');
+        controller.toggleDarkMode(false);
+        controller.toggleSound();
+        controller.toggleVibration(false);
+        controller.toggleAnimations(false);
+        await Future<void>.delayed(Duration.zero);
+        syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(syncedData.language, 'de');
+        expect(syncedData.darkMode, isFalse);
+        expect(syncedData.soundEnabled, isFalse);
+        expect(syncedData.vibrationEnabled, isFalse);
+        expect(syncedData.animationsEnabled, isFalse);
       },
     );
   });
 
-  group('SettingsDialog Player Profile UI Tests', () {
+  group('SettingsDialog Player Profile & Reset All Progress UI Tests', () {
     testWidgets(
-      'Displays single Sign in with Google Play button when disconnected, shows connected profile card without Switch Account or Sign Out buttons, and copies Player ID',
+      'Displays single Sign in with Google Play button when disconnected, and shows connected profile card with Player ID and NO copy button, Switch Account, or Sign Out buttons',
       (WidgetTester tester) async {
-        String? clipboardContent;
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-              if (call.method == 'Clipboard.setData') {
-                final args = call.arguments as Map<dynamic, dynamic>;
-                clipboardContent = args['text'] as String?;
-              }
-              return null;
-            });
-        addTearDown(() {
-          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-              .setMockMethodCallHandler(SystemChannels.platform, null);
-        });
-
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
           'musicEnabled': false,
@@ -491,6 +517,10 @@ void main() {
           shouldSucceedSignIn: true,
           mockPlayerName: 'OracleSlayer',
           mockPlayerId: 'player_4242',
+          cloudPayload: const CloudSaveData(
+            musicEnabled: false,
+            animationsEnabled: false,
+          ).toJsonString(),
         );
         final playGames = PlayGamesService(
           storage: storage,
@@ -536,8 +566,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Connected state: shows playerName, playerID, copy button, Synced status,
-        // and NO Switch Account or Sign Out buttons
+        // Connected state: shows playerName, playerID, Synced status,
+        // and NO copy button, Switch Account button, or Sign Out button
         expect(
           find.byKey(const ValueKey('play_games_profile_card')),
           findsOneWidget,
@@ -545,6 +575,11 @@ void main() {
         expect(find.text('OracleSlayer'), findsOneWidget);
         expect(find.text('ID: player_4242'), findsOneWidget);
         expect(find.text('Synced'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('play_games_copy_id_button')),
+          findsNothing,
+        );
+        expect(find.byIcon(Icons.copy_rounded), findsNothing);
         expect(
           find.byKey(const ValueKey('play_games_switch_account_button')),
           findsNothing,
@@ -555,14 +590,108 @@ void main() {
         );
         expect(find.text('Switch Account'), findsNothing);
         expect(find.text('Sign Out'), findsNothing);
+      },
+    );
 
-        // Tap copy icon next to Player ID -> copies ID to clipboard and shows SnackBar
-        await tester.tap(
-          find.byKey(const ValueKey('play_games_copy_id_button')),
+    testWidgets(
+      'Reset All Progress button in SettingsDialog asks for confirmation and resets all local and cloud progress so the user can restart fresh',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'diamonds': 800,
+          'userScore': 20,
+          'pcScore': 10,
+          'total': 30,
+          'unlockedReset': true,
+          'showReset': true,
+          'unlockedAlgorithm': true,
+          'showAlgorithm': true,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+          'darkMode': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'ResetTester',
+          mockPlayerId: 'player_reset',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
         );
         await tester.pumpAndSettle();
-        expect(clipboardContent, equals('player_4242'));
-        expect(find.text('Player ID copied: player_4242'), findsOneWidget);
+
+        expect(controller.diamonds, 800);
+        expect(controller.unlockedReset, isTrue);
+        expect(controller.unlockedAlgorithm, isTrue);
+
+        // Open SettingsDialog
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        final resetBtn = find.byKey(
+          const ValueKey('settings_reset_progress_button'),
+        );
+        await tester.ensureVisible(resetBtn);
+        expect(resetBtn, findsOneWidget);
+        expect(find.text('Reset All Progress'), findsOneWidget);
+
+        // Tap Reset All Progress -> opens confirmation dialog; tap Cancel first
+        await tester.tap(resetBtn);
+        await tester.pumpAndSettle();
+        expect(find.text('Reset All Progress?'), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('cancel_reset_progress_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.diamonds, 800);
+        expect(controller.unlockedReset, isTrue);
+
+        // Tap Reset All Progress again and confirm
+        await tester.tap(resetBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('confirm_reset_progress_button')),
+        );
+        await tester.pumpAndSettle();
+
+        // All progress is wiped locally and synced to cloud, while UI settings stay intact
+        expect(controller.diamonds, 0);
+        expect(storage.diamonds, 0);
+        expect(controller.userScore, 0);
+        expect(controller.pcScore, 0);
+        expect(controller.totalRounds, 0);
+        expect(controller.unlockedReset, isFalse);
+        expect(controller.showReset, isFalse);
+        expect(controller.unlockedAlgorithm, isFalse);
+        expect(controller.showAlgorithm, isFalse);
+        expect(controller.darkMode, isFalse);
+
+        final cloudAfterReset =
+            CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(cloudAfterReset.diamonds, 0);
+        expect(cloudAfterReset.unlockedCount, 0);
+        expect(cloudAfterReset.total, 0);
+        expect(cloudAfterReset.darkMode, isFalse);
       },
     );
 

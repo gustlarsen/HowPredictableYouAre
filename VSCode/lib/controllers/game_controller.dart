@@ -139,6 +139,7 @@ class GameController extends ChangeNotifier {
     musicEnabled = storage.musicEnabled;
     vibrationEnabled = storage.vibrationEnabled;
     animationsEnabled = storage.animationsEnabled;
+    localization.setLanguage(storage.language);
 
     unlockedReset = storage.unlockedReset;
     unlockedPredictability = storage.unlockedPredictability;
@@ -338,6 +339,20 @@ class GameController extends ChangeNotifier {
     storage.clearGameStats();
     _computeNextHints();
     notifyListeners();
+  }
+
+  /// Wipes all gameplay progression (diamonds, shop unlocks, active toggles,
+  /// scores, Markov matrices, and unlocked story chapters) while preserving
+  /// the player's UI settings, and syncs the fresh state to the cloud if signed in.
+  Future<void> resetAllProgress() async {
+    await storage.clearGameplayProgress(includeSettings: false);
+    turnCount = 0;
+    is100RoundsAlertPending = false;
+    _loadState(restartAudio: false);
+    notifyListeners();
+    if (playGames.isSignedIn) {
+      await playGames.saveCloudData();
+    }
   }
 
   // Shop Purchases
@@ -722,6 +737,7 @@ class GameController extends ChangeNotifier {
   void toggleDarkMode(bool val) {
     darkMode = val;
     storage.setDarkMode(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -729,6 +745,7 @@ class GameController extends ChangeNotifier {
     soundEnabled = !soundEnabled;
     storage.setSoundEnabled(soundEnabled);
     audio.soundEnabled = soundEnabled;
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -741,6 +758,7 @@ class GameController extends ChangeNotifier {
     } else {
       audio.stopMusic();
     }
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -748,18 +766,21 @@ class GameController extends ChangeNotifier {
     vibrationEnabled = val;
     storage.setVibrationEnabled(vibrationEnabled);
     audio.vibrationEnabled = vibrationEnabled;
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleAnimations(bool val) {
     animationsEnabled = val;
     storage.setAnimationsEnabled(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void setLanguage(String lang) {
     localization.setLanguage(lang);
     storage.setLanguage(lang);
+    _triggerCloudSave();
     notifyListeners();
   }
 

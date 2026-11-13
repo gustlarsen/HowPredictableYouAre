@@ -262,11 +262,26 @@ class StorageService {
     ]);
   }
 
-  /// Wipes all local gameplay progression (diamonds, scores, shop unlocks,
-  /// active toggles, story chapter flags, last moves, and Markov matrices)
-  /// while preserving UI settings (language, sound, music, vibration, dark mode, animations).
-  Future<void> clearGameplayProgress() {
+  /// Resets UI settings (language, dark mode, sound, music, vibration, animations)
+  /// back to their default values.
+  Future<void> resetSettingsToDefault() {
     return Future.wait([
+      setLanguage('en'),
+      setDarkMode(true),
+      setSoundEnabled(true),
+      setMusicEnabled(true),
+      setVibrationEnabled(true),
+      setAnimationsEnabled(true),
+    ]);
+  }
+
+  /// Wipes all local gameplay progression (diamonds, scores, shop unlocks,
+  /// active toggles, story chapter flags, last moves, and Markov matrices).
+  /// When [includeSettings] is true (e.g., on multi-account switch), also resets
+  /// UI settings back to defaults so settings are isolated per account.
+  Future<void> clearGameplayProgress({bool includeSettings = false}) {
+    return Future.wait([
+      if (includeSettings) resetSettingsToDefault(),
       setDiamonds(0),
       setUserScore(0),
       setPcScore(0),
