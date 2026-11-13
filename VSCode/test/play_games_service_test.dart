@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,21 +13,15 @@ import 'package:how_predictable/services/storage_service.dart';
 
 class FakePlayGamesClient implements PlayGamesClient {
   bool shouldSucceedSignIn;
-  bool shouldCancelAccountPicker;
-  String? mockChosenAccount;
   String? mockPlayerName;
   String? mockPlayerId;
   String? cloudPayload;
   int saveCallCount = 0;
   int loadCallCount = 0;
   int signInCallCount = 0;
-  int chooseAccountCallCount = 0;
-  int signOutCallCount = 0;
 
   FakePlayGamesClient({
     this.shouldSucceedSignIn = true,
-    this.shouldCancelAccountPicker = false,
-    this.mockChosenAccount,
     this.mockPlayerName = 'MasterHand99',
     this.mockPlayerId = 'gpg_987654321',
     this.cloudPayload,
@@ -37,18 +32,6 @@ class FakePlayGamesClient implements PlayGamesClient {
     signInCallCount++;
     if (!shouldSucceedSignIn) return null;
     return 'success';
-  }
-
-  @override
-  Future<String?> chooseAccount() async {
-    chooseAccountCallCount++;
-    if (shouldCancelAccountPicker || !shouldSucceedSignIn) return null;
-    return mockChosenAccount ?? mockPlayerName ?? 'success';
-  }
-
-  @override
-  Future<void> signOut() async {
-    signOutCallCount++;
   }
 
   @override
@@ -322,57 +305,26 @@ void main() {
         expect(syncedData.diamonds, 455);
       },
     );
-
-    test(
-      'Interactive Sign-in and Switch Account prompt account picker and switch Google accounts even when default Play Games player is unchanged',
-      () async {
-        SharedPreferences.setMockInitialValues({'musicEnabled': false});
-        final storage = StorageService();
-        await storage.init();
-
-        final fakeClient = FakePlayGamesClient(
-          shouldSucceedSignIn: true,
-          mockChosenAccount: 'first.user@gmail.com',
-          mockPlayerName: 'DefaultOSPlayer',
-          mockPlayerId: 'default_os_id',
-        );
-        final playGames = PlayGamesService(
-          storage: storage,
-          client: fakeClient,
-        );
-
-        // Interactive sign-in opens account picker
-        final signedIn = await playGames.signIn(silent: false);
-        expect(signedIn, isTrue);
-        expect(fakeClient.chooseAccountCallCount, 1);
-        expect(playGames.playerName, 'first.user@gmail.com');
-        final firstId = playGames.playerID;
-        expect(firstId, isNotNull);
-        expect(firstId, isNot(equals('default_os_id')));
-
-        // Switch account to second Google account
-        fakeClient.mockChosenAccount = 'second.user@gmail.com';
-        final switched = await playGames.switchAccount();
-        expect(switched, isTrue);
-        expect(fakeClient.chooseAccountCallCount, 2);
-        expect(playGames.playerName, 'second.user@gmail.com');
-        expect(playGames.playerID, isNot(equals(firstId)));
-
-        // Canceling account picker during Switch Account disconnects instead of relogging same account
-        fakeClient.shouldCancelAccountPicker = true;
-        final canceledSwitch = await playGames.switchAccount();
-        expect(canceledSwitch, isFalse);
-        expect(playGames.isSignedIn, isFalse);
-        expect(playGames.playerName, isNull);
-        expect(playGames.playerID, isNull);
-      },
-    );
   });
 
   group('SettingsDialog Player Profile UI Tests', () {
     testWidgets(
-      'Displays disconnected state, signs in via account picker, hides copy button after Player ID, and confirms Switch Account / Sign Out',
+      'Displays disconnected state, signs in to show connected profile card, copies Player ID, and confirms Switch Account / Sign Out',
       (WidgetTester tester) async {
+        String? clipboardContent;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              if (call.method == 'Clipboard.setData') {
+                final args = call.arguments as Map<dynamic, dynamic>;
+                clipboardContent = args['text'] as String?;
+              }
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, null);
+        });
+
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
           'musicEnabled': false,
@@ -416,25 +368,19 @@ void main() {
         expect(find.text('Sign in with Google Play'), findsOneWidget);
         expect(find.text('Offline'), findsOneWidget);
 
-        // Tap "Sign in with Google Play" -> invokes chooseAccount
+        // Tap "Sign in with Google Play"
         await tester.tap(
           find.byKey(const ValueKey('play_games_sign_in_button')),
         );
         await tester.pumpAndSettle();
-        expect(fakeClient.chooseAccountCallCount, 1);
 
-        // Connected state: shows playerName, playerID (without copy button), Synced status, Switch Account, and Sign Out
+        // Connected state: shows playerName, playerID, copy button, Synced status, Switch Account, and Sign Out
         expect(
           find.byKey(const ValueKey('play_games_profile_card')),
           findsOneWidget,
         );
         expect(find.text('OracleSlayer'), findsOneWidget);
         expect(find.text('ID: gpg_id_4242'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('play_games_copy_id_button')),
-          findsNothing,
-        );
-        expect(find.byIcon(Icons.copy_rounded), findsNothing);
         expect(find.text('Synced'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('play_games_switch_account_button')),
@@ -444,6 +390,14 @@ void main() {
           find.byKey(const ValueKey('play_games_sign_out_button')),
           findsOneWidget,
         );
+
+        // Tap copy icon next to Player ID -> copies ID to clipboard and shows SnackBar
+        await tester.tap(
+          find.byKey(const ValueKey('play_games_copy_id_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(clipboardContent, equals('gpg_id_4242'));
+        expect(find.text('Player ID copied: gpg_id_4242'), findsOneWidget);
 
         // Tap "Switch Account" -> shows confirmation dialog warning about offline progression
         fakeClient.mockPlayerName = 'NewChallenger';
@@ -464,7 +418,6 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(fakeClient.chooseAccountCallCount, 2);
         expect(find.text('NewChallenger'), findsOneWidget);
         expect(find.text('ID: gpg_id_9999'), findsOneWidget);
 

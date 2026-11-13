@@ -237,26 +237,6 @@ class StorageService {
     return _prefs.setString('markov_matrix_$size', json.encode(matrix));
   }
 
-  // Google Play Games Account Persistence
-  bool get playGamesSignedOut =>
-      _prefs.getBool('play_games_signed_out') ?? false;
-  Future<void> setPlayGamesSignedOut(bool val) =>
-      _prefs.setBool('play_games_signed_out', val);
-
-  String? get playGamesSelectedAccount =>
-      _prefs.getString('play_games_selected_account');
-  Future<void> setPlayGamesSelectedAccount(String? account) {
-    if (account == null || account.trim().isEmpty) {
-      return _prefs.remove('play_games_selected_account');
-    }
-    return _prefs.setString('play_games_selected_account', account.trim());
-  }
-
-  String? getAccountCloudSave(String slotName) =>
-      _prefs.getString('cloud_save_backup_$slotName');
-  Future<void> setAccountCloudSave(String slotName, String data) =>
-      _prefs.setString('cloud_save_backup_$slotName', data);
-
   Future<void> clearGameStats() {
     return Future.wait([
       setUserScore(0),

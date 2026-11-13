@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
@@ -183,6 +184,13 @@ class SettingsDialog extends StatelessWidget {
     _showDiscreetSnackBar(context, 'Signed out. Playing in offline mode.');
   }
 
+  Future<void> _handleCopyPlayerId(BuildContext context, String playerId) async {
+    controller.audio.playTapVibrate();
+    await Clipboard.setData(ClipboardData(text: playerId));
+    if (!context.mounted) return;
+    _showDiscreetSnackBar(context, 'Player ID copied: $playerId');
+  }
+
   Future<void> _handleManualSync(BuildContext context) async {
     controller.audio.playTapVibrate();
     final ok = await controller.playGames.saveCloudData();
@@ -242,6 +250,7 @@ class SettingsDialog extends StatelessWidget {
                         onSignIn: () => _handleSignIn(context),
                         onSwitchAccount: () => _handleSwitchAccount(context),
                         onSignOut: () => _handleSignOut(context),
+                        onCopyPlayerId: (id) => _handleCopyPlayerId(context, id),
                         onManualSync: () => _handleManualSync(context),
                       ),
 
@@ -392,6 +401,7 @@ class _PlayerProfileSection extends StatelessWidget {
   final VoidCallback onSignIn;
   final VoidCallback onSwitchAccount;
   final VoidCallback onSignOut;
+  final ValueChanged<String> onCopyPlayerId;
   final VoidCallback onManualSync;
 
   const _PlayerProfileSection({
@@ -399,6 +409,7 @@ class _PlayerProfileSection extends StatelessWidget {
     required this.onSignIn,
     required this.onSwitchAccount,
     required this.onSignOut,
+    required this.onCopyPlayerId,
     required this.onManualSync,
   });
 
@@ -544,16 +555,38 @@ class _PlayerProfileSection extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          'ID: ${playGames.playerID ?? "Unknown"}',
-                          key: const ValueKey('play_games_player_id'),
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'ID: ${playGames.playerID ?? "Unknown"}',
+                                key: const ValueKey('play_games_player_id'),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              key: const ValueKey('play_games_copy_id_button'),
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () => onCopyPlayerId(
+                                playGames.playerID ?? '',
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(3.0),
+                                child: Icon(
+                                  Icons.copy_rounded,
+                                  size: 13,
+                                  color: Colors.amber.shade300,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
