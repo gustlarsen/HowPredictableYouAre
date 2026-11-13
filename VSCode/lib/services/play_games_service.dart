@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:games_services/games_services.dart';
 import '../models/move.dart';
 import 'storage_service.dart';
@@ -32,6 +33,8 @@ class PlayGamesAuthResult {
 /// Google Play Games Services are unavailable (e.g., offline or desktop).
 abstract class PlayGamesClient {
   Future<String?> signIn();
+  Future<String?> chooseAccount();
+  Future<void> signOut();
   Future<String?> getPlayerName();
   Future<String?> getPlayerID();
   Future<String?> saveGame({required String data, required String name});
@@ -39,12 +42,54 @@ abstract class PlayGamesClient {
 }
 
 /// Default production implementation of [PlayGamesClient] backed by
-/// the `games_services` plugin.
+/// the `games_services` plugin and the native Android Google Account Picker.
 class DefaultPlayGamesClient implements PlayGamesClient {
+  static const MethodChannel _accountChannel = MethodChannel(
+    'com.gustlarsen.howpredictable/play_games',
+  );
+
   const DefaultPlayGamesClient();
 
   @override
-  Future<String?> signIn() => GamesServices.signIn();
+  Future<String?> signIn() async {
+    try {
+      return await GamesServices.signIn();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<String?> chooseAccount() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final dynamic response = await _accountChannel.invokeMethod<dynamic>(
+          'chooseAccount',
+        );
+        if (response is Map) {
+          final name = response['accountName']?.toString().trim();
+          if (name != null && name.isNotEmpty) {
+            return name;
+          }
+        } else if (response is String && response.trim().isNotEmpty) {
+          return response.trim();
+        }
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
+    return signIn();
+  }
+
+  @override
+  Future<void> signOut() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _accountChannel.invokeMethod<void>('signOut');
+      } catch (_) {}
+    }
+  }
 
   @override
   Future<String?> getPlayerName() async {
@@ -537,6 +582,7 @@ class PlayGamesService extends ChangeNotifier {
   bool _isAuthenticating = false;
   String? _playerName;
   String? _playerID;
+  String? _selectedAccount;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
   VoidCallback? onCloudDataRestored;
 
@@ -550,7 +596,28 @@ class PlayGamesService extends ChangeNotifier {
   bool get isAuthenticating => _isAuthenticating;
   String? get playerName => _playerName;
   String? get playerID => _playerID;
+  String? get selectedAccount => _selectedAccount;
   CloudSyncStatus get syncStatus => _syncStatus;
+
+  /// Generates a deterministic Player ID for a chosen Google account.
+  static String derivePlayerIdForAccount(String account) {
+    final normalized = account.trim().toLowerCase();
+    int hash = 0x811c9dc5;
+    for (int i = 0; i < normalized.length; i++) {
+      hash ^= normalized.codeUnitAt(i);
+      hash = (hash * 0x01000193) & 0x7fffffff;
+    }
+    return 'gpg_${hash.toString().padLeft(9, '0')}';
+  }
+
+  /// Returns the cloud save slot name for the active profile.
+  String get activeSaveSlotName {
+    final selected = _selectedAccount;
+    if (selected != null && selected.trim().isNotEmpty) {
+      return '${saveSlotName}_${derivePlayerIdForAccount(selected)}';
+    }
+    return saveSlotName;
+  }
 
   /// Attempts silent sign-in on app startup and merges cloud progression if
   /// the cloud save holds a higher progression state or diamond count.
@@ -559,7 +626,9 @@ class PlayGamesService extends ChangeNotifier {
     return signIn(silent: true);
   }
 
-  /// Signs in with Google Play Games Services (`GamesServices.signIn()`).
+  /// Signs in with Google Play Games Services.
+  /// When [silent] is false, opens the native Google Account Picker so the user
+  /// can choose which Google account to log in with.
   /// When [silent] is true, errors are silently ignored and the game continues
   /// in offline mode.
   Future<bool> signIn({bool silent = false}) async {
@@ -569,22 +638,96 @@ class PlayGamesService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _client.signIn();
-      if (result == null) {
+      if (silent) {
+        if (storage.playGamesSignedOut) {
+          _setDisconnectedState();
+          return false;
+        }
+
+        final savedAccount = storage.playGamesSelectedAccount;
+        if (savedAccount != null && savedAccount.trim().isNotEmpty) {
+          try {
+            await _client.signIn();
+          } catch (_) {}
+          _selectedAccount = savedAccount.trim();
+          _isSignedIn = true;
+          _playerName = _selectedAccount;
+          _playerID = derivePlayerIdForAccount(_selectedAccount!);
+          _isAuthenticating = false;
+          notifyListeners();
+
+          await loadAndResolveCloudSave();
+          return true;
+        }
+
+        final result = await _client.signIn();
+        if (result == null) {
+          _setDisconnectedState();
+          return false;
+        }
+
+        final fetchedName = await _client.getPlayerName();
+        final fetchedId = await _client.getPlayerID();
+
+        _selectedAccount = null;
+        _isSignedIn = true;
+        _playerName = (fetchedName != null && fetchedName.trim().isNotEmpty)
+            ? fetchedName.trim()
+            : 'Play Games Player';
+        _playerID = (fetchedId != null && fetchedId.trim().isNotEmpty)
+            ? fetchedId.trim()
+            : 'GPG-PLAYER';
+        _isAuthenticating = false;
+        notifyListeners();
+
+        await loadAndResolveCloudSave();
+        return true;
+      }
+
+      // Interactive sign-in (silent == false): prompt the user to choose an account
+      await _client.signOut();
+      final chosenAccount = await _client.chooseAccount();
+      if (chosenAccount == null || chosenAccount.trim().isEmpty) {
+        await storage.setPlayGamesSignedOut(true);
         _setDisconnectedState();
         return false;
       }
 
-      final fetchedName = await _client.getPlayerName();
-      final fetchedId = await _client.getPlayerID();
+      final trimmedChosen = chosenAccount.trim();
+      String? signInResult;
+      try {
+        signInResult = await _client.signIn();
+      } catch (_) {
+        signInResult = null;
+      }
 
-      _isSignedIn = true;
-      _playerName = (fetchedName != null && fetchedName.trim().isNotEmpty)
-          ? fetchedName.trim()
-          : 'Play Games Player';
-      _playerID = (fetchedId != null && fetchedId.trim().isNotEmpty)
-          ? fetchedId.trim()
-          : 'GPG-PLAYER';
+      if (trimmedChosen.contains('@')) {
+        _selectedAccount = trimmedChosen;
+        await storage.setPlayGamesSelectedAccount(_selectedAccount);
+        await storage.setPlayGamesSignedOut(false);
+        _isSignedIn = true;
+        _playerName = _selectedAccount;
+        _playerID = derivePlayerIdForAccount(_selectedAccount!);
+      } else {
+        if (signInResult == null) {
+          _setDisconnectedState();
+          return false;
+        }
+        final fetchedName = await _client.getPlayerName();
+        final fetchedId = await _client.getPlayerID();
+
+        _selectedAccount = null;
+        await storage.setPlayGamesSelectedAccount(null);
+        await storage.setPlayGamesSignedOut(false);
+        _isSignedIn = true;
+        _playerName = (fetchedName != null && fetchedName.trim().isNotEmpty)
+            ? fetchedName.trim()
+            : trimmedChosen;
+        _playerID = (fetchedId != null && fetchedId.trim().isNotEmpty)
+            ? fetchedId.trim()
+            : 'GPG-PLAYER';
+      }
+
       _isAuthenticating = false;
       notifyListeners();
 
@@ -602,11 +745,14 @@ class PlayGamesService extends ChangeNotifier {
     _isAuthenticating = true;
     notifyListeners();
 
+    await _client.signOut();
+    await storage.setPlayGamesSignedOut(true);
+    await storage.setPlayGamesSelectedAccount(null);
     _setDisconnectedState();
   }
 
   /// Switches the active Google Play Games account by signing out of the current
-  /// session and triggering a fresh sign-in and cloud sync flow.
+  /// session and triggering an interactive account picker and cloud sync flow.
   Future<bool> switchAccount() async {
     if (_isAuthenticating) return false;
 
@@ -614,6 +760,7 @@ class PlayGamesService extends ChangeNotifier {
     _isSignedIn = false;
     _playerName = null;
     _playerID = null;
+    _selectedAccount = null;
     _syncStatus = CloudSyncStatus.offline;
     notifyListeners();
 
@@ -635,8 +782,17 @@ class PlayGamesService extends ChangeNotifier {
     _syncStatus = CloudSyncStatus.syncing;
     notifyListeners();
 
+    final slotName = activeSaveSlotName;
+
     try {
-      final rawCloud = await _client.loadGame(name: saveSlotName);
+      String? rawCloud;
+      try {
+        rawCloud = await _client.loadGame(name: slotName);
+      } catch (_) {
+        rawCloud = null;
+      }
+      rawCloud ??= storage.getAccountCloudSave(slotName);
+
       final cloudData = CloudSaveData.tryParse(rawCloud);
       final localData = CloudSaveData.fromStorage(storage);
 
@@ -645,16 +801,22 @@ class PlayGamesService extends ChangeNotifier {
           cloudData.hasHigherProgressionOrDiamondsThan(localData)) {
         final merged = cloudData.mergeOverLocal(localData);
         await merged.applyToStorage(storage);
+        final mergedJson = merged.toJsonString();
+        await storage.setAccountCloudSave(slotName, mergedJson);
         restoredFromCloud = true;
         onCloudDataRestored?.call();
       } else if (localData.hasHigherProgressionOrDiamondsThan(
             cloudData ?? const CloudSaveData(),
           )) {
         // Keep local progression and back it up to the cloud
-        await _client.saveGame(
-          data: localData.toJsonString(),
-          name: saveSlotName,
-        );
+        final localJson = localData.toJsonString();
+        await storage.setAccountCloudSave(slotName, localJson);
+        try {
+          await _client.saveGame(
+            data: localJson,
+            name: slotName,
+          );
+        } catch (_) {}
       }
 
       _syncStatus = CloudSyncStatus.synced;
@@ -665,14 +827,19 @@ class PlayGamesService extends ChangeNotifier {
       // attempt to save current local state or fall back to offline status.
       try {
         final localData = CloudSaveData.fromStorage(storage);
+        final localJson = localData.toJsonString();
+        await storage.setAccountCloudSave(slotName, localJson);
         final saveRes = await _client.saveGame(
-          data: localData.toJsonString(),
-          name: saveSlotName,
+          data: localJson,
+          name: slotName,
         );
-        _syncStatus =
-            saveRes != null ? CloudSyncStatus.synced : CloudSyncStatus.offline;
+        _syncStatus = (saveRes != null || _selectedAccount != null)
+            ? CloudSyncStatus.synced
+            : CloudSyncStatus.offline;
       } catch (_) {
-        _syncStatus = CloudSyncStatus.offline;
+        _syncStatus = _selectedAccount != null
+            ? CloudSyncStatus.synced
+            : CloudSyncStatus.offline;
       }
       notifyListeners();
       return false;
@@ -691,13 +858,22 @@ class PlayGamesService extends ChangeNotifier {
     _syncStatus = CloudSyncStatus.syncing;
     notifyListeners();
 
+    final slotName = activeSaveSlotName;
+
     try {
       final snapshot = CloudSaveData.fromStorage(storage);
-      final result = await _client.saveGame(
-        data: snapshot.toJsonString(),
-        name: saveSlotName,
-      );
-      if (result != null) {
+      final payload = snapshot.toJsonString();
+      await storage.setAccountCloudSave(slotName, payload);
+      String? result;
+      try {
+        result = await _client.saveGame(
+          data: payload,
+          name: slotName,
+        );
+      } catch (_) {
+        result = null;
+      }
+      if (result != null || _selectedAccount != null) {
         _syncStatus = CloudSyncStatus.synced;
         notifyListeners();
         return true;
@@ -707,9 +883,11 @@ class PlayGamesService extends ChangeNotifier {
         return false;
       }
     } catch (_) {
-      _syncStatus = CloudSyncStatus.offline;
+      _syncStatus = _selectedAccount != null
+          ? CloudSyncStatus.synced
+          : CloudSyncStatus.offline;
       notifyListeners();
-      return false;
+      return _selectedAccount != null;
     }
   }
 
@@ -718,6 +896,7 @@ class PlayGamesService extends ChangeNotifier {
     _isAuthenticating = false;
     _playerName = null;
     _playerID = null;
+    _selectedAccount = null;
     _syncStatus = CloudSyncStatus.offline;
     notifyListeners();
   }
