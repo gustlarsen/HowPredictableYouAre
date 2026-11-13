@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/storage_service.dart';
 import 'services/localization_service.dart';
 import 'services/audio_service.dart';
+import 'services/play_games_service.dart';
 import 'controllers/game_controller.dart';
 import 'views/screens/game_screen.dart';
 
@@ -19,13 +21,18 @@ void main() async {
   final audio = AudioService();
   await audio.init();
 
+  final playGames = PlayGamesService(storage: storage);
+  final controller = GameController(
+    storage: storage,
+    localization: localization,
+    audio: audio,
+    playGames: playGames,
+  );
+  unawaited(playGames.initialize());
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => GameController(
-        storage: storage,
-        localization: localization,
-        audio: audio,
-      ),
+    ChangeNotifierProvider.value(
+      value: controller,
       child: const HowPredictableApp(),
     ),
   );

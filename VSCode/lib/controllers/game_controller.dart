@@ -7,11 +7,13 @@ import '../services/markov_engine.dart';
 import '../services/storage_service.dart';
 import '../services/localization_service.dart';
 import '../services/audio_service.dart';
+import '../services/play_games_service.dart';
 
 class GameController extends ChangeNotifier {
   final StorageService storage;
   final LocalizationService localization;
   final AudioService audio;
+  late final PlayGamesService playGames;
 
   late MarkovEngine _engine;
 
@@ -89,11 +91,30 @@ class GameController extends ChangeNotifier {
     required this.storage,
     required this.localization,
     required this.audio,
+    PlayGamesService? playGames,
   }) {
+    this.playGames = playGames ?? PlayGamesService(storage: storage);
+    this.playGames.onCloudDataRestored = _handleCloudDataRestored;
+    this.playGames.addListener(_handlePlayGamesUpdate);
     _loadState();
   }
 
-  void _loadState() {
+  void _handleCloudDataRestored() {
+    _loadState(restartAudio: false);
+    notifyListeners();
+  }
+
+  void _handlePlayGamesUpdate() {
+    notifyListeners();
+  }
+
+  void _triggerCloudSave() {
+    if (playGames.isSignedIn) {
+      unawaited(playGames.saveCloudData());
+    }
+  }
+
+  void _loadState({bool restartAudio = true}) {
     diamonds = storage.diamonds;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
@@ -150,7 +171,7 @@ class GameController extends ChangeNotifier {
     audio.soundEnabled = soundEnabled;
     audio.musicEnabled = musicEnabled;
     audio.vibrationEnabled = vibrationEnabled;
-    if (musicEnabled) {
+    if (restartAudio && musicEnabled) {
       audio.startMusic();
     }
 
@@ -254,6 +275,10 @@ class GameController extends ChangeNotifier {
     storage.setLastUserMove(currentUserMove);
     storage.setLastComputerMove(currentComputerMove);
 
+    if (lastWinner == RoundWinner.user) {
+      _triggerCloudSave();
+    }
+
     if (totalRounds == 100) {
       is100RoundsAlertPending = true;
     }
@@ -312,6 +337,7 @@ class GameController extends ChangeNotifier {
     diamonds -= cost;
     storage.setDiamonds(diamonds);
     onUnlock();
+    _triggerCloudSave();
     notifyListeners();
     return true;
   }
@@ -575,6 +601,7 @@ class GameController extends ChangeNotifier {
     storage.setDiamonds(diamonds);
     isGiftAvailable = false;
     audio.playVibrate();
+    _triggerCloudSave();
     notifyListeners();
 
     _giftTimer?.cancel();
@@ -588,42 +615,49 @@ class GameController extends ChangeNotifier {
   void toggleShowReset(bool val) {
     showReset = val;
     storage.setShowReset(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowPredictability(bool val) {
     showPredictability = val;
     storage.setShowPredictability(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowRandom(bool val) {
     showRandom = val;
     storage.setShowRandom(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowAlgorithm(bool val) {
     showAlgorithm = val;
     storage.setShowAlgorithm(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowYourPrediction(bool val) {
     showYourPrediction = val;
     storage.setShowYourPrediction(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowNextMove(bool val) {
     showNextMove = val;
     storage.setShowNextMove(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   void toggleShowSuggestion(bool val) {
     showSuggestion = val;
     storage.setShowSuggestion(val);
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -645,6 +679,7 @@ class GameController extends ChangeNotifier {
         storage.setShowCrystalBallPlus(showCrystalBallPlus);
       }
     }
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -658,6 +693,7 @@ class GameController extends ChangeNotifier {
       crystalBallPlusSavedState = val;
       storage.setCrystalBallPlusSavedState(val);
     }
+    _triggerCloudSave();
     notifyListeners();
   }
 
@@ -666,6 +702,7 @@ class GameController extends ChangeNotifier {
     storage.setShowNewHands(val);
     _engine = MarkovEngine(enableExtendedHands: val);
     resetGame();
+    _triggerCloudSave();
   }
 
   // Settings
@@ -716,12 +753,14 @@ class GameController extends ChangeNotifier {
   void addFreeDiamonds(int amount) {
     diamonds += amount;
     storage.setDiamonds(diamonds);
+    _triggerCloudSave();
     notifyListeners();
   }
 
   @override
   void dispose() {
     _giftTimer?.cancel();
+    playGames.removeListener(_handlePlayGamesUpdate);
     super.dispose();
   }
 }
