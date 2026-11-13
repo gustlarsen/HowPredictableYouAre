@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
 import '../models/story_chapter.dart';
@@ -108,6 +108,16 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      audio.pauseMusic();
+    } else if (state == AppLifecycleState.resumed) {
+      audio.resumeMusic();
+      unawaited(playGames.handleAppResumed());
+    }
+  }
+
   void _triggerCloudSave() {
     if (playGames.isSignedIn) {
       unawaited(playGames.saveCloudData());
@@ -119,8 +129,9 @@ class GameController extends ChangeNotifier {
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
-    if (totalRounds >= 100) {
-      is100RoundsAlertPending = true;
+    is100RoundsAlertPending = totalRounds >= 100;
+    if (totalRounds == 0 && storage.lastUserMove == null) {
+      turnCount = 0;
     }
 
     darkMode = storage.darkMode;
@@ -166,6 +177,8 @@ class GameController extends ChangeNotifier {
 
     if (!hasSeenStoryIntro && totalRounds == 0) {
       pendingStoryChapter = StoryChapter.intro;
+    } else {
+      pendingStoryChapter = null;
     }
 
     audio.soundEnabled = soundEnabled;

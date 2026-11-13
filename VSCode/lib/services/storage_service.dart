@@ -13,6 +13,15 @@ class StorageService {
   int get diamonds => _prefs.getInt('diamonds') ?? 0;
   Future<void> setDiamonds(int val) => _prefs.setInt('diamonds', val);
 
+  // Last Signed-In Google Play Games Player ID
+  String? get lastPlayerId => _prefs.getString('last_player_id');
+  Future<void> setLastPlayerId(String? id) {
+    if (id == null) {
+      return _prefs.remove('last_player_id');
+    }
+    return _prefs.setString('last_player_id', id);
+  }
+
   int get userScore => _prefs.getInt('userScore') ?? 0;
   Future<void> setUserScore(int val) => _prefs.setInt('userScore', val);
 
@@ -237,11 +246,61 @@ class StorageService {
     return _prefs.setString('markov_matrix_$size', json.encode(matrix));
   }
 
+  Future<void> removeMarkovMatrix(int size) {
+    return _prefs.remove('markov_matrix_$size');
+  }
+
   Future<void> clearGameStats() {
     return Future.wait([
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
+      _prefs.remove('last_user_move'),
+      _prefs.remove('last_computer_move'),
+      _prefs.remove('markov_matrix_3'),
+      _prefs.remove('markov_matrix_5'),
+    ]);
+  }
+
+  /// Wipes all local gameplay progression (diamonds, scores, shop unlocks,
+  /// active toggles, story chapter flags, last moves, and Markov matrices)
+  /// while preserving UI settings (language, sound, music, vibration, dark mode, animations).
+  Future<void> clearGameplayProgress() {
+    return Future.wait([
+      setDiamonds(0),
+      setUserScore(0),
+      setPcScore(0),
+      setTotal(0),
+      setUnlockedReset(false),
+      setUnlockedPredictability(false),
+      setUnlockedRandom(false),
+      setUnlockedAlgorithm(false),
+      setUnlockedNewHands(false),
+      setUnlockedYourPrediction(false),
+      setUnlockedNextMove(false),
+      setUnlockedSuggestion(false),
+      setUnlockedAds(false),
+      setUnlockedCrystalBall(false),
+      setUnlockedCrystalBallPlus(false),
+      setShowReset(false),
+      setShowPredictability(false),
+      setShowRandom(false),
+      setShowAlgorithm(false),
+      setShowNewHands(false),
+      setShowYourPrediction(false),
+      setShowNextMove(false),
+      setShowSuggestion(false),
+      setShowCrystalBall(false),
+      setShowCrystalBallPlus(false),
+      setCrystalBallPlusSavedState(false),
+      setHasSeenStoryReset(false),
+      setHasSeenStoryPredictability(false),
+      setHasSeenStoryRandom(false),
+      setHasSeenStoryAlgorithm(false),
+      setHasSeenStoryYourPrediction(false),
+      setHasSeenStoryPcNextMove(false),
+      setHasSeenStorySuggestion(false),
+      setHasSeenStoryCrystalBall(false),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),

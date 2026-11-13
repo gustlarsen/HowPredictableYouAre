@@ -18,105 +18,6 @@ class SettingsDialog extends StatelessWidget {
     );
   }
 
-  Future<bool> _showAccountConfirmationDialog({
-    required BuildContext context,
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-    required IconData icon,
-    required Key confirmButtonKey,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.amber.withValues(alpha: 0.35),
-              width: 1.2,
-            ),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, color: Colors.amber, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    message,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      TextButton(
-                        key: const ValueKey('account_confirm_cancel_button'),
-                        onPressed: () => Navigator.of(dialogContext).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        key: confirmButtonKey,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: confirmColor,
-                          foregroundColor: confirmColor == Colors.amber
-                              ? Colors.black87
-                              : Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => Navigator.of(dialogContext).pop(true),
-                        child: Text(
-                          confirmLabel,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-    return confirmed == true;
-  }
-
   void _showDiscreetSnackBar(BuildContext context, String text) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -138,50 +39,6 @@ class SettingsDialog extends StatelessWidget {
           ? 'Signed in as ${controller.playGames.playerName ?? "Player"}'
           : 'Could not connect to Google Play Games (Offline mode)',
     );
-  }
-
-  Future<void> _handleSwitchAccount(BuildContext context) async {
-    controller.audio.playTapVibrate();
-    final confirmed = await _showAccountConfirmationDialog(
-      context: context,
-      title: 'Switch Account?',
-      message:
-          'Switching Google Play accounts will disconnect your current cloud profile. '
-          'Offline progression on this device is preserved and will only be replaced if the new cloud save holds higher progression or diamonds.',
-      confirmLabel: 'Switch Account',
-      confirmColor: Colors.amber,
-      icon: Icons.swap_horiz_rounded,
-      confirmButtonKey: const ValueKey('confirm_switch_account_button'),
-    );
-    if (!confirmed || !context.mounted) return;
-
-    final ok = await controller.playGames.switchAccount();
-    if (!context.mounted) return;
-    _showDiscreetSnackBar(
-      context,
-      ok
-          ? 'Switched account to ${controller.playGames.playerName ?? "Player"}'
-          : 'Disconnected from Google Play Games (Offline mode)',
-    );
-  }
-
-  Future<void> _handleSignOut(BuildContext context) async {
-    controller.audio.playTapVibrate();
-    final confirmed = await _showAccountConfirmationDialog(
-      context: context,
-      title: 'Sign Out?',
-      message:
-          'While signed out, your offline progression and diamonds will only be saved locally on this device and will not sync to Google Play Cloud until you sign in again.',
-      confirmLabel: 'Sign Out',
-      confirmColor: Colors.redAccent,
-      icon: Icons.logout_rounded,
-      confirmButtonKey: const ValueKey('confirm_sign_out_button'),
-    );
-    if (!confirmed || !context.mounted) return;
-
-    await controller.playGames.signOut();
-    if (!context.mounted) return;
-    _showDiscreetSnackBar(context, 'Signed out. Playing in offline mode.');
   }
 
   Future<void> _handleCopyPlayerId(BuildContext context, String playerId) async {
@@ -248,8 +105,6 @@ class SettingsDialog extends StatelessWidget {
                       _PlayerProfileSection(
                         playGames: controller.playGames,
                         onSignIn: () => _handleSignIn(context),
-                        onSwitchAccount: () => _handleSwitchAccount(context),
-                        onSignOut: () => _handleSignOut(context),
                         onCopyPlayerId: (id) => _handleCopyPlayerId(context, id),
                         onManualSync: () => _handleManualSync(context),
                       ),
@@ -399,16 +254,12 @@ class SettingsDialog extends StatelessWidget {
 class _PlayerProfileSection extends StatelessWidget {
   final PlayGamesService playGames;
   final VoidCallback onSignIn;
-  final VoidCallback onSwitchAccount;
-  final VoidCallback onSignOut;
   final ValueChanged<String> onCopyPlayerId;
   final VoidCallback onManualSync;
 
   const _PlayerProfileSection({
     required this.playGames,
     required this.onSignIn,
-    required this.onSwitchAccount,
-    required this.onSignOut,
     required this.onCopyPlayerId,
     required this.onManualSync,
   });
@@ -593,74 +444,6 @@ class _PlayerProfileSection extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 8),
-
-            // Secondary Action Buttons: Switch Account & Sign Out
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('play_games_switch_account_button'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.amber,
-                      side: BorderSide(
-                        color: Colors.amber.withValues(alpha: 0.45),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 6,
-                      ),
-                      minimumSize: const Size(0, 32),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: isBusy ? null : onSwitchAccount,
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 14),
-                    label: const Text(
-                      'Switch Account',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const ValueKey('play_games_sign_out_button'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.redAccent,
-                      side: BorderSide(
-                        color: Colors.redAccent.withValues(alpha: 0.45),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 6,
-                      ),
-                      minimumSize: const Size(0, 32),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: isBusy ? null : onSignOut,
-                    icon: const Icon(Icons.logout_rounded, size: 14),
-                    label: const Text(
-                      'Sign Out',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ],

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:games_services/games_services.dart';
 import '../models/move.dart';
 import 'storage_service.dart';
@@ -373,7 +373,9 @@ class CloudSaveData {
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
 
-    await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
+    if (hasSeenStoryIntro) {
+      await storage.setHasSeenStoryIntro(true);
+    }
     await storage.setHasSeenStoryReset(hasSeenStoryReset);
     await storage.setHasSeenStoryPredictability(hasSeenStoryPredictability);
     await storage.setHasSeenStoryRandom(hasSeenStoryRandom);
@@ -396,9 +398,13 @@ class CloudSaveData {
 
     if (markovMatrix3 != null && markovMatrix3!.length == 3) {
       await storage.setMarkovMatrix(markovMatrix3!);
+    } else {
+      await storage.removeMarkovMatrix(3);
     }
     if (markovMatrix5 != null && markovMatrix5!.length == 5) {
       await storage.setMarkovMatrix(markovMatrix5!);
+    } else {
+      await storage.removeMarkovMatrix(5);
     }
   }
 
@@ -537,6 +543,7 @@ class PlayGamesService extends ChangeNotifier {
   bool _isAuthenticating = false;
   String? _playerName;
   String? _playerID;
+  String? _lastPlayerID;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
   VoidCallback? onCloudDataRestored;
 
@@ -550,6 +557,7 @@ class PlayGamesService extends ChangeNotifier {
   bool get isAuthenticating => _isAuthenticating;
   String? get playerName => _playerName;
   String? get playerID => _playerID;
+  String? get lastPlayerID => _lastPlayerID ?? storage.lastPlayerId;
   CloudSyncStatus get syncStatus => _syncStatus;
 
   /// Attempts silent sign-in on app startup and merges cloud progression if
@@ -557,6 +565,21 @@ class PlayGamesService extends ChangeNotifier {
   /// Gracefully falls back to offline `SharedPreferences` cache if declined or offline.
   Future<bool> initialize() async {
     return signIn(silent: true);
+  }
+
+  /// Re-checks the active Google Play Games player session when the app resumes
+  /// from the background (`AppLifecycleState.resumed`), detecting any OS-level
+  /// account switch or sign-out performed in the Google Play Games app.
+  Future<bool> handleAppResumed() {
+    return signIn(silent: true);
+  }
+
+  /// Handles app lifecycle state transitions, refreshing the active player
+  /// session whenever [state] is [AppLifecycleState.resumed].
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(handleAppResumed());
+    }
   }
 
   /// Signs in with Google Play Games Services (`GamesServices.signIn()`).
@@ -578,17 +601,32 @@ class PlayGamesService extends ChangeNotifier {
       final fetchedName = await _client.getPlayerName();
       final fetchedId = await _client.getPlayerID();
 
-      _isSignedIn = true;
-      _playerName = (fetchedName != null && fetchedName.trim().isNotEmpty)
+      final resolvedName = (fetchedName != null && fetchedName.trim().isNotEmpty)
           ? fetchedName.trim()
           : 'Play Games Player';
-      _playerID = (fetchedId != null && fetchedId.trim().isNotEmpty)
+      final resolvedId = (fetchedId != null && fetchedId.trim().isNotEmpty)
           ? fetchedId.trim()
           : 'GPG-PLAYER';
+
+      final previousPlayerId = _lastPlayerID ?? storage.lastPlayerId;
+      final bool playerChanged =
+          previousPlayerId != null && previousPlayerId != resolvedId;
+
+      _isSignedIn = true;
+      _playerName = resolvedName;
+      _playerID = resolvedId;
+      _lastPlayerID = resolvedId;
+      await storage.setLastPlayerId(resolvedId);
       _isAuthenticating = false;
       notifyListeners();
 
-      await loadAndResolveCloudSave();
+      if (playerChanged) {
+        await storage.clearGameplayProgress();
+        onCloudDataRestored?.call();
+        await loadAndResolveCloudSave(isAccountSwitch: true);
+      } else {
+        await loadAndResolveCloudSave();
+      }
       return true;
     } catch (_) {
       _setDisconnectedState();
@@ -596,36 +634,14 @@ class PlayGamesService extends ChangeNotifier {
     }
   }
 
-  /// Signs out from the active Google Play Games profile in the app and switches
-  /// to local offline progression mode.
-  Future<void> signOut() async {
-    _isAuthenticating = true;
-    notifyListeners();
-
-    _setDisconnectedState();
-  }
-
-  /// Switches the active Google Play Games account by signing out of the current
-  /// session and triggering a fresh sign-in and cloud sync flow.
-  Future<bool> switchAccount() async {
-    if (_isAuthenticating) return false;
-
-    _isAuthenticating = true;
-    _isSignedIn = false;
-    _playerName = null;
-    _playerID = null;
-    _syncStatus = CloudSyncStatus.offline;
-    notifyListeners();
-
-    _isAuthenticating = false;
-    return signIn(silent: false);
-  }
-
-  /// Loads the saved game from Google Play Saved Games (`GamesServices.loadGame`)
-  /// and merges/restores it over local data ONLY if the cloud save holds a
-  /// higher progression state or diamond count.
-  /// If local data has higher or equal progression, pushes the local state to cloud.
-  Future<bool> loadAndResolveCloudSave() async {
+  /// Loads the saved game from Google Play Saved Games (`GamesServices.loadGame`).
+  /// When [isAccountSwitch] is true, local gameplay progress has already been
+  /// wiped for the new playerID, so any existing cloud save for the new playerID
+  /// is applied directly (or defaults to 0 if none exists).
+  /// Otherwise, merges/restores cloud data over local data ONLY if the cloud save
+  /// holds a higher progression state or diamond count; if local data has higher
+  /// progression, pushes the local state to cloud.
+  Future<bool> loadAndResolveCloudSave({bool isAccountSwitch = false}) async {
     if (!_isSignedIn) {
       _syncStatus = CloudSyncStatus.offline;
       notifyListeners();
@@ -636,12 +652,38 @@ class PlayGamesService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      if (!isAccountSwitch) {
+        final fetchedId = await _client.getPlayerID();
+        if (fetchedId != null && fetchedId.trim().isNotEmpty) {
+          final resolvedId = fetchedId.trim();
+          final previousPlayerId = _lastPlayerID ?? storage.lastPlayerId;
+          if (previousPlayerId != null && previousPlayerId != resolvedId) {
+            isAccountSwitch = true;
+            _playerID = resolvedId;
+            _lastPlayerID = resolvedId;
+            await storage.setLastPlayerId(resolvedId);
+            final fetchedName = await _client.getPlayerName();
+            if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+              _playerName = fetchedName.trim();
+            }
+            await storage.clearGameplayProgress();
+            onCloudDataRestored?.call();
+          }
+        }
+      }
+
       final rawCloud = await _client.loadGame(name: saveSlotName);
       final cloudData = CloudSaveData.tryParse(rawCloud);
       final localData = CloudSaveData.fromStorage(storage);
 
       bool restoredFromCloud = false;
-      if (cloudData != null &&
+      if (isAccountSwitch) {
+        if (cloudData != null) {
+          await cloudData.applyToStorage(storage);
+          restoredFromCloud = true;
+        }
+        onCloudDataRestored?.call();
+      } else if (cloudData != null &&
           cloudData.hasHigherProgressionOrDiamondsThan(localData)) {
         final merged = cloudData.mergeOverLocal(localData);
         await merged.applyToStorage(storage);
@@ -661,6 +703,9 @@ class PlayGamesService extends ChangeNotifier {
       notifyListeners();
       return restoredFromCloud;
     } catch (_) {
+      if (isAccountSwitch) {
+        onCloudDataRestored?.call();
+      }
       // Cloud load failed (e.g., no existing snapshot or temporary network issue);
       // attempt to save current local state or fall back to offline status.
       try {

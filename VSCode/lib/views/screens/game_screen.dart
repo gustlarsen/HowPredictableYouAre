@@ -39,12 +39,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
     final controller = context.read<GameController>();
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      controller.audio.pauseMusic();
-    } else if (state == AppLifecycleState.resumed) {
-      controller.audio.resumeMusic();
-    }
+    controller.didChangeAppLifecycleState(state);
   }
 
   void _checkIntroStory(BuildContext context, GameController controller) {
