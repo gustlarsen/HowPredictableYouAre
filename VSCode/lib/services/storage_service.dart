@@ -315,6 +315,7 @@ class StorageService {
       setShowCrystalBall(false),
       setShowCrystalBallPlus(false),
       setCrystalBallPlusSavedState(false),
+      setHasSeenStoryIntro(false),
       setHasSeenStoryReset(false),
       setHasSeenStoryPredictability(false),
       setHasSeenStoryRandom(false),

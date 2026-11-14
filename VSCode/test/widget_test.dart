@@ -604,6 +604,80 @@ void main() {
     expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
   });
 
+  testWidgets('Resetting all progress from SettingsDialog closes settings and plays the intro cutscene as if opened for the first time', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'diamonds': 500,
+      'total': 15,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Intro cutscene should NOT be visible initially since has_seen_story_intro was true
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+    expect(controller.diamonds, 500);
+
+    // Open SettingsDialog
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    final resetBtn = find.byKey(
+      const ValueKey('settings_reset_progress_button'),
+    );
+    await tester.ensureVisible(resetBtn);
+    await tester.tap(resetBtn);
+    await tester.pumpAndSettle();
+
+    // Confirmation dialog appears
+    expect(find.text('Reset All Progress?'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('confirm_reset_progress_button')),
+    );
+    await tester.pumpAndSettle();
+
+    // Settings dialog is dismissed, progress is reset, and Intro cutscene is opened
+    expect(controller.diamonds, 0);
+    expect(controller.totalRounds, 0);
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
+    expect(find.text('Panel 1 / 4'), findsOneWidget);
+
+    // Navigate through the cutscene panels and finish
+    final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
+    await tester.tap(nextBtnFinder); // Panel 2
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 2 / 4'), findsOneWidget);
+
+    await tester.tap(nextBtnFinder); // Panel 3
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 3 / 4'), findsOneWidget);
+
+    await tester.tap(nextBtnFinder); // Panel 4
+    await tester.pumpAndSettle();
+    expect(find.text('Panel 4 / 4'), findsOneWidget);
+
+    await tester.tap(nextBtnFinder); // Finish
+    await tester.pumpAndSettle();
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+    expect(storage.hasSeenStoryIntro, isTrue);
+  });
+
   testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,

@@ -692,6 +692,22 @@ void main() {
         expect(cloudAfterReset.unlockedCount, 0);
         expect(cloudAfterReset.total, 0);
         expect(cloudAfterReset.darkMode, isFalse);
+        expect(cloudAfterReset.hasSeenStoryIntro, isFalse);
+
+        // Intro comic cutscene opens automatically as if opened for the first time
+        expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
+        expect(find.text('Panel 1 / 4'), findsOneWidget);
+
+        final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
+        await tester.tap(nextBtnFinder); // Panel 2
+        await tester.pumpAndSettle();
+        await tester.tap(nextBtnFinder); // Panel 3
+        await tester.pumpAndSettle();
+        await tester.tap(nextBtnFinder); // Panel 4
+        await tester.pumpAndSettle();
+        await tester.tap(nextBtnFinder); // Finish cutscene
+        await tester.pumpAndSettle();
+        expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
       },
     );
 
@@ -713,6 +729,7 @@ void main() {
           total: 15,
           unlockedReset: true,
           showReset: true,
+          hasSeenStoryIntro: true,
         );
 
         final fakeClient = FakePlayGamesClient(
@@ -749,10 +766,17 @@ void main() {
         );
         expect(find.byIcon(Icons.restart_alt), findsOneWidget);
 
-        // Simulate user switching to AccountBeta (no cloud save) in Google Play Games app while game is in background
+        // Simulate user switching to AccountBeta in Google Play Games app while game is in background
         fakeClient.mockPlayerName = 'AccountBeta';
         fakeClient.mockPlayerId = 'player_beta';
-        fakeClient.setCloudSaveForPlayer('player_beta', null);
+        final accountBSave = const CloudSaveData(
+          diamonds: 0,
+          hasSeenStoryIntro: true,
+        );
+        fakeClient.setCloudSaveForPlayer(
+          'player_beta',
+          accountBSave.toJsonString(),
+        );
 
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
         tester.binding.handleAppLifecycleStateChanged(
@@ -1004,6 +1028,9 @@ void main() {
         expect(controller.diamonds, 100000);
         expect(storage.diamonds, 100000);
         expect(storage.hasClaimedQaBonus, isTrue);
+        expect(controller.pendingStoryChapter, StoryChapter.intro);
+        expect(controller.hasSeenStoryIntro, isFalse);
+        expect(storage.hasSeenStoryIntro, isFalse);
         expect(
           controller.consumePendingQaBonusSnackBar(),
           'Tester Bonus: +100,000 💎',
@@ -1013,6 +1040,7 @@ void main() {
             CloudSaveData.tryParse(fakeClient.cloudPayload)!;
         expect(cloudAfterReset.diamonds, 100000);
         expect(cloudAfterReset.hasClaimedQaBonus, isTrue);
+        expect(cloudAfterReset.hasSeenStoryIntro, isFalse);
       },
     );
 

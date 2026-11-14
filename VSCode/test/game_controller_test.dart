@@ -236,6 +236,32 @@ void main() {
     expect(controller.pendingStoryChapter, isNull);
   });
 
+  test('resetAllProgress resets intro story flag and sets pendingStoryChapter to intro as if opened for first time', () async {
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+      'has_seen_story_intro': true,
+      'diamonds': 500,
+      'total': 10,
+    });
+    await createController();
+
+    expect(storage.hasSeenStoryIntro, isTrue);
+    expect(controller.hasSeenStoryIntro, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
+
+    await controller.resetAllProgress();
+
+    expect(storage.hasSeenStoryIntro, isFalse);
+    expect(controller.hasSeenStoryIntro, isFalse);
+    expect(controller.pendingStoryChapter, StoryChapter.intro);
+
+    final consumed = controller.consumePendingStory(StoryChapter.intro);
+    expect(consumed, StoryChapter.intro);
+    expect(controller.hasSeenStoryIntro, isTrue);
+    expect(storage.hasSeenStoryIntro, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
+  });
+
   test('All 8 shop story chapters trigger on first unlock, persist flags, and do not re-trigger on toggle', () async {
     SharedPreferences.setMockInitialValues({
       'diamonds': 100000,

@@ -43,9 +43,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _checkIntroStory(BuildContext context, GameController controller) {
-    if (!_isIntroDialogScheduled &&
-        controller.pendingStoryChapter == StoryChapter.intro &&
-        !controller.hasSeenStoryIntro) {
+    if (controller.pendingStoryChapter != StoryChapter.intro) {
+      _isIntroDialogScheduled = false;
+      return;
+    }
+    if (!_isIntroDialogScheduled && !controller.hasSeenStoryIntro) {
       _isIntroDialogScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;

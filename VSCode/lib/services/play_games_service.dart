@@ -412,9 +412,7 @@ class CloudSaveData {
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
 
-    if (hasSeenStoryIntro) {
-      await storage.setHasSeenStoryIntro(true);
-    }
+    await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
     await storage.setHasSeenStoryReset(hasSeenStoryReset);
     await storage.setHasSeenStoryPredictability(hasSeenStoryPredictability);
     await storage.setHasSeenStoryRandom(hasSeenStoryRandom);
