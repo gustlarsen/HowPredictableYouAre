@@ -22,6 +22,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _isIntroDialogScheduled = false;
+  GameController? _controller;
 
   @override
   void initState() {
@@ -30,7 +31,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller = context.read<GameController>();
+  }
+
+  @override
   void dispose() {
+    _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -242,6 +250,48 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
         ),
         actions: [
+          // Voluntary Rewarded Video Ad (+50 💎) button when loaded and not on cooldown
+          if (controller.isRewardedAdReady)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: InkWell(
+                key: const ValueKey('watch_rewarded_ad_button'),
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _handleWatchRewardedAd(context, controller),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.play_circle_fill_rounded,
+                        size: 16,
+                        color: Colors.amber,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '+50 💎',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Periodic Gift button (matching Kodular ButtonGift / Clock1)
           if (controller.isGiftAvailable)
             IconButton(
@@ -327,126 +377,166 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Main Scrollable Game Layout
+          // Main Scrollable Game Layout + Safe Bottom Banner Area
           SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Column(
-                    children: [
-                      // Score & Diamonds Header
-                      ScoreHeader(controller: controller),
-                      const SizedBox(height: 10),
-
-                      // Unlocked Hint Pills (Prediction, Next move, Suggestion)
-                      HintsBar(controller: controller),
-                      const SizedBox(height: 10),
-
-                      // Versus Arena with Punch & 360 Spin Animations
-                      VersusArena(
-                        userMove: controller.currentUserMove,
-                        computerMove: controller.currentComputerMove,
-                        winner: controller.lastWinner,
-                        localization: loc,
-                        animationsEnabled: controller.animationsEnabled,
-                        roundId: controller.turnCount,
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Live Markov Transition Matrix (if unlocked & enabled)
-                      if (controller.showAlgorithm) ...[
-                        MarkovMatrixView(
-                          engine: controller.engine,
-                          lastUserMove: controller.lastUserMove,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          12,
+                          16,
+                          controller.shouldShowBannerAd ? 24 : 12,
                         ),
-                        const SizedBox(height: 14),
-                      ],
+                        child: Column(
+                          children: [
+                            // Score & Diamonds Header
+                            ScoreHeader(controller: controller),
+                            const SizedBox(height: 10),
 
-                      // Move Controls Section
-                      Card(
-                        elevation: 4,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withValues(alpha: 0.9),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                            horizontal: 10,
-                          ),
-                          child: Column(
-                            children: [
-                              // Hand move buttons (single row for 3 classic or all 5 hands)
-                              Row(
-                                key: const ValueKey('hand_buttons_row'),
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  for (final move in [
-                                    HandMove.rock,
-                                    HandMove.paper,
-                                    HandMove.scissors,
-                                    if (controller.showNewHands) ...[
-                                      HandMove.lizard,
-                                      HandMove.spock,
-                                    ],
-                                  ])
-                                    _HandActionButton(
-                                      key: ValueKey('hand_button_${move.name}'),
-                                      move: move,
-                                      compact: controller.showNewHands,
-                                      animationsEnabled:
-                                          controller.animationsEnabled,
-                                      onPressed: () =>
-                                          controller.playTurn(move),
-                                    ),
-                                ],
+                            // Unlocked Hint Pills (Prediction, Next move, Suggestion)
+                            HintsBar(controller: controller),
+                            const SizedBox(height: 10),
+
+                            // Versus Arena with Punch & 360 Spin Animations
+                            VersusArena(
+                              userMove: controller.currentUserMove,
+                              computerMove: controller.currentComputerMove,
+                              winner: controller.lastWinner,
+                              localization: loc,
+                              animationsEnabled: controller.animationsEnabled,
+                              roundId: controller.turnCount,
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Live Markov Transition Matrix (if unlocked & enabled)
+                            if (controller.showAlgorithm) ...[
+                              MarkovMatrixView(
+                                engine: controller.engine,
+                                lastUserMove: controller.lastUserMove,
                               ),
-
-                              // Optional Random move button (if unlocked & enabled)
-                              if (controller.showRandom) ...[
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: controller.playRandom,
-                                    icon: const Icon(
-                                      Icons.casino_outlined,
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      loc.t(
-                                        'string16',
-                                        fallback: 'RANDOM MOVE',
-                                      ),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              const SizedBox(height: 14),
                             ],
-                          ),
+
+                            // Move Controls Section
+                            Card(
+                              elevation: 4,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.9),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                  horizontal: 10,
+                                ),
+                                child: Column(
+                                  children: [
+                                    // Hand move buttons (single row for 3 classic or all 5 hands)
+                                    Row(
+                                      key: const ValueKey('hand_buttons_row'),
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        for (final move in [
+                                          HandMove.rock,
+                                          HandMove.paper,
+                                          HandMove.scissors,
+                                          if (controller.showNewHands) ...[
+                                            HandMove.lizard,
+                                            HandMove.spock,
+                                          ],
+                                        ])
+                                          _HandActionButton(
+                                            key: ValueKey(
+                                              'hand_button_${move.name}',
+                                            ),
+                                            move: move,
+                                            compact: controller.showNewHands,
+                                            animationsEnabled:
+                                                controller.animationsEnabled,
+                                            onPressed: () =>
+                                                controller.playTurn(move),
+                                          ),
+                                      ],
+                                    ),
+
+                                    // Optional Random move button (if unlocked & enabled)
+                                    if (controller.showRandom) ...[
+                                      const SizedBox(height: 10),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: controller.playRandom,
+                                          icon: const Icon(
+                                            Icons.casino_outlined,
+                                            size: 18,
+                                          ),
+                                          label: Text(
+                                            loc.t(
+                                              'string16',
+                                              fallback: 'RANDOM MOVE',
+                                            ),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+
+                // Bottom Banner Ad: placed at the very bottom inside SafeArea with generous top spacing
+                if (controller.shouldShowBannerAd)
+                  Padding(
+                    key: const ValueKey('bottom_banner_ad_container'),
+                    padding: const EdgeInsets.only(top: 16, bottom: 4),
+                    child: Center(
+                      child: controller.adService.buildBannerWidget(),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleWatchRewardedAd(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    await controller.watchRewardedAd(
+      onRewardEarned: () {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(GameController.rewardedAdSnackBarMessage),
+              duration: Duration(seconds: 2),
+            ),
+          );
+      },
     );
   }
 

@@ -92,8 +92,13 @@ class StorageService {
   Future<void> setUnlockedSuggestion(bool val) =>
       _prefs.setBool('unlockedSuggestion', val);
 
-  bool get unlockedAds => _prefs.getBool('unlockedAds') ?? false;
-  Future<void> setUnlockedAds(bool val) => _prefs.setBool('unlockedAds', val);
+  bool get unlockedAds =>
+      (_prefs.getBool('unlockedAds') ?? false) ||
+      (_prefs.getBool('unlock_remove_ads') ?? false);
+  Future<void> setUnlockedAds(bool val) async {
+    await _prefs.setBool('unlockedAds', val);
+    await _prefs.setBool('unlock_remove_ads', val);
+  }
 
   bool get unlockedCrystalBall =>
       _prefs.getBool('unlockedCrystalBall') ?? false;

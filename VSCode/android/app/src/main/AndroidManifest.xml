@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:label="How Predictable You Are"
@@ -32,6 +33,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/game_services_project_id" />
+        <!-- Google AdMob App ID: Production App ID is set below (ca-app-pub-2990586338327178~5364692228).
+             For local testing with Google's placeholder App ID, you can swap with ca-app-pub-3940256099942544~3347511713 -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2990586338327178~5364692228" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

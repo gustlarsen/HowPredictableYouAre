@@ -1,12 +1,78 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/models/move.dart';
 import 'package:how_predictable/models/story_chapter.dart';
+import 'package:how_predictable/services/ad_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+
+class _FakeAdMobClient implements AdMobClient {
+  bool bannerShouldLoad;
+  bool rewardedShouldLoad;
+  int bannerDisposeCount = 0;
+
+  _FakeAdMobClient({
+    this.bannerShouldLoad = true,
+    this.rewardedShouldLoad = true,
+  });
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<void> loadBanner({
+    required String adUnitId,
+    required AdSize size,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    if (bannerShouldLoad) {
+      onLoaded();
+    } else {
+      onFailed();
+    }
+  }
+
+  @override
+  Widget? buildBannerWidget() => const SizedBox(width: 320, height: 50);
+
+  @override
+  void disposeBanner() {
+    bannerDisposeCount++;
+  }
+
+  @override
+  Future<void> loadRewarded({
+    required String adUnitId,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    if (rewardedShouldLoad) {
+      onLoaded();
+    } else {
+      onFailed();
+    }
+  }
+
+  @override
+  Future<bool> showRewarded({
+    required VoidCallback onUserEarnedReward,
+    required VoidCallback onDismissed,
+    required VoidCallback onFailedToShow,
+  }) async {
+    onUserEarnedReward();
+    onDismissed();
+    return true;
+  }
+
+  @override
+  void disposeRewarded() {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -497,5 +563,83 @@ void main() {
     expect(controller.currentComputerMove, isNull);
     expect(controller.lastUserMove, isNull);
     expect(controller.lastWinner, isNull);
+  });
+
+  test('Completing a rewarded ad increments diamonds by 50, persists to SharedPreferences, and activates 2-minute cooldown', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 25,
+      'musicEnabled': false,
+    });
+    storage = StorageService();
+    await storage.init();
+    audio = AudioService();
+    final fakeAdClient = _FakeAdMobClient();
+    final adService = AdService(client: fakeAdClient);
+    await adService.initialize();
+
+    controller = GameController(
+      storage: storage,
+      localization: LocalizationService(),
+      audio: audio,
+      adService: adService,
+    );
+    addTearDown(() => controller.dispose());
+
+    expect(controller.diamonds, 25);
+    expect(controller.isRewardedAdReady, isTrue);
+
+    bool rewardCallbackTriggered = false;
+    final rewarded = await controller.watchRewardedAd(
+      onRewardEarned: () {
+        rewardCallbackTriggered = true;
+      },
+    );
+
+    expect(rewarded, isTrue);
+    expect(rewardCallbackTriggered, isTrue);
+    expect(controller.diamonds, 75);
+    expect(storage.diamonds, 75);
+    expect(controller.isRewardedAdOnCooldown, isTrue);
+    expect(controller.isRewardedAdReady, isFalse);
+  });
+
+  test('Unlocking Remove Ads disables banner display and disposes banner while keeping rewarded ad available', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 15000,
+      'musicEnabled': false,
+    });
+    storage = StorageService();
+    await storage.init();
+    audio = AudioService();
+    final fakeAdClient = _FakeAdMobClient();
+    final adService = AdService(client: fakeAdClient);
+    await adService.initialize();
+
+    controller = GameController(
+      storage: storage,
+      localization: LocalizationService(),
+      audio: audio,
+      adService: adService,
+    );
+    addTearDown(() => controller.dispose());
+
+    expect(controller.unlockedAds, isFalse);
+    expect(controller.shouldShowBannerAd, isTrue);
+    expect(adService.isBannerAdLoaded, isTrue);
+    expect(adService.bannerHeight, 50.0);
+
+    final unlocked = controller.unlockAds();
+    expect(unlocked, isTrue);
+    expect(controller.diamonds, 5000);
+    expect(controller.unlockedAds, isTrue);
+    expect(controller.unlockedRemoveAds, isTrue);
+    expect(storage.unlockedAds, isTrue);
+    expect(controller.shouldShowBannerAd, isFalse);
+    expect(adService.isBannerAdLoaded, isFalse);
+    expect(adService.bannerHeight, 0.0);
+    expect(fakeAdClient.bannerDisposeCount, greaterThanOrEqualTo(1));
+
+    // Voluntary Rewarded Video ad remains available even when Remove Ads is unlocked
+    expect(controller.isRewardedAdReady, isTrue);
   });
 }

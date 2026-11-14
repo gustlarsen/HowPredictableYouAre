@@ -18,3 +18,9 @@
 # App MainActivity & MethodChannel handlers
 -keep class com.gustlarsen.howpredictable.** { *; }
 
+# Google Mobile Ads (AdMob)
+-keep class com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**
+-dontwarn com.google.errorprone.annotations.**
+
+

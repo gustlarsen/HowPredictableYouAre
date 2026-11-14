@@ -372,11 +372,14 @@ class ShopDialog extends StatelessWidget {
                       ),
 
                     const SizedBox(height: 12),
-                    // Free diamonds action
+                    // Voluntary Rewarded Video Ad (+50 💎) action
                     Card(
-                      color: Colors.green.withValues(alpha: 0.12),
+                      color: Colors.amber.withValues(alpha: 0.12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: Colors.amber.withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -395,30 +398,57 @@ class ShopDialog extends StatelessWidget {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const Text(
-                                  '+50 💎 bonus',
+                                Text(
+                                  controller.isRewardedAdOnCooldown
+                                      ? 'Cooldown active (2m)'
+                                      : '+50 💎 bonus',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.green,
+                                    color: controller.isRewardedAdOnCooldown
+                                        ? Colors.grey
+                                        : Colors.amber,
                                   ),
                                 ),
                               ],
                             ),
                             ElevatedButton.icon(
-                              onPressed: () {
-                                controller.addFreeDiamonds(50);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('+50 💎 Diamonds added!'),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.card_giftcard, size: 16),
-                              label: const Text('Claim'),
+                              key: const ValueKey(
+                                'shop_watch_rewarded_ad_button',
+                              ),
+                              onPressed: controller.isRewardedAdReady
+                                  ? () {
+                                      controller.watchRewardedAd(
+                                        onRewardEarned: () {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                            ..hideCurrentSnackBar()
+                                            ..showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  GameController
+                                                      .rewardedAdSnackBarMessage,
+                                                ),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                        },
+                                      );
+                                    }
+                                  : null,
+                              icon: const Icon(
+                                Icons.play_circle_fill_rounded,
+                                size: 16,
+                              ),
+                              label: Text(
+                                controller.isRewardedAdOnCooldown
+                                    ? 'Wait 2m'
+                                    : (controller.isRewardedAdReady
+                                        ? '+50 💎'
+                                        : 'Watch Ad'),
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
+                                backgroundColor: Colors.amber,
+                                foregroundColor: Colors.black87,
                               ),
                             ),
                           ],

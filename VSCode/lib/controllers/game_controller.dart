@@ -8,12 +8,18 @@ import '../services/storage_service.dart';
 import '../services/localization_service.dart';
 import '../services/audio_service.dart';
 import '../services/play_games_service.dart';
+import '../services/ad_service.dart';
 
 class GameController extends ChangeNotifier {
+  static const int rewardedAdDiamondBonus = 50;
+  static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
+  static const String rewardedAdSnackBarMessage = '+50 💎 earned!';
+
   final StorageService storage;
   final LocalizationService localization;
   final AudioService audio;
   late final PlayGamesService playGames;
+  late final AdService adService;
 
   late MarkovEngine _engine;
 
@@ -75,6 +81,11 @@ class GameController extends ChangeNotifier {
   bool isGiftAvailable = true;
   Timer? _giftTimer;
 
+  // Rewarded Ad 2-minute Anti-Spam Cooldown State
+  bool isRewardedAdOnCooldown = false;
+  DateTime? _rewardedAdCooldownUntil;
+  Timer? _rewardedAdCooldownTimer;
+
   // QA Tester Bonus Persistence & Pending Notification
   bool hasClaimedQaBonus = false;
   String? pendingQaBonusSnackBar;
@@ -96,12 +107,39 @@ class GameController extends ChangeNotifier {
     required this.localization,
     required this.audio,
     PlayGamesService? playGames,
+    AdService? adService,
   }) {
     this.playGames = playGames ?? PlayGamesService(storage: storage);
+    this.adService = adService ?? AdService();
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
     this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
+    this.adService.addListener(_handleAdServiceUpdate);
     _loadState();
+  }
+
+  void _handleAdServiceUpdate() {
+    notifyListeners();
+  }
+
+  /// True when the Remove Ads shop upgrade (`unlock_remove_ads` / `unlockedAds`) is owned.
+  bool get unlockedRemoveAds => unlockedAds;
+
+  /// True when the bottom banner ad should be displayed on screen.
+  bool get shouldShowBannerAd => !unlockedAds && adService.isBannerAdLoaded;
+
+  /// True when the optional Rewarded Video ad (+50 💎) is preloaded and not on cooldown.
+  /// Remains available even if Remove Ads is purchased, as it is a voluntary bonus.
+  bool get isRewardedAdReady =>
+      adService.isRewardedAdLoaded && !isRewardedAdOnCooldown;
+
+  /// Remaining cooldown duration after watching a rewarded ad, or [Duration.zero].
+  Duration get rewardedAdCooldownRemaining {
+    if (!isRewardedAdOnCooldown || _rewardedAdCooldownUntil == null) {
+      return Duration.zero;
+    }
+    final remaining = _rewardedAdCooldownUntil!.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
   }
 
   void _handleCloudDataRestored() {
@@ -169,6 +207,7 @@ class GameController extends ChangeNotifier {
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
+    adService.setAdsRemoved(unlockedAds);
     unlockedCrystalBall = storage.unlockedCrystalBall;
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
 
@@ -619,8 +658,44 @@ class GameController extends ChangeNotifier {
       onUnlock: () {
         unlockedAds = true;
         storage.setUnlockedAds(true);
+        adService.setAdsRemoved(true);
       },
     );
+  }
+
+  bool unlockRemoveAds() => unlockAds();
+
+  /// Grants +50 diamonds when the player finishes watching a rewarded ad,
+  /// persists immediately to [SharedPreferences], triggers a [PlayGamesService]
+  /// cloud save if signed in, and starts the 2-minute anti-spam cooldown.
+  void completeRewardedAd() {
+    diamonds += rewardedAdDiamondBonus;
+    storage.setDiamonds(diamonds);
+    isRewardedAdOnCooldown = true;
+    _rewardedAdCooldownUntil = DateTime.now().add(rewardedAdCooldownDuration);
+    _rewardedAdCooldownTimer?.cancel();
+    _rewardedAdCooldownTimer = Timer(rewardedAdCooldownDuration, () {
+      isRewardedAdOnCooldown = false;
+      _rewardedAdCooldownUntil = null;
+      notifyListeners();
+    });
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  /// Displays the preloaded rewarded video ad if ready, granting +50 diamonds
+  /// via [completeRewardedAd] and invoking [onRewardEarned] upon completion.
+  Future<bool> watchRewardedAd({VoidCallback? onRewardEarned}) async {
+    if (!isRewardedAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onRewardEarned: () {
+        earned = true;
+        completeRewardedAd();
+        onRewardEarned?.call();
+      },
+    );
+    return shown && earned;
   }
 
   bool unlockCrystalBall() {
@@ -823,10 +898,18 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void cancelPendingTimers() {
+    _giftTimer?.cancel();
+    _giftTimer = null;
+    _rewardedAdCooldownTimer?.cancel();
+    _rewardedAdCooldownTimer = null;
+  }
+
   @override
   void dispose() {
-    _giftTimer?.cancel();
+    cancelPendingTimers();
     playGames.removeListener(_handlePlayGamesUpdate);
+    adService.removeListener(_handleAdServiceUpdate);
     super.dispose();
   }
 }
