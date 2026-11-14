@@ -824,14 +824,18 @@ void main() {
         expect(savedCloud1.diamonds, 100000);
         expect(savedCloud1.hasClaimedQaBonus, isTrue);
 
+        // Spend some diamonds on Player 1 before switching
+        controller1.unlockReset();
+        expect(controller1.diamonds, 99900);
+        final savedCloud1AfterSpend = CloudSaveData.tryParse(
+          fakeClient1.cloudSaveForPlayer('a_2116013489197419559'),
+        )!;
+        expect(savedCloud1AfterSpend.diamonds, 99900);
+
         // Test Player 2 by ID ("g01804264806540615668") and when switching accounts on AppLifecycleState.resumed
         fakeClient1.mockPlayerName = 'gustlarsen';
         fakeClient1.mockPlayerId = 'g01804264806540615668';
         fakeClient1.setCloudSaveForPlayer('g01804264806540615668', null);
-
-        // Spend some diamonds on Player 1 before switching
-        controller1.unlockReset();
-        expect(controller1.diamonds, 99900);
 
         // Resume app after OS account switch to Player 2
         await playGames1.handleAppResumed();
