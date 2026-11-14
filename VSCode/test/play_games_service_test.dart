@@ -777,5 +777,283 @@ void main() {
       },
     );
   });
+
+  group('QA Tester Automatic 100,000 Diamond Bonus Grant Tests', () {
+    test(
+      '(a) Grants +100,000 diamonds once on sign-in for matching tester IDs (Player 1 & Player 2) and case-insensitive playerName fallback, and saves to cloud',
+      () async {
+        // Test Player 1 by ID ("a_2116013489197419559")
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage1 = StorageService();
+        await storage1.init();
+
+        final fakeClient1 = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsentester',
+          mockPlayerId: 'a_2116013489197419559',
+        );
+        final playGames1 = PlayGamesService(
+          storage: storage1,
+          client: fakeClient1,
+        );
+        final controller1 = GameController(
+          storage: storage1,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames1,
+        );
+
+        expect(controller1.diamonds, 0);
+        expect(storage1.hasClaimedQaBonus, isFalse);
+
+        final signedIn1 = await playGames1.initialize();
+        expect(signedIn1, isTrue);
+        expect(controller1.diamonds, 100000);
+        expect(storage1.diamonds, 100000);
+        expect(controller1.hasClaimedQaBonus, isTrue);
+        expect(storage1.hasClaimedQaBonus, isTrue);
+        expect(
+          controller1.pendingQaBonusSnackBar,
+          'Tester Bonus: +100,000 💎',
+        );
+
+        final savedCloud1 =
+            CloudSaveData.tryParse(fakeClient1.cloudPayload)!;
+        expect(savedCloud1.diamonds, 100000);
+        expect(savedCloud1.hasClaimedQaBonus, isTrue);
+
+        // Test Player 2 by ID ("g01804264806540615668") and when switching accounts on AppLifecycleState.resumed
+        fakeClient1.mockPlayerName = 'gustlarsen';
+        fakeClient1.mockPlayerId = 'g01804264806540615668';
+        fakeClient1.setCloudSaveForPlayer('g01804264806540615668', null);
+
+        // Spend some diamonds on Player 1 before switching
+        controller1.unlockReset();
+        expect(controller1.diamonds, 99900);
+
+        // Resume app after OS account switch to Player 2
+        await playGames1.handleAppResumed();
+        expect(playGames1.playerID, 'g01804264806540615668');
+        expect(controller1.diamonds, 100000);
+        expect(storage1.diamonds, 100000);
+        expect(storage1.hasClaimedQaBonus, isTrue);
+        final savedCloud2 = CloudSaveData.tryParse(
+          fakeClient1.cloudSaveForPlayer('g01804264806540615668'),
+        )!;
+        expect(savedCloud2.diamonds, 100000);
+        expect(savedCloud2.hasClaimedQaBonus, isTrue);
+
+        // Test case-insensitive playerName fallback ("GUSTLARSENTESTER") with a different ID
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storageFallback = StorageService();
+        await storageFallback.init();
+        final fakeClientFallback = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'GUSTLARSENTESTER',
+          mockPlayerId: 'unlisted_id_999',
+        );
+        final playGamesFallback = PlayGamesService(
+          storage: storageFallback,
+          client: fakeClientFallback,
+        );
+        final controllerFallback = GameController(
+          storage: storageFallback,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGamesFallback,
+        );
+
+        await playGamesFallback.initialize();
+        expect(controllerFallback.diamonds, 100000);
+        expect(storageFallback.hasClaimedQaBonus, isTrue);
+      },
+    );
+
+    test(
+      '(b) Prevents duplicate grants on subsequent sign-ins when hasClaimedQaBonus is already true in local storage or cloud save',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsentester',
+          mockPlayerId: 'a_2116013489197419559',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        // First sign-in grants +100,000 diamonds
+        await playGames.initialize();
+        expect(controller.diamonds, 100000);
+        expect(storage.hasClaimedQaBonus, isTrue);
+        expect(
+          controller.consumePendingQaBonusSnackBar(),
+          'Tester Bonus: +100,000 💎',
+        );
+
+        // Tester spends 20,000 diamonds on Crystal Ball -> 80,000 left
+        expect(controller.unlockCrystalBall(), isTrue);
+        expect(controller.diamonds, 80000);
+        await Future<void>.delayed(Duration.zero);
+
+        // Subsequent sign-in / app resume with local & cloud hasClaimedQaBonus = true
+        await playGames.handleAppResumed();
+        expect(controller.diamonds, 80000);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+
+        // Fresh install on another device (local storage hasClaimedQaBonus = false,
+        // but loaded cloud save has hasClaimedQaBonus = true and 80,000 diamonds)
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final freshDeviceStorage = StorageService();
+        await freshDeviceStorage.init();
+        expect(freshDeviceStorage.hasClaimedQaBonus, isFalse);
+
+        final playGamesDevice2 = PlayGamesService(
+          storage: freshDeviceStorage,
+          client: fakeClient,
+        );
+        final controllerDevice2 = GameController(
+          storage: freshDeviceStorage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGamesDevice2,
+        );
+
+        await playGamesDevice2.initialize();
+        // Restores 80,000 from cloud without granting another 100,000
+        expect(controllerDevice2.diamonds, 80000);
+        expect(freshDeviceStorage.hasClaimedQaBonus, isTrue);
+        expect(controllerDevice2.pendingQaBonusSnackBar, isNull);
+      },
+    );
+
+    test(
+      '(c) Re-grants the +100,000 diamond bonus after a game reset (resetGame and resetAllProgress)',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsen',
+          mockPlayerId: 'g01804264806540615668',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        // Initial sign-in grants +100,000 diamonds
+        await playGames.initialize();
+        expect(controller.diamonds, 100000);
+        expect(storage.hasClaimedQaBonus, isTrue);
+        controller.consumePendingQaBonusSnackBar();
+
+        // Spend 20,000 diamonds on Crystal Ball & 50,000 on Crystal Ball Plus (30,000 left)
+        expect(controller.unlockCrystalBall(), isTrue);
+        expect(controller.unlockCrystalBallPlus(), isTrue);
+        expect(controller.diamonds, 30000);
+
+        // 1. Trigger resetGame -> resets hasClaimedQaBonus to false, syncs reset state, and re-grants +100,000
+        controller.resetGame();
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(controller.diamonds, 130000);
+        expect(storage.diamonds, 130000);
+        expect(storage.hasClaimedQaBonus, isTrue);
+        expect(
+          controller.consumePendingQaBonusSnackBar(),
+          'Tester Bonus: +100,000 💎',
+        );
+
+        // 2. Trigger full progression reset (resetAllProgress) -> wipes diamonds to 0 & hasClaimedQaBonus to false,
+        // syncs to cloud, and automatically re-grants +100,000 diamonds
+        await controller.resetAllProgress();
+        expect(controller.diamonds, 100000);
+        expect(storage.diamonds, 100000);
+        expect(storage.hasClaimedQaBonus, isTrue);
+        expect(
+          controller.consumePendingQaBonusSnackBar(),
+          'Tester Bonus: +100,000 💎',
+        );
+
+        final cloudAfterReset =
+            CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(cloudAfterReset.diamonds, 100000);
+        expect(cloudAfterReset.hasClaimedQaBonus, isTrue);
+      },
+    );
+
+    testWidgets(
+      'Shows "Tester Bonus: +100,000 💎" SnackBar in UI when QA tester signs in',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsentester',
+          mockPlayerId: 'a_2116013489197419559',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+
+        await playGames.initialize();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.text('Tester Bonus: +100,000 💎'), findsOneWidget);
+        expect(controller.diamonds, 100000);
+      },
+    );
+  });
 }
 

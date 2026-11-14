@@ -81,6 +81,7 @@ class DefaultPlayGamesClient implements PlayGamesClient {
 /// Google Play Saved Games cloud synchronization.
 class CloudSaveData {
   final int diamonds;
+  final bool hasClaimedQaBonus;
   final int userScore;
   final int pcScore;
   final int total;
@@ -140,6 +141,7 @@ class CloudSaveData {
 
   const CloudSaveData({
     this.diamonds = 0,
+    this.hasClaimedQaBonus = false,
     this.userScore = 0,
     this.pcScore = 0,
     this.total = 0,
@@ -262,6 +264,7 @@ class CloudSaveData {
   CloudSaveData mergeOverLocal(CloudSaveData local) {
     return CloudSaveData(
       diamonds: diamonds >= local.diamonds ? diamonds : diamonds,
+      hasClaimedQaBonus: hasClaimedQaBonus || local.hasClaimedQaBonus,
       userScore: userScore,
       pcScore: pcScore,
       total: total,
@@ -322,6 +325,7 @@ class CloudSaveData {
   factory CloudSaveData.fromStorage(StorageService storage) {
     return CloudSaveData(
       diamonds: storage.diamonds,
+      hasClaimedQaBonus: storage.hasClaimedQaBonus,
       userScore: storage.userScore,
       pcScore: storage.pcScore,
       total: storage.total,
@@ -372,6 +376,7 @@ class CloudSaveData {
 
   Future<void> applyToStorage(StorageService storage) async {
     await storage.setDiamonds(diamonds);
+    await storage.setHasClaimedQaBonus(hasClaimedQaBonus);
     await storage.setUserScore(userScore);
     await storage.setPcScore(pcScore);
     await storage.setTotal(total);
@@ -446,6 +451,7 @@ class CloudSaveData {
     return {
       'version': 1,
       'diamonds': diamonds,
+      'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
       'total': total,
@@ -512,6 +518,7 @@ class CloudSaveData {
   factory CloudSaveData.fromJson(Map<String, dynamic> map) {
     return CloudSaveData(
       diamonds: (map['diamonds'] as num?)?.toInt() ?? 0,
+      hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
       total: (map['total'] as num?)?.toInt() ?? 0,
@@ -581,6 +588,33 @@ class CloudSaveData {
 /// and Saved Games cloud synchronization with offline-first fallback.
 class PlayGamesService extends ChangeNotifier {
   static const String saveSlotName = 'how_predictable_cloud_save';
+  static const int qaBonusDiamonds = 100000;
+  static const String qaBonusSnackBarMessage = 'Tester Bonus: +100,000 💎';
+
+  /// Authorized QA tester Google Play Games player IDs (primary check).
+  static const Set<String> qaTesterIds = {
+    'a_2116013489197419559',
+    'g01804264806540615668',
+  };
+
+  /// Authorized QA tester Google Play Games player names (lowercase for case-insensitive fallback).
+  static const Set<String> qaTesterNamesLower = {
+    'gustlarsentester',
+    'gustlarsen',
+  };
+
+  /// Returns true if [playerId] matches an authorized QA tester ID (primary check)
+  /// or [playerName] matches an authorized QA tester name (case-insensitive fallback).
+  static bool isQaTester({String? playerId, String? playerName}) {
+    if (playerId != null && qaTesterIds.contains(playerId.trim())) {
+      return true;
+    }
+    if (playerName != null &&
+        qaTesterNamesLower.contains(playerName.trim().toLowerCase())) {
+      return true;
+    }
+    return false;
+  }
 
   final StorageService storage;
   final PlayGamesClient _client;
@@ -592,11 +626,13 @@ class PlayGamesService extends ChangeNotifier {
   String? _lastPlayerID;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
   VoidCallback? onCloudDataRestored;
+  VoidCallback? onQaBonusGranted;
 
   PlayGamesService({
     required this.storage,
     PlayGamesClient? client,
     this.onCloudDataRestored,
+    this.onQaBonusGranted,
   }) : _client = client ?? const DefaultPlayGamesClient();
 
   bool get isSignedIn => _isSignedIn;
@@ -738,9 +774,15 @@ class PlayGamesService extends ChangeNotifier {
       } else if (localData.hasHigherProgressionOrDiamondsThan(
             cloudData ?? const CloudSaveData(),
           )) {
+        if (cloudData != null &&
+            cloudData.hasClaimedQaBonus &&
+            !storage.hasClaimedQaBonus) {
+          await storage.setHasClaimedQaBonus(true);
+        }
         // Keep local progression and back it up to the cloud
+        final updatedLocal = CloudSaveData.fromStorage(storage);
         await _client.saveGame(
-          data: localData.toJsonString(),
+          data: updatedLocal.toJsonString(),
           name: saveSlotName,
         );
       } else if (cloudData != null) {
@@ -751,6 +793,8 @@ class PlayGamesService extends ChangeNotifier {
         onCloudDataRestored?.call();
       }
 
+      await checkAndGrantQaBonusIfEligible(cloudData: cloudData);
+
       _syncStatus = CloudSyncStatus.synced;
       notifyListeners();
       return restoredFromCloud;
@@ -758,6 +802,7 @@ class PlayGamesService extends ChangeNotifier {
       if (isAccountSwitch) {
         onCloudDataRestored?.call();
       }
+      await checkAndGrantQaBonusIfEligible();
       // Cloud load failed (e.g., no existing snapshot or temporary network issue);
       // attempt to save current local state or fall back to offline status.
       try {
@@ -774,6 +819,39 @@ class PlayGamesService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// If the currently signed-in player is an authorized QA tester and
+  /// `hasClaimedQaBonus` is false in both local storage and [cloudData],
+  /// grants +100,000 diamonds once, sets `hasClaimedQaBonus = true`, immediately
+  /// saves to Google Play Saved Games, and notifies listeners.
+  Future<bool> checkAndGrantQaBonusIfEligible({CloudSaveData? cloudData}) async {
+    if (!_isSignedIn) return false;
+    if (!isQaTester(playerId: _playerID, playerName: _playerName)) {
+      return false;
+    }
+
+    final alreadyClaimed =
+        storage.hasClaimedQaBonus || (cloudData?.hasClaimedQaBonus ?? false);
+    if (alreadyClaimed) {
+      if (!storage.hasClaimedQaBonus) {
+        await storage.setHasClaimedQaBonus(true);
+      }
+      return false;
+    }
+
+    final updatedDiamonds = storage.diamonds + qaBonusDiamonds;
+    await storage.setDiamonds(updatedDiamonds);
+    await storage.setHasClaimedQaBonus(true);
+    onCloudDataRestored?.call();
+    onQaBonusGranted?.call();
+
+    final snapshot = CloudSaveData.fromStorage(storage);
+    await _client.saveGame(
+      data: snapshot.toJsonString(),
+      name: saveSlotName,
+    );
+    return true;
   }
 
   /// Saves the player's current progression state from [storage] to

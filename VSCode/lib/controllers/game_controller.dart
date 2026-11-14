@@ -75,6 +75,10 @@ class GameController extends ChangeNotifier {
   bool isGiftAvailable = true;
   Timer? _giftTimer;
 
+  // QA Tester Bonus Persistence & Pending Notification
+  bool hasClaimedQaBonus = false;
+  String? pendingQaBonusSnackBar;
+
   // Story Cutscene Persistence & Pending State
   bool hasSeenStoryIntro = false;
   bool hasSeenStoryReset = false;
@@ -95,6 +99,7 @@ class GameController extends ChangeNotifier {
   }) {
     this.playGames = playGames ?? PlayGamesService(storage: storage);
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
+    this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
     _loadState();
   }
@@ -102,6 +107,19 @@ class GameController extends ChangeNotifier {
   void _handleCloudDataRestored() {
     _loadState(restartAudio: false);
     notifyListeners();
+  }
+
+  void _handleQaBonusGranted() {
+    hasClaimedQaBonus = storage.hasClaimedQaBonus;
+    diamonds = storage.diamonds;
+    pendingQaBonusSnackBar = PlayGamesService.qaBonusSnackBarMessage;
+    notifyListeners();
+  }
+
+  String? consumePendingQaBonusSnackBar() {
+    final msg = pendingQaBonusSnackBar;
+    pendingQaBonusSnackBar = null;
+    return msg;
   }
 
   void _handlePlayGamesUpdate() {
@@ -126,6 +144,7 @@ class GameController extends ChangeNotifier {
 
   void _loadState({bool restartAudio = true}) {
     diamonds = storage.diamonds;
+    hasClaimedQaBonus = storage.hasClaimedQaBonus;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
@@ -324,7 +343,7 @@ class GameController extends ChangeNotifier {
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
-  void resetGame() {
+  void resetGame({bool resetQaBonus = true}) {
     userScore = 0;
     pcScore = 0;
     totalRounds = 0;
@@ -334,11 +353,23 @@ class GameController extends ChangeNotifier {
     lastUserMove = null;
     lastWinner = null;
     is100RoundsAlertPending = false;
+    if (resetQaBonus) {
+      hasClaimedQaBonus = false;
+      storage.setHasClaimedQaBonus(false);
+    }
     _engine.reset();
 
-    storage.clearGameStats();
+    storage.clearGameStats(resetQaBonus: resetQaBonus);
     _computeNextHints();
+    if (resetQaBonus && playGames.isSignedIn) {
+      unawaited(_syncResetAndRegrantQaBonusIfTester());
+    }
     notifyListeners();
+  }
+
+  Future<void> _syncResetAndRegrantQaBonusIfTester() async {
+    await playGames.saveCloudData();
+    await playGames.checkAndGrantQaBonusIfEligible();
   }
 
   /// Wipes all gameplay progression (diamonds, shop unlocks, active toggles,
@@ -352,6 +383,7 @@ class GameController extends ChangeNotifier {
     notifyListeners();
     if (playGames.isSignedIn) {
       await playGames.saveCloudData();
+      await playGames.checkAndGrantQaBonusIfEligible();
     }
   }
 
@@ -729,7 +761,7 @@ class GameController extends ChangeNotifier {
     showNewHands = val;
     storage.setShowNewHands(val);
     _engine = MarkovEngine(enableExtendedHands: val);
-    resetGame();
+    resetGame(resetQaBonus: false);
     _triggerCloudSave();
   }
 

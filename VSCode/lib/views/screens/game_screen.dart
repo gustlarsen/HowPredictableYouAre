@@ -161,6 +161,25 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _checkQaBonusSnackBar(BuildContext context, GameController controller) {
+    if (controller.pendingQaBonusSnackBar != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final msg = controller.consumePendingQaBonusSnackBar();
+        if (msg != null) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+        }
+      });
+    }
+  }
+
   String _resolveBackgroundImage(GameController controller) {
     if (controller.lastWinner == null) {
       return 'assets/images/Splash.png';
@@ -185,6 +204,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     _checkIntroStory(context, controller);
     _check100RoundAlert(context, controller);
+    _checkQaBonusSnackBar(context, controller);
 
     return Scaffold(
       extendBodyBehindAppBar: true,

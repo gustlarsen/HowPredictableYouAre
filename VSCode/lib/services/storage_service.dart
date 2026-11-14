@@ -13,6 +13,11 @@ class StorageService {
   int get diamonds => _prefs.getInt('diamonds') ?? 0;
   Future<void> setDiamonds(int val) => _prefs.setInt('diamonds', val);
 
+  // QA Tester Bonus Persistence
+  bool get hasClaimedQaBonus => _prefs.getBool('hasClaimedQaBonus') ?? false;
+  Future<void> setHasClaimedQaBonus(bool val) =>
+      _prefs.setBool('hasClaimedQaBonus', val);
+
   // Last Signed-In Google Play Games Player ID
   String? get lastPlayerId => _prefs.getString('last_player_id');
   Future<void> setLastPlayerId(String? id) {
@@ -250,11 +255,12 @@ class StorageService {
     return _prefs.remove('markov_matrix_$size');
   }
 
-  Future<void> clearGameStats() {
+  Future<void> clearGameStats({bool resetQaBonus = true}) {
     return Future.wait([
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
+      if (resetQaBonus) setHasClaimedQaBonus(false),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),
@@ -283,6 +289,7 @@ class StorageService {
     return Future.wait([
       if (includeSettings) resetSettingsToDefault(),
       setDiamonds(0),
+      setHasClaimedQaBonus(false),
       setUserScore(0),
       setPcScore(0),
       setTotal(0),

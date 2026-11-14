@@ -32,6 +32,11 @@ class SettingsDialog extends StatelessWidget {
     controller.audio.playTapVibrate();
     final ok = await controller.playGames.signIn(silent: false);
     if (!context.mounted) return;
+    final qaBonusMsg = controller.consumePendingQaBonusSnackBar();
+    if (qaBonusMsg != null) {
+      _showDiscreetSnackBar(context, qaBonusMsg);
+      return;
+    }
     _showDiscreetSnackBar(
       context,
       ok
@@ -96,12 +101,14 @@ class SettingsDialog extends StatelessWidget {
     if (shouldReset == true) {
       await controller.resetAllProgress();
       if (!context.mounted) return;
+      final qaBonusMsg = controller.consumePendingQaBonusSnackBar();
       _showDiscreetSnackBar(
         context,
-        loc.t(
-          'reset_all_progress_done',
-          fallback: 'All progress has been reset!',
-        ),
+        qaBonusMsg ??
+            loc.t(
+              'reset_all_progress_done',
+              fallback: 'All progress has been reset!',
+            ),
       );
     }
   }
