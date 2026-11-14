@@ -102,24 +102,26 @@ class SettingsDialog extends StatelessWidget {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       await controller.resetAllProgress();
-      final qaBonusMsg = controller.consumePendingQaBonusSnackBar();
-      final message = qaBonusMsg ??
-          loc.t(
-            'reset_all_progress_done',
-            fallback: 'All progress has been reset!',
-          );
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(message, textAlign: TextAlign.center),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 2200),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+      if (controller.pendingStoryChapter == null) {
+        final qaBonusMsg = controller.consumePendingQaBonusSnackBar();
+        final message = qaBonusMsg ??
+            loc.t(
+              'reset_all_progress_done',
+              fallback: 'All progress has been reset!',
+            );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(message, textAlign: TextAlign.center),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(milliseconds: 2200),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           ),
-          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-        ),
-      );
+        );
+      }
     }
   }
 

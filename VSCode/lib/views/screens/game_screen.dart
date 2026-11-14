@@ -164,6 +164,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _checkQaBonusSnackBar(BuildContext context, GameController controller) {
+    if (controller.pendingStoryChapter != null) return;
     if (controller.pendingQaBonusSnackBar != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;

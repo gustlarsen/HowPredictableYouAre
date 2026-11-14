@@ -22,6 +22,7 @@ class StoryDialog extends StatefulWidget {
   }) {
     controller.markStorySeen(chapter);
     controller.audio.playStoryChime();
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
 
     return showGeneralDialog<void>(
       context: context,

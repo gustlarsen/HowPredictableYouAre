@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/main.dart';
 import 'package:how_predictable/models/move.dart';
+import 'package:how_predictable/models/story_chapter.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
