@@ -98,7 +98,7 @@ class SettingsDialog extends StatelessWidget {
       ),
     );
 
-    if (shouldReset == true) {
+    if (shouldReset == true && context.mounted) {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       await controller.resetAllProgress();
@@ -297,6 +297,61 @@ class SettingsDialog extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
+
+                      // GDPR / UMP Privacy & Ad Settings button (displayed when required for EEA/UK/Switzerland)
+                      FutureBuilder<bool>(
+                        future: controller.adService.isPrivacyOptionsRequired,
+                        initialData:
+                            controller.adService.isPrivacyOptionsRequiredSync,
+                        builder: (context, snapshot) {
+                          if (snapshot.data != true) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                key: const ValueKey(
+                                  'settings_privacy_options_button',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor:
+                                      theme.colorScheme.onSurfaceVariant,
+                                  side: BorderSide(
+                                    color: theme.colorScheme.outline
+                                        .withValues(alpha: 0.45),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 9,
+                                    horizontal: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  controller.audio.playTapVibrate();
+                                  controller.adService.showPrivacyOptionsForm();
+                                },
+                                icon: const Icon(
+                                  Icons.privacy_tip_outlined,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  loc.t(
+                                    'privacy_ad_settings',
+                                    fallback: 'Privacy / Ad Settings',
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
 
                       // Reset All Progress button
                       SizedBox(

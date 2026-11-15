@@ -250,44 +250,48 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          // Voluntary Rewarded Video Ad (+50 💎) button when loaded and not on cooldown
+          // Voluntary Rewarded Video Ad ("Watch Ad +50 💎") button with explicit disclosure,
+          // shown only when a rewarded ad is preloaded and not on cooldown
           if (controller.isRewardedAdReady)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              child: InkWell(
-                key: const ValueKey('watch_rewarded_ad_button'),
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => _handleWatchRewardedAd(context, controller),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.amber.withValues(alpha: 0.55),
+              child: Tooltip(
+                message: 'Watch a video ad to earn +50 💎',
+                child: InkWell(
+                  key: const ValueKey('watch_rewarded_ad_button'),
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _handleWatchRewardedAd(context, controller),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.play_circle_fill_rounded,
-                        size: 16,
-                        color: Colors.amber,
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.55),
                       ),
-                      SizedBox(width: 4),
-                      Text(
-                        '+50 💎',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.play_circle_fill_rounded,
+                          size: 16,
                           color: Colors.amber,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 4),
+                        Text(
+                          'Watch Ad +50 💎',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

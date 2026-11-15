@@ -9,6 +9,14 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 abstract class AdMobClient {
   Future<void> initialize();
 
+  Future<bool> isPrivacyOptionsRequired() async => false;
+
+  Future<void> showPrivacyOptionsForm({
+    OnConsentFormDismissedListener? onDismissed,
+  }) async {
+    onDismissed?.call(null);
+  }
+
   Future<void> loadBanner({
     required String adUnitId,
     required AdSize size,
@@ -36,14 +44,68 @@ abstract class AdMobClient {
 }
 
 /// Default production implementation of [AdMobClient] backed by
-/// the official `google_mobile_ads` plugin.
+/// the official `google_mobile_ads` plugin (including UMP / GDPR consent APIs).
 class DefaultAdMobClient implements AdMobClient {
   BannerAd? _bannerAd;
   RewardedAd? _rewardedAd;
 
   @override
   Future<void> initialize() async {
-    await MobileAds.instance.initialize();
+    final completer = Completer<void>();
+
+    Future<void> initializeMobileAds() async {
+      try {
+        await MobileAds.instance.initialize();
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      } catch (e, st) {
+        if (!completer.isCompleted) {
+          completer.completeError(e, st);
+        }
+      }
+    }
+
+    try {
+      final params = ConsentRequestParameters();
+      ConsentInformation.instance.requestConsentInfoUpdate(
+        params,
+        () async {
+          try {
+            await ConsentForm.loadAndShowConsentFormIfRequired(
+              (FormError? formError) async {
+                await initializeMobileAds();
+              },
+            );
+          } catch (_) {
+            await initializeMobileAds();
+          }
+        },
+        (FormError error) async {
+          await initializeMobileAds();
+        },
+      );
+    } catch (_) {
+      await initializeMobileAds();
+    }
+
+    return completer.future;
+  }
+
+  @override
+  Future<bool> isPrivacyOptionsRequired() async {
+    return await ConsentInformation.instance
+            .getPrivacyOptionsRequirementStatus() ==
+        PrivacyOptionsRequirementStatus.required;
+  }
+
+  @override
+  Future<void> showPrivacyOptionsForm({
+    OnConsentFormDismissedListener? onDismissed,
+  }) async {
+    await ConsentForm.showPrivacyOptionsForm((FormError? formError) {
+      onDismissed?.call(formError);
+    });
   }
 
   @override
@@ -196,6 +258,9 @@ class AdService extends ChangeNotifier {
   static String resolveRewardedAdUnitId({required bool isDebug}) =>
       isDebug ? testRewardedAdUnitId : productionRewardedAdUnitId;
 
+  /// Explicit policy-compliant disclosure label for the rewarded video ad button.
+  static const String rewardedAdButtonLabel = 'Watch Ad +50 💎';
+
   final AdMobClient _client;
 
   bool _isInitialized = false;
@@ -203,6 +268,7 @@ class AdService extends ChangeNotifier {
   bool _isBannerAdLoaded = false;
   bool _isRewardedAdLoaded = false;
   bool _isLoadingRewardedAd = false;
+  bool _isPrivacyOptionsRequiredCached = false;
   int _rewardedConsecutiveFailures = 0;
 
   AdService({AdMobClient? client}) : _client = client ?? DefaultAdMobClient();
@@ -210,11 +276,48 @@ class AdService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get adsRemoved => _adsRemoved;
 
+  /// Synchronous last-known value of [isPrivacyOptionsRequired] for immediate UI rendering.
+  bool get isPrivacyOptionsRequiredSync => _isPrivacyOptionsRequiredCached;
+
+  /// True when the Google UMP SDK indicates that a privacy options entry point
+  /// is required (`ConsentInformation.instance.getPrivacyOptionsRequirementStatus() == PrivacyOptionsRequirementStatus.required`,
+  /// e.g. for users in the EEA / UK / Switzerland).
+  Future<bool> get isPrivacyOptionsRequired async {
+    try {
+      final required = await _client.isPrivacyOptionsRequired();
+      _isPrivacyOptionsRequiredCached = required;
+      return required;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Presents the Google UMP privacy options form so players can review, update,
+  /// or revoke their GDPR ad consent at any time.
+  Future<void> showPrivacyOptionsForm({
+    OnConsentFormDismissedListener? onDismissed,
+  }) async {
+    try {
+      await _client.showPrivacyOptionsForm(
+        onDismissed: (FormError? formError) async {
+          _isPrivacyOptionsRequiredCached = await isPrivacyOptionsRequired;
+          onDismissed?.call(formError);
+          notifyListeners();
+        },
+      );
+    } catch (_) {
+      onDismissed?.call(null);
+    }
+  }
+
   /// True only when a banner ad has loaded successfully AND "Remove Ads" is not unlocked.
   bool get isBannerAdLoaded => !_adsRemoved && _isBannerAdLoaded;
 
   /// True when a rewarded video ad is preloaded and ready to be shown.
   bool get isRewardedAdLoaded => _isRewardedAdLoaded;
+
+  /// True when a rewarded video ad is preloaded and ready to be shown.
+  bool get isRewardedAdReady => _isRewardedAdLoaded && !_isLoadingRewardedAd;
 
   AdSize get bannerSize => AdSize.banner;
 
@@ -225,13 +328,17 @@ class AdService extends ChangeNotifier {
   double get bannerWidth =>
       isBannerAdLoaded ? bannerSize.width.toDouble() : 0.0;
 
-  /// Initializes the Mobile Ads SDK asynchronously without blocking offline gameplay,
-  /// loads the bottom banner (unless [adsRemoved] is true), and preloads a rewarded ad.
+  /// Runs the UMP / GDPR consent flow (`requestConsentInfoUpdate` and
+  /// `loadAndShowConsentFormIfRequired`), initializes the Mobile Ads SDK
+  /// asynchronously without blocking offline gameplay, loads the bottom banner
+  /// (unless [adsRemoved] is true), and preloads a rewarded ad.
   Future<void> initialize({bool adsRemoved = false}) async {
     _adsRemoved = adsRemoved;
     try {
       await _client.initialize();
       _isInitialized = true;
+      _isPrivacyOptionsRequiredCached = await isPrivacyOptionsRequired;
+      notifyListeners();
     } catch (_) {
       _isInitialized = false;
       return;
@@ -333,11 +440,16 @@ class AdService extends ChangeNotifier {
     }
   }
 
-  /// Shows the preloaded [RewardedAd] and invokes [onRewardEarned] when the
-  /// player completes watching the ad. Automatically preloads the next
-  /// [RewardedAd] after the ad is closed or fails to show.
-  Future<bool> showRewardedAd({required VoidCallback onRewardEarned}) async {
-    if (!_isRewardedAdLoaded) {
+  /// Shows the preloaded [RewardedAd] and invokes [onRewardEarned] (or
+  /// [onUserEarnedReward]) exclusively when the player finishes watching the ad
+  /// inside `onUserEarnedReward`. Automatically preloads the next [RewardedAd]
+  /// after the ad is closed or fails to show.
+  Future<bool> showRewardedAd({
+    VoidCallback? onRewardEarned,
+    VoidCallback? onUserEarnedReward,
+  }) async {
+    final rewardCallback = onUserEarnedReward ?? onRewardEarned;
+    if (!isRewardedAdReady || rewardCallback == null) {
       _rewardedConsecutiveFailures = 0;
       unawaited(loadRewardedAd());
       return false;
@@ -346,9 +458,15 @@ class AdService extends ChangeNotifier {
     _isRewardedAdLoaded = false;
     notifyListeners();
 
+    bool rewardGranted = false;
     try {
       final shown = await _client.showRewarded(
-        onUserEarnedReward: onRewardEarned,
+        onUserEarnedReward: () {
+          if (!rewardGranted) {
+            rewardGranted = true;
+            rewardCallback();
+          }
+        },
         onDismissed: () {
           _rewardedConsecutiveFailures = 0;
           notifyListeners();
@@ -364,7 +482,7 @@ class AdService extends ChangeNotifier {
         _rewardedConsecutiveFailures = 0;
         unawaited(loadRewardedAd());
       }
-      return shown;
+      return shown && rewardGranted;
     } catch (_) {
       _rewardedConsecutiveFailures = 0;
       unawaited(loadRewardedAd());

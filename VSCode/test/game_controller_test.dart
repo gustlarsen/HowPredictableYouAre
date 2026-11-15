@@ -12,17 +12,20 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 
 class _FakeAdMobClient implements AdMobClient {
-  bool bannerShouldLoad;
-  bool rewardedShouldLoad;
   int bannerDisposeCount = 0;
-
-  _FakeAdMobClient({
-    this.bannerShouldLoad = true,
-    this.rewardedShouldLoad = true,
-  });
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<bool> isPrivacyOptionsRequired() async => false;
+
+  @override
+  Future<void> showPrivacyOptionsForm({
+    OnConsentFormDismissedListener? onDismissed,
+  }) async {
+    onDismissed?.call(null);
+  }
 
   @override
   Future<void> loadBanner({
@@ -31,11 +34,7 @@ class _FakeAdMobClient implements AdMobClient {
     required VoidCallback onLoaded,
     required VoidCallback onFailed,
   }) async {
-    if (bannerShouldLoad) {
-      onLoaded();
-    } else {
-      onFailed();
-    }
+    onLoaded();
   }
 
   @override
@@ -52,11 +51,7 @@ class _FakeAdMobClient implements AdMobClient {
     required VoidCallback onLoaded,
     required VoidCallback onFailed,
   }) async {
-    if (rewardedShouldLoad) {
-      onLoaded();
-    } else {
-      onFailed();
-    }
+    onLoaded();
   }
 
   @override

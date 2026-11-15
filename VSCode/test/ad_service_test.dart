@@ -16,17 +16,22 @@ class FakeAdMobClient implements AdMobClient {
   bool shouldLoadBanner;
   bool shouldLoadRewarded;
   bool shouldShowRewardedSucceed;
+  bool shouldEarnRewardOnShow;
+  bool privacyOptionsRequired;
   int initializeCallCount = 0;
   int loadBannerCallCount = 0;
   int disposeBannerCallCount = 0;
   int loadRewardedCallCount = 0;
   int showRewardedCallCount = 0;
+  int showPrivacyOptionsFormCallCount = 0;
 
   FakeAdMobClient({
     this.shouldSucceedInit = true,
     this.shouldLoadBanner = true,
     this.shouldLoadRewarded = true,
     this.shouldShowRewardedSucceed = true,
+    this.shouldEarnRewardOnShow = true,
+    this.privacyOptionsRequired = false,
   });
 
   @override
@@ -35,6 +40,19 @@ class FakeAdMobClient implements AdMobClient {
     if (!shouldSucceedInit) {
       throw Exception('Offline or AdMob unavailable');
     }
+  }
+
+  @override
+  Future<bool> isPrivacyOptionsRequired() async {
+    return privacyOptionsRequired;
+  }
+
+  @override
+  Future<void> showPrivacyOptionsForm({
+    OnConsentFormDismissedListener? onDismissed,
+  }) async {
+    showPrivacyOptionsFormCallCount++;
+    onDismissed?.call(null);
   }
 
   @override
@@ -92,7 +110,9 @@ class FakeAdMobClient implements AdMobClient {
       onFailedToShow();
       return false;
     }
-    onUserEarnedReward();
+    if (shouldEarnRewardOnShow) {
+      onUserEarnedReward();
+    }
     onDismissed();
     return true;
   }
@@ -268,7 +288,7 @@ void main() {
     );
 
     testWidgets(
-      'GameScreen displays bottom banner and +50 💎 Watch Ad button, grants +50 💎 with SnackBar and 2m cooldown, and hides banner when Remove Ads is unlocked',
+      'GameScreen displays bottom banner and "Watch Ad +50 💎" button, grants +50 💎 with SnackBar and 2m cooldown, and hides banner when Remove Ads is unlocked',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -298,7 +318,7 @@ void main() {
         );
         await tester.pump();
 
-        // Bottom banner ad and Watch Ad (+50 💎) button are both visible
+        // Bottom banner ad and Watch Ad +50 💎 button are both visible with explicit disclosure
         expect(
           find.byKey(const ValueKey('bottom_banner_ad_container')),
           findsOneWidget,
@@ -307,9 +327,9 @@ void main() {
           find.byKey(const ValueKey('watch_rewarded_ad_button')),
           findsOneWidget,
         );
-        expect(find.text('+50 💎'), findsOneWidget);
+        expect(find.text('Watch Ad +50 💎'), findsOneWidget);
 
-        // Tap Watch Ad (+50 💎) button
+        // Tap Watch Ad +50 💎 button
         await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
         await tester.pump();
 
@@ -343,6 +363,145 @@ void main() {
           find.byKey(const ValueKey('watch_rewarded_ad_button')),
           findsOneWidget,
         );
+      },
+    );
+
+    test(
+      'Rewarded ad grants +50 💎 exclusively inside onUserEarnedReward and does not grant reward if dismissed early',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'diamonds': 100,
+          'musicEnabled': false,
+          'has_seen_story_intro': true,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeAdClient = FakeAdMobClient(shouldEarnRewardOnShow: false);
+        final adService = AdService(client: fakeAdClient);
+        await adService.initialize();
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: adService,
+        );
+        addTearDown(() => controller.dispose());
+
+        // Ad is shown, but user dismisses before earning reward (onUserEarnedReward not called)
+        final earned = await controller.watchRewardedAd();
+        expect(earned, isFalse);
+        expect(controller.diamonds, 100);
+        expect(storage.diamonds, 100);
+        expect(controller.isRewardedAdOnCooldown, isFalse);
+      },
+    );
+
+    testWidgets(
+      'Rewarded ad button is hidden when isRewardedAdReady is false (no ad loaded)',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'diamonds': 100,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeAdClient = FakeAdMobClient(shouldLoadRewarded: false);
+        final adService = AdService(client: fakeAdClient);
+        await adService.initialize();
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: adService,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pump();
+
+        expect(controller.isRewardedAdReady, isFalse);
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsNothing,
+        );
+        expect(find.text('Watch Ad +50 💎'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'SettingsDialog shows "Privacy / Ad Settings" button when isPrivacyOptionsRequired is true and opens showPrivacyOptionsForm(), and hides it when false',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeAdClient = FakeAdMobClient(privacyOptionsRequired: true);
+        final adService = AdService(client: fakeAdClient);
+        await adService.initialize();
+
+        expect(await adService.isPrivacyOptionsRequired, isTrue);
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: adService,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pump();
+
+        // Open SettingsDialog when user is in EEA/UK/Switzerland (privacyOptionsRequired == true)
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        final privacyBtn = find.byKey(
+          const ValueKey('settings_privacy_options_button'),
+        );
+        expect(privacyBtn, findsOneWidget);
+        expect(find.text('Privacy / Ad Settings'), findsOneWidget);
+
+        await tester.ensureVisible(privacyBtn);
+        await tester.tap(privacyBtn);
+        await tester.pumpAndSettle();
+
+        expect(fakeAdClient.showPrivacyOptionsFormCallCount, 1);
+
+        // Close SettingsDialog
+        await tester.tap(find.text('Ok'));
+        await tester.pumpAndSettle();
+
+        // Now simulate user outside EEA/UK/Switzerland (privacyOptionsRequired == false)
+        fakeAdClient.privacyOptionsRequired = false;
+        expect(await adService.isPrivacyOptionsRequired, isFalse);
+
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('settings_privacy_options_button')),
+          findsNothing,
+        );
+        expect(find.text('Privacy / Ad Settings'), findsNothing);
       },
     );
   });

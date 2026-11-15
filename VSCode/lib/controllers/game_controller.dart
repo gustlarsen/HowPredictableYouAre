@@ -149,7 +149,7 @@ class GameController extends ChangeNotifier {
   /// True when the optional Rewarded Video ad (+50 💎) is preloaded and not on cooldown.
   /// Remains available even if Remove Ads is purchased, as it is a voluntary bonus.
   bool get isRewardedAdReady =>
-      adService.isRewardedAdLoaded && !isRewardedAdOnCooldown;
+      adService.isRewardedAdReady && !isRewardedAdOnCooldown;
 
   /// Remaining cooldown duration after watching a rewarded ad, or [Duration.zero].
   Duration get rewardedAdCooldownRemaining {
@@ -702,12 +702,13 @@ class GameController extends ChangeNotifier {
   }
 
   /// Displays the preloaded rewarded video ad if ready, granting +50 diamonds
-  /// via [completeRewardedAd] and invoking [onRewardEarned] upon completion.
+  /// via [completeRewardedAd] exclusively inside `onUserEarnedReward` and
+  /// invoking [onRewardEarned] upon completion.
   Future<bool> watchRewardedAd({VoidCallback? onRewardEarned}) async {
     if (!isRewardedAdReady) return false;
     bool earned = false;
     final shown = await adService.showRewardedAd(
-      onRewardEarned: () {
+      onUserEarnedReward: () {
         earned = true;
         completeRewardedAd();
         onRewardEarned?.call();
