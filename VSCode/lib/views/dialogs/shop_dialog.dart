@@ -69,7 +69,7 @@ class _ShopDialogState extends State<ShopDialog> {
         _restoredDuringCurrentRequest = true;
         controller.audio.playWinVibrate();
         ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
+          ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
               content: Text('$title: Unlocked!'),
@@ -89,7 +89,7 @@ class _ShopDialogState extends State<ShopDialog> {
         _restoredDuringCurrentRequest = true;
         controller.audio.playWinVibrate();
         ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
+          ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
               content: Text('$title: Restored!'),
@@ -99,7 +99,7 @@ class _ShopDialogState extends State<ShopDialog> {
         break;
       case BillingEventType.canceled:
         ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
+          ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
               content: Text(event.message ?? 'Purchase canceled.'),
@@ -111,7 +111,7 @@ class _ShopDialogState extends State<ShopDialog> {
         _errorDuringCurrentRequest = true;
         controller.audio.playVibrate();
         ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
+          ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
               content: Text(event.message ?? 'Purchase failed.'),

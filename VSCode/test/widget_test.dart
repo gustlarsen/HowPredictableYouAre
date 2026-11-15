@@ -383,7 +383,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll down in Shop list to Crystal Ball
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pumpAndSettle();
 
     // Before acquiring Crystal Ball: Crystal Ball costs 20000 and Crystal Ball+ is not shown
@@ -404,7 +404,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll down further to reveal the newly added Crystal Ball+ tile in the ListView
-    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
     await tester.pumpAndSettle();
 
     // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store with cost 50000
@@ -999,6 +999,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('New Hands (Lizard & Spock)'));
     await tester.pumpAndSettle();
 
@@ -1025,6 +1027,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('New Hands (Lizard & Spock)'));
     await tester.pumpAndSettle();
 

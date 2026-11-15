@@ -365,6 +365,7 @@ void main() {
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
+          'has_seen_story_predictability': true,
           'diamonds': 200,
           'animationsEnabled': false,
           'musicEnabled': false,
@@ -440,23 +441,22 @@ void main() {
           findsOneWidget,
         );
 
-        // Complete purchase via purchaseStream -> unlocks item, shows SnackBar, opens story cutscene
+        // Complete purchase via purchaseStream -> unlocks item, shows SnackBar
         fakeIapClient.emitPurchaseUpdate(
           BillingService.productPredictabilityScore,
           PurchaseStatus.purchased,
         );
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
         expect(controller.unlockedPredictability, isTrue);
         expect(controller.diamonds, 200); // Diamonds untouched
         expect(find.text('Predictability Score: Unlocked!'), findsOneWidget);
 
-        // Dismiss story cutscene if shown
-        final skipStoryBtn = find.byKey(const ValueKey('story_skip_button'));
-        if (skipStoryBtn.evaluate().isNotEmpty) {
-          await tester.tap(skipStoryBtn);
-          await tester.pumpAndSettle();
-        }
+        // Clear unlock SnackBar before testing cancellation feedback
+        ScaffoldMessenger.of(tester.element(find.byType(Dialog))).removeCurrentSnackBar();
+        await tester.pump();
+        expect(find.text('Predictability Score: Unlocked!'), findsNothing);
 
         // Test cancellation feedback
         fakeIapClient.emitPurchaseUpdate(
@@ -464,15 +464,22 @@ void main() {
           PurchaseStatus.canceled,
         );
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
         expect(find.text('Purchase canceled.'), findsOneWidget);
+
+        // Clear cancel SnackBar before testing restore purchases
+        ScaffoldMessenger.of(tester.element(find.byType(Dialog))).removeCurrentSnackBar();
+        await tester.pump();
 
         // Test Restore Purchases button
         await tester.tap(restoreBtn);
+        await tester.pump();
         fakeIapClient.emitPurchaseUpdate(
           BillingService.productNewHands,
           PurchaseStatus.restored,
         );
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
         expect(controller.unlockedNewHands, isTrue);
         expect(

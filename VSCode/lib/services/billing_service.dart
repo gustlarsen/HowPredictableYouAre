@@ -39,32 +39,33 @@ abstract class InAppPurchaseClient {
 /// Default production implementation of [InAppPurchaseClient] backed by
 /// [InAppPurchase.instance].
 class DefaultInAppPurchaseClient implements InAppPurchaseClient {
-  final InAppPurchase _iap;
+  InAppPurchase? _iap;
 
-  DefaultInAppPurchaseClient({InAppPurchase? iap})
-      : _iap = iap ?? InAppPurchase.instance;
+  DefaultInAppPurchaseClient({InAppPurchase? iap}) : _iap = iap;
 
-  @override
-  Stream<List<PurchaseDetails>> get purchaseStream => _iap.purchaseStream;
+  InAppPurchase get _instance => _iap ??= InAppPurchase.instance;
 
   @override
-  Future<bool> isAvailable() => _iap.isAvailable();
+  Stream<List<PurchaseDetails>> get purchaseStream => _instance.purchaseStream;
+
+  @override
+  Future<bool> isAvailable() => _instance.isAvailable();
 
   @override
   Future<ProductDetailsResponse> queryProductDetails(Set<String> identifiers) =>
-      _iap.queryProductDetails(identifiers);
+      _instance.queryProductDetails(identifiers);
 
   @override
   Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) =>
-      _iap.buyNonConsumable(purchaseParam: purchaseParam);
+      _instance.buyNonConsumable(purchaseParam: purchaseParam);
 
   @override
   Future<void> completePurchase(PurchaseDetails purchase) =>
-      _iap.completePurchase(purchase);
+      _instance.completePurchase(purchase);
 
   @override
   Future<void> restorePurchases({String? applicationUserName}) =>
-      _iap.restorePurchases(applicationUserName: applicationUserName);
+      _instance.restorePurchases(applicationUserName: applicationUserName);
 }
 
 /// Manages Google Play Billing (In-App Purchases) for all 10 non-consumable
