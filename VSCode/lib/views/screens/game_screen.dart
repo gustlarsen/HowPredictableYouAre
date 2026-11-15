@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../models/story_chapter.dart';
+import '../../services/ad_service.dart';
 import '../../services/localization_service.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
@@ -283,7 +284,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         ),
                         SizedBox(width: 4),
                         Text(
-                          'Watch Ad +50 💎',
+                          AdService.rewardedAdButtonLabel,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12,

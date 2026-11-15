@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
 import 'story_dialog.dart';
 
@@ -653,28 +654,31 @@ class _ShopDialogState extends State<ShopDialog> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  loc.t('string45', fallback: 'Free Diamonds'),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    loc.t('string45', fallback: 'Free Diamonds'),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  controller.isRewardedAdOnCooldown
-                                      ? 'Cooldown active (2m)'
-                                      : '+50 💎 bonus',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: controller.isRewardedAdOnCooldown
-                                        ? Colors.grey
-                                        : Colors.amber,
+                                  Text(
+                                    controller.isRewardedAdOnCooldown
+                                        ? 'Cooldown active (2m)'
+                                        : 'Watch a video ad for +50 💎',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: controller.isRewardedAdOnCooldown
+                                          ? Colors.grey
+                                          : Colors.amber,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             ElevatedButton.icon(
                               key: const ValueKey(
                                 'shop_watch_rewarded_ad_button',
@@ -706,9 +710,7 @@ class _ShopDialogState extends State<ShopDialog> {
                               label: Text(
                                 controller.isRewardedAdOnCooldown
                                     ? 'Wait 2m'
-                                    : (controller.isRewardedAdReady
-                                        ? '+50 💎'
-                                        : 'Watch Ad'),
+                                    : AdService.rewardedAdButtonLabel,
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.amber,

@@ -504,5 +504,82 @@ void main() {
         expect(find.text('Privacy / Ad Settings'), findsNothing);
       },
     );
+
+    testWidgets(
+      'ShopDialog rewarded ad button displays explicit "Watch Ad +50 💎" disclosure, disables when not ready, and grants +50 💎 on completion',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'diamonds': 100,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeAdClient = FakeAdMobClient();
+        final adService = AdService(client: fakeAdClient);
+        await adService.initialize();
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: adService,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pump();
+
+        // Open ShopDialog
+        await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+        await tester.pumpAndSettle();
+
+        final shopAdBtnFinder = find.byKey(
+          const ValueKey('shop_watch_rewarded_ad_button'),
+        );
+        await tester.scrollUntilVisible(
+          shopAdBtnFinder,
+          250,
+          scrollable: find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(shopAdBtnFinder, findsOneWidget);
+        expect(
+          find.descendant(
+            of: shopAdBtnFinder,
+            matching: find.text(AdService.rewardedAdButtonLabel),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Watch a video ad for +50 💎'), findsOneWidget);
+
+        // Tap the Shop rewarded ad button -> grants +50 💎 and enters 2m cooldown (disabled)
+        await tester.tap(shopAdBtnFinder);
+        await tester.pump();
+
+        expect(controller.diamonds, 150);
+        expect(find.text('+50 💎 earned!'), findsOneWidget);
+        expect(controller.isRewardedAdReady, isFalse);
+        expect(
+          find.descendant(
+            of: shopAdBtnFinder,
+            matching: find.text('Wait 2m'),
+          ),
+          findsOneWidget,
+        );
+        final ButtonStyleButton disabledButton = tester.widget(shopAdBtnFinder);
+        expect(disabledButton.onPressed, isNull);
+      },
+    );
   });
 }
