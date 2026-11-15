@@ -7,8 +7,10 @@ import '../services/markov_engine.dart';
 import '../services/storage_service.dart';
 import '../services/localization_service.dart';
 import '../services/audio_service.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/play_games_service.dart';
 import '../services/ad_service.dart';
+import '../services/billing_service.dart';
 
 class GameController extends ChangeNotifier {
   static const int rewardedAdDiamondBonus = 50;
@@ -20,6 +22,7 @@ class GameController extends ChangeNotifier {
   final AudioService audio;
   late final PlayGamesService playGames;
   late final AdService adService;
+  late final BillingService billingService;
 
   late MarkovEngine _engine;
 
@@ -108,18 +111,33 @@ class GameController extends ChangeNotifier {
     required this.audio,
     PlayGamesService? playGames,
     AdService? adService,
+    BillingService? billingService,
   }) {
     this.playGames = playGames ?? PlayGamesService(storage: storage);
     this.adService = adService ?? AdService();
+    this.billingService = billingService ?? BillingService();
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
     this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
     this.adService.addListener(_handleAdServiceUpdate);
+    this.billingService.onEntitlementGranted = _handleBillingEntitlementGranted;
+    this.billingService.addListener(_handleBillingServiceUpdate);
     _loadState();
   }
 
   void _handleAdServiceUpdate() {
     notifyListeners();
+  }
+
+  void _handleBillingServiceUpdate() {
+    notifyListeners();
+  }
+
+  void _handleBillingEntitlementGranted(
+    String productId,
+    PurchaseStatus status,
+  ) {
+    unlockByProductId(productId);
   }
 
   /// True when the Remove Ads shop upgrade (`unlock_remove_ads` / `unlockedAds`) is owned.
@@ -729,6 +747,144 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  /// Immediately unlocks the shop item mapped to [productId] upon a verified
+  /// Google Play purchase ([PurchaseStatus.purchased]) or restore
+  /// ([PurchaseStatus.restored]), persisting to [SharedPreferences] and
+  /// triggering a [PlayGamesService] cloud save if signed in.
+  bool unlockByProductId(String productId) {
+    switch (productId) {
+      case BillingService.productResetButton:
+        if (!unlockedReset) {
+          showReset = false;
+          storage.setShowReset(false);
+        }
+        unlockedReset = true;
+        storage.setUnlockedReset(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
+        break;
+      case BillingService.productPredictabilityScore:
+        if (!unlockedPredictability) {
+          showPredictability = false;
+          storage.setShowPredictability(false);
+        }
+        unlockedPredictability = true;
+        storage.setUnlockedPredictability(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
+        break;
+      case BillingService.productRandomButton:
+        if (!unlockedRandom) {
+          showRandom = false;
+          storage.setShowRandom(false);
+        }
+        unlockedRandom = true;
+        storage.setUnlockedRandom(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
+        break;
+      case BillingService.productShowAlgorithm:
+        if (!unlockedAlgorithm) {
+          showAlgorithm = false;
+          storage.setShowAlgorithm(false);
+        }
+        unlockedAlgorithm = true;
+        storage.setUnlockedAlgorithm(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
+        break;
+      case BillingService.productNewHands:
+        if (!unlockedNewHands) {
+          showNewHands = false;
+          storage.setShowNewHands(false);
+        }
+        unlockedNewHands = true;
+        storage.setUnlockedNewHands(true);
+        break;
+      case BillingService.productYourPrediction:
+        if (!unlockedYourPrediction) {
+          showYourPrediction = false;
+          storage.setShowYourPrediction(false);
+        }
+        unlockedYourPrediction = true;
+        storage.setUnlockedYourPrediction(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
+        break;
+      case BillingService.productPcNextMove:
+        if (!unlockedNextMove) {
+          showNextMove = false;
+          storage.setShowNextMove(false);
+        }
+        unlockedNextMove = true;
+        storage.setUnlockedNextMove(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
+        break;
+      case BillingService.productSuggestion:
+        if (!unlockedSuggestion) {
+          showSuggestion = false;
+          storage.setShowSuggestion(false);
+        }
+        unlockedSuggestion = true;
+        storage.setUnlockedSuggestion(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
+        break;
+      case BillingService.productRemoveAds:
+        unlockedAds = true;
+        storage.setUnlockedAds(true);
+        adService.setAdsRemoved(true);
+        break;
+      case BillingService.productCrystalBall:
+        if (!unlockedCrystalBall) {
+          showCrystalBall = false;
+          storage.setShowCrystalBall(false);
+        }
+        unlockedCrystalBall = true;
+        storage.setUnlockedCrystalBall(true);
+        _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
+        break;
+      default:
+        return false;
+    }
+
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Returns true if the shop item corresponding to [productId] is unlocked.
+  bool isProductUnlocked(String productId) {
+    switch (productId) {
+      case BillingService.productResetButton:
+        return unlockedReset;
+      case BillingService.productPredictabilityScore:
+        return unlockedPredictability;
+      case BillingService.productRandomButton:
+        return unlockedRandom;
+      case BillingService.productShowAlgorithm:
+        return unlockedAlgorithm;
+      case BillingService.productNewHands:
+        return unlockedNewHands;
+      case BillingService.productYourPrediction:
+        return unlockedYourPrediction;
+      case BillingService.productPcNextMove:
+        return unlockedNextMove;
+      case BillingService.productSuggestion:
+        return unlockedSuggestion;
+      case BillingService.productRemoveAds:
+        return unlockedAds;
+      case BillingService.productCrystalBall:
+        return unlockedCrystalBall;
+      default:
+        return false;
+    }
+  }
+
+  /// Initiates a Google Play Billing purchase for the non-consumable [productId].
+  Future<bool> buyWithRealMoney(String productId) {
+    return billingService.buyNonConsumable(productId);
+  }
+
+  /// Restores previously purchased non-consumable items from Google Play.
+  Future<bool> restorePurchases() {
+    return billingService.restorePurchases();
+  }
+
   /// Gift feature: periodic free diamonds (matching Kodular ButtonGift / Clock1)
   void claimGift() {
     if (!isGiftAvailable) return;
@@ -910,6 +1066,7 @@ class GameController extends ChangeNotifier {
     cancelPendingTimers();
     playGames.removeListener(_handlePlayGamesUpdate);
     adService.removeListener(_handleAdServiceUpdate);
+    billingService.removeListener(_handleBillingServiceUpdate);
     super.dispose();
   }
 }

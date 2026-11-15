@@ -1,11 +1,143 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../services/billing_service.dart';
 import 'story_dialog.dart';
 
-class ShopDialog extends StatelessWidget {
+class ShopDialog extends StatefulWidget {
   final GameController controller;
 
   const ShopDialog({super.key, required this.controller});
+
+  @override
+  State<ShopDialog> createState() => _ShopDialogState();
+}
+
+class _ShopDialogState extends State<ShopDialog> {
+  GameController get controller => widget.controller;
+
+  bool _restoredDuringCurrentRequest = false;
+  bool _errorDuringCurrentRequest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.billingService.addEventListener(_onBillingEvent);
+  }
+
+  @override
+  void dispose() {
+    controller.billingService.removeEventListener(_onBillingEvent);
+    super.dispose();
+  }
+
+  String _titleForProductId(String productId) {
+    final loc = controller.localization;
+    switch (productId) {
+      case BillingService.productResetButton:
+        return loc.t('string37', fallback: 'Reset Button');
+      case BillingService.productPredictabilityScore:
+        return loc.t('string38', fallback: 'Predictability Score');
+      case BillingService.productRandomButton:
+        return loc.t('string39', fallback: 'Random Move Button');
+      case BillingService.productShowAlgorithm:
+        return loc.t('string40', fallback: 'Show Markov Algorithm');
+      case BillingService.productNewHands:
+        return loc.t('string56', fallback: 'New Hands (Lizard & Spock)');
+      case BillingService.productYourPrediction:
+        return loc.t('string41', fallback: 'Your Prediction Hint');
+      case BillingService.productPcNextMove:
+        return loc.t('string42', fallback: 'PC Next Move Reveal');
+      case BillingService.productSuggestion:
+        return loc.t('string43', fallback: 'Optimal Suggestion');
+      case BillingService.productRemoveAds:
+        return loc.t('string44', fallback: 'Remove Ads');
+      case BillingService.productCrystalBall:
+        return loc.t('string80', fallback: 'Crystal Ball');
+      default:
+        return 'Item';
+    }
+  }
+
+  void _onBillingEvent(BillingPurchaseEvent event) {
+    if (!mounted) return;
+    final title = _titleForProductId(event.productId);
+
+    switch (event.type) {
+      case BillingEventType.pending:
+        break;
+      case BillingEventType.purchased:
+        _restoredDuringCurrentRequest = true;
+        controller.audio.playWinVibrate();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('$title: Unlocked!'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        final pendingStory = controller.consumePendingStory();
+        if (pendingStory != null) {
+          StoryDialog.show(
+            context,
+            chapter: pendingStory,
+            controller: controller,
+          );
+        }
+        break;
+      case BillingEventType.restored:
+        _restoredDuringCurrentRequest = true;
+        controller.audio.playWinVibrate();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('$title: Restored!'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        break;
+      case BillingEventType.canceled:
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(event.message ?? 'Purchase canceled.'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        break;
+      case BillingEventType.error:
+        _errorDuringCurrentRequest = true;
+        controller.audio.playVibrate();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(event.message ?? 'Purchase failed.'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        break;
+    }
+  }
+
+  Future<void> _handleRestorePurchases() async {
+    _restoredDuringCurrentRequest = false;
+    _errorDuringCurrentRequest = false;
+    final ok = await controller.restorePurchases();
+    if (!mounted) return;
+    if (ok && !_restoredDuringCurrentRequest && !_errorDuringCurrentRequest) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Purchases restored.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +239,48 @@ class ShopDialog extends StatelessWidget {
     _handleToggle(context, title, val);
   }
 
+  Widget _buildShopItem({
+    required BuildContext context,
+    required String title,
+    required int cost,
+    required String? productId,
+    required bool isUnlocked,
+    required bool isActive,
+    bool isToggleEnabled = true,
+    required String enabledLabel,
+    required String disabledLabel,
+    required VoidCallback onUnlock,
+    required ValueChanged<bool> onToggle,
+  }) {
+    final billing = controller.billingService;
+    final localizedPrice =
+        productId != null ? billing.getLocalizedPrice(productId) : null;
+    final isPending =
+        productId != null && billing.isPurchasePending(productId);
+    final isLoadingStore = productId != null && billing.isLoadingProducts;
+
+    return _ShopItemTile(
+      title: title,
+      cost: cost,
+      productId: productId,
+      localizedPrice: localizedPrice,
+      isPurchasePending: isPending,
+      isLoadingStore: isLoadingStore,
+      isUnlocked: isUnlocked,
+      isActive: isActive,
+      isToggleEnabled: isToggleEnabled,
+      enabledLabel: enabledLabel,
+      disabledLabel: disabledLabel,
+      onUnlock: onUnlock,
+      onRealMoneyUnlock: productId != null
+          ? () {
+              controller.buyWithRealMoney(productId);
+            }
+          : null,
+      onToggle: onToggle,
+    );
+  }
+
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
@@ -169,82 +343,124 @@ class ShopDialog extends StatelessWidget {
               Expanded(
                 child: ListView(
                   children: [
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string37', fallback: 'Reset Button'),
                       cost: 100,
+                      productId: BillingService.productResetButton,
                       isUnlocked: controller.unlockedReset,
                       isActive: controller.showReset,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockReset();
-                        _handleUnlock(context, loc.t('string37', fallback: 'Reset Button'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string37', fallback: 'Reset Button'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowReset(val);
-                        _handleToggle(context, loc.t('string37', fallback: 'Reset Button'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string37', fallback: 'Reset Button'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t(
                         'string38',
                         fallback: 'Predictability Score',
                       ),
                       cost: 150,
+                      productId: BillingService.productPredictabilityScore,
                       isUnlocked: controller.unlockedPredictability,
                       isActive: controller.showPredictability,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockPredictability();
-                        _handleUnlock(context, loc.t('string38', fallback: 'Predictability Score'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string38', fallback: 'Predictability Score'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowPredictability(val);
-                        _handleToggle(context, loc.t('string38', fallback: 'Predictability Score'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string38', fallback: 'Predictability Score'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string39', fallback: 'Random Move Button'),
                       cost: 300,
+                      productId: BillingService.productRandomButton,
                       isUnlocked: controller.unlockedRandom,
                       isActive: controller.showRandom,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockRandom();
-                        _handleUnlock(context, loc.t('string39', fallback: 'Random Move Button'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string39', fallback: 'Random Move Button'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowRandom(val);
-                        _handleToggle(context, loc.t('string39', fallback: 'Random Move Button'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string39', fallback: 'Random Move Button'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t(
                         'string40',
                         fallback: 'Show Markov Algorithm',
                       ),
                       cost: 500,
+                      productId: BillingService.productShowAlgorithm,
                       isUnlocked: controller.unlockedAlgorithm,
                       isActive: controller.showAlgorithm,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockAlgorithm();
-                        _handleUnlock(context, loc.t('string40', fallback: 'Show Markov Algorithm'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string40', fallback: 'Show Markov Algorithm'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowAlgorithm(val);
-                        _handleToggle(context, loc.t('string40', fallback: 'Show Markov Algorithm'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string40', fallback: 'Show Markov Algorithm'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t(
                         'string56',
                         fallback: 'New Hands (Lizard & Spock)',
                       ),
                       cost: 100,
+                      productId: BillingService.productNewHands,
                       isUnlocked: controller.unlockedNewHands,
                       isActive: controller.showNewHands,
                       enabledLabel: enabledStr,
@@ -252,90 +468,138 @@ class ShopDialog extends StatelessWidget {
                       onUnlock: () => _handleNewHandsUnlock(context),
                       onToggle: (val) => _handleNewHandsToggle(context, val),
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t(
                         'string41',
                         fallback: 'Your Prediction Hint',
                       ),
                       cost: 1000,
+                      productId: BillingService.productYourPrediction,
                       isUnlocked: controller.unlockedYourPrediction,
                       isActive: controller.showYourPrediction,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockYourPrediction();
-                        _handleUnlock(context, loc.t('string41', fallback: 'Your Prediction Hint'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string41', fallback: 'Your Prediction Hint'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowYourPrediction(val);
-                        _handleToggle(context, loc.t('string41', fallback: 'Your Prediction Hint'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string41', fallback: 'Your Prediction Hint'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string42', fallback: 'PC Next Move Reveal'),
                       cost: 3000,
+                      productId: BillingService.productPcNextMove,
                       isUnlocked: controller.unlockedNextMove,
                       isActive: controller.showNextMove,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockNextMove();
-                        _handleUnlock(context, loc.t('string42', fallback: 'PC Next Move Reveal'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string42', fallback: 'PC Next Move Reveal'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowNextMove(val);
-                        _handleToggle(context, loc.t('string42', fallback: 'PC Next Move Reveal'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string42', fallback: 'PC Next Move Reveal'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string43', fallback: 'Optimal Suggestion'),
                       cost: 5000,
+                      productId: BillingService.productSuggestion,
                       isUnlocked: controller.unlockedSuggestion,
                       isActive: controller.showSuggestion,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockSuggestion();
-                        _handleUnlock(context, loc.t('string43', fallback: 'Optimal Suggestion'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string43', fallback: 'Optimal Suggestion'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowSuggestion(val);
-                        _handleToggle(context, loc.t('string43', fallback: 'Optimal Suggestion'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string43', fallback: 'Optimal Suggestion'),
+                          val,
+                        );
                       },
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string44', fallback: 'Remove Ads'),
                       cost: 10000,
+                      productId: BillingService.productRemoveAds,
                       isUnlocked: controller.unlockedAds,
                       isActive: controller.unlockedAds,
                       enabledLabel: 'Ads Removed',
                       disabledLabel: 'Not Active',
                       onUnlock: () {
                         final ok = controller.unlockAds();
-                        _handleUnlock(context, loc.t('string44', fallback: 'Remove Ads'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string44', fallback: 'Remove Ads'),
+                          ok,
+                        );
                       },
                       onToggle: (_) {},
                     ),
-                    _ShopItemTile(
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string80', fallback: 'Crystal Ball'),
                       cost: 20000,
+                      productId: BillingService.productCrystalBall,
                       isUnlocked: controller.unlockedCrystalBall,
                       isActive: controller.showCrystalBall,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
                       onUnlock: () {
                         final ok = controller.unlockCrystalBall();
-                        _handleUnlock(context, loc.t('string80', fallback: 'Crystal Ball'), ok);
+                        _handleUnlock(
+                          context,
+                          loc.t('string80', fallback: 'Crystal Ball'),
+                          ok,
+                        );
                       },
                       onToggle: (val) {
                         controller.toggleShowCrystalBall(val);
-                        _handleToggle(context, loc.t('string80', fallback: 'Crystal Ball'), val);
+                        _handleToggle(
+                          context,
+                          loc.t('string80', fallback: 'Crystal Ball'),
+                          val,
+                        );
                       },
                     ),
                     if (controller.unlockedCrystalBall)
-                      _ShopItemTile(
+                      _buildShopItem(
+                        context: context,
                         title: loc.t('string82', fallback: 'Crystal Ball+'),
                         cost: 50000,
+                        productId: null,
                         isUnlocked: controller.unlockedCrystalBallPlus,
                         isActive: controller.showCrystalBallPlus,
                         isToggleEnabled: controller.showCrystalBall,
@@ -460,12 +724,32 @@ class ShopDialog extends StatelessWidget {
               ),
 
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(loc.t('string36', fallback: 'Close')),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    key: const ValueKey('shop_restore_purchases_button'),
+                    onPressed: controller.billingService.isRestoring
+                        ? null
+                        : _handleRestorePurchases,
+                    icon: controller.billingService.isRestoring
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.restore_rounded, size: 16),
+                    label: const Text(
+                      'Restore Purchases',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    key: const ValueKey('shop_close_button'),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(loc.t('string36', fallback: 'Close')),
+                  ),
+                ],
               ),
             ],
           ),
@@ -478,29 +762,41 @@ class ShopDialog extends StatelessWidget {
 class _ShopItemTile extends StatelessWidget {
   final String title;
   final int cost;
+  final String? productId;
+  final String? localizedPrice;
+  final bool isPurchasePending;
+  final bool isLoadingStore;
   final bool isUnlocked;
   final bool isActive;
   final bool isToggleEnabled;
   final String enabledLabel;
   final String disabledLabel;
   final VoidCallback onUnlock;
+  final VoidCallback? onRealMoneyUnlock;
   final ValueChanged<bool> onToggle;
 
   const _ShopItemTile({
     required this.title,
     required this.cost,
+    this.productId,
+    this.localizedPrice,
+    this.isPurchasePending = false,
+    this.isLoadingStore = false,
     required this.isUnlocked,
     required this.isActive,
     this.isToggleEnabled = true,
     required this.enabledLabel,
     required this.disabledLabel,
     required this.onUnlock,
+    this.onRealMoneyUnlock,
     required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasRealMoneyPrice =
+        localizedPrice != null && localizedPrice!.trim().isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -517,7 +813,9 @@ class _ShopItemTile extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: isUnlocked
-              ? (isToggleEnabled ? () => onToggle(!isActive) : () => onToggle(true))
+              ? (isToggleEnabled
+                  ? () => onToggle(!isActive)
+                  : () => onToggle(true))
               : onUnlock,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -536,12 +834,11 @@ class _ShopItemTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       if (!isUnlocked)
-                        Text(
-                          '$cost 💎',
-                          style: const TextStyle(
+                        const Text(
+                          'Unlock',
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
                           ),
                         )
                       else
@@ -549,7 +846,9 @@ class _ShopItemTile extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isActive ? Icons.check_circle : Icons.cancel_outlined,
+                              isActive
+                                  ? Icons.check_circle
+                                  : Icons.cancel_outlined,
                               size: 13,
                               color: isActive ? Colors.green : Colors.grey,
                             ),
@@ -567,6 +866,7 @@ class _ShopItemTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 if (isUnlocked)
                   Switch(
                     value: isActive,
@@ -574,16 +874,69 @@ class _ShopItemTile extends StatelessWidget {
                     activeTrackColor: Colors.green,
                   )
                 else
-                  ElevatedButton(
-                    onPressed: onUnlock,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton(
+                        key: ValueKey(
+                          'diamond_unlock_${productId ?? title}',
+                        ),
+                        onPressed: isPurchasePending ? null : onUnlock,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          minimumSize: const Size(56, 34),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          '$cost 💎',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.amber,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      minimumSize: const Size(64, 34),
-                    ),
-                    child: const Text('Unlock'),
+                      if (productId != null) ...[
+                        const SizedBox(width: 6),
+                        OutlinedButton(
+                          key: ValueKey('real_money_unlock_$productId'),
+                          onPressed: (!isPurchasePending &&
+                                  !isLoadingStore &&
+                                  hasRealMoneyPrice)
+                              ? onRealMoneyUnlock
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            minimumSize: const Size(56, 34),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: (isPurchasePending || isLoadingStore)
+                              ? const SizedBox(
+                                  key: ValueKey('purchase_loading_indicator'),
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  hasRealMoneyPrice
+                                      ? localizedPrice!
+                                      : 'Unavailable',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ],
                   ),
               ],
             ),
