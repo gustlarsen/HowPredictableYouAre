@@ -175,7 +175,88 @@ void main() {
     });
 
     testWidgets(
-      'Projectile clash & impact VFX progresses through Launch (0-300ms), Clash/Surge (300-550ms), and Impact Explosion (550-750ms) synced with haptics',
+      'Classic Hands mode (elementalMode: false) performs hand-lunge animation with zero projectiles launched',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        int impactHapticCount = 0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                child: VersusArena(
+                  userMove: HandMove.rock,
+                  computerMove: HandMove.scissors,
+                  winner: RoundWinner.user,
+                  localization: localization,
+                  animationsEnabled: true,
+                  roundId: 1,
+                  userHp: 100,
+                  computerHp: 99,
+                  elementalMode: false,
+                  onImpactHaptic: () => impactHapticCount++,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        BattleVfxPainter getPainter() {
+          final customPaint = tester.widget<CustomPaint>(
+            find.byKey(const ValueKey('versus_battle_vfx_layer')),
+          );
+          return customPaint.painter! as BattleVfxPainter;
+        }
+
+        // Start at t = 0ms
+        await tester.pump();
+        expect(getPainter().isAnimating, isFalse);
+        expect(getPainter().phase, BattleVfxPhase.idle);
+
+        // At t = 250ms: winning hand lunges halfway across arena; zero projectiles launched
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(getPainter().isAnimating, isFalse);
+        expect(getPainter().phase, BattleVfxPhase.idle);
+        expect(getPainter().leftProjectilePosition, isNull);
+        expect(getPainter().rightProjectilePosition, isNull);
+
+        final userTranslateAt250 = tester.widget<Transform>(
+          find.descendant(
+            of: find.byKey(const ValueKey('user_card')),
+            matching: find.byType(Transform),
+          ),
+        );
+        expect(userTranslateAt250.transform.getTranslation().x, greaterThan(50.0));
+
+        // At t = 500ms: winning hand reaches full lunge distance over losing hand; still zero projectiles
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(getPainter().isAnimating, isFalse);
+        expect(getPainter().phase, BattleVfxPhase.idle);
+        final userTranslateAt500 = tester.widget<Transform>(
+          find.descendant(
+            of: find.byKey(const ValueKey('user_card')),
+            matching: find.byType(Transform),
+          ),
+        );
+        expect(
+          userTranslateAt500.transform.getTranslation().x,
+          greaterThan(userTranslateAt250.transform.getTranslation().x),
+        );
+
+        // At t = 625ms: winning hand returns while beaten hand rotates and shows classic impact flash/shake/-1
+        await tester.pump(const Duration(milliseconds: 125));
+        expect(getPainter().isAnimating, isFalse);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsOneWidget);
+        expect(impactHapticCount, 0);
+
+        // Finish 1000ms classic animation
+        await tester.pump(const Duration(milliseconds: 375));
+      },
+    );
+
+    testWidgets(
+      'Elemental Orbs mode (elementalMode: true) keeps orbs completely stationary while projectiles progress through Launch (0-300ms), Clash/Surge (300-550ms), and Impact Explosion (550-750ms)',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         int impactHapticCount = 0;
@@ -209,11 +290,42 @@ void main() {
           return customPaint.painter! as BattleVfxPainter;
         }
 
+        final initialUserOrbCenter = tester.getCenter(
+          find.byKey(const ValueKey('user_orb_container')),
+        );
+        final initialPcOrbCenter = tester.getCenter(
+          find.byKey(const ValueKey('pc_orb_container')),
+        );
+
         // Start frame at t = 0ms
         await tester.pump();
 
         // Phase 1 — Launch (at 150ms, halfway to center)
         await tester.pump(const Duration(milliseconds: 150));
+        // Both orbs remain completely stationary in their base positions (no lunge Transform)
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('user_card')),
+            matching: find.byType(Transform),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('pc_card')),
+            matching: find.byType(Transform),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('user_orb_container'))),
+          equals(initialUserOrbCenter),
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('pc_orb_container'))),
+          equals(initialPcOrbCenter),
+        );
+
         final painterAt150 = getPainter();
         expect(painterAt150.isAnimating, isTrue);
         expect(painterAt150.phase, BattleVfxPhase.launch);
@@ -243,7 +355,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 275));
         final painterAt425 = getPainter();
         expect(painterAt425.phase, BattleVfxPhase.clash);
-        // Winning left projectile surges past center toward right combatant; losing right projectile shattered
+        // Winning left projectile surges past center toward right stationary orb; losing right projectile shattered
         expect(painterAt425.leftProjectilePosition, isNotNull);
         expect(
           painterAt425.leftProjectilePosition!.dx,
@@ -254,6 +366,10 @@ void main() {
           lessThan(painterAt425.rightCenterX),
         );
         expect(painterAt425.rightProjectilePosition, isNull);
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('user_orb_container'))),
+          equals(initialUserOrbCenter),
+        );
         expect(impactHapticCount, 0);
 
         // Phase 3 — Impact Explosion (at 600ms, between 550ms and 750ms)
@@ -268,32 +384,29 @@ void main() {
         final painterAt750 = getPainter();
         expect(painterAt750.isAnimating, isFalse);
         expect(painterAt750.phase, BattleVfxPhase.idle);
-
-        // Complete remaining hand return animation
-        await tester.pump(const Duration(milliseconds: 250));
       },
     );
 
     testWidgets(
-      'Tie round shatters both projectiles at center at 300ms, and all 5 elemental themes + classic mode render without overflow or pending timers on rapid taps',
+      'Elemental Orbs tie round shatters both projectiles at center at 300ms while orbs stay stationary, and rapid taps across all 5 elements reset cleanly',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         int hapticTriggers = 0;
 
-        // 1. Tie round in Classic Mode (elementalMode: false)
+        // 1. Tie round in Elemental Mode (elementalMode: true)
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
               body: SizedBox(
                 width: 320,
                 child: VersusArena(
-                  userMove: HandMove.paper,
-                  computerMove: HandMove.paper,
+                  userMove: HandMove.paper, // Water
+                  computerMove: HandMove.paper, // Water
                   winner: RoundWinner.draw,
                   localization: localization,
                   animationsEnabled: true,
                   roundId: 1,
-                  elementalMode: false,
+                  elementalMode: true,
                   onImpactHaptic: () => hapticTriggers++,
                 ),
               ),
@@ -304,13 +417,29 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
 
+        // Orbs do not rotate or lunge on a tie in Elemental Mode
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('user_card')),
+            matching: find.byType(Transform),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('pc_card')),
+            matching: find.byType(Transform),
+          ),
+          findsNothing,
+        );
+
         final tiePainter = tester
             .widget<CustomPaint>(
               find.byKey(const ValueKey('versus_battle_vfx_layer')),
             )
             .painter! as BattleVfxPainter;
-        expect(tiePainter.leftElement, BattleVfxElement.classic);
-        expect(tiePainter.rightElement, BattleVfxElement.classic);
+        expect(tiePainter.leftElement, BattleVfxElement.water);
+        expect(tiePainter.rightElement, BattleVfxElement.water);
         // On a tie after 300ms, both projectiles have shattered at the center
         expect(tiePainter.leftProjectilePosition, isNull);
         expect(tiePainter.rightProjectilePosition, isNull);

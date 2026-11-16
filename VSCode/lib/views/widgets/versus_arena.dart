@@ -115,8 +115,11 @@ class _VersusArenaState extends State<VersusArena>
 
   void _startRoundAnimations() {
     _didTriggerImpactHaptic = false;
-    _animController.forward(from: 0.0);
-    _vfxController.forward(from: 0.0);
+    if (widget.elementalMode) {
+      _vfxController.forward(from: 0.0);
+    } else {
+      _animController.forward(from: 0.0);
+    }
   }
 
   void _stopRoundAnimations() {
@@ -132,7 +135,8 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   void _handleVfxTick() {
-    if (!widget.animationsEnabled ||
+    if (!widget.elementalMode ||
+        !widget.animationsEnabled ||
         !_vfxController.isAnimating ||
         _didTriggerImpactHaptic ||
         widget.winner == null) {
@@ -156,6 +160,10 @@ class _VersusArenaState extends State<VersusArena>
       return;
     }
 
+    if (widget.elementalMode != oldWidget.elementalMode) {
+      _stopRoundAnimations();
+    }
+
     if (widget.roundId != oldWidget.roundId) {
       // Immediately cancel any active animation, return to initial state, and restart cleanly
       _stopRoundAnimations();
@@ -174,10 +182,20 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   double _calculateShake(bool isDamaged) {
-    if (!isDamaged ||
-        !widget.animationsEnabled ||
-        !_vfxController.isAnimating ||
-        _vfxController.value >= 1.0) {
+    if (!isDamaged || !widget.animationsEnabled) {
+      return 0.0;
+    }
+    if (!widget.elementalMode) {
+      if (!_animController.isAnimating) return 0.0;
+      final t = _animController.value;
+      if (t >= 0.5 && t <= 0.8) {
+        final progress = (t - 0.5) / 0.3;
+        final decay = 1.0 - progress;
+        return math.sin(progress * math.pi * 6) * decay * 3.5;
+      }
+      return 0.0;
+    }
+    if (!_vfxController.isAnimating || _vfxController.value >= 1.0) {
       return 0.0;
     }
     final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
@@ -192,10 +210,19 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   double _calculateFlash(bool isDamaged) {
-    if (!isDamaged ||
-        !widget.animationsEnabled ||
-        !_vfxController.isAnimating ||
-        _vfxController.value >= 1.0) {
+    if (!isDamaged || !widget.animationsEnabled) {
+      return 0.0;
+    }
+    if (!widget.elementalMode) {
+      if (!_animController.isAnimating) return 0.0;
+      final t = _animController.value;
+      if (t >= 0.5 && t <= 0.8) {
+        final progress = (t - 0.5) / 0.3;
+        return (1.0 - progress) * 0.55;
+      }
+      return 0.0;
+    }
+    if (!_vfxController.isAnimating || _vfxController.value >= 1.0) {
       return 0.0;
     }
     final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
@@ -209,10 +236,18 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   double? _calculateDamageProgress(bool isDamaged) {
-    if (!isDamaged ||
-        !widget.animationsEnabled ||
-        !_vfxController.isAnimating ||
-        _vfxController.value >= 1.0) {
+    if (!isDamaged || !widget.animationsEnabled) {
+      return null;
+    }
+    if (!widget.elementalMode) {
+      if (!_animController.isAnimating) return null;
+      final t = _animController.value;
+      if (t >= 0.5 && t <= 1.0) {
+        return ((t - 0.5) / 0.5).clamp(0.0, 1.0);
+      }
+      return null;
+    }
+    if (!_vfxController.isAnimating || _vfxController.value >= 1.0) {
       return null;
     }
     final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
@@ -373,10 +408,13 @@ class _VersusArenaState extends State<VersusArena>
                     ]),
                     builder: (context, _) {
                       final isDamaged = pcWins && widget.roundId > 0;
-                      final pulseProgress =
-                          (userWins && widget.animationsEnabled)
-                              ? _punchAnim.value
-                              : 0.0;
+                      final pulseProgress = widget.animationsEnabled
+                          ? (widget.elementalMode
+                              ? (_vfxController.isAnimating
+                                  ? math.sin(_vfxController.value * math.pi)
+                                  : 0.0)
+                              : (userWins ? _punchAnim.value : 0.0))
+                          : 0.0;
                       return _MoveCard(
                         label: widget.localization.t(
                           'string9',
@@ -398,7 +436,9 @@ class _VersusArenaState extends State<VersusArena>
                         damageAmount: 1,
                         handBuilder: (context, handWidget) {
                           Widget animatedChild = handWidget;
-                          if (widget.animationsEnabled && widget.roundId > 0) {
+                          if (!widget.elementalMode &&
+                              widget.animationsEnabled &&
+                              widget.roundId > 0) {
                             if (userWins) {
                               animatedChild = Transform.translate(
                                 offset: Offset(
@@ -440,10 +480,13 @@ class _VersusArenaState extends State<VersusArena>
                     ]),
                     builder: (context, _) {
                       final isDamaged = userWins && widget.roundId > 0;
-                      final pulseProgress =
-                          (pcWins && widget.animationsEnabled)
-                              ? _punchAnim.value
-                              : 0.0;
+                      final pulseProgress = widget.animationsEnabled
+                          ? (widget.elementalMode
+                              ? (_vfxController.isAnimating
+                                  ? math.sin(_vfxController.value * math.pi)
+                                  : 0.0)
+                              : (pcWins ? _punchAnim.value : 0.0))
+                          : 0.0;
                       return _MoveCard(
                         label: widget.localization.t(
                           'string52',
@@ -465,7 +508,9 @@ class _VersusArenaState extends State<VersusArena>
                         damageAmount: 1,
                         handBuilder: (context, handWidget) {
                           Widget animatedChild = handWidget;
-                          if (widget.animationsEnabled && widget.roundId > 0) {
+                          if (!widget.elementalMode &&
+                              widget.animationsEnabled &&
+                              widget.roundId > 0) {
                             if (pcWins) {
                               animatedChild = Transform.translate(
                                 offset: Offset(
@@ -500,7 +545,8 @@ class _VersusArenaState extends State<VersusArena>
                   child: AnimatedBuilder(
                     animation: _vfxController,
                     builder: (context, _) {
-                      final isVfxActive = widget.animationsEnabled &&
+                      final isVfxActive = widget.elementalMode &&
+                          widget.animationsEnabled &&
                           widget.roundId > 0 &&
                           widget.userMove != null &&
                           widget.computerMove != null &&
@@ -653,7 +699,8 @@ class BattleVfxPainter extends CustomPainter {
   double get elapsedMs => progress * VersusArena.vfxDurationMs;
 
   BattleVfxPhase get phase {
-    if (!isAnimating ||
+    if (!elementalMode ||
+        !isAnimating ||
         progress >= 1.0 ||
         userMove == null ||
         computerMove == null ||
@@ -1589,7 +1636,7 @@ class _MoveCard extends StatelessWidget {
 
     final double orbScale =
         (isElementalOrb && isWinner) ? (1.0 + 0.08 * pulseProgress) : 1.0;
-    final double orbDiameter = 86.0 * orbScale;
+    const double orbDiameter = 86.0;
 
     final BoxDecoration circleDecoration = isElementalOrb
         ? BoxDecoration(
