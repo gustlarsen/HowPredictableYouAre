@@ -1225,4 +1225,113 @@ void main() {
     expect(find.text('LIZARD'), findsWidgets);
     expect(find.text('SPOCK'), findsWidgets);
   });
+
+  testWidgets('Purchasing and toggling New Skin inside ShopDialog deducts 10000 diamonds, starts off by default, switches visuals immediately without reset confirmation, and reverts when disabled', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'diamonds': 12500,
+      'unlockedAds': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // Play 2 turns so an ongoing match is active
+    await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('hand_button_paper')));
+    await tester.pumpAndSettle();
+
+    final ongoingTurnCount = controller.turnCount;
+    final ongoingTotalRounds = controller.totalRounds;
+    expect(ongoingTurnCount, 2);
+    expect(controller.hasGameStarted, isTrue);
+
+    // Open ShopDialog and scroll to New Skin
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('New Skin'), findsOneWidget);
+    expect(find.text('Elemental Theme (Fire, Water, Wood, Earth, Metal)'), findsOneWidget);
+
+    // Purchase New Skin (10,000 diamonds) via the shop button
+    final diamondsBeforePurchase = controller.diamonds;
+    await tester.tap(find.byKey(const ValueKey('diamond_unlock_New Skin')));
+    await tester.pumpAndSettle();
+
+    expect(controller.unlockedNewSkin, isTrue);
+    expect(controller.showNewSkin, isFalse);
+    expect(controller.diamonds, diamondsBeforePurchase - 10000);
+
+    // Tap New Skin tile in ShopDialog to toggle ON -> must NOT show any reset dialog even though match is in progress
+    await tester.tap(find.text('New Skin'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This will clear your scores and prediction history.'), findsNothing);
+    expect(controller.showNewSkin, isTrue);
+    expect(controller.turnCount, ongoingTurnCount);
+    expect(controller.totalRounds, ongoingTotalRounds);
+
+    // Close ShopDialog and verify immediate visual switch to Elemental Theme
+    await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.byIcon(HandMove.rock.elementalIcon), findsWidgets);
+    expect(find.byIcon(HandMove.paper.elementalIcon), findsWidgets);
+    expect(find.byIcon(HandMove.scissors.elementalIcon), findsWidgets);
+    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
+    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
+
+    // Reopen ShopDialog and toggle New Skin OFF -> reverts to classic hands without resetting match
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Skin'));
+    await tester.pumpAndSettle();
+
+    expect(controller.showNewSkin, isFalse);
+    expect(controller.turnCount, ongoingTurnCount);
+    expect(controller.totalRounds, ongoingTotalRounds);
+
+    await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('PAPER'), findsWidgets);
+    expect(find.text('SCISSORS'), findsWidgets);
+    expect(find.text('FIRE'), findsNothing);
+    expect(find.text('WATER'), findsNothing);
+    expect(find.text('WOOD'), findsNothing);
+    expect(find.byIcon(HandMove.rock.elementalIcon), findsNothing);
+    expect(find.byIcon(HandMove.paper.elementalIcon), findsNothing);
+    expect(find.byIcon(HandMove.scissors.elementalIcon), findsNothing);
+  });
 }

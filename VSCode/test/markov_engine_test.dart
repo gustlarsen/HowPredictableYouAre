@@ -63,6 +63,67 @@ void main() {
       expect(HandMove.spock.beats(HandMove.scissors, elemental: true), isTrue);
       expect(HandMove.spock.beats(HandMove.rock, elemental: true), isFalse);
       expect(HandMove.spock.beats(HandMove.paper, elemental: true), isFalse);
+
+      // Ties: no element beats itself in either classic or elemental mode
+      for (final move in HandMove.values) {
+        expect(move.beats(move, elemental: false), isFalse);
+        expect(move.beats(move, elemental: true), isFalse);
+        expect(move.battleDescriptionAgainst(move, elemental: false), isNull);
+        expect(move.battleDescriptionAgainst(move, elemental: true), isNull);
+      }
+    });
+
+    test('Battle descriptions and counterForMode cover all 3-element and 5-element Wu Xing interactions', () {
+      // 10 Wu Xing winning interactions
+      expect(
+        HandMove.rock.battleDescriptionAgainst(HandMove.scissors, elemental: true),
+        'Fire burns Wood',
+      );
+      expect(
+        HandMove.rock.battleDescriptionAgainst(HandMove.spock, elemental: true),
+        'Fire melts Metal',
+      );
+      expect(
+        HandMove.paper.battleDescriptionAgainst(HandMove.rock, elemental: true),
+        'Water extinguishes Fire',
+      );
+      expect(
+        HandMove.paper.battleDescriptionAgainst(HandMove.spock, elemental: true),
+        'Water rusts Metal',
+      );
+      expect(
+        HandMove.scissors.battleDescriptionAgainst(HandMove.paper, elemental: true),
+        'Wood absorbs Water',
+      );
+      expect(
+        HandMove.scissors.battleDescriptionAgainst(HandMove.lizard, elemental: true),
+        'Wood roots in Earth',
+      );
+      expect(
+        HandMove.lizard.battleDescriptionAgainst(HandMove.rock, elemental: true),
+        'Earth smothers Fire',
+      );
+      expect(
+        HandMove.lizard.battleDescriptionAgainst(HandMove.paper, elemental: true),
+        'Earth dams Water',
+      );
+      expect(
+        HandMove.spock.battleDescriptionAgainst(HandMove.lizard, elemental: true),
+        'Metal carves Earth',
+      );
+      expect(
+        HandMove.spock.battleDescriptionAgainst(HandMove.scissors, elemental: true),
+        'Metal chops Wood',
+      );
+
+      // counterForMode returns a valid winning move for every element
+      for (final move in HandMove.values) {
+        final classicCounter = move.counterForMode(elemental: false);
+        expect(classicCounter.beats(move, elemental: false), isTrue);
+
+        final elementalCounter = move.counterForMode(elemental: true);
+        expect(elementalCounter.beats(move, elemental: true), isTrue);
+      }
     });
   });
 
@@ -167,6 +228,67 @@ void main() {
         engine.computeSuggestions([HandMove.scissors, HandMove.spock]),
         [HandMove.rock],
       );
+    });
+
+    test('Full 3-element and 5-element Wu Xing Markov predictions, smart counters, and suggestions for all elements', () {
+      // 1. 3-Element Mode (Fire, Water, Wood)
+      final engine3 = MarkovEngine(enableExtendedHands: false, enableElementalMode: true);
+      expect(engine3.activeMoves, [HandMove.rock, HandMove.paper, HandMove.scissors]);
+
+      // Fire -> Water transition: predicts Water (paper), PC counters with Wood (scissors), suggestion for user is Fire (rock)
+      engine3.recordTransition(HandMove.rock, HandMove.paper);
+      expect(engine3.predictNextUserMoves(HandMove.rock), [HandMove.paper]);
+      expect(engine3.computeSmartChoices(HandMove.rock), [HandMove.scissors]);
+      expect(engine3.computeSuggestions([HandMove.scissors]), [HandMove.rock]);
+
+      // Water -> Wood transition: predicts Wood (scissors), PC counters with Fire (rock), suggestion for user is Water (paper)
+      engine3.recordTransition(HandMove.paper, HandMove.scissors);
+      expect(engine3.predictNextUserMoves(HandMove.paper), [HandMove.scissors]);
+      expect(engine3.computeSmartChoices(HandMove.paper), [HandMove.rock]);
+      expect(engine3.computeSuggestions([HandMove.rock]), [HandMove.paper]);
+
+      // Wood -> Fire transition: predicts Fire (rock), PC counters with Water (paper), suggestion for user is Wood (scissors)
+      engine3.recordTransition(HandMove.scissors, HandMove.rock);
+      expect(engine3.predictNextUserMoves(HandMove.scissors), [HandMove.rock]);
+      expect(engine3.computeSmartChoices(HandMove.scissors), [HandMove.paper]);
+      expect(engine3.computeSuggestions([HandMove.paper]), [HandMove.scissors]);
+
+      // 2. 5-Element Mode (Fire, Water, Wood, Earth, Metal)
+      final engine5 = MarkovEngine(enableExtendedHands: true, enableElementalMode: true);
+      expect(
+        engine5.activeMoves,
+        [HandMove.rock, HandMove.paper, HandMove.scissors, HandMove.lizard, HandMove.spock],
+      );
+
+      // Predict Fire (rock): beaten by Water (paper) & Earth (lizard); Wood (scissors) beats both Water & Earth!
+      engine5.recordTransition(HandMove.rock, HandMove.rock);
+      expect(engine5.predictNextUserMoves(HandMove.rock), [HandMove.rock]);
+      expect(engine5.computeSmartChoices(HandMove.rock), [HandMove.paper, HandMove.lizard]);
+      expect(engine5.computeSuggestions([HandMove.paper, HandMove.lizard]), [HandMove.scissors]);
+
+      // Predict Water (paper): beaten by Wood (scissors) & Earth (lizard); Metal (spock) beats both Wood & Earth!
+      engine5.recordTransition(HandMove.paper, HandMove.paper);
+      expect(engine5.predictNextUserMoves(HandMove.paper), [HandMove.paper]);
+      expect(engine5.computeSmartChoices(HandMove.paper), [HandMove.scissors, HandMove.lizard]);
+      expect(engine5.computeSuggestions([HandMove.scissors, HandMove.lizard]), [HandMove.spock]);
+
+      // Predict Wood (scissors): beaten by Fire (rock) & Metal (spock); Water (paper) beats both Fire & Metal!
+      engine5.recordTransition(HandMove.scissors, HandMove.scissors);
+      expect(engine5.predictNextUserMoves(HandMove.scissors), [HandMove.scissors]);
+      expect(engine5.computeSmartChoices(HandMove.scissors), [HandMove.rock, HandMove.spock]);
+      expect(engine5.computeSuggestions([HandMove.rock, HandMove.spock]), [HandMove.paper]);
+
+      // Predict Earth (lizard): beaten by Wood (scissors) & Metal (spock); Fire (rock) beats both Wood & Metal!
+      engine5.recordTransition(HandMove.lizard, HandMove.lizard);
+      expect(engine5.predictNextUserMoves(HandMove.lizard), [HandMove.lizard]);
+      expect(engine5.computeSmartChoices(HandMove.lizard), [HandMove.scissors, HandMove.spock]);
+      expect(engine5.computeSuggestions([HandMove.scissors, HandMove.spock]), [HandMove.rock]);
+
+      // Predict Metal (spock): beaten by Fire (rock) & Water (paper); Earth (lizard) beats both Fire & Water!
+      engine5.recordTransition(HandMove.spock, HandMove.spock);
+      expect(engine5.predictNextUserMoves(HandMove.spock), [HandMove.spock]);
+      expect(engine5.computeSmartChoices(HandMove.spock), [HandMove.rock, HandMove.paper]);
+      expect(engine5.computeSuggestions([HandMove.rock, HandMove.paper]), [HandMove.lizard]);
     });
   });
 

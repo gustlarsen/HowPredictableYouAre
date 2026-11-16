@@ -571,6 +571,67 @@ void main() {
     expect(controller.pcScore, savedPcScore);
     expect(controller.engine.matrix[0][1], savedMatrix01);
     expect(controller.engine.matrix[1][0], savedMatrix10);
+
+    // Rejects New Skin purchase when player has fewer than 10,000 diamonds
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 9999,
+      'musicEnabled': false,
+    });
+    await createController();
+    expect(controller.unlockNewSkin(), isFalse);
+    expect(controller.diamonds, 9999);
+    expect(controller.unlockedNewSkin, isFalse);
+    expect(controller.showNewSkin, isFalse);
+  });
+
+  test('Wu Xing 3-element and 5-element win/loss/tie resolution in GameController and dynamic lastWinner update on skin toggle', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 30000,
+      'unlockedNewHands': true,
+      'showNewHands': true,
+      'unlockedNewSkin': true,
+      'showNewSkin': false,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    // Force deterministic PC move (Lizard / Earth) and play Rock (Fire) in Classic 5-hand mode
+    controller.crystalBallMove = HandMove.lizard;
+    controller.playTurn(HandMove.rock);
+
+    // In Classic RPSLS: Rock crushes Lizard -> User wins
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 0);
+
+    // Toggle New Skin ON mid-match -> Earth (lizard) smothers Fire (rock), so lastWinner re-evaluates to computer without resetting scores
+    controller.toggleShowNewSkin(true);
+    expect(controller.showNewSkin, isTrue);
+    expect(controller.lastWinner, RoundWinner.computer);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 0);
+    expect(controller.turnCount, 1);
+
+    // Play a round in 5-element Wu Xing mode: Fire (rock) vs Metal (spock) -> Fire melts Metal (User wins!)
+    controller.crystalBallMove = HandMove.spock;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.userScore, 2);
+    expect(controller.pcScore, 0);
+
+    // Play a round in 5-element Wu Xing mode: Fire (rock) vs Earth (lizard) -> Earth smothers Fire (Computer wins!)
+    controller.crystalBallMove = HandMove.lizard;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.computer);
+    expect(controller.userScore, 2);
+    expect(controller.pcScore, 1);
+
+    // Play a tie round in 5-element Wu Xing mode: Metal (spock) vs Metal (spock) -> Draw
+    controller.crystalBallMove = HandMove.spock;
+    controller.playTurn(HandMove.spock);
+    expect(controller.lastWinner, RoundWinner.draw);
+    expect(controller.userScore, 2);
+    expect(controller.pcScore, 1);
   });
 
   test('Last played hands are saved on playTurn, restored on app reopen, and cleared on resetGame', () async {
