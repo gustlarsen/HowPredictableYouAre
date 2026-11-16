@@ -266,23 +266,18 @@ class _VersusArenaState extends State<VersusArena>
     final winner = widget.winner;
 
     Color outcomeColor;
-    String outcomeText;
     switch (winner) {
       case RoundWinner.user:
         outcomeColor = Colors.green;
-        outcomeText = widget.localization.t('string51', fallback: 'YOU');
         break;
       case RoundWinner.computer:
         outcomeColor = Colors.redAccent;
-        outcomeText = widget.localization.t('string50', fallback: 'PC');
         break;
       case RoundWinner.draw:
         outcomeColor = Colors.amber;
-        outcomeText = 'DRAW';
         break;
       case null:
         outcomeColor = Colors.grey;
-        outcomeText = widget.localization.t('string20', fallback: 'NONE');
         break;
     }
 
@@ -490,7 +485,7 @@ class _VersusArenaState extends State<VersusArena>
                       return _MoveCard(
                         label: widget.localization.t(
                           'string52',
-                          fallback: 'PC Chose',
+                          fallback: 'PC Chose:',
                         ),
                         move: widget.computerMove,
                         isLeft: false,
@@ -587,49 +582,8 @@ class _VersusArenaState extends State<VersusArena>
               );
             },
           ),
-          const SizedBox(height: 14),
-
-          // Winner Announcement Banner
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              Text(
-                widget.localization.t(
-                  'string10',
-                  fallback: 'The winner of this round:',
-                ),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade400,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: outcomeColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: outcomeColor, width: 1.5),
-                ),
-                child: Text(
-                  outcomeText,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: outcomeColor,
-                    fontSize: 15,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
           if (battleDescription != null && battleDescription.isNotEmpty) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 12),
             Text(
               key: const ValueKey('battle_outcome_description'),
               battleDescription,

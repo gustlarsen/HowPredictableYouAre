@@ -254,8 +254,9 @@ void main() {
     // Verify updated labels and single AppBar reset button
     expect(find.text('You will Chose:'), findsOneWidget);
     expect(find.text('PC will Chose:'), findsOneWidget);
-    expect(find.text('PC Chose'), findsOneWidget);
-    expect(find.text('The winner of this round:'), findsOneWidget);
+    expect(find.text('PC Chose:'), findsOneWidget);
+    expect(find.text('PC Chose'), findsNothing);
+    expect(find.text('The winner of this round:'), findsNothing);
     expect(find.text('The winner of this round::'), findsNothing);
     expect(find.byIcon(Icons.restart_alt), findsOneWidget);
     expect(find.byKey(const ValueKey('appbar_story_gallery_button')), findsNothing);
