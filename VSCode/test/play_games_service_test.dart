@@ -1147,5 +1147,381 @@ void main() {
       },
     );
   });
+
+  group('Security & Anti-Breach Tests: QA Bonus Isolation & Non-Tester Protection', () {
+    test(
+      'isQaTester rejects lookalike, prefix, suffix, substring, empty, and normal player IDs and names',
+      () {
+        // Valid QA tester credentials
+        expect(PlayGamesService.isQaTester(playerId: 'a_2116013489197419559'), isTrue);
+        expect(PlayGamesService.isQaTester(playerId: 'g01804264806540615668'), isTrue);
+        expect(PlayGamesService.isQaTester(playerId: '  a_2116013489197419559  '), isTrue);
+        expect(PlayGamesService.isQaTester(playerName: 'gustlarsentester'), isTrue);
+        expect(PlayGamesService.isQaTester(playerName: 'gustlarsen'), isTrue);
+        expect(PlayGamesService.isQaTester(playerName: 'GUSTLARSEN'), isTrue);
+        expect(PlayGamesService.isQaTester(playerName: ' GustLarsenTester '), isTrue);
+
+        // Substring / Prefix / Suffix / Lookalike attacks on playerName
+        final unauthorizedNames = [
+          '',
+          '   ',
+          'not_gustlarsen',
+          'fake_gustlarsentester',
+          'gustlarsen_fan',
+          'gustlarsentester1',
+          'gustlarsentester_fake',
+          'gustlarsen123',
+          'agustlarsen',
+          'agustlarsentester',
+          'gust',
+          'larsen',
+          'tester',
+          'gustlars',
+          'Play Games Player',
+          'GPG-PLAYER',
+          'pro_gamer_2026',
+        ];
+        for (final name in unauthorizedNames) {
+          expect(
+            PlayGamesService.isQaTester(playerName: name),
+            isFalse,
+            reason: 'Failed to reject unauthorized playerName: "$name"',
+          );
+        }
+
+        // Substring / Prefix / Suffix / Partial attacks on playerId
+        final unauthorizedIds = [
+          '',
+          '   ',
+          'fake_a_2116013489197419559',
+          'a_2116013489197419559_extra',
+          '2116013489197419559',
+          'g018042648065406156680',
+          '1804264806540615668',
+          '01804264806540615668',
+          'player_987654321',
+          'GPG-PLAYER',
+        ];
+        for (final id in unauthorizedIds) {
+          expect(
+            PlayGamesService.isQaTester(playerId: id),
+            isFalse,
+            reason: 'Failed to reject unauthorized playerId: "$id"',
+          );
+        }
+
+        // Null checks
+        expect(PlayGamesService.isQaTester(), isFalse);
+        expect(PlayGamesService.isQaTester(playerId: null, playerName: null), isFalse);
+      },
+    );
+
+    test(
+      'Normal signed-in player never receives QA bonus on sign-in, resume, or checkAndGrantQaBonusIfEligible',
+      () async {
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+        await storage.setDiamonds(25);
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'RandomPlayer123',
+          mockPlayerId: 'player_random_555',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        // Sign in
+        await playGames.initialize();
+        expect(controller.diamonds, 25);
+        expect(storage.diamonds, 25);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+
+        // Direct call to grant
+        final granted = await playGames.checkAndGrantQaBonusIfEligible();
+        expect(granted, isFalse);
+        expect(controller.diamonds, 25);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+
+        // App resumed
+        await playGames.handleAppResumed();
+        expect(controller.diamonds, 25);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+      },
+    );
+
+    test(
+      'Offline / Guest player cannot receive QA bonus under any condition',
+      () async {
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: false,
+          mockPlayerName: null,
+          mockPlayerId: null,
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+        expect(playGames.isSignedIn, isFalse);
+        expect(controller.diamonds, 0);
+
+        final granted = await playGames.checkAndGrantQaBonusIfEligible();
+        expect(granted, isFalse);
+        expect(controller.diamonds, 0);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+      },
+    );
+
+    test(
+      'Normal player resetting all progress in SettingsDialog wipes to 0 diamonds without receiving QA bonus',
+      () async {
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+        await storage.setDiamonds(120);
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'HonestGamer',
+          mockPlayerId: 'player_honest_777',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+        expect(controller.diamonds, 120);
+
+        // Wipe all gameplay progress
+        await controller.resetAllProgress();
+        expect(controller.diamonds, 0);
+        expect(storage.diamonds, 0);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+
+        final cloudSave = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(cloudSave.diamonds, 0);
+        expect(cloudSave.hasClaimedQaBonus, isFalse);
+      },
+    );
+
+    test(
+      'Local storage tampering with hasClaimedQaBonus=false cannot bypass tester check for normal players',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+          'diamonds': 50,
+          'hasClaimedQaBonus': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'CraftyPlayer',
+          mockPlayerId: 'player_crafty_999',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+
+        // Attempt repeatedly to trigger bonus
+        for (var i = 0; i < 5; i++) {
+          await storage.setHasClaimedQaBonus(false);
+          final res = await playGames.checkAndGrantQaBonusIfEligible();
+          expect(res, isFalse);
+          expect(controller.diamonds, 50);
+          expect(controller.pendingQaBonusSnackBar, isNull);
+        }
+      },
+    );
+
+    test(
+      'Loading forged cloud save payload cannot grant QA bonus to normal player',
+      () async {
+        final forgedPayload = CloudSaveData(
+          diamonds: 50,
+          hasClaimedQaBonus: false,
+          userScore: 10,
+          pcScore: 10,
+          total: 20,
+          userHp: 100,
+          pcHp: 100,
+        ).toJsonString();
+
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'VictimOrAttacker',
+          mockPlayerId: 'player_non_qa_111',
+          cloudPayload: forgedPayload,
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+        // Restored cloud save data
+        expect(controller.diamonds, 50);
+        expect(storage.hasClaimedQaBonus, isFalse);
+        expect(controller.pendingQaBonusSnackBar, isNull);
+      },
+    );
+
+    testWidgets(
+      'Normal user clicking TRY AGAIN after 100 rounds retains diamonds and never receives bonus',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+          'userScore': 50,
+          'pcScore': 50,
+          'total': 100,
+          'diamonds': 35,
+          'hasClaimedQaBonus': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'NormalPlayer100Rounds',
+          mockPlayerId: 'player_normal_100_rounds',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('TRY AGAIN'), findsOneWidget);
+        expect(controller.diamonds, 35);
+
+        await tester.tap(find.text('TRY AGAIN'));
+        await tester.pumpAndSettle();
+
+        expect(controller.totalRounds, 0);
+        expect(controller.userScore, 0);
+        expect(controller.pcScore, 0);
+        expect(controller.diamonds, 35);
+        expect(find.text('Tester Bonus: +100,000 💎'), findsNothing);
+      },
+    );
+
+    test(
+      'QA tester repeating 100-round match resets and in-game resets never gains duplicate diamonds',
+      () async {
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsentester',
+          mockPlayerId: 'a_2116013489197419559',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        // 1st sign in -> grants initial 100,000 diamonds
+        await playGames.initialize();
+        expect(controller.diamonds, 100000);
+        controller.consumePendingQaBonusSnackBar();
+
+        // Simulate 5 successive 100-round match completions and resets
+        for (var match = 1; match <= 5; match++) {
+          controller.totalRounds = 100;
+          controller.userScore = 50;
+          controller.pcScore = 50;
+
+          // Player clicks "TRY AGAIN" or "RESET"
+          controller.resetGame();
+          await Future<void>.delayed(Duration.zero);
+
+          expect(controller.totalRounds, 0);
+          expect(controller.userScore, 0);
+          expect(controller.diamonds, 100000);
+          expect(storage.diamonds, 100000);
+          expect(storage.hasClaimedQaBonus, isTrue);
+          expect(controller.pendingQaBonusSnackBar, isNull);
+        }
+      },
+    );
+  });
 }
 

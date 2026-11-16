@@ -222,8 +222,10 @@ void main() {
     expect(controller.isGiftAvailable, isFalse);
   });
 
-  test('Reset game clears scores and round stats', () async {
+  test('Reset game clears scores and round stats without altering diamonds or hasClaimedQaBonus', () async {
     await createController(resetPreferences: true);
+    controller.diamonds = 250;
+    controller.hasClaimedQaBonus = true;
     controller.userScore = 10;
     controller.pcScore = 5;
     controller.totalRounds = 15;
@@ -235,6 +237,8 @@ void main() {
     expect(controller.pcScore, 0);
     expect(controller.totalRounds, 0);
     expect(controller.turnCount, 0);
+    expect(controller.diamonds, 250);
+    expect(controller.hasClaimedQaBonus, isTrue);
   });
 
   test('turnCount increments with each played turn even on draws', () async {
