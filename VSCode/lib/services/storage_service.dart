@@ -36,6 +36,15 @@ class StorageService {
   int get total => _prefs.getInt('total') ?? 0;
   Future<void> setTotal(int val) => _prefs.setInt('total', val);
 
+  // RPG Hand HP (0 - 100)
+  int get userHp => _prefs.getInt('userHp') ?? 100;
+  int? get userHpRaw => _prefs.getInt('userHp');
+  Future<void> setUserHp(int val) => _prefs.setInt('userHp', val);
+
+  int get pcHp => _prefs.getInt('pcHp') ?? 100;
+  int? get pcHpRaw => _prefs.getInt('pcHp');
+  Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
+
   // Settings
   bool get darkMode => _prefs.getBool('darkMode') ?? true;
   Future<void> setDarkMode(bool val) => _prefs.setBool('darkMode', val);
@@ -265,6 +274,8 @@ class StorageService {
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
+      setUserHp(100),
+      setPcHp(100),
       if (resetQaBonus) setHasClaimedQaBonus(false),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
@@ -298,6 +309,8 @@ class StorageService {
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
+      setUserHp(100),
+      setPcHp(100),
       setUnlockedReset(false),
       setUnlockedPredictability(false),
       setUnlockedRandom(false),

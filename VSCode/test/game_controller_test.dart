@@ -637,4 +637,53 @@ void main() {
     // Voluntary Rewarded Video ad remains available even when Remove Ads is unlocked
     expect(controller.isRewardedAdReady, isTrue);
   });
+
+  test('HP mechanics: starts at 100, reduces on loss, persists to storage, and resets back to 100', () async {
+    await createController(resetPreferences: true);
+
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 100);
+    expect(storage.userHp, 100);
+    expect(storage.pcHp, 100);
+
+    // Play rounds until user and pc both experience outcomes
+    // Play with predictable moves against empty engine
+    controller.playTurn(HandMove.rock);
+    expect(controller.userHp, inInclusiveRange(0, 100));
+    expect(controller.computerHp, inInclusiveRange(0, 100));
+
+    if (controller.lastWinner == RoundWinner.user) {
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 99);
+      expect(storage.pcHp, 99);
+    } else if (controller.lastWinner == RoundWinner.computer) {
+      expect(controller.userHp, 99);
+      expect(controller.computerHp, 100);
+      expect(storage.userHp, 99);
+    } else {
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 100);
+    }
+
+    // Persist and reopen
+    final prevUserHp = controller.userHp;
+    final prevPcHp = controller.computerHp;
+    await createController();
+    expect(controller.userHp, prevUserHp);
+    expect(controller.computerHp, prevPcHp);
+
+    // Resetting game restores both back to 100
+    controller.resetGame();
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 100);
+    expect(storage.userHp, 100);
+    expect(storage.pcHp, 100);
+
+    // Resetting all progress restores both back to 100
+    await controller.resetAllProgress();
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 100);
+    expect(storage.userHp, 100);
+    expect(storage.pcHp, 100);
+  });
 }

@@ -85,6 +85,8 @@ class CloudSaveData {
   final int userScore;
   final int pcScore;
   final int total;
+  final int userHp;
+  final int pcHp;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -145,6 +147,8 @@ class CloudSaveData {
     this.userScore = 0,
     this.pcScore = 0,
     this.total = 0,
+    this.userHp = 100,
+    this.pcHp = 100,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -268,6 +272,8 @@ class CloudSaveData {
       userScore: userScore,
       pcScore: pcScore,
       total: total,
+      userHp: userHp,
+      pcHp: pcHp,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -329,6 +335,8 @@ class CloudSaveData {
       userScore: storage.userScore,
       pcScore: storage.pcScore,
       total: storage.total,
+      userHp: storage.userHp,
+      pcHp: storage.pcHp,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -380,6 +388,8 @@ class CloudSaveData {
     await storage.setUserScore(userScore);
     await storage.setPcScore(pcScore);
     await storage.setTotal(total);
+    await storage.setUserHp(userHp);
+    await storage.setPcHp(pcHp);
 
     await storage.setLanguage(language);
     await storage.setDarkMode(darkMode);
@@ -453,6 +463,8 @@ class CloudSaveData {
       'userScore': userScore,
       'pcScore': pcScore,
       'total': total,
+      'userHp': userHp,
+      'pcHp': pcHp,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -520,6 +532,8 @@ class CloudSaveData {
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
       total: (map['total'] as num?)?.toInt() ?? 0,
+      userHp: (map['userHp'] as num?)?.toInt() ?? 100,
+      pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

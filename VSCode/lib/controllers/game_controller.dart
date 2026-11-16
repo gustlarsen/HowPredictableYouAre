@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
@@ -16,6 +17,8 @@ class GameController extends ChangeNotifier {
   static const int rewardedAdDiamondBonus = 50;
   static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
   static const String rewardedAdSnackBarMessage = '+50 💎 earned!';
+  static const int maxHp = 100;
+  static const int damagePerLoss = 1;
 
   final StorageService storage;
   final LocalizationService localization;
@@ -47,6 +50,8 @@ class GameController extends ChangeNotifier {
   int pcScore = 0;
   int totalRounds = 0;
   int turnCount = 0;
+  int userHp = maxHp;
+  int computerHp = maxHp;
 
   bool darkMode = true;
   bool soundEnabled = true;
@@ -204,6 +209,16 @@ class GameController extends ChangeNotifier {
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
+    if (storage.userHpRaw != null) {
+      userHp = storage.userHp;
+    } else {
+      userHp = math.max(0, maxHp - pcScore * damagePerLoss);
+    }
+    if (storage.pcHpRaw != null) {
+      computerHp = storage.pcHp;
+    } else {
+      computerHp = math.max(0, maxHp - userScore * damagePerLoss);
+    }
     is100RoundsAlertPending = totalRounds >= 100;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
@@ -345,13 +360,17 @@ class GameController extends ChangeNotifier {
       lastWinner = RoundWinner.user;
       userScore += 1;
       diamonds += 1;
+      computerHp = math.max(0, computerHp - damagePerLoss);
       storage.setUserScore(userScore);
       storage.setDiamonds(diamonds);
+      storage.setPcHp(computerHp);
       audio.playWin();
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
+      userHp = math.max(0, userHp - damagePerLoss);
       storage.setPcScore(pcScore);
+      storage.setUserHp(userHp);
       audio.playDefeat();
     }
 
@@ -409,6 +428,8 @@ class GameController extends ChangeNotifier {
     currentComputerMove = null;
     lastUserMove = null;
     lastWinner = null;
+    userHp = maxHp;
+    computerHp = maxHp;
     is100RoundsAlertPending = false;
     if (resetQaBonus) {
       hasClaimedQaBonus = false;
@@ -417,6 +438,8 @@ class GameController extends ChangeNotifier {
     _engine.reset();
 
     storage.clearGameStats(resetQaBonus: resetQaBonus);
+    storage.setUserHp(maxHp);
+    storage.setPcHp(maxHp);
     _computeNextHints();
     if (resetQaBonus && playGames.isSignedIn) {
       unawaited(_syncResetAndRegrantQaBonusIfTester());

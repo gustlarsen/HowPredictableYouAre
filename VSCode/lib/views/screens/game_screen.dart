@@ -415,6 +415,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               localization: loc,
                               animationsEnabled: controller.animationsEnabled,
                               roundId: controller.turnCount,
+                              userHp: controller.userHp,
+                              computerHp: controller.computerHp,
                             ),
                             const SizedBox(height: 14),
 

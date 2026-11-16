@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/move.dart';
 import '../../services/localization_service.dart';
+import 'rpg_hp_bar.dart';
 
 class VersusArena extends StatefulWidget {
   final HandMove? userMove;
@@ -10,6 +11,8 @@ class VersusArena extends StatefulWidget {
   final LocalizationService localization;
   final bool animationsEnabled;
   final int roundId;
+  final int userHp;
+  final int computerHp;
 
   const VersusArena({
     super.key,
@@ -19,6 +22,8 @@ class VersusArena extends StatefulWidget {
     required this.localization,
     required this.animationsEnabled,
     required this.roundId,
+    this.userHp = 100,
+    this.computerHp = 100,
   });
 
   @override
@@ -100,6 +105,42 @@ class _VersusArenaState extends State<VersusArena>
   void dispose() {
     _animController.dispose();
     super.dispose();
+  }
+
+  double _calculateShake(bool isDamaged) {
+    if (!isDamaged || !widget.animationsEnabled || !_animController.isAnimating) {
+      return 0.0;
+    }
+    final t = _animController.value;
+    if (t >= 0.5 && t <= 0.8) {
+      final progress = (t - 0.5) / 0.3;
+      final decay = 1.0 - progress;
+      return math.sin(progress * math.pi * 6) * decay * 3.5;
+    }
+    return 0.0;
+  }
+
+  double _calculateFlash(bool isDamaged) {
+    if (!isDamaged || !widget.animationsEnabled || !_animController.isAnimating) {
+      return 0.0;
+    }
+    final t = _animController.value;
+    if (t >= 0.5 && t <= 0.8) {
+      final progress = (t - 0.5) / 0.3;
+      return (1.0 - progress) * 0.55;
+    }
+    return 0.0;
+  }
+
+  double? _calculateDamageProgress(bool isDamaged) {
+    if (!isDamaged || !widget.animationsEnabled || !_animController.isAnimating) {
+      return null;
+    }
+    final t = _animController.value;
+    if (t >= 0.5 && t <= 1.0) {
+      return ((t - 0.5) / 0.5).clamp(0.0, 1.0);
+    }
+    return null;
   }
 
   @override
@@ -210,19 +251,28 @@ class _VersusArenaState extends State<VersusArena>
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: EdgeInsets.only(left: leftX),
-                  child: _MoveCard(
-                    label: widget.localization.t(
-                      'string9',
-                      fallback: 'You Chose:',
-                    ),
-                    move: widget.userMove,
-                    isLeft: true,
-                    isWinner: userWins,
-                    handBuilder: (context, handWidget) {
-                      return AnimatedBuilder(
-                        animation: _animController,
-                        builder: (context, child) {
-                          Widget animatedChild = child!;
+                  child: AnimatedBuilder(
+                    animation: _animController,
+                    builder: (context, _) {
+                      final isDamaged = pcWins && widget.roundId > 0;
+                      return _MoveCard(
+                        label: widget.localization.t(
+                          'string9',
+                          fallback: 'You Chose:',
+                        ),
+                        move: widget.userMove,
+                        isLeft: true,
+                        isWinner: userWins,
+                        hp: widget.userHp,
+                        hpBarKey: const ValueKey('user_hp_bar'),
+                        isDamaged: isDamaged,
+                        flashOpacity: _calculateFlash(isDamaged),
+                        shakeOffset: _calculateShake(isDamaged),
+                        damageIndicatorProgress:
+                            _calculateDamageProgress(isDamaged),
+                        damageAmount: 1,
+                        handBuilder: (context, handWidget) {
+                          Widget animatedChild = handWidget;
                           if (widget.animationsEnabled && widget.roundId > 0) {
                             if (userWins) {
                               animatedChild = Transform.translate(
@@ -247,7 +297,6 @@ class _VersusArenaState extends State<VersusArena>
                           }
                           return animatedChild;
                         },
-                        child: handWidget,
                       );
                     },
                   ),
@@ -259,19 +308,28 @@ class _VersusArenaState extends State<VersusArena>
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: EdgeInsets.only(left: rightX),
-                  child: _MoveCard(
-                    label: widget.localization.t(
-                      'string52',
-                      fallback: 'PC Chose',
-                    ),
-                    move: widget.computerMove,
-                    isLeft: false,
-                    isWinner: pcWins,
-                    handBuilder: (context, handWidget) {
-                      return AnimatedBuilder(
-                        animation: _animController,
-                        builder: (context, child) {
-                          Widget animatedChild = child!;
+                  child: AnimatedBuilder(
+                    animation: _animController,
+                    builder: (context, _) {
+                      final isDamaged = userWins && widget.roundId > 0;
+                      return _MoveCard(
+                        label: widget.localization.t(
+                          'string52',
+                          fallback: 'PC Chose',
+                        ),
+                        move: widget.computerMove,
+                        isLeft: false,
+                        isWinner: pcWins,
+                        hp: widget.computerHp,
+                        hpBarKey: const ValueKey('pc_hp_bar'),
+                        isDamaged: isDamaged,
+                        flashOpacity: _calculateFlash(isDamaged),
+                        shakeOffset: _calculateShake(isDamaged),
+                        damageIndicatorProgress:
+                            _calculateDamageProgress(isDamaged),
+                        damageAmount: 1,
+                        handBuilder: (context, handWidget) {
+                          Widget animatedChild = handWidget;
                           if (widget.animationsEnabled && widget.roundId > 0) {
                             if (pcWins) {
                               animatedChild = Transform.translate(
@@ -296,7 +354,6 @@ class _VersusArenaState extends State<VersusArena>
                           }
                           return animatedChild;
                         },
-                        child: handWidget,
                       );
                     },
                   ),
@@ -367,6 +424,13 @@ class _MoveCard extends StatelessWidget {
   final HandMove? move;
   final bool isLeft;
   final bool isWinner;
+  final int hp;
+  final Key? hpBarKey;
+  final bool isDamaged;
+  final double flashOpacity;
+  final double shakeOffset;
+  final double? damageIndicatorProgress;
+  final int damageAmount;
   final Widget Function(BuildContext context, Widget handWidget) handBuilder;
 
   const _MoveCard({
@@ -374,6 +438,13 @@ class _MoveCard extends StatelessWidget {
     required this.move,
     required this.isLeft,
     required this.isWinner,
+    required this.hp,
+    this.hpBarKey,
+    required this.isDamaged,
+    required this.flashOpacity,
+    required this.shakeOffset,
+    required this.damageIndicatorProgress,
+    required this.damageAmount,
     required this.handBuilder,
   });
 
@@ -382,47 +453,139 @@ class _MoveCard extends StatelessWidget {
     final assetPath = isLeft ? move?.leftAsset : move?.rightAsset;
     final hasAsset = assetPath != null && assetPath.isNotEmpty;
 
-    final handCircle = Container(
-      width: 86,
-      height: 86,
-      decoration: BoxDecoration(
-        color: isWinner
-            ? Colors.green.withValues(alpha: 0.25)
-            : Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isWinner ? Colors.green : Colors.white24,
-          width: isWinner ? 3 : 1.5,
+    final handCircle = Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 86,
+          height: 86,
+          decoration: BoxDecoration(
+            color: isWinner
+                ? Colors.green.withValues(alpha: 0.25)
+                : Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isWinner
+                  ? Colors.green
+                  : (flashOpacity > 0.0
+                      ? Color.lerp(
+                          Colors.white,
+                          Colors.redAccent,
+                          0.65,
+                        )!.withValues(alpha: 0.85)
+                      : Colors.white24),
+              width: isWinner ? 3 : (flashOpacity > 0.0 ? 2.5 : 1.5),
+            ),
+            boxShadow: isWinner
+                ? [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : (flashOpacity > 0.0
+                    ? [
+                        BoxShadow(
+                          color: Colors.redAccent.withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null),
+          ),
+          child: Center(
+            child: move == null
+                ? const Text(
+                    '?',
+                    style: TextStyle(fontSize: 34, color: Colors.grey),
+                  )
+                : hasAsset
+                ? Image.asset(
+                    assetPath,
+                    width: 58,
+                    height: 58,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Text(move!.emoji, style: const TextStyle(fontSize: 38)),
+                  )
+                : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
+          ),
         ),
-        boxShadow: isWinner
-            ? [
-                BoxShadow(
-                  color: Colors.green.withValues(alpha: 0.4),
-                  blurRadius: 10,
-                  spreadRadius: 2,
+
+        // Damage White/Red Flash Overlay on hand circle
+        if (flashOpacity > 0.0)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color.lerp(
+                  Colors.white,
+                  Colors.redAccent,
+                  0.65,
+                )!.withValues(
+                  alpha: flashOpacity.clamp(0.0, 1.0) * 0.65,
                 ),
-              ]
-            : null,
-      ),
-      child: Center(
-        child: move == null
-            ? const Text(
-                '?',
-                style: TextStyle(fontSize: 34, color: Colors.grey),
-              )
-            : hasAsset
-            ? Image.asset(
-                assetPath,
-                width: 58,
-                height: 58,
-                errorBuilder: (context, error, stackTrace) =>
-                    Text(move!.emoji, style: const TextStyle(fontSize: 38)),
-              )
-            : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
-      ),
+              ),
+            ),
+          ),
+
+        // Floating Damage Indicator (-1 in crisp red/gold text that fades upward)
+        if (damageIndicatorProgress != null)
+          Positioned(
+            top: 10.0 - (28.0 * Curves.easeOut.transform(damageIndicatorProgress!)),
+            child: Opacity(
+              opacity: (1.0 - damageIndicatorProgress!).clamp(0.0, 1.0),
+              child: Container(
+                key: isLeft
+                    ? const ValueKey('user_damage_indicator')
+                    : const ValueKey('pc_damage_indicator'),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B0505).withValues(alpha: 0.88),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: Colors.amber.withValues(
+                      alpha: 0.85 * (1.0 - damageIndicatorProgress!),
+                    ),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.redAccent.withValues(
+                        alpha: 0.55 * (1.0 - damageIndicatorProgress!),
+                      ),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '-$damageAmount',
+                  style: const TextStyle(
+                    color: Color(0xFFFF4D4D),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                    shadows: [
+                      Shadow(color: Colors.amber, blurRadius: 4),
+                      Shadow(
+                        color: Colors.black,
+                        blurRadius: 2,
+                        offset: Offset(1, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
+
+    final paddingLeft = shakeOffset > 0 ? shakeOffset : 0.0;
+    final paddingRight = shakeOffset < 0 ? -shakeOffset : 0.0;
 
     return SizedBox(
       width: 86,
@@ -435,8 +598,18 @@ class _MoveCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
-          handBuilder(context, handCircle),
+          Padding(
+            padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
+            child: handBuilder(context, handCircle),
+          ),
           const SizedBox(height: 6),
+          RpgHpBar(
+            key: hpBarKey,
+            hp: hp,
+            flashOpacity: flashOpacity,
+            shakeOffset: shakeOffset,
+          ),
+          const SizedBox(height: 4),
           Text(
             move?.label.toUpperCase() ?? 'NONE',
             style: const TextStyle(
