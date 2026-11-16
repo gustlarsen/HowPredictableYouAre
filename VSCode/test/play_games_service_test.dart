@@ -979,7 +979,7 @@ void main() {
     );
 
     test(
-      '(c) Re-grants the +100,000 diamond bonus after a game reset (resetGame and resetAllProgress)',
+      '(c) Preserves diamond balance on match reset (resetGame) and re-grants the +100,000 tester bonus only on full progression wipe (resetAllProgress)',
       () async {
         SharedPreferences.setMockInitialValues({
           'musicEnabled': false,
@@ -1014,18 +1014,16 @@ void main() {
         expect(controller.unlockCrystalBallPlus(), isTrue);
         expect(controller.diamonds, 30000);
 
-        // 1. Trigger resetGame -> resets hasClaimedQaBonus to false, syncs reset state, and re-grants +100,000
+        // 1. Trigger resetGame (e.g. Try Again after 100 rounds or match reset)
+        // -> resets match state only, does NOT grant extra QA bonus or reset hasClaimedQaBonus
         controller.resetGame();
         await Future<void>.delayed(Duration.zero);
         await Future<void>.delayed(Duration.zero);
 
-        expect(controller.diamonds, 130000);
-        expect(storage.diamonds, 130000);
+        expect(controller.diamonds, 30000);
+        expect(storage.diamonds, 30000);
         expect(storage.hasClaimedQaBonus, isTrue);
-        expect(
-          controller.consumePendingQaBonusSnackBar(),
-          'Tester Bonus: +100,000 💎',
-        );
+        expect(controller.pendingQaBonusSnackBar, isNull);
 
         // 2. Trigger full progression reset (resetAllProgress) -> wipes diamonds to 0 & hasClaimedQaBonus to false,
         // syncs to cloud, and automatically re-grants +100,000 diamonds
@@ -1089,6 +1087,63 @@ void main() {
 
         expect(find.text('Tester Bonus: +100,000 💎'), findsOneWidget);
         expect(controller.diamonds, 100000);
+      },
+    );
+
+    testWidgets(
+      'Clicking TRY AGAIN after 100 rounds resets match stats without re-granting QA tester bonus diamonds or showing SnackBar',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+          'userScore': 50,
+          'pcScore': 50,
+          'total': 100,
+          'diamonds': 100000,
+          'hasClaimedQaBonus': true,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'gustlarsentester',
+          mockPlayerId: 'a_2116013489197419559',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+        controller.consumePendingQaBonusSnackBar();
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('TRY AGAIN'), findsOneWidget);
+        expect(controller.diamonds, 100000);
+
+        await tester.tap(find.text('TRY AGAIN'));
+        await tester.pumpAndSettle();
+
+        expect(controller.totalRounds, 0);
+        expect(controller.userScore, 0);
+        expect(controller.pcScore, 0);
+        expect(controller.diamonds, 100000);
+        expect(find.text('Tester Bonus: +100,000 💎'), findsNothing);
       },
     );
   });

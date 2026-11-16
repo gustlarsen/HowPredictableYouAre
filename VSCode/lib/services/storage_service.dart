@@ -276,14 +276,13 @@ class StorageService {
     return _prefs.remove('markov_matrix_$size');
   }
 
-  Future<void> clearGameStats({bool resetQaBonus = true}) {
+  Future<void> clearGameStats() {
     return Future.wait([
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
       setUserHp(100),
       setPcHp(100),
-      if (resetQaBonus) setHasClaimedQaBonus(false),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),

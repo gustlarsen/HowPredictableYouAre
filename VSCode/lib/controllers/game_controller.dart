@@ -432,7 +432,7 @@ class GameController extends ChangeNotifier {
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
-  void resetGame({bool resetQaBonus = true}) {
+  void resetGame() {
     userScore = 0;
     pcScore = 0;
     totalRounds = 0;
@@ -444,25 +444,14 @@ class GameController extends ChangeNotifier {
     userHp = maxHp;
     computerHp = maxHp;
     is100RoundsAlertPending = false;
-    if (resetQaBonus) {
-      hasClaimedQaBonus = false;
-      storage.setHasClaimedQaBonus(false);
-    }
     _engine.reset();
 
-    storage.clearGameStats(resetQaBonus: resetQaBonus);
+    storage.clearGameStats();
     storage.setUserHp(maxHp);
     storage.setPcHp(maxHp);
     _computeNextHints();
-    if (resetQaBonus && playGames.isSignedIn) {
-      unawaited(_syncResetAndRegrantQaBonusIfTester());
-    }
+    _triggerCloudSave();
     notifyListeners();
-  }
-
-  Future<void> _syncResetAndRegrantQaBonusIfTester() async {
-    await playGames.saveCloudData();
-    await playGames.checkAndGrantQaBonusIfEligible();
   }
 
   /// Wipes all gameplay progression (diamonds, shop unlocks, active toggles,
@@ -1044,7 +1033,7 @@ class GameController extends ChangeNotifier {
       enableExtendedHands: val,
       enableElementalMode: showNewSkin,
     );
-    resetGame(resetQaBonus: false);
+    resetGame();
     _triggerCloudSave();
   }
 
