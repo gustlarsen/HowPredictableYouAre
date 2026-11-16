@@ -98,6 +98,7 @@ class CloudSaveData {
   final bool unlockedNextMove;
   final bool unlockedSuggestion;
   final bool unlockedAds;
+  final bool unlockedNewSkin;
   final bool unlockedCrystalBall;
   final bool unlockedCrystalBallPlus;
 
@@ -107,6 +108,7 @@ class CloudSaveData {
   final bool showRandom;
   final bool showAlgorithm;
   final bool showNewHands;
+  final bool showNewSkin;
   final bool showYourPrediction;
   final bool showNextMove;
   final bool showSuggestion;
@@ -158,6 +160,7 @@ class CloudSaveData {
     this.unlockedNextMove = false,
     this.unlockedSuggestion = false,
     this.unlockedAds = false,
+    this.unlockedNewSkin = false,
     this.unlockedCrystalBall = false,
     this.unlockedCrystalBallPlus = false,
     this.showReset = false,
@@ -165,6 +168,7 @@ class CloudSaveData {
     this.showRandom = false,
     this.showAlgorithm = false,
     this.showNewHands = false,
+    this.showNewSkin = false,
     this.showYourPrediction = false,
     this.showNextMove = false,
     this.showSuggestion = false,
@@ -205,6 +209,7 @@ class CloudSaveData {
     if (unlockedNextMove) count++;
     if (unlockedSuggestion) count++;
     if (unlockedAds) count++;
+    if (unlockedNewSkin) count++;
     if (unlockedCrystalBall) count++;
     if (unlockedCrystalBallPlus) count++;
     return count;
@@ -222,6 +227,7 @@ class CloudSaveData {
     if (unlockedNextMove) value += 3000;
     if (unlockedSuggestion) value += 5000;
     if (unlockedAds) value += 10000;
+    if (unlockedNewSkin) value += 10000;
     if (unlockedCrystalBall) value += 20000;
     if (unlockedCrystalBallPlus) value += 50000;
     return value;
@@ -285,6 +291,7 @@ class CloudSaveData {
       unlockedNextMove: unlockedNextMove || local.unlockedNextMove,
       unlockedSuggestion: unlockedSuggestion || local.unlockedSuggestion,
       unlockedAds: unlockedAds || local.unlockedAds,
+      unlockedNewSkin: unlockedNewSkin || local.unlockedNewSkin,
       unlockedCrystalBall: unlockedCrystalBall || local.unlockedCrystalBall,
       unlockedCrystalBallPlus:
           unlockedCrystalBallPlus || local.unlockedCrystalBallPlus,
@@ -293,6 +300,7 @@ class CloudSaveData {
       showRandom: showRandom,
       showAlgorithm: showAlgorithm,
       showNewHands: showNewHands,
+      showNewSkin: showNewSkin,
       showYourPrediction: showYourPrediction,
       showNextMove: showNextMove,
       showSuggestion: showSuggestion,
@@ -346,6 +354,7 @@ class CloudSaveData {
       unlockedNextMove: storage.unlockedNextMove,
       unlockedSuggestion: storage.unlockedSuggestion,
       unlockedAds: storage.unlockedAds,
+      unlockedNewSkin: storage.unlockedNewSkin,
       unlockedCrystalBall: storage.unlockedCrystalBall,
       unlockedCrystalBallPlus: storage.unlockedCrystalBallPlus,
       showReset: storage.showReset,
@@ -353,6 +362,7 @@ class CloudSaveData {
       showRandom: storage.showRandom,
       showAlgorithm: storage.showAlgorithm,
       showNewHands: storage.showNewHands,
+      showNewSkin: storage.showNewSkin,
       showYourPrediction: storage.showYourPrediction,
       showNextMove: storage.showNextMove,
       showSuggestion: storage.showSuggestion,
@@ -407,6 +417,7 @@ class CloudSaveData {
     await storage.setUnlockedNextMove(unlockedNextMove);
     await storage.setUnlockedSuggestion(unlockedSuggestion);
     await storage.setUnlockedAds(unlockedAds);
+    await storage.setUnlockedNewSkin(unlockedNewSkin);
     await storage.setUnlockedCrystalBall(unlockedCrystalBall);
     await storage.setUnlockedCrystalBallPlus(unlockedCrystalBallPlus);
 
@@ -415,6 +426,7 @@ class CloudSaveData {
     await storage.setShowRandom(showRandom);
     await storage.setShowAlgorithm(showAlgorithm);
     await storage.setShowNewHands(showNewHands);
+    await storage.setShowNewSkin(showNewSkin);
     await storage.setShowYourPrediction(showYourPrediction);
     await storage.setShowNextMove(showNextMove);
     await storage.setShowSuggestion(showSuggestion);
@@ -474,6 +486,7 @@ class CloudSaveData {
       'unlockedNextMove': unlockedNextMove,
       'unlockedSuggestion': unlockedSuggestion,
       'unlockedAds': unlockedAds,
+      'unlockedNewSkin': unlockedNewSkin,
       'unlockedCrystalBall': unlockedCrystalBall,
       'unlockedCrystalBallPlus': unlockedCrystalBallPlus,
       'showReset': showReset,
@@ -481,6 +494,7 @@ class CloudSaveData {
       'showRandom': showRandom,
       'showAlgorithm': showAlgorithm,
       'showNewHands': showNewHands,
+      'showNewSkin': showNewSkin,
       'showYourPrediction': showYourPrediction,
       'showNextMove': showNextMove,
       'showSuggestion': showSuggestion,
@@ -543,6 +557,7 @@ class CloudSaveData {
       unlockedNextMove: map['unlockedNextMove'] as bool? ?? false,
       unlockedSuggestion: map['unlockedSuggestion'] as bool? ?? false,
       unlockedAds: map['unlockedAds'] as bool? ?? false,
+      unlockedNewSkin: map['unlockedNewSkin'] as bool? ?? false,
       unlockedCrystalBall: map['unlockedCrystalBall'] as bool? ?? false,
       unlockedCrystalBallPlus: map['unlockedCrystalBallPlus'] as bool? ?? false,
       showReset: map['showReset'] as bool? ?? false,
@@ -550,6 +565,7 @@ class CloudSaveData {
       showRandom: map['showRandom'] as bool? ?? false,
       showAlgorithm: map['showAlgorithm'] as bool? ?? false,
       showNewHands: map['showNewHands'] as bool? ?? false,
+      showNewSkin: map['showNewSkin'] as bool? ?? false,
       showYourPrediction: map['showYourPrediction'] as bool? ?? false,
       showNextMove: map['showNextMove'] as bool? ?? false,
       showSuggestion: map['showSuggestion'] as bool? ?? false,

@@ -4,12 +4,14 @@ import '../models/move.dart';
 class MarkovEngine {
   final Random _random;
   final bool enableExtendedHands;
+  bool enableElementalMode;
 
   late List<List<int>> _matrix;
   late List<HandMove> _activeMoves;
 
   MarkovEngine({
     this.enableExtendedHands = false,
+    this.enableElementalMode = false,
     Random? random,
   }) : _random = random ?? Random() {
     _initMatrix();
@@ -111,7 +113,9 @@ class MarkovEngine {
 
     final List<HandMove> choices = [];
     for (final predicted in predictedMoves) {
-      final winningCounters = _activeMoves.where((m) => m.beats(predicted)).toList();
+      final winningCounters = _activeMoves
+          .where((m) => m.beats(predicted, elemental: enableElementalMode))
+          .toList();
       if (winningCounters.isNotEmpty) {
         for (final counter in winningCounters) {
           if (!choices.contains(counter)) {
@@ -119,7 +123,9 @@ class MarkovEngine {
           }
         }
       } else {
-        final fallback = predicted.standardCounter;
+        final fallback = predicted.counterForMode(
+          elemental: enableElementalMode,
+        );
         if (!choices.contains(fallback)) {
           choices.add(fallback);
         }
@@ -155,7 +161,9 @@ class MarkovEngine {
     // Build ordered candidate list corresponding to each anticipated PC move
     final List<HandMove> orderedCandidates = [];
     for (final pcMove in anticipatedPcMoves) {
-      final counters = _activeMoves.where((m) => m.beats(pcMove)).toList();
+      final counters = _activeMoves
+          .where((m) => m.beats(pcMove, elemental: enableElementalMode))
+          .toList();
       for (final c in counters) {
         if (!orderedCandidates.contains(c)) {
           orderedCandidates.add(c);
@@ -172,7 +180,9 @@ class MarkovEngine {
     int maxWins = 0;
     final Map<HandMove, int> winCounts = {};
     for (final candidate in orderedCandidates) {
-      final wins = anticipatedPcMoves.where((pc) => candidate.beats(pc)).length;
+      final wins = anticipatedPcMoves
+          .where((pc) => candidate.beats(pc, elemental: enableElementalMode))
+          .length;
       winCounts[candidate] = wins;
       if (wins > maxWins) {
         maxWins = wins;
@@ -197,6 +207,6 @@ class MarkovEngine {
     if (suggestions.isNotEmpty) {
       return suggestions[_random.nextInt(suggestions.length)];
     }
-    return anticipatedPcMove.standardCounter;
+    return anticipatedPcMove.counterForMode(elemental: enableElementalMode);
   }
 }

@@ -417,6 +417,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               roundId: controller.turnCount,
                               userHp: controller.userHp,
                               computerHp: controller.computerHp,
+                              elementalMode: controller.showNewSkin,
                             ),
                             const SizedBox(height: 14),
 
@@ -425,6 +426,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               MarkovMatrixView(
                                 engine: controller.engine,
                                 lastUserMove: controller.lastUserMove,
+                                elementalMode: controller.showNewSkin,
+                                localization: loc,
                               ),
                               const SizedBox(height: 14),
                             ],
@@ -466,6 +469,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                             ),
                                             move: move,
                                             compact: controller.showNewHands,
+                                            elementalMode:
+                                                controller.showNewSkin,
+                                            isSelected:
+                                                controller.currentUserMove ==
+                                                move,
+                                            localization: loc,
                                             animationsEnabled:
                                                 controller.animationsEnabled,
                                             onPressed: () =>
@@ -593,6 +602,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
   final bool compact;
+  final bool elementalMode;
+  final bool isSelected;
+  final LocalizationService localization;
   final bool animationsEnabled;
   final VoidCallback onPressed;
 
@@ -600,6 +612,9 @@ class _HandActionButton extends StatefulWidget {
     super.key,
     required this.move,
     this.compact = false,
+    this.elementalMode = false,
+    this.isSelected = false,
+    required this.localization,
     required this.animationsEnabled,
     required this.onPressed,
   });
@@ -652,6 +667,10 @@ class _HandActionButtonState extends State<_HandActionButton>
     final theme = Theme.of(context);
     final hasAsset = widget.move.leftAsset.isNotEmpty;
     final compact = widget.compact;
+    final elemental = widget.elementalMode;
+    final isSelected = widget.isSelected;
+    final primaryColor = widget.move.elementalPrimaryColor;
+    final secondaryColor = widget.move.elementalSecondaryColor;
 
     final horizontalPadding = compact ? 6.0 : 14.0;
     final verticalPadding = compact ? 8.0 : 10.0;
@@ -659,9 +678,52 @@ class _HandActionButtonState extends State<_HandActionButton>
     final circleSize = compact ? 38.0 : 52.0;
     final imageSize = compact ? 26.0 : 36.0;
     final emojiFontSize = compact ? 20.0 : 26.0;
+    final iconSize = compact ? 22.0 : 30.0;
     final labelSpacing = compact ? 4.0 : 6.0;
     final labelFontSize = compact ? 9.5 : 12.0;
     final letterSpacing = compact ? 0.2 : 0.5;
+
+    final String buttonLabel = elemental
+        ? widget.move
+              .displayLabel(elemental: true, localization: widget.localization)
+              .toUpperCase()
+        : widget.move.label.toUpperCase();
+
+    final BoxDecoration orbDecoration = elemental
+        ? BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              center: const Alignment(-0.2, -0.2),
+              radius: 0.88,
+              colors: [
+                const Color(0xFF0A0C12),
+                Color.lerp(
+                  const Color(0xFF0E121B),
+                  secondaryColor,
+                  isSelected ? 0.55 : 0.38,
+                )!,
+                primaryColor.withValues(alpha: isSelected ? 0.92 : 0.72),
+              ],
+              stops: const [0.0, 0.58, 1.0],
+            ),
+            border: Border.all(
+              color: isSelected
+                  ? Color.lerp(primaryColor, Colors.white, 0.45)!
+                  : primaryColor.withValues(alpha: 0.75),
+              width: isSelected ? 2.2 : 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: isSelected ? 0.65 : 0.35),
+                blurRadius: isSelected ? 12 : 8,
+                spreadRadius: isSelected ? 2.0 : 1.0,
+              ),
+            ],
+          )
+        : BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          );
 
     Widget buttonContent = InkWell(
       onTap: _handleTap,
@@ -672,25 +734,49 @@ class _HandActionButtonState extends State<_HandActionButton>
           vertical: verticalPadding,
         ),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
-          ),
+          color: elemental
+              ? const Color(0xFF10131C).withValues(alpha: 0.85)
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+            color: elemental
+                ? primaryColor.withValues(alpha: isSelected ? 0.7 : 0.35)
+                : theme.colorScheme.outline.withValues(alpha: 0.2),
+            width: elemental && isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: elemental && isSelected
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
             Container(
+              key: ValueKey('hand_orb_${widget.move.name}'),
               width: circleSize,
               height: circleSize,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
+              decoration: orbDecoration,
               child: Center(
-                child: hasAsset
+                child: elemental
+                    ? Icon(
+                        widget.move.elementalIcon,
+                        size: iconSize,
+                        color: primaryColor,
+                        shadows: [
+                          Shadow(
+                            color: primaryColor.withValues(alpha: 0.75),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      )
+                    : hasAsset
                     ? Image.asset(
                         widget.move.leftAsset,
                         width: imageSize,
@@ -708,11 +794,12 @@ class _HandActionButtonState extends State<_HandActionButton>
             ),
             SizedBox(height: labelSpacing),
             Text(
-              widget.move.label.toUpperCase(),
+              buttonLabel,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: labelFontSize,
                 letterSpacing: letterSpacing,
+                color: elemental ? primaryColor : null,
               ),
             ),
           ],

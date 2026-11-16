@@ -339,8 +339,10 @@ void main() {
           total: 40,
           unlockedReset: true,
           unlockedAlgorithm: true,
+          unlockedNewSkin: true,
           showReset: true,
           showAlgorithm: true,
+          showNewSkin: true,
           lastUserMoveId: HandMove.paper.id,
           lastComputerMoveId: HandMove.rock.id,
           markovMatrix3: const [
@@ -373,8 +375,10 @@ void main() {
         expect(controller.totalRounds, 40);
         expect(controller.unlockedReset, isTrue);
         expect(controller.unlockedAlgorithm, isTrue);
+        expect(controller.unlockedNewSkin, isTrue);
         expect(controller.showReset, isTrue);
         expect(controller.showAlgorithm, isTrue);
+        expect(controller.showNewSkin, isTrue);
         expect(controller.currentUserMove, HandMove.paper);
         expect(controller.currentComputerMove, HandMove.rock);
         expect(controller.engine.matrix[0], [2, 5, 1]);

@@ -69,6 +69,7 @@ class GameController extends ChangeNotifier {
   bool unlockedNextMove = false;
   bool unlockedSuggestion = false;
   bool unlockedAds = false;
+  bool unlockedNewSkin = false;
   bool unlockedCrystalBall = false;
   bool unlockedCrystalBallPlus = false;
 
@@ -78,6 +79,7 @@ class GameController extends ChangeNotifier {
   bool showRandom = false;
   bool showAlgorithm = false;
   bool showNewHands = false;
+  bool showNewSkin = false;
   bool showYourPrediction = false;
   bool showNextMove = false;
   bool showSuggestion = false;
@@ -241,6 +243,7 @@ class GameController extends ChangeNotifier {
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
     adService.setAdsRemoved(unlockedAds);
+    unlockedNewSkin = storage.unlockedNewSkin;
     unlockedCrystalBall = storage.unlockedCrystalBall;
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
 
@@ -249,6 +252,7 @@ class GameController extends ChangeNotifier {
     showRandom = storage.showRandom;
     showAlgorithm = storage.showAlgorithm;
     showNewHands = storage.showNewHands;
+    showNewSkin = storage.showNewSkin;
     showYourPrediction = storage.showYourPrediction;
     showNextMove = storage.showNextMove;
     showSuggestion = storage.showSuggestion;
@@ -280,7 +284,10 @@ class GameController extends ChangeNotifier {
       audio.startMusic();
     }
 
-    _engine = MarkovEngine(enableExtendedHands: showNewHands);
+    _engine = MarkovEngine(
+      enableExtendedHands: showNewHands,
+      enableElementalMode: showNewSkin,
+    );
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
     if (savedMatrix != null) {
       _engine.setMatrix(savedMatrix);
@@ -304,7 +311,10 @@ class GameController extends ChangeNotifier {
       lastWinner = null;
     } else if (currentUserMove == currentComputerMove) {
       lastWinner = RoundWinner.draw;
-    } else if (currentUserMove!.beats(currentComputerMove!)) {
+    } else if (currentUserMove!.beats(
+      currentComputerMove!,
+      elemental: showNewSkin,
+    )) {
       lastWinner = RoundWinner.user;
     } else {
       lastWinner = RoundWinner.computer;
@@ -356,7 +366,10 @@ class GameController extends ChangeNotifier {
     if (currentUserMove == currentComputerMove) {
       lastWinner = RoundWinner.draw;
       audio.playDraw();
-    } else if (currentUserMove!.beats(currentComputerMove!)) {
+    } else if (currentUserMove!.beats(
+      currentComputerMove!,
+      elemental: showNewSkin,
+    )) {
       lastWinner = RoundWinner.user;
       userScore += 1;
       diamonds += 1;
@@ -706,6 +719,18 @@ class GameController extends ChangeNotifier {
 
   bool unlockRemoveAds() => unlockAds();
 
+  bool unlockNewSkin() {
+    return purchaseItem(
+      cost: 10000,
+      onUnlock: () {
+        unlockedNewSkin = true;
+        showNewSkin = false;
+        storage.setUnlockedNewSkin(true);
+        storage.setShowNewSkin(false);
+      },
+    );
+  }
+
   /// Grants +50 diamonds when the player finishes watching a rewarded ad,
   /// persists immediately to [SharedPreferences], triggers a [PlayGamesService]
   /// cloud save if signed in, and starts the 2-minute anti-spam cooldown.
@@ -1015,9 +1040,38 @@ class GameController extends ChangeNotifier {
   void toggleShowNewHands(bool val) {
     showNewHands = val;
     storage.setShowNewHands(val);
-    _engine = MarkovEngine(enableExtendedHands: val);
+    _engine = MarkovEngine(
+      enableExtendedHands: val,
+      enableElementalMode: showNewSkin,
+    );
     resetGame(resetQaBonus: false);
     _triggerCloudSave();
+  }
+
+  /// Toggles the Elemental Theme ("New Skin") ON or OFF seamlessly over the
+  /// existing move indices without resetting the current match, scores, or
+  /// Markov transition matrix.
+  void toggleShowNewSkin(bool val) {
+    showNewSkin = val;
+    storage.setShowNewSkin(val);
+    _engine.enableElementalMode = val;
+
+    if (currentUserMove != null && currentComputerMove != null) {
+      if (currentUserMove == currentComputerMove) {
+        lastWinner = RoundWinner.draw;
+      } else if (currentUserMove!.beats(
+        currentComputerMove!,
+        elemental: showNewSkin,
+      )) {
+        lastWinner = RoundWinner.user;
+      } else {
+        lastWinner = RoundWinner.computer;
+      }
+    }
+
+    _computeNextHints();
+    _triggerCloudSave();
+    notifyListeners();
   }
 
   // Settings

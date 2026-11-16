@@ -109,6 +109,10 @@ class StorageService {
     await _prefs.setBool('unlock_remove_ads', val);
   }
 
+  bool get unlockedNewSkin => _prefs.getBool('unlockedNewSkin') ?? false;
+  Future<void> setUnlockedNewSkin(bool val) =>
+      _prefs.setBool('unlockedNewSkin', val);
+
   bool get unlockedCrystalBall =>
       _prefs.getBool('unlockedCrystalBall') ?? false;
   Future<void> setUnlockedCrystalBall(bool val) =>
@@ -156,6 +160,9 @@ class StorageService {
 
   bool get showNewHands => _prefs.getBool('showNewHands') ?? false;
   Future<void> setShowNewHands(bool val) => _prefs.setBool('showNewHands', val);
+
+  bool get showNewSkin => _prefs.getBool('showNewSkin') ?? false;
+  Future<void> setShowNewSkin(bool val) => _prefs.setBool('showNewSkin', val);
 
   bool get showRandom => _prefs.getBool('showRandom') ?? false;
   Future<void> setShowRandom(bool val) => _prefs.setBool('showRandom', val);
@@ -320,6 +327,7 @@ class StorageService {
       setUnlockedNextMove(false),
       setUnlockedSuggestion(false),
       setUnlockedAds(false),
+      setUnlockedNewSkin(false),
       setUnlockedCrystalBall(false),
       setUnlockedCrystalBallPlus(false),
       setShowReset(false),
@@ -327,6 +335,7 @@ class StorageService {
       setShowRandom(false),
       setShowAlgorithm(false),
       setShowNewHands(false),
+      setShowNewSkin(false),
       setShowYourPrediction(false),
       setShowNextMove(false),
       setShowSuggestion(false),

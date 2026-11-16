@@ -243,6 +243,7 @@ class _ShopDialogState extends State<ShopDialog> {
   Widget _buildShopItem({
     required BuildContext context,
     required String title,
+    String? subtitle,
     required int cost,
     required String? productId,
     required bool isUnlocked,
@@ -262,6 +263,7 @@ class _ShopDialogState extends State<ShopDialog> {
 
     return _ShopItemTile(
       title: title,
+      subtitle: subtitle,
       cost: cost,
       productId: productId,
       localizedPrice: localizedPrice,
@@ -343,6 +345,7 @@ class _ShopDialogState extends State<ShopDialog> {
               // Shop items list
               Expanded(
                 child: ListView(
+                  cacheExtent: 1000,
                   children: [
                     _buildShopItem(
                       context: context,
@@ -635,6 +638,36 @@ class _ShopDialogState extends State<ShopDialog> {
                           );
                         },
                       ),
+                    _buildShopItem(
+                      context: context,
+                      title: loc.t('new_skin', fallback: 'New Skin'),
+                      subtitle: loc.t(
+                        'new_skin_desc',
+                        fallback: 'Elemental Theme (Fire, Water, Wood, Earth, Metal)',
+                      ),
+                      cost: 10000,
+                      productId: null,
+                      isUnlocked: controller.unlockedNewSkin,
+                      isActive: controller.showNewSkin,
+                      enabledLabel: enabledStr,
+                      disabledLabel: disabledStr,
+                      onUnlock: () {
+                        final ok = controller.unlockNewSkin();
+                        _handleUnlock(
+                          context,
+                          loc.t('new_skin', fallback: 'New Skin'),
+                          ok,
+                        );
+                      },
+                      onToggle: (val) {
+                        controller.toggleShowNewSkin(val);
+                        _handleToggle(
+                          context,
+                          loc.t('new_skin', fallback: 'New Skin'),
+                          val,
+                        );
+                      },
+                    ),
 
                     const SizedBox(height: 12),
                     // Voluntary Rewarded Video Ad (+50 💎) action
@@ -763,6 +796,7 @@ class _ShopDialogState extends State<ShopDialog> {
 
 class _ShopItemTile extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final int cost;
   final String? productId;
   final String? localizedPrice;
@@ -779,6 +813,7 @@ class _ShopItemTile extends StatelessWidget {
 
   const _ShopItemTile({
     required this.title,
+    this.subtitle,
     required this.cost,
     this.productId,
     this.localizedPrice,
@@ -834,6 +869,16 @@ class _ShopItemTile extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.amber.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 2),
                       if (!isUnlocked)
                         const Text(

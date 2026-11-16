@@ -1,16 +1,62 @@
 import 'package:flutter/material.dart';
 import '../../services/markov_engine.dart';
+import '../../services/localization_service.dart';
 import '../../models/move.dart';
 
 class MarkovMatrixView extends StatelessWidget {
   final MarkovEngine engine;
   final HandMove? lastUserMove;
+  final bool elementalMode;
+  final LocalizationService? localization;
 
   const MarkovMatrixView({
     super.key,
     required this.engine,
     this.lastUserMove,
+    this.elementalMode = false,
+    this.localization,
   });
+
+  Widget _buildMoveHeader(HandMove move, {bool isHighlighted = false}) {
+    if (elementalMode) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                move.elementalIcon,
+                size: 18,
+                color: move.elementalPrimaryColor,
+              ),
+              Text(
+                move.displayLabel(elemental: true, localization: localization),
+                style: TextStyle(
+                  fontSize: 8.5,
+                  fontWeight:
+                      isHighlighted ? FontWeight.bold : FontWeight.w600,
+                  color: move.elementalPrimaryColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: Text(
+        move.emoji,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,12 +89,7 @@ class MarkovMatrixView extends StatelessWidget {
                 TableRow(
                   children: [
                     const SizedBox(width: 32),
-                    ...moves.map((m) => Center(
-                          child: Text(
-                            m.emoji,
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                        )),
+                    ...moves.map((m) => _buildMoveHeader(m)),
                   ],
                 ),
                 // Matrix rows
@@ -67,14 +108,9 @@ class MarkovMatrixView extends StatelessWidget {
                         : null,
                     children: [
                       // Row header
-                      Center(
-                        child: Text(
-                          rowMove.emoji,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: isCurrentLastMove ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
+                      _buildMoveHeader(
+                        rowMove,
+                        isHighlighted: isCurrentLastMove,
                       ),
                       // Row cells
                       ...List.generate(moves.length, (colIdx) {

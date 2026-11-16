@@ -1137,4 +1137,92 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('New Skin (Elemental Theme) transforms move buttons, VersusArena Energy Orbs, MarkovMatrixView, and HintsBar with vector icons and localized element names without resetting match', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'diamonds': 15000,
+      'unlockedAlgorithm': true,
+      'showAlgorithm': true,
+      'unlockedYourPrediction': true,
+      'showYourPrediction': true,
+      'unlockedNextMove': true,
+      'showNextMove': true,
+      'unlockedSuggestion': true,
+      'showSuggestion': true,
+      'unlockedNewHands': true,
+      'showNewHands': false,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+
+    // 1. Play 3 turns in Classic mode so Markov transitions and scores are populated
+    controller.playTurn(HandMove.rock);
+    controller.playTurn(HandMove.paper);
+    controller.playTurn(HandMove.rock);
+    await tester.pump();
+
+    expect(controller.turnCount, 3);
+    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('PAPER'), findsWidgets);
+    expect(find.text('SCISSORS'), findsWidgets);
+
+    // 2. Unlock New Skin (10,000 diamonds) -> stays disabled on unlock
+    final diamondsBeforeUnlock = controller.diamonds;
+    expect(controller.unlockNewSkin(), isTrue);
+    expect(controller.diamonds, diamondsBeforeUnlock - 10000);
+    expect(controller.unlockedNewSkin, isTrue);
+    expect(controller.showNewSkin, isFalse);
+    await tester.pump();
+    expect(find.text('ROCK'), findsWidgets);
+
+    // 3. Toggle New Skin ON -> transforms to FIRE, WATER, WOOD with vector icons and Energy Orbs without resetting turnCount or matrix
+    controller.toggleShowNewSkin(true);
+    await tester.pump();
+
+    expect(controller.turnCount, 3);
+    expect(controller.engine.matrix[0][1], 1);
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
+    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
+
+    // 4. Enable New Hands as well -> expands to 5-element Wu Xing cycle (adding EARTH & METAL)
+    controller.toggleShowNewHands(true);
+    await tester.pump();
+
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.text('EARTH'), findsWidgets);
+    expect(find.text('METAL'), findsWidgets);
+
+    // 5. Disable New Skin -> cleanly reverts to classic ROCK, PAPER, SCISSORS, LIZARD, SPOCK
+    controller.toggleShowNewSkin(false);
+    await tester.pump();
+
+    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('PAPER'), findsWidgets);
+    expect(find.text('SCISSORS'), findsWidgets);
+    expect(find.text('LIZARD'), findsWidgets);
+    expect(find.text('SPOCK'), findsWidgets);
+  });
 }

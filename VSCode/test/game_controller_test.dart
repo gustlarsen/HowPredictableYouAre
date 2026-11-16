@@ -513,6 +513,64 @@ void main() {
     expect(controller.unlockCrystalBallPlus(), isTrue);
     expect(controller.unlockedCrystalBallPlus, isTrue);
     expect(controller.showCrystalBallPlus, isFalse);
+
+    expect(controller.unlockNewSkin(), isTrue);
+    expect(controller.unlockedNewSkin, isTrue);
+    expect(controller.showNewSkin, isFalse);
+  });
+
+  test('New Skin purchase costs 10000 diamonds, starts disabled, and toggling ON/OFF applies seamlessly without resetting match, scores, or Markov matrix', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 25000,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    // Play a few turns first so we have active scores, turnCount, and Markov transitions
+    controller.playTurn(HandMove.rock);
+    controller.playTurn(HandMove.paper);
+    controller.playTurn(HandMove.rock);
+
+    final savedTurnCount = controller.turnCount;
+    final savedTotalRounds = controller.totalRounds;
+    final savedUserScore = controller.userScore;
+    final savedPcScore = controller.pcScore;
+    final savedMatrix01 = controller.engine.matrix[0][1];
+    final savedMatrix10 = controller.engine.matrix[1][0];
+    expect(savedTurnCount, 3);
+    expect(savedMatrix01, 1);
+    expect(savedMatrix10, 1);
+
+    // Purchase New Skin (10,000 diamonds): unlocks without enabling or resetting
+    final diamondsBefore = controller.diamonds;
+    expect(controller.unlockNewSkin(), isTrue);
+    expect(controller.diamonds, diamondsBefore - 10000);
+    expect(controller.unlockedNewSkin, isTrue);
+    expect(controller.showNewSkin, isFalse);
+    expect(storage.unlockedNewSkin, isTrue);
+    expect(storage.showNewSkin, isFalse);
+
+    // Toggle New Skin ON: must NOT reset match, scores, or Markov matrix
+    controller.toggleShowNewSkin(true);
+    expect(controller.showNewSkin, isTrue);
+    expect(storage.showNewSkin, isTrue);
+    expect(controller.turnCount, savedTurnCount);
+    expect(controller.totalRounds, savedTotalRounds);
+    expect(controller.userScore, savedUserScore);
+    expect(controller.pcScore, savedPcScore);
+    expect(controller.engine.matrix[0][1], savedMatrix01);
+    expect(controller.engine.matrix[1][0], savedMatrix10);
+
+    // Toggle New Skin OFF: must also preserve match, scores, and Markov matrix
+    controller.toggleShowNewSkin(false);
+    expect(controller.showNewSkin, isFalse);
+    expect(storage.showNewSkin, isFalse);
+    expect(controller.turnCount, savedTurnCount);
+    expect(controller.totalRounds, savedTotalRounds);
+    expect(controller.userScore, savedUserScore);
+    expect(controller.pcScore, savedPcScore);
+    expect(controller.engine.matrix[0][1], savedMatrix01);
+    expect(controller.engine.matrix[1][0], savedMatrix10);
   });
 
   test('Last played hands are saved on playTurn, restored on app reopen, and cleared on resetGame', () async {

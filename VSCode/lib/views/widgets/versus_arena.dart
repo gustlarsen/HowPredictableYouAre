@@ -13,6 +13,7 @@ class VersusArena extends StatefulWidget {
   final int roundId;
   final int userHp;
   final int computerHp;
+  final bool elementalMode;
 
   const VersusArena({
     super.key,
@@ -24,6 +25,7 @@ class VersusArena extends StatefulWidget {
     required this.roundId,
     this.userHp = 100,
     this.computerHp = 100,
+    this.elementalMode = false,
   });
 
   @override
@@ -173,6 +175,30 @@ class _VersusArenaState extends State<VersusArena>
     final pcWins = winner == RoundWinner.computer;
     final isDraw = winner == RoundWinner.draw;
 
+    String? battleDescription;
+    Color? battleDescColor;
+    if (widget.userMove != null && widget.computerMove != null) {
+      if (userWins) {
+        battleDescription = widget.userMove!.battleDescriptionAgainst(
+          widget.computerMove!,
+          elemental: widget.elementalMode,
+          localization: widget.localization,
+        );
+        battleDescColor = widget.elementalMode
+            ? widget.userMove!.elementalPrimaryColor
+            : Colors.greenAccent;
+      } else if (pcWins) {
+        battleDescription = widget.computerMove!.battleDescriptionAgainst(
+          widget.userMove!,
+          elemental: widget.elementalMode,
+          localization: widget.localization,
+        );
+        battleDescColor = widget.elementalMode
+            ? widget.computerMove!.elementalPrimaryColor
+            : Colors.redAccent;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
       decoration: BoxDecoration(
@@ -255,6 +281,10 @@ class _VersusArenaState extends State<VersusArena>
                     animation: _animController,
                     builder: (context, _) {
                       final isDamaged = pcWins && widget.roundId > 0;
+                      final pulseProgress =
+                          (userWins && widget.animationsEnabled)
+                              ? _punchAnim.value
+                              : 0.0;
                       return _MoveCard(
                         label: widget.localization.t(
                           'string9',
@@ -263,6 +293,9 @@ class _VersusArenaState extends State<VersusArena>
                         move: widget.userMove,
                         isLeft: true,
                         isWinner: userWins,
+                        elementalMode: widget.elementalMode,
+                        localization: widget.localization,
+                        pulseProgress: pulseProgress,
                         hp: widget.userHp,
                         hpBarKey: const ValueKey('user_hp_bar'),
                         isDamaged: isDamaged,
@@ -312,6 +345,10 @@ class _VersusArenaState extends State<VersusArena>
                     animation: _animController,
                     builder: (context, _) {
                       final isDamaged = userWins && widget.roundId > 0;
+                      final pulseProgress =
+                          (pcWins && widget.animationsEnabled)
+                              ? _punchAnim.value
+                              : 0.0;
                       return _MoveCard(
                         label: widget.localization.t(
                           'string52',
@@ -320,6 +357,9 @@ class _VersusArenaState extends State<VersusArena>
                         move: widget.computerMove,
                         isLeft: false,
                         isWinner: pcWins,
+                        elementalMode: widget.elementalMode,
+                        localization: widget.localization,
+                        pulseProgress: pulseProgress,
                         hp: widget.computerHp,
                         hpBarKey: const ValueKey('pc_hp_bar'),
                         isDamaged: isDamaged,
@@ -413,6 +453,20 @@ class _VersusArenaState extends State<VersusArena>
               ),
             ],
           ),
+          if (battleDescription != null && battleDescription.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              key: const ValueKey('battle_outcome_description'),
+              battleDescription,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: battleDescColor ?? Colors.amber,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -424,6 +478,9 @@ class _MoveCard extends StatelessWidget {
   final HandMove? move;
   final bool isLeft;
   final bool isWinner;
+  final bool elementalMode;
+  final LocalizationService localization;
+  final double pulseProgress;
   final int hp;
   final Key? hpBarKey;
   final bool isDamaged;
@@ -438,6 +495,9 @@ class _MoveCard extends StatelessWidget {
     required this.move,
     required this.isLeft,
     required this.isWinner,
+    required this.elementalMode,
+    required this.localization,
+    this.pulseProgress = 0.0,
     required this.hp,
     this.hpBarKey,
     required this.isDamaged,
@@ -453,14 +513,64 @@ class _MoveCard extends StatelessWidget {
     final assetPath = isLeft ? move?.leftAsset : move?.rightAsset;
     final hasAsset = assetPath != null && assetPath.isNotEmpty;
 
-    final handCircle = Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 86,
-          height: 86,
-          decoration: BoxDecoration(
+    final bool isElementalOrb = elementalMode && move != null;
+    final Color primaryElementColor =
+        move?.elementalPrimaryColor ?? Colors.amber;
+    final Color secondaryElementColor =
+        move?.elementalSecondaryColor ?? Colors.deepOrange;
+
+    final double orbScale =
+        (isElementalOrb && isWinner) ? (1.0 + 0.08 * pulseProgress) : 1.0;
+    final double orbDiameter = 86.0 * orbScale;
+
+    final BoxDecoration circleDecoration = isElementalOrb
+        ? BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              center: const Alignment(-0.2, -0.2),
+              radius: 0.88,
+              colors: [
+                const Color(0xFF0A0C12),
+                Color.lerp(
+                  const Color(0xFF0E121B),
+                  secondaryElementColor,
+                  isWinner ? 0.55 : 0.38,
+                )!,
+                primaryElementColor.withValues(alpha: isWinner ? 0.92 : 0.72),
+              ],
+              stops: const [0.0, 0.58, 1.0],
+            ),
+            border: Border.all(
+              color: isWinner
+                  ? Color.lerp(primaryElementColor, Colors.white, 0.45)!
+                  : (flashOpacity > 0.0
+                      ? Color.lerp(
+                          Colors.white,
+                          Colors.redAccent,
+                          0.65,
+                        )!.withValues(alpha: 0.85)
+                      : primaryElementColor.withValues(alpha: 0.75)),
+              width: isWinner ? 3.0 : (flashOpacity > 0.0 ? 2.5 : 2.0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryElementColor.withValues(
+                  alpha: isWinner
+                      ? (0.55 + 0.25 * pulseProgress).clamp(0.0, 1.0)
+                      : 0.35,
+                ),
+                blurRadius: isWinner ? (16.0 + 8.0 * pulseProgress) : 10.0,
+                spreadRadius: isWinner ? (3.0 + 2.0 * pulseProgress) : 1.5,
+              ),
+              if (isWinner)
+                BoxShadow(
+                  color: secondaryElementColor.withValues(alpha: 0.45),
+                  blurRadius: 22,
+                  spreadRadius: 2,
+                ),
+            ],
+          )
+        : BoxDecoration(
             color: isWinner
                 ? Colors.green.withValues(alpha: 0.25)
                 : Theme.of(
@@ -496,20 +606,50 @@ class _MoveCard extends StatelessWidget {
                         ),
                       ]
                     : null),
-          ),
+          );
+
+    final handCircle = Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        Container(
+          key: isLeft
+              ? const ValueKey('user_orb_container')
+              : const ValueKey('pc_orb_container'),
+          width: orbDiameter,
+          height: orbDiameter,
+          decoration: circleDecoration,
           child: Center(
             child: move == null
                 ? const Text(
                     '?',
                     style: TextStyle(fontSize: 34, color: Colors.grey),
                   )
+                : elementalMode
+                ? Icon(
+                    move!.elementalIcon,
+                    size: 42 * orbScale,
+                    color: primaryElementColor,
+                    shadows: [
+                      Shadow(
+                        color: primaryElementColor.withValues(alpha: 0.8),
+                        blurRadius: 12,
+                      ),
+                      const Shadow(
+                        color: Colors.black87,
+                        blurRadius: 4,
+                      ),
+                    ],
+                  )
                 : hasAsset
                 ? Image.asset(
                     assetPath,
                     width: 58,
                     height: 58,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Text(move!.emoji, style: const TextStyle(fontSize: 38)),
+                    errorBuilder: (context, error, stackTrace) => Text(
+                      move!.emoji,
+                      style: const TextStyle(fontSize: 38),
+                    ),
                   )
                 : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
           ),
@@ -611,11 +751,23 @@ class _MoveCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            move?.label.toUpperCase() ?? 'NONE',
-            style: const TextStyle(
+            move == null
+                ? 'NONE'
+                : (elementalMode
+                      ? move!
+                            .displayLabel(
+                              elemental: true,
+                              localization: localization,
+                            )
+                            .toUpperCase()
+                      : move!.label.toUpperCase()),
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
               letterSpacing: 0.5,
+              color: (elementalMode && move != null)
+                  ? move!.elementalPrimaryColor
+                  : null,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

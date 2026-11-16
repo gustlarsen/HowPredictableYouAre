@@ -40,6 +40,7 @@ dependencies:
   games_services: ^5.0.0
   google_mobile_ads: ^9.2.0
   in_app_purchase: ^3.2.0
+  material_symbols_icons: ^4.2960.0
 
 dev_dependencies:
   flutter_test:
