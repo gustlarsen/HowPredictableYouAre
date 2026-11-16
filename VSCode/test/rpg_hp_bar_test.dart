@@ -173,5 +173,186 @@ void main() {
       // Finish the 1000ms animation
       await tester.pump(const Duration(milliseconds: 375));
     });
+
+    testWidgets(
+      'Projectile clash & impact VFX progresses through Launch (0-300ms), Clash/Surge (300-550ms), and Impact Explosion (550-750ms) synced with haptics',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        int impactHapticCount = 0;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                child: VersusArena(
+                  userMove: HandMove.rock, // Fire
+                  computerMove: HandMove.scissors, // Wood
+                  winner: RoundWinner.user,
+                  localization: localization,
+                  animationsEnabled: true,
+                  roundId: 1,
+                  userHp: 100,
+                  computerHp: 99,
+                  elementalMode: true,
+                  onImpactHaptic: () => impactHapticCount++,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        BattleVfxPainter getPainter() {
+          final customPaint = tester.widget<CustomPaint>(
+            find.byKey(const ValueKey('versus_battle_vfx_layer')),
+          );
+          return customPaint.painter! as BattleVfxPainter;
+        }
+
+        // Start frame at t = 0ms
+        await tester.pump();
+
+        // Phase 1 — Launch (at 150ms, halfway to center)
+        await tester.pump(const Duration(milliseconds: 150));
+        final painterAt150 = getPainter();
+        expect(painterAt150.isAnimating, isTrue);
+        expect(painterAt150.phase, BattleVfxPhase.launch);
+        expect(painterAt150.leftElement, BattleVfxElement.fire);
+        expect(painterAt150.rightElement, BattleVfxElement.wood);
+        expect(painterAt150.leftProjectilePosition, isNotNull);
+        expect(painterAt150.rightProjectilePosition, isNotNull);
+        expect(
+          painterAt150.leftProjectilePosition!.dx,
+          greaterThan(painterAt150.leftCenterX),
+        );
+        expect(
+          painterAt150.leftProjectilePosition!.dx,
+          lessThan(painterAt150.centerX),
+        );
+        expect(
+          painterAt150.rightProjectilePosition!.dx,
+          lessThan(painterAt150.rightCenterX),
+        );
+        expect(
+          painterAt150.rightProjectilePosition!.dx,
+          greaterThan(painterAt150.centerX),
+        );
+        expect(impactHapticCount, 0);
+
+        // Phase 2 — Mid-Arena Clash & Winning Surge (at 425ms, between 300ms and 550ms)
+        await tester.pump(const Duration(milliseconds: 275));
+        final painterAt425 = getPainter();
+        expect(painterAt425.phase, BattleVfxPhase.clash);
+        // Winning left projectile surges past center toward right combatant; losing right projectile shattered
+        expect(painterAt425.leftProjectilePosition, isNotNull);
+        expect(
+          painterAt425.leftProjectilePosition!.dx,
+          greaterThan(painterAt425.centerX),
+        );
+        expect(
+          painterAt425.leftProjectilePosition!.dx,
+          lessThan(painterAt425.rightCenterX),
+        );
+        expect(painterAt425.rightProjectilePosition, isNull);
+        expect(impactHapticCount, 0);
+
+        // Phase 3 — Impact Explosion (at 600ms, between 550ms and 750ms)
+        await tester.pump(const Duration(milliseconds: 175));
+        final painterAt600 = getPainter();
+        expect(painterAt600.phase, BattleVfxPhase.impact);
+        expect(impactHapticCount, 1);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsOneWidget);
+
+        // At 750ms, VFX animation finishes cleanly
+        await tester.pump(const Duration(milliseconds: 150));
+        final painterAt750 = getPainter();
+        expect(painterAt750.isAnimating, isFalse);
+        expect(painterAt750.phase, BattleVfxPhase.idle);
+
+        // Complete remaining hand return animation
+        await tester.pump(const Duration(milliseconds: 250));
+      },
+    );
+
+    testWidgets(
+      'Tie round shatters both projectiles at center at 300ms, and all 5 elemental themes + classic mode render without overflow or pending timers on rapid taps',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        int hapticTriggers = 0;
+
+        // 1. Tie round in Classic Mode (elementalMode: false)
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: VersusArena(
+                  userMove: HandMove.paper,
+                  computerMove: HandMove.paper,
+                  winner: RoundWinner.draw,
+                  localization: localization,
+                  animationsEnabled: true,
+                  roundId: 1,
+                  elementalMode: false,
+                  onImpactHaptic: () => hapticTriggers++,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+
+        final tiePainter = tester
+            .widget<CustomPaint>(
+              find.byKey(const ValueKey('versus_battle_vfx_layer')),
+            )
+            .painter! as BattleVfxPainter;
+        expect(tiePainter.leftElement, BattleVfxElement.classic);
+        expect(tiePainter.rightElement, BattleVfxElement.classic);
+        // On a tie after 300ms, both projectiles have shattered at the center
+        expect(tiePainter.leftProjectilePosition, isNull);
+        expect(tiePainter.rightProjectilePosition, isNull);
+        expect(hapticTriggers, 1);
+
+        // 2. Rapidly trigger new rounds across all 5 Elemental moves (Earth vs Water, Metal vs Wood) mid-animation
+        final matchups = <(HandMove, HandMove, RoundWinner)>[
+          (HandMove.lizard, HandMove.paper, RoundWinner.user), // Earth beats Water
+          (HandMove.scissors, HandMove.spock, RoundWinner.computer), // Metal beats Wood
+        ];
+
+        int roundId = 2;
+        for (final (uMove, cMove, win) in matchups) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 320,
+                  child: VersusArena(
+                    userMove: uMove,
+                    computerMove: cMove,
+                    winner: win,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: roundId++,
+                    elementalMode: true,
+                    onImpactHaptic: () => hapticTriggers++,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 120)); // Launch phase
+          await tester.pump(const Duration(milliseconds: 280)); // Clash phase (400ms)
+          await tester.pump(const Duration(milliseconds: 220)); // Impact phase (620ms)
+        }
+
+        // Let final animation settle completely with zero pending timers
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

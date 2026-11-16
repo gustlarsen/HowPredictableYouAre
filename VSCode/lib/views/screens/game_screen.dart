@@ -407,7 +407,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             HintsBar(controller: controller),
                             const SizedBox(height: 10),
 
-                            // Versus Arena with Punch & 360 Spin Animations
+                            // Versus Arena with Projectile Clash VFX, Punch & 360 Spin Animations
                             VersusArena(
                               userMove: controller.currentUserMove,
                               computerMove: controller.currentComputerMove,
@@ -418,6 +418,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               userHp: controller.userHp,
                               computerHp: controller.computerHp,
                               elementalMode: controller.showNewSkin,
+                              onImpactHaptic: controller.audio.playTapVibrate,
                             ),
                             const SizedBox(height: 14),
 
