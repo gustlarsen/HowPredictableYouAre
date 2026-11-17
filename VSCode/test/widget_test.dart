@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
@@ -1568,5 +1570,93 @@ void main() {
     // HelpDialog is displayed
     expect(find.text('How It Works'), findsOneWidget);
     expect(find.text('💡 Pro Tip: The Markov Model'), findsOneWidget);
+  });
+
+  testWidgets('ShopDialog renders titles without mid-word breaks and displays Rewarded Ad text horizontally on narrow mobile screens', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'diamonds': 200024,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          body: ShopDialog(controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. "Predictability" in "Predictability Score" must never split mid-word on narrow mobile screens
+    final predTitleFinder = find.text('Predictability Score');
+    expect(predTitleFinder, findsOneWidget);
+    final predParagraph =
+        tester.renderObject<RenderParagraph>(predTitleFinder);
+    expect(predParagraph.text.toPlainText(), 'Predictability Score');
+    final predictabilityWordBoxes = predParagraph.getBoxesForSelection(
+      TextSelection(
+        baseOffset: 0,
+        extentOffset: 'Predictability'.length,
+      ),
+    );
+    final predictabilityLineTops =
+        predictabilityWordBoxes.map((b) => b.top.round()).toSet();
+    expect(predictabilityLineTops.length, 1);
+
+    // 2. Scroll to the Rewarded Ad card at the bottom of the Shop list
+    final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
+    await tester.scrollUntilVisible(
+      adCardFinder,
+      250,
+      scrollable: find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final freeDiamondsFinder = find.text('Free Diamonds');
+    final subtitleFinder = find.text('Watch a video ad for +50 💎');
+    final watchAdBtnFinder =
+        find.byKey(const ValueKey('shop_watch_rewarded_ad_button'));
+
+    expect(freeDiamondsFinder, findsOneWidget);
+    expect(subtitleFinder, findsOneWidget);
+    expect(watchAdBtnFinder, findsOneWidget);
+
+    // Free Diamonds title and subtitle must render cleanly horizontally (not squeezed into a narrow strip)
+    final freeDiamondsRect = tester.getRect(freeDiamondsFinder);
+    final subtitleRect = tester.getRect(subtitleFinder);
+    final watchAdBtnRect = tester.getRect(watchAdBtnFinder);
+
+    expect(freeDiamondsRect.width, greaterThan(150));
+    expect(freeDiamondsRect.height, lessThan(30));
+    expect(subtitleRect.width, greaterThan(180));
+    expect(subtitleRect.height, lessThan(45));
+    // On a 360px screen, text is stacked cleanly above the full-width button
+    expect(freeDiamondsRect.bottom, lessThanOrEqualTo(subtitleRect.top + 4));
+    expect(subtitleRect.bottom, lessThan(watchAdBtnRect.top));
+    expect(tester.takeException(), isNull);
   });
 }

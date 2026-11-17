@@ -292,32 +292,36 @@ class _ShopDialogState extends State<ShopDialog> {
     final disabledStr = loc.t('string48', fallback: 'Disabled');
 
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 450, maxHeight: 650),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 18.0, 16.0, 14.0),
           child: Column(
             children: [
               // Dialog Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.shopping_cart_outlined,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
+                  const Icon(
+                    Icons.shopping_cart_outlined,
+                    color: Colors.amber,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
                         'Upgrades & Shop',
+                        maxLines: 1,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -328,6 +332,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text('💎', style: TextStyle(fontSize: 14)),
                         const SizedBox(width: 4),
@@ -672,6 +677,8 @@ class _ShopDialogState extends State<ShopDialog> {
                     const SizedBox(height: 12),
                     // Voluntary Rewarded Video Ad (+50 💎) action
                     Card(
+                      key: const ValueKey('shop_rewarded_ad_card'),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
                       color: Colors.amber.withValues(alpha: 0.12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -681,38 +688,37 @@ class _ShopDialogState extends State<ShopDialog> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
+                          horizontal: 14,
                           vertical: 12,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.t('string45', fallback: 'Free Diamonds'),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final textColumn = Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  loc.t('string45', fallback: 'Free Diamonds'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
                                   ),
-                                  Text(
-                                    controller.isRewardedAdOnCooldown
-                                        ? 'Cooldown active (2m)'
-                                        : 'Watch a video ad for +50 💎',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: controller.isRewardedAdOnCooldown
-                                          ? Colors.grey
-                                          : Colors.amber,
-                                    ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  controller.isRewardedAdOnCooldown
+                                      ? 'Cooldown active (2m)'
+                                      : 'Watch a video ad for +50 💎',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: controller.isRewardedAdOnCooldown
+                                        ? Colors.grey
+                                        : Colors.amber,
                                   ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
+                                ),
+                              ],
+                            );
+
+                            final actionButton = ElevatedButton.icon(
                               key: const ValueKey(
                                 'shop_watch_rewarded_ad_button',
                               ),
@@ -748,9 +754,33 @@ class _ShopDialogState extends State<ShopDialog> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.amber,
                                 foregroundColor: Colors.black87,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
                               ),
-                            ),
-                          ],
+                            );
+
+                            if (constraints.maxWidth < 360) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  textColumn,
+                                  const SizedBox(height: 10),
+                                  actionButton,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: textColumn),
+                                const SizedBox(width: 12),
+                                actionButton,
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -762,21 +792,24 @@ class _ShopDialogState extends State<ShopDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  TextButton.icon(
-                    key: const ValueKey('shop_restore_purchases_button'),
-                    onPressed: controller.billingService.isRestoring
-                        ? null
-                        : _handleRestorePurchases,
-                    icon: controller.billingService.isRestoring
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.restore_rounded, size: 16),
-                    label: const Text(
-                      'Restore Purchases',
-                      style: TextStyle(fontSize: 12),
+                  Flexible(
+                    child: TextButton.icon(
+                      key: const ValueKey('shop_restore_purchases_button'),
+                      onPressed: controller.billingService.isRestoring
+                          ? null
+                          : _handleRestorePurchases,
+                      icon: controller.billingService.isRestoring
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.restore_rounded, size: 16),
+                      label: const Text(
+                        'Restore Purchases',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ),
                   TextButton(
@@ -855,141 +888,177 @@ class _ShopItemTile extends StatelessWidget {
                   : () => onToggle(true))
               : onUnlock,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.amber.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 2),
-                      if (!isUnlocked)
-                        const Text(
-                          'Unlock',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        )
-                      else
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isActive
-                                  ? Icons.check_circle
-                                  : Icons.cancel_outlined,
-                              size: 13,
-                              color: isActive ? Colors.green : Colors.grey,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isActive ? enabledLabel : disabledLabel,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isActive ? Colors.green : Colors.grey,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (isUnlocked)
-                  Switch(
-                    value: isActive,
-                    onChanged: isToggleEnabled ? onToggle : null,
-                    activeTrackColor: Colors.green,
-                  )
-                else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ElevatedButton(
-                        key: ValueKey(
-                          'diamond_unlock_${productId ?? title}',
-                        ),
-                        onPressed: isPurchasePending ? null : onUnlock,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          minimumSize: const Size(56, 34),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          '$cost 💎',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (productId != null) ...[
-                        const SizedBox(width: 6),
-                        OutlinedButton(
-                          key: ValueKey('real_money_unlock_$productId'),
-                          onPressed: (!isPurchasePending &&
-                                  !isLoadingStore &&
-                                  hasRealMoneyPrice)
-                              ? onRealMoneyUnlock
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            minimumSize: const Size(56, 34),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: (isPurchasePending || isLoadingStore)
-                              ? const SizedBox(
-                                  key: ValueKey('purchase_loading_indicator'),
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  hasRealMoneyPrice
-                                      ? localizedPrice!
-                                      : 'Unavailable',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ],
-                  ),
-              ],
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: isUnlocked
+                ? _buildUnlockedContent()
+                : _buildLockedContent(hasRealMoneyPrice),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildUnlockedContent() {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.amber.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? Icons.check_circle : Icons.cancel_outlined,
+                    size: 13,
+                    color: isActive ? Colors.green : Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      isActive ? enabledLabel : disabledLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isActive ? Colors.green : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Switch(
+          value: isActive,
+          onChanged: isToggleEnabled ? onToggle : null,
+          activeTrackColor: Colors.green,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLockedContent(bool hasRealMoneyPrice) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        if (subtitle != null && subtitle!.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.amber.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Unlock',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              key: ValueKey(
+                'diamond_unlock_${productId ?? title}',
+              ),
+              onPressed: isPurchasePending ? null : onUnlock,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                minimumSize: const Size(56, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                '$cost 💎',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.amber,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (productId != null) ...[
+              const SizedBox(width: 6),
+              OutlinedButton(
+                key: ValueKey('real_money_unlock_$productId'),
+                onPressed: (!isPurchasePending &&
+                        !isLoadingStore &&
+                        hasRealMoneyPrice)
+                    ? onRealMoneyUnlock
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  minimumSize: const Size(56, 34),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: (isPurchasePending || isLoadingStore)
+                    ? const SizedBox(
+                        key: ValueKey('purchase_loading_indicator'),
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        hasRealMoneyPrice ? localizedPrice! : 'Unavailable',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }
