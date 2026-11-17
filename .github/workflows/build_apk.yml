@@ -43,6 +43,57 @@ jobs:
           flutter-version: '3.47.9'
           cache: true
 
+      - name: Prepare Android SDK directory
+        run: |
+          sudo mkdir -p /usr/local/lib/android/sdk/ndk
+          sudo chown -R $USER:$USER /usr/local/lib/android/sdk
+
+      - name: Resolve Android NDK Version
+        id: ndk_info
+        run: |
+          NDK_VER=$(grep 'val ndkVersion: String =' "$FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt" 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+          if [ -z "$NDK_VER" ]; then
+            NDK_VER="28.2.13676358"
+          fi
+          echo "ndk_version=$NDK_VER" >> $GITHUB_OUTPUT
+          echo "ANDROID_NDK_VERSION=$NDK_VER" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/$NDK_VER" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=/usr/local/lib/android/sdk/ndk/$NDK_VER" >> $GITHUB_ENV
+          echo "ANDROID_NDK=/usr/local/lib/android/sdk/ndk/$NDK_VER" >> $GITHUB_ENV
+          echo "Resolved Android NDK version: $NDK_VER"
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ steps.ndk_info.outputs.ndk_version }}
+          key: ${{ runner.os }}-android-ndk-${{ steps.ndk_info.outputs.ndk_version }}
+
+      - name: Install Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          NDK_VER="${{ steps.ndk_info.outputs.ndk_version }}"
+          SDK_DIR="/usr/local/lib/android/sdk"
+          SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+          NDK_TARGET_DIR="$SDK_DIR/ndk/$NDK_VER"
+
+          echo "Installing Android NDK $NDK_VER..."
+          for i in 1 2 3; do
+            echo "Attempt $i: Installing NDK $NDK_VER via sdkmanager..."
+            if yes | "$SDKMANAGER" --install "ndk;$NDK_VER" && [ -f "$NDK_TARGET_DIR/source.properties" ]; then
+              echo "Android NDK $NDK_VER installed and verified successfully."
+              break
+            fi
+            echo "Attempt $i failed or incomplete. Cleaning up partial download..."
+            rm -rf "$NDK_TARGET_DIR"
+            rm -rf ~/.android/cache/* 2>/dev/null || true
+            if [ "$i" -eq 3 ]; then
+              echo "Failed to install Android NDK $NDK_VER after 3 attempts."
+              exit 1
+            fi
+            sleep 5
+          done
+
       - name: Prepare Log Directory
         run: mkdir -p build_logs
 

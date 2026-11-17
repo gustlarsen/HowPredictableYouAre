@@ -26,7 +26,7 @@ val hasReleaseSigning = resolvedKeystoreFile != null &&
 android {
     namespace = "com.gustlarsen.howpredictable"
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = System.getenv("ANDROID_NDK_VERSION")?.takeIf { it.isNotBlank() } ?: flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
