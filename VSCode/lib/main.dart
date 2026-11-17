@@ -7,6 +7,7 @@ import 'services/audio_service.dart';
 import 'services/play_games_service.dart';
 import 'services/ad_service.dart';
 import 'services/billing_service.dart';
+import 'services/update_service.dart';
 import 'controllers/game_controller.dart';
 import 'views/screens/game_screen.dart';
 
@@ -26,6 +27,7 @@ void main() async {
   final playGames = PlayGamesService(storage: storage);
   final adService = AdService();
   final billingService = BillingService();
+  final updateService = UpdateService();
   final controller = GameController(
     storage: storage,
     localization: localization,
@@ -33,6 +35,7 @@ void main() async {
     playGames: playGames,
     adService: adService,
     billingService: billingService,
+    updateService: updateService,
   );
   unawaited(playGames.initialize());
   unawaited(adService.initialize(adsRemoved: controller.unlockedAds));

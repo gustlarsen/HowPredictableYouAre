@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
@@ -5,6 +6,7 @@ import '../../models/move.dart';
 import '../../models/story_chapter.dart';
 import '../../services/ad_service.dart';
 import '../../services/localization_service.dart';
+import '../../services/update_service.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
@@ -22,12 +24,18 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _isIntroDialogScheduled = false;
+  bool _hasCheckedForUpdate = false;
   GameController? _controller;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hasCheckedForUpdate) return;
+      _hasCheckedForUpdate = true;
+      unawaited(context.read<GameController>().checkForUpdate());
+    });
   }
 
   @override
@@ -191,6 +199,60 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _checkUpdateSnackBar(BuildContext context, GameController controller) {
+    if (controller.pendingUpdateSnackBar) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (controller.consumePendingUpdateSnackBar()) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                key: const ValueKey('update_ready_snackbar'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: const Color(0xFF16181D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: Colors.amber.withValues(alpha: 0.65),
+                    width: 1.2,
+                  ),
+                ),
+                duration: const Duration(seconds: 10),
+                content: const Row(
+                  children: [
+                    Icon(
+                      Icons.system_update_rounded,
+                      color: Colors.amber,
+                      size: 20,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        UpdateService.updateReadyMessage,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                action: SnackBarAction(
+                  label: UpdateService.restartActionLabel,
+                  textColor: Colors.amber,
+                  onPressed: () {
+                    unawaited(controller.completeFlexibleUpdate());
+                  },
+                ),
+              ),
+            );
+        }
+      });
+    }
+  }
+
   String _resolveBackgroundImage(GameController controller) {
     if (controller.lastWinner == null) {
       return 'assets/images/Splash.png';
@@ -216,6 +278,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _checkIntroStory(context, controller);
     _check100RoundAlert(context, controller);
     _checkQaBonusSnackBar(context, controller);
+    _checkUpdateSnackBar(context, controller);
 
     return Scaffold(
       extendBodyBehindAppBar: true,

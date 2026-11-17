@@ -12,6 +12,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/play_games_service.dart';
 import '../services/ad_service.dart';
 import '../services/billing_service.dart';
+import '../services/update_service.dart';
 
 class GameController extends ChangeNotifier {
   static const int rewardedAdDiamondBonus = 50;
@@ -26,6 +27,7 @@ class GameController extends ChangeNotifier {
   late final PlayGamesService playGames;
   late final AdService adService;
   late final BillingService billingService;
+  late final UpdateService updateService;
 
   late MarkovEngine _engine;
 
@@ -107,6 +109,9 @@ class GameController extends ChangeNotifier {
   bool hasClaimedQaBonus = false;
   String? pendingQaBonusSnackBar;
 
+  // Google Play Flexible In-App Update Pending Notification
+  bool pendingUpdateSnackBar = false;
+
   // Story Cutscene Persistence & Pending State
   bool hasSeenStoryIntro = false;
   bool hasSeenStoryReset = false;
@@ -126,16 +131,23 @@ class GameController extends ChangeNotifier {
     PlayGamesService? playGames,
     AdService? adService,
     BillingService? billingService,
+    UpdateService? updateService,
   }) {
     this.playGames = playGames ?? PlayGamesService(storage: storage);
     this.adService = adService ?? AdService();
     this.billingService = billingService ?? BillingService();
+    this.updateService = updateService ?? UpdateService();
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
     this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
     this.adService.addListener(_handleAdServiceUpdate);
     this.billingService.onEntitlementGranted = _handleBillingEntitlementGranted;
     this.billingService.addListener(_handleBillingServiceUpdate);
+    this.updateService.onUpdateDownloaded = _handleUpdateDownloaded;
+    this.updateService.addListener(_handleUpdateServiceUpdate);
+    if (this.updateService.isUpdateDownloaded) {
+      pendingUpdateSnackBar = true;
+    }
     _loadState();
   }
 
@@ -146,6 +158,31 @@ class GameController extends ChangeNotifier {
   void _handleBillingServiceUpdate() {
     notifyListeners();
   }
+
+  void _handleUpdateServiceUpdate() {
+    notifyListeners();
+  }
+
+  void _handleUpdateDownloaded() {
+    pendingUpdateSnackBar = true;
+    notifyListeners();
+  }
+
+  bool get isUpdateDownloaded => updateService.isUpdateDownloaded;
+
+  bool consumePendingUpdateSnackBar() {
+    final pending = pendingUpdateSnackBar;
+    pendingUpdateSnackBar = false;
+    return pending;
+  }
+
+  /// Checks Google Play for an available flexible in-app update asynchronously.
+  Future<void> checkForUpdate() => updateService.checkForUpdate();
+
+  /// Completes installation and restarts the app when a flexible update has
+  /// finished downloading in the background.
+  Future<bool> completeFlexibleUpdate() =>
+      updateService.completeFlexibleUpdate();
 
   void _handleBillingEntitlementGranted(
     String productId,
@@ -203,6 +240,7 @@ class GameController extends ChangeNotifier {
     } else if (state == AppLifecycleState.resumed) {
       audio.resumeMusic();
       unawaited(playGames.handleAppResumed());
+      unawaited(updateService.handleAppResumed());
     }
   }
 
@@ -1144,6 +1182,7 @@ class GameController extends ChangeNotifier {
     playGames.removeListener(_handlePlayGamesUpdate);
     adService.removeListener(_handleAdServiceUpdate);
     billingService.removeListener(_handleBillingServiceUpdate);
+    updateService.removeListener(_handleUpdateServiceUpdate);
     super.dispose();
   }
 }
