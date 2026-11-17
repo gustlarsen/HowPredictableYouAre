@@ -285,28 +285,92 @@ class _VersusArenaState extends State<VersusArena>
     final pcWins = winner == RoundWinner.computer;
     final isDraw = winner == RoundWinner.draw;
 
-    String? battleDescription;
-    Color? battleDescColor;
+    String battleDescription;
+    Color battleDescColor;
     if (widget.userMove != null && widget.computerMove != null) {
       if (userWins) {
         battleDescription = widget.userMove!.battleDescriptionAgainst(
-          widget.computerMove!,
-          elemental: widget.elementalMode,
-          localization: widget.localization,
-        );
+              widget.computerMove!,
+              elemental: widget.elementalMode,
+              localization: widget.localization,
+            ) ??
+            '';
         battleDescColor = widget.elementalMode
             ? widget.userMove!.elementalPrimaryColor
             : Colors.greenAccent;
       } else if (pcWins) {
         battleDescription = widget.computerMove!.battleDescriptionAgainst(
-          widget.userMove!,
-          elemental: widget.elementalMode,
-          localization: widget.localization,
-        );
+              widget.userMove!,
+              elemental: widget.elementalMode,
+              localization: widget.localization,
+            ) ??
+            '';
         battleDescColor = widget.elementalMode
             ? widget.computerMove!.elementalPrimaryColor
             : Colors.redAccent;
+      } else if (isDraw) {
+        final drawKey = widget.elementalMode
+            ? 'battle_draw_elemental'
+            : 'battle_draw_classic';
+        final drawFallback = widget.elementalMode
+            ? "It's a Draw! Elements neutralized."
+            : "It's a Draw! Moves neutralized.";
+        battleDescription = widget.localization.t(
+          drawKey,
+          fallback: drawFallback,
+        );
+        battleDescColor = Colors.amber;
+      } else {
+        final idleKey = widget.elementalMode
+            ? 'battle_idle_elemental'
+            : 'battle_idle_classic';
+        final idleFallback = widget.elementalMode
+            ? 'Choose an element to attack!'
+            : 'Choose a move to battle!';
+        battleDescription = widget.localization.t(
+          idleKey,
+          fallback: idleFallback,
+        );
+        battleDescColor = Colors.grey.shade400;
       }
+    } else if (isDraw) {
+      final drawKey = widget.elementalMode
+          ? 'battle_draw_elemental'
+          : 'battle_draw_classic';
+      final drawFallback = widget.elementalMode
+          ? "It's a Draw! Elements neutralized."
+          : "It's a Draw! Moves neutralized.";
+      battleDescription = widget.localization.t(
+        drawKey,
+        fallback: drawFallback,
+      );
+      battleDescColor = Colors.amber;
+    } else {
+      final idleKey = widget.elementalMode
+          ? 'battle_idle_elemental'
+          : 'battle_idle_classic';
+      final idleFallback = widget.elementalMode
+          ? 'Choose an element to attack!'
+          : 'Choose a move to battle!';
+      battleDescription = widget.localization.t(
+        idleKey,
+        fallback: idleFallback,
+      );
+      battleDescColor = Colors.grey.shade400;
+    }
+
+    if (battleDescription.isEmpty) {
+      final idleKey = widget.elementalMode
+          ? 'battle_idle_elemental'
+          : 'battle_idle_classic';
+      final idleFallback = widget.elementalMode
+          ? 'Choose an element to attack!'
+          : 'Choose a move to battle!';
+      battleDescription = widget.localization.t(
+        idleKey,
+        fallback: idleFallback,
+      );
+      battleDescColor = Colors.grey.shade400;
     }
 
     return Container(
@@ -582,20 +646,25 @@ class _VersusArenaState extends State<VersusArena>
               );
             },
           ),
-          if (battleDescription != null && battleDescription.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              key: const ValueKey('battle_outcome_description'),
-              battleDescription,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: battleDescColor ?? Colors.amber,
-                letterSpacing: 0.4,
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 34,
+            child: Center(
+              child: Text(
+                key: const ValueKey('battle_outcome_description'),
+                battleDescription,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: battleDescColor,
+                  letterSpacing: 0.4,
+                ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );

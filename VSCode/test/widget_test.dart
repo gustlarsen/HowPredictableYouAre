@@ -220,6 +220,182 @@ void main() {
     await tester.pump(const Duration(milliseconds: 375));
   });
 
+  testWidgets('VersusArena maintains fixed height and displays outcome text across Idle, Win, Loss, and Draw states', (WidgetTester tester) async {
+    final localization = LocalizationService();
+    await localization.load();
+
+    Future<double> pumpAndMeasureArena({
+      required HandMove? userMove,
+      required HandMove? computerMove,
+      required RoundWinner? winner,
+      required int roundId,
+      required bool elementalMode,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              child: VersusArena(
+                userMove: userMove,
+                computerMove: computerMove,
+                winner: winner,
+                localization: localization,
+                animationsEnabled: false,
+                roundId: roundId,
+                elementalMode: elementalMode,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final renderBox = tester.renderObject(find.byType(VersusArena)) as RenderBox;
+      return renderBox.size.height;
+    }
+
+    // 1. Elemental Mode tests
+    // Idle state
+    final idleHeight = await pumpAndMeasureArena(
+      userMove: null,
+      computerMove: null,
+      winner: null,
+      roundId: 0,
+      elementalMode: true,
+    );
+    expect(find.byKey(const ValueKey('battle_outcome_description')), findsOneWidget);
+    expect(find.text('Choose an element to attack!'), findsOneWidget);
+
+    // Win state
+    final winHeight = await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.scissors,
+      winner: RoundWinner.user,
+      roundId: 1,
+      elementalMode: true,
+    );
+    expect(find.text('Fire burns Wood'), findsOneWidget);
+
+    // Loss state
+    final lossHeight = await pumpAndMeasureArena(
+      userMove: HandMove.scissors,
+      computerMove: HandMove.rock,
+      winner: RoundWinner.computer,
+      roundId: 2,
+      elementalMode: true,
+    );
+    expect(find.text('Fire burns Wood'), findsOneWidget);
+
+    // Draw state
+    final drawHeight = await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.rock,
+      winner: RoundWinner.draw,
+      roundId: 3,
+      elementalMode: true,
+    );
+    expect(find.text("It's a Draw! Elements neutralized."), findsOneWidget);
+
+    // Exact height equality across all elemental states
+    expect(winHeight, equals(idleHeight));
+    expect(lossHeight, equals(idleHeight));
+    expect(drawHeight, equals(idleHeight));
+
+    // 2. Classic Mode tests
+    final classicIdleHeight = await pumpAndMeasureArena(
+      userMove: null,
+      computerMove: null,
+      winner: null,
+      roundId: 0,
+      elementalMode: false,
+    );
+    expect(find.text('Choose a move to battle!'), findsOneWidget);
+
+    final classicWinHeight = await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.scissors,
+      winner: RoundWinner.user,
+      roundId: 1,
+      elementalMode: false,
+    );
+    expect(find.text('Rock crushes Scissors'), findsOneWidget);
+
+    final classicDrawHeight = await pumpAndMeasureArena(
+      userMove: HandMove.paper,
+      computerMove: HandMove.paper,
+      winner: RoundWinner.draw,
+      roundId: 2,
+      elementalMode: false,
+    );
+    expect(find.text("It's a Draw! Moves neutralized."), findsOneWidget);
+
+    // Exact height equality in classic mode and matches elemental mode
+    expect(classicWinHeight, equals(classicIdleHeight));
+    expect(classicDrawHeight, equals(classicIdleHeight));
+    expect(classicIdleHeight, equals(idleHeight));
+
+    // 3. Multi-language Draw and Idle outcome text tests
+    // Portuguese
+    localization.setLanguage('pt');
+    await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.rock,
+      winner: RoundWinner.draw,
+      roundId: 4,
+      elementalMode: true,
+    );
+    expect(find.text('É um Empate! Elementos neutralizados.'), findsOneWidget);
+
+    await pumpAndMeasureArena(
+      userMove: null,
+      computerMove: null,
+      winner: null,
+      roundId: 0,
+      elementalMode: true,
+    );
+    expect(find.text('Escolha um elemento para atacar!'), findsOneWidget);
+
+    // Spanish
+    localization.setLanguage('es');
+    await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.rock,
+      winner: RoundWinner.draw,
+      roundId: 5,
+      elementalMode: true,
+    );
+    expect(find.text('¡Es un Empate! Elementos neutralizados.'), findsOneWidget);
+
+    await pumpAndMeasureArena(
+      userMove: null,
+      computerMove: null,
+      winner: null,
+      roundId: 0,
+      elementalMode: true,
+    );
+    expect(find.text('¡Elige un elemento para atacar!'), findsOneWidget);
+
+    // German
+    localization.setLanguage('de');
+    await pumpAndMeasureArena(
+      userMove: HandMove.rock,
+      computerMove: HandMove.rock,
+      winner: RoundWinner.draw,
+      roundId: 6,
+      elementalMode: true,
+    );
+    expect(find.text('Unentschieden! Elemente neutralisiert.'), findsOneWidget);
+
+    await pumpAndMeasureArena(
+      userMove: null,
+      computerMove: null,
+      winner: null,
+      roundId: 0,
+      elementalMode: true,
+    );
+    expect(find.text('Wähle ein Element zum Angriff!'), findsOneWidget);
+  });
+
   testWidgets('HintsBar displays ? when Markov row is empty and shows all tied moves on tie', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
