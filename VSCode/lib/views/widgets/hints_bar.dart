@@ -46,7 +46,6 @@ class HintsBar extends StatelessWidget {
               value: _formatMoves(controller.predictedUserMoves),
               moves: _visibleMoves(controller.predictedUserMoves),
               elementalMode: elemental,
-              localization: loc,
               color: Colors.blueAccent,
             ),
           if (controller.showNextMove)
@@ -56,7 +55,6 @@ class HintsBar extends StatelessWidget {
               value: _formatMoves(controller.pcNextMoves),
               moves: _visibleMoves(controller.pcNextMoves),
               elementalMode: elemental,
-              localization: loc,
               color: Colors.orangeAccent,
             ),
           if (controller.showSuggestion)
@@ -66,7 +64,6 @@ class HintsBar extends StatelessWidget {
               value: _formatMoves(controller.suggestedMoves),
               moves: _visibleMoves(controller.suggestedMoves),
               elementalMode: elemental,
-              localization: loc,
               color: Colors.greenAccent,
             ),
           if (controller.showCrystalBall &&
@@ -78,7 +75,6 @@ class HintsBar extends StatelessWidget {
               value: controller.crystalBallPlusMove!.emoji,
               moves: [controller.crystalBallPlusMove!],
               elementalMode: elemental,
-              localization: loc,
               color: Colors.purpleAccent,
             )
           else if (controller.showCrystalBall &&
@@ -89,7 +85,6 @@ class HintsBar extends StatelessWidget {
               value: controller.crystalBallMove!.emoji,
               moves: [controller.crystalBallMove!],
               elementalMode: elemental,
-              localization: loc,
               color: Colors.purpleAccent,
             ),
         ],
@@ -104,7 +99,6 @@ class _HintChip extends StatelessWidget {
   final String value;
   final List<HandMove> moves;
   final bool elementalMode;
-  final dynamic localization;
   final Color color;
 
   const _HintChip({
@@ -113,7 +107,6 @@ class _HintChip extends StatelessWidget {
     required this.value,
     this.moves = const [],
     this.elementalMode = false,
-    this.localization,
     required this.color,
   });
 
@@ -141,23 +134,11 @@ class _HintChip extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (int i = 0; i < moves.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
+                  if (i > 0) const SizedBox(width: 4),
                   Icon(
                     moves[i].elementalIcon,
                     size: 16,
                     color: moves[i].elementalPrimaryColor,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    moves[i].displayLabel(
-                      elemental: true,
-                      localization: localization,
-                    ),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: moves[i].elementalPrimaryColor,
-                    ),
                   ),
                 ],
               ],

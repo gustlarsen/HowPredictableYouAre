@@ -349,7 +349,14 @@ void main() {
     final predictedBeforeTurn = controller.crystalBallMove;
     expect(predictedBeforeTurn, isNotNull);
     expect(find.text('Crystal Ball:'), findsOneWidget);
-    expect(find.text(predictedBeforeTurn!.displayLabel(elemental: true, localization: localization)), findsWidgets);
+    // Helpers display only symbols (icons) and no element name texts
+    expect(
+      find.descendant(
+        of: find.byType(HintsBar),
+        matching: find.text(predictedBeforeTurn!.displayLabel(elemental: true, localization: localization)),
+      ),
+      findsNothing,
+    );
     expect(find.byIcon(predictedBeforeTurn.elementalIcon), findsWidgets);
 
     // When the user plays a hand, the PC plays the exact move shown in the Crystal Ball
