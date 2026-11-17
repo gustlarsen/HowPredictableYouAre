@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -508,8 +509,22 @@ void main() {
 
   group('SettingsDialog Player Profile & Reset All Progress UI Tests', () {
     testWidgets(
-      'Displays single Sign in with Google Play button when disconnected, and shows connected profile card with Player ID and NO copy button, Switch Account, or Sign Out buttons',
+      'Displays single Sign in with Google Play button when disconnected, and shows connected profile card with copyable Player ID and NO Switch Account or Sign Out buttons',
       (WidgetTester tester) async {
+        String? copiedClipboardText;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              if (call.method == 'Clipboard.setData') {
+                final args = call.arguments as Map<dynamic, dynamic>;
+                copiedClipboardText = args['text'] as String?;
+              }
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, null);
+        });
+
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
           'musicEnabled': false,
@@ -571,8 +586,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Connected state: shows playerName, playerID, Synced status,
-        // and NO copy button, Switch Account button, or Sign Out button
+        // Connected state: shows playerName, playerID, copy icon button, Synced status,
+        // and NO Switch Account button or Sign Out button
         expect(
           find.byKey(const ValueKey('play_games_profile_card')),
           findsOneWidget,
@@ -582,9 +597,9 @@ void main() {
         expect(find.text('Synced'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('play_games_copy_id_button')),
-          findsNothing,
+          findsOneWidget,
         );
-        expect(find.byIcon(Icons.copy_rounded), findsNothing);
+        expect(find.byIcon(Icons.copy_rounded), findsOneWidget);
         expect(
           find.byKey(const ValueKey('play_games_switch_account_button')),
           findsNothing,
@@ -595,6 +610,14 @@ void main() {
         );
         expect(find.text('Switch Account'), findsNothing);
         expect(find.text('Sign Out'), findsNothing);
+
+        // Tap copy button -> copies raw player ID to clipboard and shows "Player ID copied" SnackBar
+        await tester.tap(
+          find.byKey(const ValueKey('play_games_copy_id_button')),
+        );
+        await tester.pump();
+        expect(copiedClipboardText, 'player_4242');
+        expect(find.text('Player ID copied'), findsOneWidget);
       },
     );
 

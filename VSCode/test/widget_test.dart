@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:how_predictable/main.dart';
@@ -9,7 +11,9 @@ import 'package:how_predictable/models/move.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
+import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
@@ -1659,4 +1663,143 @@ void main() {
     expect(subtitleRect.bottom, lessThan(watchAdBtnRect.top));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('SettingsDialog displays dynamic release version, copyable Player ID with SnackBar, toggle spacing/contrast, and outlined Ok button', (WidgetTester tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'How Predictable',
+      packageName: 'com.gustlarsen.howpredictable',
+      version: '1.0.68',
+      buildNumber: '168',
+      buildSignature: '',
+    );
+
+    String? copiedText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final args = call.arguments as Map<dynamic, dynamic>;
+            copiedText = args['text'] as String?;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'vibrationEnabled': false,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+    final playGames = PlayGamesService(
+      storage: storage,
+      client: _SettingsTestPlayGamesClient(),
+    );
+    await playGames.signIn();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+      playGames: playGames,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open SettingsDialog
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    // 1. Dynamic Release Version Display in bottom footer
+    final versionFinder = find.byKey(const ValueKey('settings_version_label'));
+    expect(versionFinder, findsOneWidget);
+    expect(find.text('Version 1.0.68 (168)'), findsOneWidget);
+
+    // Verify clean fallback helper when version is empty
+    expect(
+      SettingsDialog.formatVersionLabel('', ''),
+      SettingsDialog.fallbackVersionLabel,
+    );
+
+    // 2. Copyable Player ID button right next to ID text
+    final idFinder = find.byKey(const ValueKey('play_games_player_id'));
+    final copyBtnFinder = find.byKey(const ValueKey('play_games_copy_id_button'));
+    expect(idFinder, findsOneWidget);
+    expect(copyBtnFinder, findsOneWidget);
+    expect(find.byIcon(Icons.copy_rounded), findsOneWidget);
+
+    await tester.tap(copyBtnFinder);
+    await tester.pump();
+    expect(copiedText, 'a_2116013489197419559');
+    expect(find.text('Player ID copied'), findsOneWidget);
+
+    // 3. Toggle Spacing (8-12px vertical gap) & OFF state contrast
+    final darkTile = find.byKey(const ValueKey('settings_dark_mode_tile'));
+    final soundTile = find.byKey(const ValueKey('settings_sound_effects_tile'));
+    final musicTile = find.byKey(const ValueKey('settings_background_music_tile'));
+    final vibrationTile = find.byKey(const ValueKey('settings_vibration_tile'));
+    final animationsTile = find.byKey(const ValueKey('settings_animations_tile'));
+
+    expect(
+      tester.getTopLeft(soundTile).dy - tester.getBottomLeft(darkTile).dy,
+      closeTo(10.0, 0.1),
+    );
+    expect(
+      tester.getTopLeft(musicTile).dy - tester.getBottomLeft(soundTile).dy,
+      closeTo(10.0, 0.1),
+    );
+    expect(
+      tester.getTopLeft(vibrationTile).dy - tester.getBottomLeft(musicTile).dy,
+      closeTo(10.0, 0.1),
+    );
+    expect(
+      tester.getTopLeft(animationsTile).dy - tester.getBottomLeft(vibrationTile).dy,
+      closeTo(10.0, 0.1),
+    );
+
+    // 4. Scroll view & Outlined Ok button in bottom-right opposite version label
+    expect(find.byKey(const ValueKey('settings_scroll_view')), findsOneWidget);
+    final okBtnFinder = find.byKey(const ValueKey('settings_ok_button'));
+    expect(okBtnFinder, findsOneWidget);
+    expect(tester.widget(okBtnFinder), isA<OutlinedButton>());
+    expect(
+      tester.getCenter(versionFinder).dx,
+      lessThan(tester.getCenter(okBtnFinder).dx),
+    );
+
+    await tester.tap(okBtnFinder);
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsDialog), findsNothing);
+  });
+}
+
+class _SettingsTestPlayGamesClient implements PlayGamesClient {
+  @override
+  Future<String?> signIn() async => 'success';
+
+  @override
+  Future<String?> getPlayerName() async => 'gustlarsentester';
+
+  @override
+  Future<String?> getPlayerID() async => 'a_2116013489197419559';
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
 }

@@ -1,14 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
-class SettingsDialog extends StatelessWidget {
+class SettingsDialog extends StatefulWidget {
   final GameController controller;
 
   const SettingsDialog({super.key, required this.controller});
+
+  static const String fallbackVersionLabel = 'Version 1.0.4 (104)';
+
+  static String formatVersionLabel(String version, String buildNumber) {
+    final cleanVersion = version.trim();
+    final cleanBuild = buildNumber.trim();
+    if (cleanVersion.isEmpty) return fallbackVersionLabel;
+    if (cleanBuild.isEmpty) return 'Version $cleanVersion';
+    return 'Version $cleanVersion ($cleanBuild)';
+  }
+
+  static Future<String> resolveVersionLabel() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.appName == 'flutter_tester' || info.version.trim().isEmpty) {
+        return fallbackVersionLabel;
+      }
+      return formatVersionLabel(info.version, info.buildNumber);
+    } catch (_) {
+      return fallbackVersionLabel;
+    }
+  }
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  late final Future<String> _versionFuture;
+
+  GameController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _versionFuture = SettingsDialog.resolveVersionLabel();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +93,45 @@ class SettingsDialog extends StatelessWidget {
       context,
       ok ? 'Cloud save synced!' : 'Cloud sync unavailable (Offline)',
     );
+  }
+
+  Future<void> _handleCopyPlayerId(BuildContext context) async {
+    final rawId = controller.playGames.playerID;
+    if (rawId == null || rawId.isEmpty) return;
+    controller.audio.playTapVibrate();
+    await Clipboard.setData(ClipboardData(text: rawId));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.amber,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Player ID copied',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF22252D),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.amber.withValues(alpha: 0.45)),
+          ),
+        ),
+      );
   }
 
   Future<void> _confirmResetAllProgress(BuildContext context) async {
@@ -137,7 +215,8 @@ class SettingsDialog extends StatelessWidget {
       'es': 'Español 🇪🇸',
     };
 
-    const compactDensity = VisualDensity(horizontal: 0, vertical: -4);
+    const compactDensity = VisualDensity(horizontal: 0, vertical: -2);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -166,97 +245,144 @@ class SettingsDialog extends StatelessWidget {
               Flexible(
                 child: SingleChildScrollView(
                   key: const ValueKey('settings_scroll_view'),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Player Profile / Cloud Account section
-                      _PlayerProfileSection(
-                        playGames: controller.playGames,
-                        onSignIn: () => _handleSignIn(context),
-                        onManualSync: () => _handleManualSync(context),
-                      ),
+                  child: SwitchTheme(
+                    data: SwitchThemeData(
+                      thumbColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.amber;
+                        }
+                        return isDark
+                            ? const Color(0xFFD5D9E2)
+                            : Colors.grey.shade700;
+                      }),
+                      trackColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.amber.withValues(alpha: 0.35);
+                        }
+                        return isDark
+                            ? Colors.white.withValues(alpha: 0.14)
+                            : Colors.black.withValues(alpha: 0.10);
+                      }),
+                      trackOutlineColor: WidgetStateProperty.resolveWith((
+                        states,
+                      ) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.amber.withValues(alpha: 0.80);
+                        }
+                        return isDark
+                            ? Colors.white.withValues(alpha: 0.55)
+                            : Colors.black.withValues(alpha: 0.42);
+                      }),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Player Profile / Cloud Account section
+                        _PlayerProfileSection(
+                          playGames: controller.playGames,
+                          onSignIn: () => _handleSignIn(context),
+                          onManualSync: () => _handleManualSync(context),
+                          onCopyPlayerId: () => _handleCopyPlayerId(context),
+                        ),
 
-                      const Divider(height: 14),
+                        const Divider(height: 16),
 
-                      // Language selector
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(loc.t('string55', fallback: 'Language:')),
-                          DropdownButton<String>(
-                            value: loc.currentLanguage,
-                            isDense: true,
-                            underline: const SizedBox.shrink(),
-                            items: LocalizationService.supportedLanguages.map((
-                              code,
-                            ) {
-                              return DropdownMenuItem(
-                                value: code,
-                                child: Text(languageNames[code] ?? code),
-                              );
-                            }).toList(),
-                            onChanged: (lang) {
-                              if (lang != null) controller.setLanguage(lang);
-                            },
+                        // Language selector
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(loc.t('string55', fallback: 'Language:')),
+                              DropdownButton<String>(
+                                value: loc.currentLanguage,
+                                isDense: true,
+                                underline: const SizedBox.shrink(),
+                                items: LocalizationService.supportedLanguages
+                                    .map((code) {
+                                      return DropdownMenuItem(
+                                        value: code,
+                                        child: Text(languageNames[code] ?? code),
+                                      );
+                                    })
+                                    .toList(),
+                                onChanged: (lang) {
+                                  if (lang != null) {
+                                    controller.setLanguage(lang);
+                                  }
+                                },
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 10),
 
-                      // Dark mode toggle
-                      SwitchListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(loc.t('string54', fallback: 'Dark Mode:')),
-                        value: controller.darkMode,
-                        onChanged: controller.toggleDarkMode,
-                      ),
+                        // Dark mode toggle
+                        SwitchListTile(
+                          key: const ValueKey('settings_dark_mode_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            loc.t('string54', fallback: 'Dark Mode:'),
+                          ),
+                          value: controller.darkMode,
+                          onChanged: controller.toggleDarkMode,
+                        ),
+                        const SizedBox(height: 10),
 
-                      // Sound toggle
-                      SwitchListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Sound Effects:'),
-                        value: controller.soundEnabled,
-                        onChanged: (_) => controller.toggleSound(),
-                      ),
+                        // Sound toggle
+                        SwitchListTile(
+                          key: const ValueKey('settings_sound_effects_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Sound Effects:'),
+                          value: controller.soundEnabled,
+                          onChanged: (_) => controller.toggleSound(),
+                        ),
+                        const SizedBox(height: 10),
 
-                      SwitchListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Background Music:'),
-                        value: controller.musicEnabled,
-                        onChanged: controller.toggleMusic,
-                      ),
+                        SwitchListTile(
+                          key: const ValueKey('settings_background_music_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Background Music:'),
+                          value: controller.musicEnabled,
+                          onChanged: controller.toggleMusic,
+                        ),
+                        const SizedBox(height: 10),
 
-                      // Vibration toggle
-                      SwitchListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Vibration:'),
-                        value: controller.vibrationEnabled,
-                        onChanged: (val) {
-                          controller.toggleVibration(val);
-                          if (val) {
-                            controller.audio.playVibrate();
-                          }
-                        },
-                      ),
+                        // Vibration toggle
+                        SwitchListTile(
+                          key: const ValueKey('settings_vibration_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Vibration:'),
+                          value: controller.vibrationEnabled,
+                          onChanged: (val) {
+                            controller.toggleVibration(val);
+                            if (val) {
+                              controller.audio.playVibrate();
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 10),
 
-                      // Animations toggle
-                      SwitchListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Animations:'),
-                        value: controller.animationsEnabled,
-                        onChanged: controller.toggleAnimations,
-                      ),
+                        // Animations toggle
+                        SwitchListTile(
+                          key: const ValueKey('settings_animations_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Animations:'),
+                          value: controller.animationsEnabled,
+                          onChanged: controller.toggleAnimations,
+                        ),
 
-                      const Divider(height: 12),
+                        const Divider(height: 16),
 
                       // Story Memories / Lore Gallery button
                       SizedBox(
@@ -430,14 +556,60 @@ class SettingsDialog extends StatelessWidget {
                   ),
                 ),
               ),
+              ),
 
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(loc.t('string36', fallback: 'Ok')),
-                ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: FutureBuilder<String>(
+                      future: _versionFuture,
+                      initialData: SettingsDialog.fallbackVersionLabel,
+                      builder: (context, snapshot) {
+                        final versionText =
+                            snapshot.data ??
+                            SettingsDialog.fallbackVersionLabel;
+                        return Text(
+                          versionText,
+                          key: const ValueKey('settings_version_label'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.72),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    key: const ValueKey('settings_ok_button'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.amber,
+                      backgroundColor: Colors.amber.withValues(alpha: 0.10),
+                      side: BorderSide(
+                        color: Colors.amber.withValues(alpha: 0.65),
+                        width: 1.2,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 8,
+                      ),
+                      minimumSize: const Size(64, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      loc.t('string36', fallback: 'Ok'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -451,11 +623,13 @@ class _PlayerProfileSection extends StatelessWidget {
   final PlayGamesService playGames;
   final VoidCallback onSignIn;
   final VoidCallback onManualSync;
+  final VoidCallback onCopyPlayerId;
 
   const _PlayerProfileSection({
     required this.playGames,
     required this.onSignIn,
     required this.onManualSync,
+    required this.onCopyPlayerId,
   });
 
   @override
@@ -600,16 +774,37 @@ class _PlayerProfileSection extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          'ID: ${playGames.playerID ?? "Unknown"}',
-                          key: const ValueKey('play_games_player_id'),
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'ID: ${playGames.playerID ?? "Unknown"}',
+                                key: const ValueKey('play_games_player_id'),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              key: const ValueKey('play_games_copy_id_button'),
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: onCopyPlayerId,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: Icon(
+                                  Icons.copy_rounded,
+                                  size: 13,
+                                  color: Colors.amber.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
