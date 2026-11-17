@@ -643,7 +643,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       title: loc.t('new_skin', fallback: 'New Skin'),
                       subtitle: loc.t(
                         'new_skin_desc',
-                        fallback: 'Elemental Theme (Fire, Water, Wood, Earth, Metal)',
+                        fallback: 'Hands Theme (Rock, Paper, Scissors)',
                       ),
                       cost: 10000,
                       productId: null,

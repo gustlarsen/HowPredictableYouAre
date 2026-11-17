@@ -599,43 +599,46 @@ void main() {
     });
     await createController();
 
-    // Force deterministic PC move (Lizard / Earth) and play Rock (Fire) in Classic 5-hand mode
+    // Default starting skin is Elemental Mode (Wu Xing 5-element):
+    // Force deterministic PC move (Earth / lizard) and play Fire (rock)
     controller.crystalBallMove = HandMove.lizard;
     controller.playTurn(HandMove.rock);
 
-    // In Classic RPSLS: Rock crushes Lizard -> User wins
-    expect(controller.lastWinner, RoundWinner.user);
-    expect(controller.userScore, 1);
-    expect(controller.pcScore, 0);
-
-    // Toggle New Skin ON mid-match -> Earth (lizard) smothers Fire (rock), so lastWinner re-evaluates to computer without resetting scores
-    controller.toggleShowNewSkin(true);
-    expect(controller.showNewSkin, isTrue);
+    // In Wu Xing cycle: Earth smothers Fire -> Computer wins
     expect(controller.lastWinner, RoundWinner.computer);
-    expect(controller.userScore, 1);
-    expect(controller.pcScore, 0);
-    expect(controller.turnCount, 1);
-
-    // Play a round in 5-element Wu Xing mode: Fire (rock) vs Metal (spock) -> Fire melts Metal (User wins!)
-    controller.crystalBallMove = HandMove.spock;
-    controller.playTurn(HandMove.rock);
-    expect(controller.lastWinner, RoundWinner.user);
-    expect(controller.userScore, 2);
-    expect(controller.pcScore, 0);
-
-    // Play a round in 5-element Wu Xing mode: Fire (rock) vs Earth (lizard) -> Earth smothers Fire (Computer wins!)
-    controller.crystalBallMove = HandMove.lizard;
-    controller.playTurn(HandMove.rock);
-    expect(controller.lastWinner, RoundWinner.computer);
-    expect(controller.userScore, 2);
+    expect(controller.userScore, 0);
     expect(controller.pcScore, 1);
 
-    // Play a tie round in 5-element Wu Xing mode: Metal (spock) vs Metal (spock) -> Draw
+    // Toggle New Skin ON mid-match -> Changes from Elemental to Hands theme (Classic RPSLS)
+    // Rock crushes Lizard, so lastWinner re-evaluates to user without resetting scores
+    controller.toggleShowNewSkin(true);
+    expect(controller.showNewSkin, isTrue);
+    expect(controller.isElementalMode, isFalse);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.userScore, 0);
+    expect(controller.pcScore, 1);
+    expect(controller.turnCount, 1);
+
+    // Play a round in Hands mode (RPSLS): Rock vs Scissors -> Rock crushes Scissors (User wins!)
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 1);
+
+    // Play a round in Hands mode: Rock vs Paper -> Paper covers Rock (Computer wins!)
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.computer);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 2);
+
+    // Play a tie round in Hands mode: Spock vs Spock -> Draw
     controller.crystalBallMove = HandMove.spock;
     controller.playTurn(HandMove.spock);
     expect(controller.lastWinner, RoundWinner.draw);
-    expect(controller.userScore, 2);
-    expect(controller.pcScore, 1);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 2);
   });
 
   test('Last played hands are saved on playTurn, restored on app reopen, and cleared on resetGame', () async {

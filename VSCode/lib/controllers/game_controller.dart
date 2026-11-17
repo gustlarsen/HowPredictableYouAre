@@ -81,6 +81,13 @@ class GameController extends ChangeNotifier {
   bool showNewHands = false;
   bool showNewSkin = false;
   bool showYourPrediction = false;
+
+  /// Whether the Elemental Theme is currently active.
+  /// The starting skin is the Elemental Theme.
+  /// Acquiring and enabling the "New Skin" item switches to the Hands Theme.
+  bool get isElementalMode => !showNewSkin;
+  bool get elementalMode => isElementalMode;
+  bool get isHandsTheme => showNewSkin;
   bool showNextMove = false;
   bool showSuggestion = false;
   bool showCrystalBall = false;
@@ -286,7 +293,7 @@ class GameController extends ChangeNotifier {
 
     _engine = MarkovEngine(
       enableExtendedHands: showNewHands,
-      enableElementalMode: showNewSkin,
+      enableElementalMode: isElementalMode,
     );
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
     if (savedMatrix != null) {
@@ -313,7 +320,7 @@ class GameController extends ChangeNotifier {
       lastWinner = RoundWinner.draw;
     } else if (currentUserMove!.beats(
       currentComputerMove!,
-      elemental: showNewSkin,
+      elemental: isElementalMode,
     )) {
       lastWinner = RoundWinner.user;
     } else {
@@ -368,7 +375,7 @@ class GameController extends ChangeNotifier {
       audio.playDraw();
     } else if (currentUserMove!.beats(
       currentComputerMove!,
-      elemental: showNewSkin,
+      elemental: isElementalMode,
     )) {
       lastWinner = RoundWinner.user;
       userScore += 1;
@@ -1031,26 +1038,29 @@ class GameController extends ChangeNotifier {
     storage.setShowNewHands(val);
     _engine = MarkovEngine(
       enableExtendedHands: val,
-      enableElementalMode: showNewSkin,
+      enableElementalMode: isElementalMode,
     );
     resetGame();
     _triggerCloudSave();
   }
 
-  /// Toggles the Elemental Theme ("New Skin") ON or OFF seamlessly over the
+  /// Toggles the "New Skin" item ON or OFF seamlessly over the
   /// existing move indices without resetting the current match, scores, or
   /// Markov transition matrix.
+  ///
+  /// Starting skin is the Elemental Theme.
+  /// Acquiring and enabling the "New Skin" item switches to the Hands Theme.
   void toggleShowNewSkin(bool val) {
     showNewSkin = val;
     storage.setShowNewSkin(val);
-    _engine.enableElementalMode = val;
+    _engine.enableElementalMode = isElementalMode;
 
     if (currentUserMove != null && currentComputerMove != null) {
       if (currentUserMove == currentComputerMove) {
         lastWinner = RoundWinner.draw;
       } else if (currentUserMove!.beats(
         currentComputerMove!,
-        elemental: showNewSkin,
+        elemental: isElementalMode,
       )) {
         lastWinner = RoundWinner.user;
       } else {

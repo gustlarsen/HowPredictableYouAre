@@ -41,23 +41,23 @@ void main() {
 
     expect(find.text('How Predictable You Are'), findsNothing);
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('0')), findsOneWidget);
-    expect(find.text('ROCK'), findsOneWidget);
-    expect(find.text('PAPER'), findsOneWidget);
-    expect(find.text('SCISSORS'), findsOneWidget);
+    expect(find.text('FIRE'), findsOneWidget);
+    expect(find.text('WATER'), findsOneWidget);
+    expect(find.text('WOOD'), findsOneWidget);
 
-    final controller = tester.element(find.text('ROCK')).read<GameController>();
+    final controller = tester.element(find.byKey(const ValueKey('hand_button_rock'))).read<GameController>();
     expect(controller.turnCount, 0);
 
-    // Tap ROCK and verify immediate response without waiting for button animation
-    await tester.tap(find.text('ROCK').last);
+    // Tap FIRE and verify immediate response without waiting for button animation
+    await tester.tap(find.text('FIRE').last);
     await tester.pump();
     expect(controller.turnCount, 1);
 
     // Advance partway through the 1000ms animation (e.g., 250ms)
     await tester.pump(const Duration(milliseconds: 250));
 
-    // Tap ROCK again mid-animation: should immediately increment turnCount and restart animation
-    await tester.tap(find.text('ROCK').last);
+    // Tap FIRE again mid-animation: should immediately increment turnCount and restart animation
+    await tester.tap(find.text('FIRE').last);
     await tester.pump();
     expect(controller.turnCount, 2);
 
@@ -96,7 +96,7 @@ void main() {
     await tester.tap(find.text('TRY AGAIN'));
     await tester.pumpAndSettle();
 
-    final controller = tester.element(find.text('ROCK')).read<GameController>();
+    final controller = tester.element(find.byKey(const ValueKey('hand_button_rock'))).read<GameController>();
     expect(controller.totalRounds, 0);
     expect(controller.userScore, 0);
     expect(controller.pcScore, 0);
@@ -231,6 +231,8 @@ void main() {
       'showYourPrediction': true,
       'showNextMove': true,
       'showSuggestion': true,
+      'unlockedNewSkin': true,
+      'showNewSkin': true,
       'animationsEnabled': false,
     });
     final storage = StorageService();
@@ -347,10 +349,11 @@ void main() {
     final predictedBeforeTurn = controller.crystalBallMove;
     expect(predictedBeforeTurn, isNotNull);
     expect(find.text('Crystal Ball:'), findsOneWidget);
-    expect(find.text(predictedBeforeTurn!.emoji), findsWidgets);
+    expect(find.text(predictedBeforeTurn!.displayLabel(elemental: true, localization: localization)), findsWidgets);
+    expect(find.byIcon(predictedBeforeTurn.elementalIcon), findsWidgets);
 
     // When the user plays a hand, the PC plays the exact move shown in the Crystal Ball
-    await tester.tap(find.text('ROCK'));
+    await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
     await tester.pump();
     expect(controller.currentComputerMove, equals(predictedBeforeTurn));
   });
@@ -1019,7 +1022,7 @@ void main() {
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('ROCK'));
+    await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
     await tester.pumpAndSettle();
     expect(controller.turnCount, 1);
     expect(controller.hasGameStarted, isTrue);
@@ -1126,14 +1129,14 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('user_card')),
-        matching: find.text('PAPER'),
+        matching: find.text('WATER'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('pc_card')),
-        matching: find.text(playedPcMove.label.toUpperCase()),
+        matching: find.text(playedPcMove.displayLabel(elemental: true).toUpperCase()),
       ),
       findsOneWidget,
     );
@@ -1173,16 +1176,19 @@ void main() {
       ),
     );
 
-    // 1. Play 3 turns in Classic mode so Markov transitions and scores are populated
+    // 1. Play 3 turns in starting Elemental mode so Markov transitions and scores are populated
     controller.playTurn(HandMove.rock);
     controller.playTurn(HandMove.paper);
     controller.playTurn(HandMove.rock);
     await tester.pump();
 
     expect(controller.turnCount, 3);
-    expect(find.text('ROCK'), findsWidgets);
-    expect(find.text('PAPER'), findsWidgets);
-    expect(find.text('SCISSORS'), findsWidgets);
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
+    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
 
     // 2. Unlock New Skin (10,000 diamonds) -> stays disabled on unlock
     final diamondsBeforeUnlock = controller.diamonds;
@@ -1191,33 +1197,20 @@ void main() {
     expect(controller.unlockedNewSkin, isTrue);
     expect(controller.showNewSkin, isFalse);
     await tester.pump();
-    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('FIRE'), findsWidgets);
 
-    // 3. Toggle New Skin ON -> transforms to FIRE, WATER, WOOD with vector icons and Energy Orbs without resetting turnCount or matrix
+    // 3. Toggle New Skin ON -> transforms from Elemental to Hands theme (ROCK, PAPER, SCISSORS) without resetting turnCount or matrix
     controller.toggleShowNewSkin(true);
     await tester.pump();
 
     expect(controller.turnCount, 3);
     expect(controller.engine.matrix[0][1], 1);
-    expect(find.text('FIRE'), findsWidgets);
-    expect(find.text('WATER'), findsWidgets);
-    expect(find.text('WOOD'), findsWidgets);
-    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
-    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
-    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
+    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('PAPER'), findsWidgets);
+    expect(find.text('SCISSORS'), findsWidgets);
 
-    // 4. Enable New Hands as well -> expands to 5-element Wu Xing cycle (adding EARTH & METAL)
+    // 4. Enable New Hands as well -> expands to 5 hands in Hands theme (adding LIZARD & SPOCK)
     controller.toggleShowNewHands(true);
-    await tester.pump();
-
-    expect(find.text('FIRE'), findsWidgets);
-    expect(find.text('WATER'), findsWidgets);
-    expect(find.text('WOOD'), findsWidgets);
-    expect(find.text('EARTH'), findsWidgets);
-    expect(find.text('METAL'), findsWidgets);
-
-    // 5. Disable New Skin -> cleanly reverts to classic ROCK, PAPER, SCISSORS, LIZARD, SPOCK
-    controller.toggleShowNewSkin(false);
     await tester.pump();
 
     expect(find.text('ROCK'), findsWidgets);
@@ -1225,6 +1218,16 @@ void main() {
     expect(find.text('SCISSORS'), findsWidgets);
     expect(find.text('LIZARD'), findsWidgets);
     expect(find.text('SPOCK'), findsWidgets);
+
+    // 5. Disable New Skin -> cleanly reverts to Elemental theme (FIRE, WATER, WOOD, EARTH, METAL)
+    controller.toggleShowNewSkin(false);
+    await tester.pump();
+
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.text('EARTH'), findsWidgets);
+    expect(find.text('METAL'), findsWidgets);
   });
 
   testWidgets('Purchasing and toggling New Skin inside ShopDialog deducts 10000 diamonds, starts off by default, switches visuals immediately without reset confirmation, and reverts when disabled', (WidgetTester tester) async {
@@ -1273,7 +1276,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('New Skin'), findsOneWidget);
-    expect(find.text('Elemental Theme (Fire, Water, Wood, Earth, Metal)'), findsOneWidget);
+    expect(find.text('Hands Theme (Rock, Paper, Scissors)'), findsOneWidget);
 
     // Purchase New Skin (10,000 diamonds) via the shop button
     final diamondsBeforePurchase = controller.diamonds;
@@ -1293,21 +1296,21 @@ void main() {
     expect(controller.turnCount, ongoingTurnCount);
     expect(controller.totalRounds, ongoingTotalRounds);
 
-    // Close ShopDialog and verify immediate visual switch to Elemental Theme
+    // Close ShopDialog and verify immediate visual switch to Hands Theme
     await tester.tap(find.byKey(const ValueKey('shop_close_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('FIRE'), findsWidgets);
-    expect(find.text('WATER'), findsWidgets);
-    expect(find.text('WOOD'), findsWidgets);
-    expect(find.byIcon(HandMove.rock.elementalIcon), findsWidgets);
-    expect(find.byIcon(HandMove.paper.elementalIcon), findsWidgets);
-    expect(find.byIcon(HandMove.scissors.elementalIcon), findsWidgets);
-    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
-    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
-    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
+    expect(find.text('ROCK'), findsWidgets);
+    expect(find.text('PAPER'), findsWidgets);
+    expect(find.text('SCISSORS'), findsWidgets);
+    expect(find.text('FIRE'), findsNothing);
+    expect(find.text('WATER'), findsNothing);
+    expect(find.text('WOOD'), findsNothing);
+    expect(find.byIcon(HandMove.rock.elementalIcon), findsNothing);
+    expect(find.byIcon(HandMove.paper.elementalIcon), findsNothing);
+    expect(find.byIcon(HandMove.scissors.elementalIcon), findsNothing);
 
-    // Reopen ShopDialog and toggle New Skin OFF -> reverts to classic hands without resetting match
+    // Reopen ShopDialog and toggle New Skin OFF -> reverts to Elemental Theme without resetting match
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -600));
@@ -1325,14 +1328,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('shop_close_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('ROCK'), findsWidgets);
-    expect(find.text('PAPER'), findsWidgets);
-    expect(find.text('SCISSORS'), findsWidgets);
-    expect(find.text('FIRE'), findsNothing);
-    expect(find.text('WATER'), findsNothing);
-    expect(find.text('WOOD'), findsNothing);
-    expect(find.byIcon(HandMove.rock.elementalIcon), findsNothing);
-    expect(find.byIcon(HandMove.paper.elementalIcon), findsNothing);
-    expect(find.byIcon(HandMove.scissors.elementalIcon), findsNothing);
+    expect(find.text('FIRE'), findsWidgets);
+    expect(find.text('WATER'), findsWidgets);
+    expect(find.text('WOOD'), findsWidgets);
+    expect(find.byIcon(HandMove.rock.elementalIcon), findsWidgets);
+    expect(find.byIcon(HandMove.paper.elementalIcon), findsWidgets);
+    expect(find.byIcon(HandMove.scissors.elementalIcon), findsWidgets);
+    expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
+    expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
   });
 }

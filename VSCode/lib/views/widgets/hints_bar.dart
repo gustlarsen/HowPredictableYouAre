@@ -24,7 +24,7 @@ class HintsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = controller.localization;
-    final elemental = controller.showNewSkin;
+    final elemental = controller.isElementalMode;
     final hasAnyHint = controller.showYourPrediction ||
         controller.showNextMove ||
         controller.showSuggestion ||

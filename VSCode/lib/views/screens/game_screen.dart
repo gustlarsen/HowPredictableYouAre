@@ -417,8 +417,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               roundId: controller.turnCount,
                               userHp: controller.userHp,
                               computerHp: controller.computerHp,
-                              elementalMode: controller.showNewSkin,
-                              onImpactHaptic: controller.showNewSkin
+                              elementalMode: controller.isElementalMode,
+                              onImpactHaptic: controller.isElementalMode
                                   ? controller.audio.playTapVibrate
                                   : null,
                             ),
@@ -429,7 +429,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               MarkovMatrixView(
                                 engine: controller.engine,
                                 lastUserMove: controller.lastUserMove,
-                                elementalMode: controller.showNewSkin,
+                                elementalMode: controller.isElementalMode,
                                 localization: loc,
                               ),
                               const SizedBox(height: 14),
@@ -473,7 +473,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                             move: move,
                                             compact: controller.showNewHands,
                                             elementalMode:
-                                                controller.showNewSkin,
+                                                controller.isElementalMode,
                                             isSelected:
                                                 controller.currentUserMove ==
                                                 move,
