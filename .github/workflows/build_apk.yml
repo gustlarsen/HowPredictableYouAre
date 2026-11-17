@@ -10,11 +10,13 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build_and_notify:
     name: Build & Release Flutter APK
     runs-on: ubuntu-latest
-    env:
-      HAS_GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    outputs:
+      version_code: ${{ steps.version_info.outputs.version_code }}
+      aab_name: ${{ steps.version_info.outputs.aab_name }}
+      has_play_credentials: ${{ steps.version_info.outputs.has_play_credentials }}
 
     steps:
       - name: Checkout repository
@@ -46,8 +48,15 @@ jobs:
 
       - name: Calculate Incremental Version
         id: version_info
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           echo "versioning" > build_logs/phase.txt
+          if [ -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "has_play_credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_play_credentials=false" >> $GITHUB_OUTPUT
+          fi
           git fetch --tags --force
           LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "")
           if [ -z "$LATEST_TAG" ]; then
@@ -166,17 +175,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload AAB to Google Play Console (Internal Testing)
-        if: env.HAS_GOOGLE_PLAY_SERVICE_ACCOUNT == 'true' && github.ref == 'refs/heads/main'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.gustlarsen.howpredictable
-          releaseFiles: VSCode/build/app/outputs/bundle/release/${{ steps.version_info.outputs.aab_name }}
-          track: internal
-          status: completed
-          inAppUpdatePriority: 2
-
       - name: Push Incremental Tag
         run: |
           echo "tag_release" > build_logs/phase.txt
@@ -226,3 +224,31 @@ jobs:
             --server-url "${{ github.server_url }}" \
             --run-id "${{ github.run_id }}" \
             --actor "${{ github.actor }}"
+
+  deploy_play_store:
+    name: Deploy AAB to Google Play (Internal Testing)
+    needs: build_and_notify
+    runs-on: ubuntu-latest
+    if: needs.build_and_notify.outputs.has_play_credentials == 'true' && github.ref == 'refs/heads/main'
+    env:
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+
+    steps:
+      - name: Download Build Artifacts
+        if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: how-predur-v${{ needs.build_and_notify.outputs.version_code }}-apks
+          path: artifacts
+
+      - name: Upload AAB to Google Play Console (Internal Testing)
+        if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        continue-on-error: true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.gustlarsen.howpredictable
+          releaseFiles: artifacts/bundle/release/${{ needs.build_and_notify.outputs.aab_name }}
+          tracks: internal
+          status: completed
+          inAppUpdatePriority: 2
