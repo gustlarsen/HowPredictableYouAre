@@ -436,14 +436,25 @@ void main() {
     );
 
     // Verify updated labels and single AppBar reset button
-    expect(find.text('You will Chose:'), findsOneWidget);
-    expect(find.text('PC will Chose:'), findsOneWidget);
+    expect(find.text('Your Choice:'), findsOneWidget);
+    expect(find.text("PC's Choice:"), findsOneWidget);
+    expect(find.text('Suggestion:'), findsOneWidget);
+    expect(find.text('You will Chose:'), findsNothing);
+    expect(find.text('PC will Chose:'), findsNothing);
+    expect(find.text('Sugestion:'), findsNothing);
     expect(find.text('PC Chose:'), findsOneWidget);
     expect(find.text('PC Chose'), findsNothing);
     expect(find.text('The winner of this round:'), findsNothing);
     expect(find.text('The winner of this round::'), findsNothing);
     expect(find.byIcon(Icons.restart_alt), findsOneWidget);
     expect(find.byKey(const ValueKey('appbar_story_gallery_button')), findsNothing);
+
+    // Verify that "Your Choice:" and "PC's Choice:" are rendered side-by-side on a single row
+    final yourChoiceY = tester.getTopLeft(find.text('Your Choice:')).dy;
+    final pcChoiceY = tester.getTopLeft(find.text("PC's Choice:")).dy;
+    final suggestionY = tester.getTopLeft(find.text('Suggestion:')).dy;
+    expect(yourChoiceY, equals(pcChoiceY));
+    expect(suggestionY, greaterThan(yourChoiceY));
 
     // Initially, Markov matrix is empty -> all three hint chips show '?'
     expect(
