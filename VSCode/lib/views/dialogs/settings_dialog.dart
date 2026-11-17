@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
+import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
 class SettingsDialog extends StatelessWidget {
@@ -291,6 +292,46 @@ class SettingsDialog extends StatelessWidget {
                             loc.t(
                               'story_gallery_title',
                               fallback: 'Story Memories',
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Help / How It Works button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('settings_help_button'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.blueAccent,
+                            side: BorderSide(
+                              color: Colors.blueAccent.withValues(alpha: 0.55),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 9,
+                              horizontal: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () {
+                            controller.audio.playTapVibrate();
+                            showDialog(
+                              context: context,
+                              builder: (_) => HelpDialog(localization: loc),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.help_outline,
+                            size: 18,
+                          ),
+                          label: Text(
+                            loc.t(
+                              'string35',
+                              fallback: 'Help',
                             ),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),

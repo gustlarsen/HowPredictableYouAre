@@ -327,7 +327,23 @@ void main() {
           find.byKey(const ValueKey('watch_rewarded_ad_button')),
           findsOneWidget,
         );
-        expect(find.text('Watch Ad +50 💎'), findsOneWidget);
+        final watchAdButtonFinder = find.byKey(
+          const ValueKey('watch_rewarded_ad_button'),
+        );
+        expect(
+          find.descendant(
+            of: watchAdButtonFinder,
+            matching: find.byIcon(Icons.play_circle_fill_rounded),
+          ),
+          findsNothing,
+        );
+        final watchAdTextFinder = find.descendant(
+          of: watchAdButtonFinder,
+          matching: find.text('Watch Ad +50 💎'),
+        );
+        expect(watchAdTextFinder, findsOneWidget);
+        final watchAdText = tester.widget<Text>(watchAdTextFinder);
+        expect(watchAdText.style?.fontSize, equals(10.5));
 
         // Tap Watch Ad +50 💎 button
         await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));

@@ -1521,4 +1521,52 @@ void main() {
     expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
     expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
   });
+
+  testWidgets('Help button is moved from AppBar into SettingsDialog and opens HelpDialog', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Help icon button is no longer in the top AppBar
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byIcon(Icons.help_outline),
+      ),
+      findsNothing,
+    );
+
+    // Open SettingsDialog -> Help button is present inside Settings
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    final helpBtn = find.byKey(const ValueKey('settings_help_button'));
+    expect(helpBtn, findsOneWidget);
+    await tester.ensureVisible(helpBtn);
+    await tester.tap(helpBtn);
+    await tester.pumpAndSettle();
+
+    // HelpDialog is displayed
+    expect(find.text('How It Works'), findsOneWidget);
+    expect(find.text('💡 Pro Tip: The Markov Model'), findsOneWidget);
+  });
 }

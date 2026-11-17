@@ -11,7 +11,6 @@ import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
-import '../dialogs/help_dialog.dart';
 import '../dialogs/story_dialog.dart';
 
 class GameScreen extends StatefulWidget {
@@ -263,6 +262,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(20),
                   onTap: () => _handleWatchRewardedAd(context, controller),
                   child: Container(
+                    alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 4,
@@ -274,24 +274,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         color: Colors.amber.withValues(alpha: 0.55),
                       ),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.play_circle_fill_rounded,
-                          size: 16,
-                          color: Colors.amber,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          AdService.rewardedAdButtonLabel,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.amber,
-                          ),
-                        ),
-                      ],
+                    child: const Text(
+                      AdService.rewardedAdButtonLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                        color: Colors.amber,
+                      ),
                     ),
                   ),
                 ),
@@ -319,16 +308,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               tooltip: loc.t('string53', fallback: 'RESET'),
               onPressed: () => _confirmReset(context, controller, loc),
             ),
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Help',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => HelpDialog(localization: loc),
-              );
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.shopping_cart_outlined),
             tooltip: 'Shop',
