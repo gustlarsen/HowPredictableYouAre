@@ -3147,6 +3147,159 @@ void main() {
       expect(tester.getRect(rockBtnFinder), equals(initialRockRect));
     },
   );
+
+  testWidgets(
+    'Draw consumes 1 Mana (100 -> 99) with -1 indicator and 0 HP damage, keeps ScoreHeader Gauge fair, and reaches 0 at 100 total rounds',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedPredictability': true,
+        'showPredictability': true,
+        'musicEnabled': false,
+        'animationsEnabled': true,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      final audio = AudioService();
+
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: audio,
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: controller,
+          child: const HowPredictableApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
+      final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
+
+      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, HP stays 100/100, Gauge = 0.0%
+      controller.crystalBallMove = HandMove.rock;
+      await tester.tap(rockBtnFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(controller.lastWinner, RoundWinner.draw);
+      expect(controller.remainingMana, 99);
+      expect(controller.totalRounds, 1);
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 100);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('99')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: manaOrbFinder,
+          matching: find.byKey(const ValueKey('mana_drain_indicator')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('0.0%')),
+        findsOneWidget,
+      );
+
+      await tester.pumpAndSettle();
+
+      // Round 2 (Win): Mana decrements 99 -> 98, Gauge = 100.0%
+      controller.crystalBallMove = HandMove.scissors;
+      await tester.tap(rockBtnFinder);
+      await tester.pumpAndSettle();
+      expect(controller.remainingMana, 98);
+      expect(controller.totalRounds, 2);
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 99);
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('100.0%')),
+        findsOneWidget,
+      );
+
+      // Round 3 (Draw): Mana decrements 98 -> 97, floating -1 shows, HP unchanged, Gauge stays 100.0% (not penalized)
+      controller.crystalBallMove = HandMove.rock;
+      await tester.tap(rockBtnFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(controller.remainingMana, 97);
+      expect(controller.totalRounds, 3);
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 99);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('97')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: manaOrbFinder,
+          matching: find.byKey(const ValueKey('mana_drain_indicator')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('100.0%')),
+        findsOneWidget,
+      );
+
+      await tester.pumpAndSettle();
+
+      // Advance to 99 total rounds (60 wins, 20 losses, 19 draws) and play a Draw on turn 100
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedPredictability': true,
+        'showPredictability': true,
+        'userScore': 60,
+        'pcScore': 20,
+        'total': 99,
+        'musicEnabled': false,
+        'animationsEnabled': false,
+      });
+      final storageAt99 = StorageService();
+      await storageAt99.init();
+      final controllerAt99 = GameController(
+        storage: storageAt99,
+        localization: LocalizationService(),
+        audio: AudioService(),
+      );
+      addTearDown(controllerAt99.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: controllerAt99,
+          child: const HowPredictableApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controllerAt99.remainingMana, 1);
+      controllerAt99.crystalBallMove = HandMove.rock;
+      await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
+      await tester.pumpAndSettle();
+
+      expect(controllerAt99.lastWinner, RoundWinner.draw);
+      expect(controllerAt99.totalRounds, 100);
+      expect(controllerAt99.remainingMana, 0);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('0')),
+        findsOneWidget,
+      );
+      // 100-round completion dialog fires with fair decisive win rate (60 / 80 = 75.0%)
+      expect(find.text('TRY AGAIN'), findsOneWidget);
+      expect(find.textContaining('75.0%'), findsWidgets);
+    },
+  );
 }
 
 class _SettingsTestPlayGamesClient implements PlayGamesClient {

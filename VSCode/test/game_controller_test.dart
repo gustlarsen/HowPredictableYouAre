@@ -1178,7 +1178,7 @@ void main() {
     expect(controller.shouldShowGiftBox, isTrue);
   });
 
-  test('remainingMana tracks 100-to-0 match countdown, clamps at 0 on 100 rounds, and resets back to 100', () async {
+  test('remainingMana tracks 100-to-0 match countdown across wins, losses, and draws, clamps at 0 on 100 rounds, and resets back to 100', () async {
     SharedPreferences.setMockInitialValues({
       'musicEnabled': false,
     });
@@ -1187,33 +1187,61 @@ void main() {
     expect(controller.totalRounds, 0);
     expect(controller.remainingMana, 100);
 
-    // Win a round -> totalRounds = 1, remainingMana = 99
-    controller.crystalBallMove = HandMove.scissors;
-    controller.playTurn(HandMove.rock);
-    expect(controller.totalRounds, 1);
-    expect(controller.remainingMana, 99);
-
-    // Lose a round -> totalRounds = 2, remainingMana = 98
-    controller.crystalBallMove = HandMove.paper;
-    controller.playTurn(HandMove.rock);
-    expect(controller.totalRounds, 2);
-    expect(controller.remainingMana, 98);
-
-    // Draw does not increment totalRounds -> remainingMana stays 98
+    // Draw on round 1 -> totalRounds = 1, remainingMana = 99, 0 HP damage, Gauge = 0.0%
     controller.crystalBallMove = HandMove.rock;
     controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.draw);
+    expect(controller.totalRounds, 1);
+    expect(controller.remainingMana, 99);
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 100);
+    expect(controller.percentPredict, 0.0);
+
+    // Win on round 2 -> totalRounds = 2, remainingMana = 98, Gauge = 100.0%
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.user);
     expect(controller.totalRounds, 2);
     expect(controller.remainingMana, 98);
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 99);
+    expect(controller.percentPredict, 100.0);
+
+    // Draw on round 3 -> totalRounds = 3, remainingMana = 97, 0 HP damage, Gauge stays 100.0%
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.paper);
+    expect(controller.lastWinner, RoundWinner.draw);
+    expect(controller.totalRounds, 3);
+    expect(controller.remainingMana, 97);
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 99);
+    expect(controller.percentPredict, 100.0);
+
+    // Lose on round 4 -> totalRounds = 4, remainingMana = 96, Gauge = 50.0% (1 win / 2 decisive rounds)
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.computer);
+    expect(controller.totalRounds, 4);
+    expect(controller.remainingMana, 96);
+    expect(controller.userHp, 99);
+    expect(controller.computerHp, 99);
+    expect(controller.percentPredict, 50.0);
+    expect(storage.total, 4);
+
+    // Persisted totalRounds including draws restores remainingMana accurately
+    await createController();
+    expect(controller.totalRounds, 4);
+    expect(controller.remainingMana, 96);
 
     // Reset restores remainingMana to 100
     controller.resetGame();
     expect(controller.totalRounds, 0);
     expect(controller.remainingMana, 100);
 
-    // Play to 100 rounds -> remainingMana hits 0 and triggers 100-rounds alert
+    // Play to 100 total rounds including draws (40 wins, 30 losses, 29 draws -> 100th turn is a Draw)
     SharedPreferences.setMockInitialValues({
-      'userScore': 50,
-      'pcScore': 49,
+      'userScore': 40,
+      'pcScore': 30,
       'total': 99,
       'musicEnabled': false,
     });
@@ -1221,19 +1249,61 @@ void main() {
     expect(controller.remainingMana, 1);
     expect(controller.is100RoundsAlertPending, isFalse);
 
-    controller.crystalBallMove = HandMove.scissors;
+    controller.crystalBallMove = HandMove.rock;
     controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.draw);
     expect(controller.totalRounds, 100);
     expect(controller.remainingMana, 0);
     expect(controller.is100RoundsAlertPending, isTrue);
+    expect(controller.percentPredict, closeTo((40 / 70) * 100.0, 1e-6));
+    expect(controller.evaluationTier.key, isNot('string3'));
 
     // Further turns at 100 rounds do not drop remainingMana below 0
     controller.playTurn(HandMove.rock);
+    expect(controller.totalRounds, 100);
     expect(controller.remainingMana, 0);
 
     // resetAllProgress also restores remainingMana to 100
     await controller.resetAllProgress();
     expect(controller.totalRounds, 0);
     expect(controller.remainingMana, 100);
+  });
+
+  test('Playing 100 full turns from 0 including draws reaches remainingMana == 0 and triggers completion', () async {
+    await createController(resetPreferences: true);
+
+    for (var i = 0; i < 50; i++) {
+      // Draw
+      controller.crystalBallMove = HandMove.rock;
+      controller.playTurn(HandMove.rock);
+    }
+    expect(controller.totalRounds, 50);
+    expect(controller.remainingMana, 50);
+    expect(controller.userHp, 100);
+    expect(controller.computerHp, 100);
+    expect(controller.percentPredict, 0.0);
+    expect(controller.is100RoundsAlertPending, isFalse);
+
+    for (var i = 0; i < 30; i++) {
+      // Win
+      controller.crystalBallMove = HandMove.scissors;
+      controller.playTurn(HandMove.rock);
+    }
+    for (var i = 0; i < 19; i++) {
+      // Loss
+      controller.crystalBallMove = HandMove.paper;
+      controller.playTurn(HandMove.rock);
+    }
+    expect(controller.totalRounds, 99);
+    expect(controller.remainingMana, 1);
+    expect(controller.is100RoundsAlertPending, isFalse);
+
+    // 100th turn is a Draw -> hits 100 rounds, 0 Mana, triggers completion
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.scissors);
+    expect(controller.totalRounds, 100);
+    expect(controller.remainingMana, 0);
+    expect(controller.is100RoundsAlertPending, isTrue);
+    expect(controller.percentPredict, closeTo((30 / 49) * 100.0, 1e-6));
   });
 }

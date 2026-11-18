@@ -579,9 +579,11 @@ class GameController extends ChangeNotifier {
       lastUserMove != null ||
       _engine.matrix.any((row) => row.any((count) => count > 0));
 
+  int get decisiveRounds => userScore + pcScore;
+
   double get percentPredict {
-    if (totalRounds == 0) return 0.0;
-    return (userScore / totalRounds) * 100.0;
+    if (decisiveRounds == 0) return 0.0;
+    return (userScore / decisiveRounds) * 100.0;
   }
 
   /// True when the Predictability Score upgrade is both unlocked and toggled ON.
@@ -590,7 +592,7 @@ class GameController extends ChangeNotifier {
 
   EvaluationTier get evaluationTier {
     final pcPredictPercent =
-        totalRounds == 0 ? 0.0 : (pcScore / totalRounds) * 100.0;
+        decisiveRounds == 0 ? 0.0 : (pcScore / decisiveRounds) * 100.0;
     return EvaluationTier.fromPercent(pcPredictPercent, totalRounds);
   }
 
@@ -637,7 +639,7 @@ class GameController extends ChangeNotifier {
       audio.playDefeat();
     }
 
-    totalRounds = userScore + pcScore;
+    totalRounds += 1;
     storage.setTotal(totalRounds);
 
     // Record transition into Markov matrix
@@ -651,7 +653,7 @@ class GameController extends ChangeNotifier {
       _triggerCloudSave();
     }
 
-    if (totalRounds == 100) {
+    if (totalRounds >= 100) {
       is100RoundsAlertPending = true;
     }
 
