@@ -5,10 +5,79 @@ import '../../services/play_games_service.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import 'shop_dialog.dart';
 
-class InventoryDialog extends StatelessWidget {
+class InventoryDialog extends StatefulWidget {
   final GameController controller;
 
   const InventoryDialog({super.key, required this.controller});
+
+  @override
+  State<InventoryDialog> createState() => _InventoryDialogState();
+}
+
+class _InventoryDialogState extends State<InventoryDialog>
+    with TickerProviderStateMixin {
+  static const double _backpackSize = 86.0;
+  static const double _topOverhang = 24.0;
+
+  late final AnimationController _openController;
+  late final Animation<double> _openCurve;
+  late final Animation<double> _bounceCurve;
+  late final AnimationController _glowController;
+
+  GameController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _openController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _openCurve = CurvedAnimation(
+      parent: _openController,
+      curve: Curves.easeOutCubic,
+    );
+    _bounceCurve = CurvedAnimation(
+      parent: _openController,
+      curve: Curves.easeOutBack,
+    );
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+
+    _syncAnimations(fromStart: true);
+    controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    _syncAnimations(fromStart: false);
+  }
+
+  void _syncAnimations({required bool fromStart}) {
+    if (controller.animationsEnabled) {
+      if (fromStart) {
+        _openController.forward(from: 0.0);
+      }
+      if (!_glowController.isAnimating) {
+        _glowController.repeat();
+      }
+    } else {
+      _openController.stop();
+      _openController.value = 1.0;
+      _glowController.stop();
+      _glowController.value = 0.25;
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(_onControllerChanged);
+    _openController.dispose();
+    _glowController.dispose();
+    super.dispose();
+  }
 
   void _handleBackpackIconTap(BuildContext context) {
     final granted = controller.registerBackpackQaTap();
@@ -32,92 +101,101 @@ class InventoryDialog extends StatelessWidget {
         final loc = controller.localization;
         final theme = Theme.of(context);
         final isNewHandsActive = controller.showNewHands;
+        final ownedOrbs = {
+          for (final move in HandMove.values)
+            if (controller.orbsFor(move) > 0) move,
+        };
 
         return Dialog(
           key: const ValueKey('inventory_dialog'),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 18.0,
-            vertical: 24.0,
+            vertical: 20.0,
           ),
-          backgroundColor: const Color(0xFF14161D),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(
-              color: Colors.amber.withValues(alpha: 0.45),
-              width: 1.4,
-            ),
-          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18.0, 18.0, 18.0, 14.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header
-                  Row(
-                    children: [
-                      GestureDetector(
-                        key: const ValueKey('inventory_header_backpack_icon'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => _handleBackpackIconTap(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.amber.withValues(alpha: 0.5),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.amber.withValues(alpha: 0.25),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: const RpgBackpackIcon(
-                            size: 34,
-                          ),
-                        ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Dialog Card Body (offset downward so open backpack overlaps top-left)
+                Padding(
+                  padding: const EdgeInsets.only(top: _topOverhang),
+                  child: Container(
+                    key: const ValueKey('inventory_dialog_card'),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14161D),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.45),
+                        width: 1.4,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              loc.t(
-                                'inventory_title',
-                                fallback: "Cleric's Backpack",
-                              ),
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              loc.t(
-                                'inventory_subtitle',
-                                fallback: 'Elemental Energy Orbs Inventory',
-                              ),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: Colors.amber.withValues(alpha: 0.85),
-                              ),
-                            ),
-                          ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
                         ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        18.0,
+                        16.0,
+                        18.0,
+                        14.0,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    height: 1,
-                    color: Colors.amber.withValues(alpha: 0.22),
-                  ),
-                  const SizedBox(height: 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Header text positioned to the right of the overlapping backpack
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 54),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 88.0),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      loc.t(
+                                        'inventory_title',
+                                        fallback: "Cleric's Backpack",
+                                      ),
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      loc.t(
+                                        'inventory_subtitle',
+                                        fallback:
+                                            'Elemental Energy Orbs Inventory',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Divider(
+                            height: 1,
+                            color: Colors.amber.withValues(alpha: 0.22),
+                          ),
+                          const SizedBox(height: 12),
 
                   // 5 Elemental Orb Cards
                   Flexible(
@@ -220,8 +298,52 @@ class InventoryDialog extends StatelessWidget {
                       ),
                     ],
                   ),
-                ],
-              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Overlapping Open Backpack Illustration at Top-Left Corner (No Square Box)
+                Positioned(
+                  top: 0,
+                  left: 10,
+                  child: GestureDetector(
+                    key: const ValueKey('inventory_header_backpack_icon'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _handleBackpackIconTap(context),
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _openController,
+                        _glowController,
+                      ]),
+                      builder: (context, _) {
+                        final animationsEnabled = controller.animationsEnabled;
+                        final openProgress = animationsEnabled
+                            ? _openCurve.value.clamp(0.0, 1.0)
+                            : 1.0;
+                        final bounceScale = animationsEnabled
+                            ? 0.80 + 0.20 * _bounceCurve.value
+                            : 1.0;
+                        final ambientGlowPhase =
+                            animationsEnabled ? _glowController.value : 0.25;
+
+                        return Transform.scale(
+                          scale: bounceScale,
+                          alignment: Alignment.bottomCenter,
+                          child: RpgBackpackIcon(
+                            size: _backpackSize,
+                            isOpen: true,
+                            openProgress: openProgress,
+                            ambientGlowPhase: ambientGlowPhase,
+                            ownedOrbs: ownedOrbs,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );

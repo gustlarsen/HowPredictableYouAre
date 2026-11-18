@@ -2054,7 +2054,8 @@ void main() {
     final backpackBtn = find.byKey(const ValueKey('backpack_inventory_button'));
     expect(backpackBtn, findsOneWidget);
     await tester.tap(backpackBtn);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.byType(InventoryDialog), findsOneWidget);
     expect(find.text("Cleric's Backpack"), findsOneWidget);
@@ -2065,7 +2066,9 @@ void main() {
         matching: find.byType(RpgBackpackIcon),
       ),
     );
-    expect(headerBackpack.size, inInclusiveRange(32.0, 36.0));
+    expect(headerBackpack.size, inInclusiveRange(80.0, 90.0));
+    expect(headerBackpack.isOpen, isTrue);
+    expect(headerBackpack.ownedOrbs, equals(HandMove.values.toSet()));
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('inventory_orb_count_fire')),
@@ -2643,8 +2646,15 @@ void main() {
     expect(size, equals(const Size(28.0, 28.0)));
   });
 
-  testWidgets("InventoryDialog header displays brown leather RpgBackpackIcon unified with AppBar visual identity (size 32px-36px)", (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({});
+  testWidgets("InventoryDialog header displays large overlapping open RpgBackpackIcon (80px-90px) without square box, animates opening/glow, and reflects owned orbs", (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 5,
+      'orbs_water': 0,
+      'orbs_wood': 2,
+      'orbs_earth': 0,
+      'orbs_metal': 1,
+      'animationsEnabled': true,
+    });
     final storage = StorageService();
     await storage.init();
     final localization = LocalizationService();
@@ -2654,6 +2664,7 @@ void main() {
       localization: localization,
       audio: audio,
     );
+    addTearDown(controller.dispose);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -2666,14 +2677,95 @@ void main() {
     expect(find.byType(InventoryDialog), findsOneWidget);
     expect(find.byIcon(Icons.backpack_rounded), findsNothing);
 
+    final headerBackpackContainerFinder =
+        find.byKey(const ValueKey('inventory_header_backpack_icon'));
     final headerBackpackFinder = find.descendant(
-      of: find.byKey(const ValueKey('inventory_header_backpack_icon')),
+      of: headerBackpackContainerFinder,
       matching: find.byType(RpgBackpackIcon),
     );
     expect(headerBackpackFinder, findsOneWidget);
 
-    final backpackWidget = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
-    expect(backpackWidget.size, inInclusiveRange(32.0, 36.0));
+    // No square golden Container box wrapping the backpack icon
+    expect(
+      find.descendant(
+        of: headerBackpackContainerFinder,
+        matching: find.byType(Container),
+      ),
+      findsNothing,
+    );
+
+    // Early in the ~300ms entrance/open transition
+    await tester.pump(const Duration(milliseconds: 100));
+    final earlyBackpack = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(earlyBackpack.size, inInclusiveRange(80.0, 90.0));
+    expect(earlyBackpack.isOpen, isTrue);
+    expect(earlyBackpack.openProgress, lessThan(1.0));
+    expect(
+      earlyBackpack.ownedOrbs,
+      equals({HandMove.rock, HandMove.scissors, HandMove.spock}),
+    );
+
+    // Finish the ~300ms entrance/open animation
+    await tester.pump(const Duration(milliseconds: 250));
+    final openBackpack = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(openBackpack.openProgress, closeTo(1.0, 1e-4));
+
+    // Backpack overlaps/extends above the top edge of the dialog card and stays clear of title text
+    final backpackRect = tester.getRect(headerBackpackFinder);
+    final cardRect =
+        tester.getRect(find.byKey(const ValueKey('inventory_dialog_card')));
+    final titleRect = tester.getRect(find.text("Cleric's Backpack"));
+    expect(backpackRect.top, lessThan(cardRect.top));
+    expect(backpackRect.right, lessThanOrEqualTo(titleRect.left));
+
+    // Gentle looping radial glow phase continues advancing over time
+    final phaseBefore = openBackpack.ambientGlowPhase;
+    await tester.pump(const Duration(milliseconds: 400));
+    final laterBackpack = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(laterBackpack.ambientGlowPhase, isNot(equals(phaseBefore)));
+
+    // Dynamically reflects inventory changes (e.g., acquiring Water & Earth orbs)
+    controller.waterOrbs = 3;
+    controller.earthOrbs = 4;
+    controller.notifyListeners();
+    await tester.pump();
+    final updatedBackpack = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(updatedBackpack.ownedOrbs, equals(HandMove.values.toSet()));
+
+    // All-zero inventory shows empty ownedOrbs set inside open bag
+    controller.fireOrbs = 0;
+    controller.waterOrbs = 0;
+    controller.woodOrbs = 0;
+    controller.earthOrbs = 0;
+    controller.metalOrbs = 0;
+    controller.notifyListeners();
+    await tester.pump();
+    final emptyBackpack = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(emptyBackpack.ownedOrbs, isEmpty);
+  });
+
+  testWidgets('RpgBackpackIcon open mode renders cleanly across 0 to 5 owned orbs', (WidgetTester tester) async {
+    for (int count = 0; count <= HandMove.values.length; count++) {
+      final subset = HandMove.values.take(count).toSet();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: RpgBackpackIcon(
+                size: 86.0,
+                isOpen: true,
+                openProgress: 1.0,
+                ambientGlowPhase: 0.4,
+                ownedOrbs: subset,
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(RpgBackpackIcon), findsOneWidget);
+      expect(tester.getSize(find.byType(RpgBackpackIcon)), equals(const Size(86.0, 86.0)));
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('Gift Box Shop unlock, toggle ON/OFF, AppBar visibility, cooldown pause/resume, and localization', (WidgetTester tester) async {
