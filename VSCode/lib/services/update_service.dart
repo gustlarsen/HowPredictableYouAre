@@ -33,6 +33,14 @@ class DefaultInAppUpdateClient implements InAppUpdateClient {
       InAppUpdate.completeFlexibleUpdate();
 }
 
+/// Result of a user-initiated manual update check from Settings.
+enum ManualUpdateCheckResult {
+  updateStarted,
+  updateAlreadyDownloaded,
+  upToDate,
+  unavailable,
+}
+
 /// Manages Google Play In-App Updates in Flexible mode with silent offline
 /// and sideloaded-build fallback.
 class UpdateService extends ChangeNotifier {
@@ -45,6 +53,7 @@ class UpdateService extends ChangeNotifier {
   StreamSubscription<InstallStatus>? _installStatusSubscription;
 
   bool _isChecking = false;
+  bool _isManualChecking = false;
   bool _isDownloading = false;
   bool _isUpdateAvailable = false;
   bool _isUpdateDownloaded = false;
@@ -69,7 +78,8 @@ class UpdateService extends ChangeNotifier {
       _isAndroidOverride ??
       (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
 
-  bool get isChecking => _isChecking;
+  bool get isChecking => _isChecking || _isManualChecking;
+  bool get isManualChecking => _isManualChecking;
   bool get isDownloading => _isDownloading;
   bool get isUpdateAvailable => _isUpdateAvailable;
   bool get isUpdateDownloaded => _isUpdateDownloaded;
@@ -180,6 +190,90 @@ class UpdateService extends ChangeNotifier {
       _isChecking = false;
       _isDownloading = false;
       notifyListeners();
+    }
+  }
+
+  /// Manually checks Google Play for an available update when triggered by the
+  /// user from Settings:
+  /// - Returns [ManualUpdateCheckResult.updateAlreadyDownloaded] if an update is
+  ///   already downloaded and ready to install.
+  /// - Triggers [InAppUpdateClient.startFlexibleUpdate] immediately if a new
+  ///   version is available and returns [ManualUpdateCheckResult.updateStarted].
+  /// - Returns [ManualUpdateCheckResult.upToDate] when no update is available.
+  /// - Returns [ManualUpdateCheckResult.unavailable] when offline, sideloaded,
+  ///   on an unsupported platform, or when Play Services throws an error.
+  Future<ManualUpdateCheckResult> checkForUpdateManually() async {
+    if (!isSupportedPlatform) {
+      return ManualUpdateCheckResult.unavailable;
+    }
+
+    if (_isUpdateDownloaded) {
+      return ManualUpdateCheckResult.updateAlreadyDownloaded;
+    }
+
+    if (_isManualChecking || _isDownloading) {
+      return ManualUpdateCheckResult.updateStarted;
+    }
+
+    _isManualChecking = true;
+    notifyListeners();
+    _ensureInstallListenerSubscribed();
+
+    try {
+      final info = await _client.checkForUpdate();
+      _updateInfo = info;
+      _installStatus = info.installStatus;
+      _isUpdateAvailable =
+          info.updateAvailability == UpdateAvailability.updateAvailable;
+
+      if (info.installStatus == InstallStatus.downloaded) {
+        _isManualChecking = false;
+        _isDownloading = false;
+        _markUpdateDownloaded();
+        return ManualUpdateCheckResult.updateAlreadyDownloaded;
+      }
+
+      if (info.updateAvailability ==
+              UpdateAvailability.developerTriggeredUpdateInProgress &&
+          (info.installStatus == InstallStatus.pending ||
+              info.installStatus == InstallStatus.downloading)) {
+        _isManualChecking = false;
+        _isDownloading = true;
+        notifyListeners();
+        return ManualUpdateCheckResult.updateStarted;
+      }
+
+      if (info.updateAvailability == UpdateAvailability.updateAvailable &&
+          info.flexibleUpdateAllowed) {
+        _isManualChecking = false;
+        _isDownloading = true;
+        notifyListeners();
+
+        final result = await _client.startFlexibleUpdate();
+        _isDownloading = false;
+        if (result == AppUpdateResult.success) {
+          _markUpdateDownloaded();
+          return ManualUpdateCheckResult.updateStarted;
+        }
+        notifyListeners();
+        if (result == AppUpdateResult.inAppUpdateFailed) {
+          return ManualUpdateCheckResult.unavailable;
+        }
+        return ManualUpdateCheckResult.updateStarted;
+      }
+
+      _isManualChecking = false;
+      notifyListeners();
+      if (info.updateAvailability == UpdateAvailability.updateNotAvailable) {
+        return ManualUpdateCheckResult.upToDate;
+      }
+
+      return ManualUpdateCheckResult.unavailable;
+    } catch (_) {
+      _isManualChecking = false;
+      _isDownloading = false;
+      notifyListeners();
+      return ManualUpdateCheckResult.unavailable;
     }
   }
 

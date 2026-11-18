@@ -22,6 +22,7 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
   bool shouldThrowOnCheck;
   bool shouldThrowOnStartFlexible;
   bool shouldThrowOnComplete;
+  Completer<AppUpdateInfo>? checkForUpdateCompleter;
   Completer<AppUpdateResult>? flexibleUpdateCompleter;
 
   int checkForUpdateCallCount = 0;
@@ -34,6 +35,7 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
     this.shouldThrowOnCheck = false,
     this.shouldThrowOnStartFlexible = false,
     this.shouldThrowOnComplete = false,
+    this.checkForUpdateCompleter,
     this.flexibleUpdateCompleter,
   }) : updateInfo =
            updateInfo ??
@@ -57,6 +59,9 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
   @override
   Future<AppUpdateInfo> checkForUpdate() async {
     checkForUpdateCallCount++;
+    if (checkForUpdateCompleter != null) {
+      return checkForUpdateCompleter!.future;
+    }
     if (shouldThrowOnCheck) {
       throw PlatformException(
         code: 'TASK_FAILURE',
@@ -345,6 +350,350 @@ void main() {
         await tester.pump();
 
         expect(fakeClient.completeFlexibleUpdateCallCount, 1);
+      },
+    );
+
+    test(
+      '6. checkForUpdateManually returns accurate ManualUpdateCheckResult across up-to-date, update-available, already-downloaded, and error/unsupported states',
+      () async {
+        // A. Up to date
+        final upToDateClient = FakeInAppUpdateClient();
+        addTearDown(upToDateClient.dispose);
+        final upToDateService = UpdateService(client: upToDateClient);
+        addTearDown(upToDateService.dispose);
+
+        expect(
+          await upToDateService.checkForUpdateManually(),
+          ManualUpdateCheckResult.upToDate,
+        );
+        expect(upToDateClient.checkForUpdateCallCount, 1);
+        expect(upToDateClient.startFlexibleUpdateCallCount, 0);
+
+        // B. Update available -> starts flexible update immediately
+        final availableClient = FakeInAppUpdateClient(
+          updateInfo: AppUpdateInfo(
+            updateAvailability: UpdateAvailability.updateAvailable,
+            immediateUpdateAllowed: false,
+            immediateAllowedPreconditions: const [],
+            flexibleUpdateAllowed: true,
+            flexibleAllowedPreconditions: const [],
+            availableVersionCode: 105,
+            installStatus: InstallStatus.pending,
+            packageName: 'com.howpredictable.app',
+            clientVersionStalenessDays: 1,
+            updatePriority: 2,
+          ),
+        );
+        addTearDown(availableClient.dispose);
+        final availableService = UpdateService(client: availableClient);
+        addTearDown(availableService.dispose);
+
+        expect(
+          await availableService.checkForUpdateManually(),
+          ManualUpdateCheckResult.updateStarted,
+        );
+        expect(availableClient.checkForUpdateCallCount, 1);
+        expect(availableClient.startFlexibleUpdateCallCount, 1);
+        expect(availableService.isUpdateDownloaded, isTrue);
+
+        // Calling again when already downloaded prompts installation immediately
+        expect(
+          await availableService.checkForUpdateManually(),
+          ManualUpdateCheckResult.updateAlreadyDownloaded,
+        );
+        expect(availableClient.startFlexibleUpdateCallCount, 1);
+
+        // C. Offline / Play Store error -> unavailable
+        final errorClient = FakeInAppUpdateClient(shouldThrowOnCheck: true);
+        addTearDown(errorClient.dispose);
+        final errorService = UpdateService(client: errorClient);
+        addTearDown(errorService.dispose);
+
+        expect(
+          await errorService.checkForUpdateManually(),
+          ManualUpdateCheckResult.unavailable,
+        );
+        expect(errorService.isChecking, isFalse);
+
+        // D. Non-Android platform -> unavailable without querying Play Store
+        final iosService = UpdateService(
+          client: upToDateClient,
+          isAndroidOverride: false,
+        );
+        addTearDown(iosService.dispose);
+        expect(
+          await iosService.checkForUpdateManually(),
+          ManualUpdateCheckResult.unavailable,
+        );
+        expect(upToDateClient.checkForUpdateCallCount, 1);
+      },
+    );
+
+    testWidgets(
+      '7. Tapping version button in SettingsDialog shows loading indicator while checking, triggers flexible update when available, and prompts installation when downloaded',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakeInAppUpdateClient();
+        addTearDown(fakeClient.dispose);
+
+        final updateService = UpdateService(client: fakeClient);
+        addTearDown(updateService.dispose);
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          updateService: updateService,
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Open SettingsDialog
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        final versionBtn = find.byKey(
+          const ValueKey('settings_version_check_button'),
+        );
+        expect(versionBtn, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings_version_update_icon')),
+          findsOneWidget,
+        );
+
+        // Prepare a pending check to verify compact loading indicator & disabled state
+        final checkCompleter = Completer<AppUpdateInfo>();
+        fakeClient.checkForUpdateCompleter = checkCompleter;
+        fakeClient.checkForUpdateCallCount = 0;
+
+        await tester.tap(versionBtn);
+        await tester.pump();
+
+        expect(
+          find.byKey(const ValueKey('settings_version_loading_indicator')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('settings_version_update_icon')),
+          findsNothing,
+        );
+        // Tapping again while checking is ignored (disabled)
+        await tester.tap(versionBtn);
+        await tester.pump();
+        expect(fakeClient.checkForUpdateCallCount, 1);
+
+        // Complete with an available flexible update
+        checkCompleter.complete(
+          AppUpdateInfo(
+            updateAvailability: UpdateAvailability.updateAvailable,
+            immediateUpdateAllowed: false,
+            immediateAllowedPreconditions: const [],
+            flexibleUpdateAllowed: true,
+            flexibleAllowedPreconditions: const [],
+            availableVersionCode: 105,
+            installStatus: InstallStatus.pending,
+            packageName: 'com.howpredictable.app',
+            clientVersionStalenessDays: 1,
+            updatePriority: 2,
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(fakeClient.startFlexibleUpdateCallCount, 1);
+        expect(
+          find.byKey(const ValueKey('update_install_dialog')),
+          findsOneWidget,
+        );
+        expect(find.text(UpdateService.updateReadyMessage), findsOneWidget);
+        expect(find.text(UpdateService.restartActionLabel), findsOneWidget);
+
+        // Dismiss prompt with Later, then tap version button again -> prompts immediately
+        await tester.tap(
+          find.byKey(const ValueKey('update_install_later_button')),
+        );
+        await tester.pumpAndSettle();
+
+        fakeClient.checkForUpdateCompleter = null;
+        await tester.tap(versionBtn);
+        await tester.pumpAndSettle();
+
+        expect(fakeClient.startFlexibleUpdateCallCount, 1);
+        expect(
+          find.byKey(const ValueKey('update_install_dialog')),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('update_install_restart_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(fakeClient.completeFlexibleUpdateCallCount, 1);
+      },
+    );
+
+    testWidgets(
+      '8. Tapping version button in SettingsDialog when up to date shows localized SnackBar in English and Portuguese',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await localization.load();
+
+        final fakeClient = FakeInAppUpdateClient();
+        addTearDown(fakeClient.dispose);
+
+        final updateService = UpdateService(client: fakeClient);
+        addTearDown(updateService.dispose);
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          updateService: updateService,
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        final versionBtn = find.byKey(
+          const ValueKey('settings_version_check_button'),
+        );
+
+        // English check
+        await tester.tap(versionBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          find.byKey(const ValueKey('update_up_to_date_snackbar')),
+          findsOneWidget,
+        );
+        expect(find.text("You're on the latest version!"), findsOneWidget);
+
+        // Switch to Portuguese and re-check
+        controller.setLanguage('pt');
+        await tester.pumpAndSettle();
+
+        await tester.tap(versionBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          find.byKey(const ValueKey('update_up_to_date_snackbar')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Você já está na versão mais recente!'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      '9. Tapping version button in SettingsDialog fails gracefully when offline or sideloaded and shows localized error SnackBar',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await localization.load();
+
+        final fakeClient = FakeInAppUpdateClient(shouldThrowOnCheck: true);
+        addTearDown(fakeClient.dispose);
+
+        final updateService = UpdateService(client: fakeClient);
+        addTearDown(updateService.dispose);
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          updateService: updateService,
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        final versionBtn = find.byKey(
+          const ValueKey('settings_version_check_button'),
+        );
+
+        // English offline/sideloaded error fallback
+        await tester.tap(versionBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          find.byKey(const ValueKey('update_unavailable_snackbar')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Could not check for updates. Make sure you installed via Google Play and are online.',
+          ),
+          findsOneWidget,
+        );
+        expect(updateService.isChecking, isFalse);
+
+        // Portuguese offline/sideloaded error fallback
+        controller.setLanguage('pt');
+        await tester.pumpAndSettle();
+
+        await tester.tap(versionBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          find.text(
+            'Não foi possível verificar atualizações. Certifique-se de ter instalado pela Google Play e estar online.',
+          ),
+          findsOneWidget,
+        );
       },
     );
   });

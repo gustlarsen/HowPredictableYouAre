@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
+import '../../services/update_service.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
@@ -129,6 +130,139 @@ class _SettingsDialogState extends State<SettingsDialog> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: Colors.amber.withValues(alpha: 0.45)),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _handleCheckForUpdates(BuildContext context) async {
+    controller.audio.playTapVibrate();
+    final loc = controller.localization;
+    final result = await controller.checkForUpdateManually();
+    if (!context.mounted) return;
+
+    switch (result) {
+      case ManualUpdateCheckResult.updateStarted:
+        if (controller.consumePendingUpdateSnackBar()) {
+          await _promptCompleteUpdateDialog(context);
+        }
+        break;
+      case ManualUpdateCheckResult.updateAlreadyDownloaded:
+        controller.consumePendingUpdateSnackBar();
+        await _promptCompleteUpdateDialog(context);
+        break;
+      case ManualUpdateCheckResult.upToDate:
+        _showThemedUpdateSnackBar(
+          context,
+          key: const ValueKey('update_up_to_date_snackbar'),
+          icon: Icons.check_circle_outline_rounded,
+          message: loc.t(
+            'update_latest_version',
+            fallback: "You're on the latest version!",
+          ),
+        );
+        break;
+      case ManualUpdateCheckResult.unavailable:
+        _showThemedUpdateSnackBar(
+          context,
+          key: const ValueKey('update_unavailable_snackbar'),
+          icon: Icons.cloud_off_rounded,
+          message: loc.t(
+            'update_check_unavailable',
+            fallback:
+                'Could not check for updates. Make sure you installed via Google Play and are online.',
+          ),
+        );
+        break;
+    }
+  }
+
+  Future<void> _promptCompleteUpdateDialog(BuildContext context) async {
+    final loc = controller.localization;
+    final shouldRestart = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('update_install_dialog'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.system_update_rounded,
+              color: Colors.amber,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.t('update_ready_title', fallback: 'Update Ready'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(UpdateService.updateReadyMessage),
+        actions: [
+          TextButton(
+            key: const ValueKey('update_install_later_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(loc.t('update_later', fallback: 'Later')),
+          ),
+          ElevatedButton(
+            key: const ValueKey('update_install_restart_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black87,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text(
+              UpdateService.restartActionLabel,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (shouldRestart == true) {
+      await controller.completeFlexibleUpdate();
+    }
+  }
+
+  void _showThemedUpdateSnackBar(
+    BuildContext context, {
+    required Key key,
+    required IconData icon,
+    required String message,
+  }) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: key,
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF16181D),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: Colors.amber.withValues(alpha: 0.55),
+              width: 1.2,
+            ),
+          ),
+          duration: const Duration(seconds: 3),
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.amber, size: 19),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -571,15 +705,109 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         final versionText =
                             snapshot.data ??
                             SettingsDialog.fallbackVersionLabel;
-                        return Text(
-                          versionText,
-                          key: const ValueKey('settings_version_label'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.72),
+                        final isBusy =
+                            controller.updateService.isManualChecking ||
+                            controller.updateService.isDownloading;
+                        final isDownloaded =
+                            controller.updateService.isUpdateDownloaded;
+                        final accentColor = isBusy
+                            ? Colors.amber.withValues(alpha: 0.55)
+                            : Colors.amber;
+                        return Tooltip(
+                          message: loc.t(
+                            'check_for_updates',
+                            fallback: 'Check for updates',
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const ValueKey(
+                                'settings_version_check_button',
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              splashColor: Colors.amber.withValues(alpha: 0.16),
+                              highlightColor: Colors.amber.withValues(
+                                alpha: 0.08,
+                              ),
+                              onTap: isBusy
+                                  ? null
+                                  : () => _handleCheckForUpdates(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.amber.withValues(
+                                          alpha: isBusy ? 0.04 : 0.08,
+                                        )
+                                      : Colors.amber.withValues(
+                                          alpha: isBusy ? 0.06 : 0.12,
+                                        ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.amber.withValues(
+                                      alpha: isBusy ? 0.22 : 0.35,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isBusy)
+                                      SizedBox(
+                                        key: const ValueKey(
+                                          'settings_version_loading_indicator',
+                                        ),
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.8,
+                                          color: accentColor,
+                                        ),
+                                      )
+                                    else
+                                      Icon(
+                                        isDownloaded
+                                            ? Icons.system_update_rounded
+                                            : Icons.refresh_rounded,
+                                        key: const ValueKey(
+                                          'settings_version_update_icon',
+                                        ),
+                                        size: 14,
+                                        color: accentColor.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                      ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        versionText,
+                                        key: const ValueKey(
+                                          'settings_version_label',
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: isBusy
+                                              ? theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant
+                                                    .withValues(alpha: 0.5)
+                                              : theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant
+                                                    .withValues(alpha: 0.85),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         );
                       },

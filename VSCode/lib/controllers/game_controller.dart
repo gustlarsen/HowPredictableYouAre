@@ -320,6 +320,10 @@ class GameController extends ChangeNotifier {
   /// Checks Google Play for an available flexible in-app update asynchronously.
   Future<void> checkForUpdate() => updateService.checkForUpdate();
 
+  /// Manually checks Google Play for an available in-app update from Settings.
+  Future<ManualUpdateCheckResult> checkForUpdateManually() =>
+      updateService.checkForUpdateManually();
+
   /// Completes installation and restarts the app when a flexible update has
   /// finished downloading in the background.
   Future<bool> completeFlexibleUpdate() =>
