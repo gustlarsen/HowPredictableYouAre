@@ -488,6 +488,8 @@ void main() {
           'orbs_fire': 500,
           'orbs_water': 500,
           'orbs_wood': 500,
+          'giftBoxUnlocked': true,
+          'giftBoxEnabled': true,
           'musicEnabled': false,
         });
         final storage = StorageService();
@@ -551,6 +553,80 @@ void main() {
         expect(syncedData.soundEnabled, isFalse);
         expect(syncedData.vibrationEnabled, isFalse);
         expect(syncedData.animationsEnabled, isFalse);
+      },
+    );
+
+    test(
+      'CloudSaveData syncs giftBoxUnlocked & giftBoxEnabled and migrates legacy saves cleanly',
+      () async {
+        // 1. Legacy cloud JSON without giftBoxUnlocked/giftBoxEnabled defaults both to false
+        final legacyCloud = CloudSaveData.fromJson({
+          'fireOrbs': 600,
+          'waterOrbs': 600,
+          'woodOrbs': 600,
+          'earthOrbs': 600,
+          'metalOrbs': 600,
+          'userScore': 12,
+          'pcScore': 8,
+          'total': 20,
+          'unlockedReset': true,
+          'showReset': true,
+        });
+        expect(legacyCloud.giftBoxUnlocked, isFalse);
+        expect(legacyCloud.giftBoxEnabled, isFalse);
+        expect(legacyCloud.unlockedCount, 1);
+
+        // 2. Active local save restores legacy cloud cleanly without losing orbs/scores
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'LegacyHero',
+          mockPlayerId: 'player_legacy_gift',
+          cloudPayload: legacyCloud.toJsonString(),
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          playGames: playGames,
+        );
+
+        await playGames.initialize();
+        expect(controller.fireOrbs, 600);
+        expect(controller.userScore, 12);
+        expect(controller.unlockedReset, isTrue);
+        expect(controller.giftBoxUnlocked, isFalse);
+        expect(controller.giftBoxEnabled, isFalse);
+
+        // 3. Purchasing & enabling Gift Box syncs both flags to cloud JSON
+        expect(controller.unlockGiftBox(), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        var synced = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(synced.fireOrbs, 100);
+        expect(synced.giftBoxUnlocked, isTrue);
+        expect(synced.giftBoxEnabled, isFalse);
+        expect(synced.unlockedCount, 2);
+
+        controller.toggleGiftBox(true);
+        await Future<void>.delayed(Duration.zero);
+        synced = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(synced.giftBoxUnlocked, isTrue);
+        expect(synced.giftBoxEnabled, isTrue);
+
+        // Round-trip via toJson / fromJson preserves both fields
+        final roundTrip = CloudSaveData.fromJson(synced.toJson());
+        expect(roundTrip.giftBoxUnlocked, isTrue);
+        expect(roundTrip.giftBoxEnabled, isTrue);
       },
     );
   });

@@ -266,6 +266,14 @@ class StorageService {
   bool get showReset => _prefs.getBool('showReset') ?? false;
   Future<void> setShowReset(bool val) => _prefs.setBool('showReset', val);
 
+  bool get giftBoxUnlocked => _prefs.getBool('giftBoxUnlocked') ?? false;
+  Future<void> setGiftBoxUnlocked(bool val) =>
+      _prefs.setBool('giftBoxUnlocked', val);
+
+  bool get giftBoxEnabled => _prefs.getBool('giftBoxEnabled') ?? false;
+  Future<void> setGiftBoxEnabled(bool val) =>
+      _prefs.setBool('giftBoxEnabled', val);
+
   // Story Cutscene Persistence Flags
   bool get hasSeenStoryIntro =>
       _prefs.getBool('has_seen_story_intro') ?? false;
@@ -427,6 +435,7 @@ class StorageService {
       setUnlockedNewSkin(false),
       setUnlockedCrystalBall(false),
       setUnlockedCrystalBallPlus(false),
+      setGiftBoxUnlocked(false),
       setShowReset(false),
       setShowPredictability(false),
       setShowRandom(false),
@@ -439,6 +448,7 @@ class StorageService {
       setShowCrystalBall(false),
       setShowCrystalBallPlus(false),
       setCrystalBallPlusSavedState(false),
+      setGiftBoxEnabled(false),
       setHasSeenStoryIntro(false),
       setHasSeenStoryReset(false),
       setHasSeenStoryPredictability(false),

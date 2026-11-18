@@ -2442,9 +2442,14 @@ void main() {
     final initialIconSize = tester.getSize(backpackIconFinder);
     expect(initialIconSize, equals(const Size(28.0, 28.0)));
 
+    // Gift Box starts locked and hidden from the AppBar
+    expect(find.text('🎁'), findsNothing);
+
     // Activate ALL top bar icons: Rewarded Ad, Gift, Reset, Cart, Settings
     controller.showReset = true;
     controller.unlockedReset = true;
+    controller.giftBoxUnlocked = true;
+    controller.giftBoxEnabled = true;
     await controller.adService.loadRewardedAd();
     controller.notifyListeners();
     await tester.pumpAndSettle();
@@ -2500,6 +2505,8 @@ void main() {
     await controller.adService.loadRewardedAd();
     controller.showReset = true;
     controller.unlockedReset = true;
+    controller.giftBoxUnlocked = true;
+    controller.giftBoxEnabled = true;
 
     await tester.pumpWidget(
       ChangeNotifierProvider<GameController>.value(
@@ -2647,6 +2654,155 @@ void main() {
 
     final backpackWidget = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
     expect(backpackWidget.size, inInclusiveRange(32.0, 36.0));
+  });
+
+  testWidgets('Gift Box Shop unlock, toggle ON/OFF, AppBar visibility, cooldown pause/resume, and localization', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'orbs_fire': 600,
+      'orbs_water': 600,
+      'orbs_wood': 600,
+      'orbs_earth': 600,
+      'orbs_metal': 600,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    await localization.load();
+    final audio = AudioService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    // Verify all 4 localizations exist for Gift Box title and description
+    for (final lang in ['en', 'pt', 'es', 'de']) {
+      localization.setLanguage(lang);
+      expect(localization.t('gift_box'), isNot('gift_box'));
+      expect(localization.t('gift_box_desc'), isNot('gift_box_desc'));
+      expect(localization.t('gift_box_desc'), contains('+5'));
+    }
+    localization.setLanguage('en');
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Gift Box starts locked and hidden from AppBar
+    expect(controller.giftBoxUnlocked, isFalse);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+    expect(find.text('🎁'), findsNothing);
+
+    // 2. Open Shop and scroll to Gift Box
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Gift Box'),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(ShopDialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.ensureVisible(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gift Box'), findsOneWidget);
+    expect(
+      find.textContaining('periodic 🎁 gift chest'),
+      findsOneWidget,
+    );
+    // Gift Box costs 500 of each of the 5 elements
+    final giftBoxTile = find.ancestor(
+      of: find.text('Gift Box'),
+      matching: find.byType(InkWell),
+    );
+    expect(
+      find.descendant(of: giftBoxTile, matching: find.text('500')),
+      findsNWidgets(5),
+    );
+
+    // 3. Purchase Gift Box in Shop -> deducts 500 of each element, starts disabled
+    await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+
+    expect(controller.giftBoxUnlocked, isTrue);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(controller.fireOrbs, 100);
+    expect(controller.waterOrbs, 100);
+    expect(controller.woodOrbs, 100);
+    expect(controller.earthOrbs, 100);
+    expect(controller.metalOrbs, 100);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+
+    // 4. Toggle Gift Box ON in Shop
+    await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    expect(controller.giftBoxEnabled, isTrue);
+
+    // Close Shop -> Gift Box appears in AppBar
+    await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('gift_box_button')), findsOneWidget);
+    expect(find.text('🎁'), findsOneWidget);
+
+    // 5. Claim periodic gift -> +5 of each orb, enters cooldown, hides button
+    await tester.tap(find.byKey(const ValueKey('gift_box_button')));
+    await tester.pump();
+    expect(controller.fireOrbs, 105);
+    expect(controller.waterOrbs, 105);
+    expect(controller.woodOrbs, 105);
+    expect(controller.earthOrbs, 105);
+    expect(controller.metalOrbs, 105);
+    expect(controller.isGiftAvailable, isFalse);
+    expect(controller.isGiftTimerActive, isTrue);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+
+    // 6. Toggle Gift Box OFF in Shop -> stops background timer cleanly
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Gift Box'),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(ShopDialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.ensureVisible(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(controller.isGiftTimerActive, isFalse);
+
+    // Even after 1 minute passes while OFF, Gift Box stays disabled and hidden
+    await tester.pump(const Duration(minutes: 1));
+    expect(controller.isGiftAvailable, isFalse);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+
+    // 7. Toggle back ON -> resumes periodic timer and makes 🎁 appear once ready
+    await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    expect(controller.giftBoxEnabled, isTrue);
+    expect(controller.isGiftTimerActive, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pumpAndSettle();
+    expect(controller.isGiftAvailable, isTrue);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsOneWidget);
   });
 }
 

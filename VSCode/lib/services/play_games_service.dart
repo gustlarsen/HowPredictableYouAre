@@ -105,6 +105,7 @@ class CloudSaveData {
   final bool unlockedNewSkin;
   final bool unlockedCrystalBall;
   final bool unlockedCrystalBallPlus;
+  final bool giftBoxUnlocked;
 
   // Feature Active Toggles
   final bool showReset;
@@ -120,6 +121,7 @@ class CloudSaveData {
   final bool showCrystalBall;
   final bool showCrystalBallPlus;
   final bool crystalBallPlusSavedState;
+  final bool giftBoxEnabled;
 
   // Story Cutscene Persistence Flags
   final bool hasSeenStoryIntro;
@@ -172,6 +174,7 @@ class CloudSaveData {
     this.unlockedNewSkin = false,
     this.unlockedCrystalBall = false,
     this.unlockedCrystalBallPlus = false,
+    this.giftBoxUnlocked = false,
     this.showReset = false,
     this.showPredictability = false,
     this.showRandom = false,
@@ -185,6 +188,7 @@ class CloudSaveData {
     this.showCrystalBall = false,
     this.showCrystalBallPlus = false,
     this.crystalBallPlusSavedState = false,
+    this.giftBoxEnabled = false,
     this.hasSeenStoryIntro = false,
     this.hasSeenStoryReset = false,
     this.hasSeenStoryPredictability = false,
@@ -226,6 +230,7 @@ class CloudSaveData {
     if (unlockedNewSkin) count++;
     if (unlockedCrystalBall) count++;
     if (unlockedCrystalBallPlus) count++;
+    if (giftBoxUnlocked) count++;
     return count;
   }
 
@@ -239,6 +244,7 @@ class CloudSaveData {
     if (unlockedAlgorithm) value += 460;
     if (unlockedYourPrediction) value += 950;
     if (unlockedNextMove) value += 2400;
+    if (giftBoxUnlocked) value += 2500;
     if (unlockedSuggestion) value += 4000;
     if (unlockedNewSkin) value += 6500;
     if (unlockedAds) value += 9000;
@@ -313,6 +319,7 @@ class CloudSaveData {
       unlockedCrystalBall: unlockedCrystalBall || local.unlockedCrystalBall,
       unlockedCrystalBallPlus:
           unlockedCrystalBallPlus || local.unlockedCrystalBallPlus,
+      giftBoxUnlocked: giftBoxUnlocked || local.giftBoxUnlocked,
       showReset: showReset,
       showPredictability: showPredictability,
       showRandom: showRandom,
@@ -326,6 +333,7 @@ class CloudSaveData {
       showCrystalBall: showCrystalBall,
       showCrystalBallPlus: showCrystalBallPlus,
       crystalBallPlusSavedState: crystalBallPlusSavedState,
+      giftBoxEnabled: giftBoxEnabled,
       hasSeenStoryIntro: hasSeenStoryIntro || local.hasSeenStoryIntro,
       hasSeenStoryReset: hasSeenStoryReset || local.hasSeenStoryReset,
       hasSeenStoryPredictability:
@@ -380,6 +388,7 @@ class CloudSaveData {
       unlockedNewSkin: storage.unlockedNewSkin,
       unlockedCrystalBall: storage.unlockedCrystalBall,
       unlockedCrystalBallPlus: storage.unlockedCrystalBallPlus,
+      giftBoxUnlocked: storage.giftBoxUnlocked,
       showReset: storage.showReset,
       showPredictability: storage.showPredictability,
       showRandom: storage.showRandom,
@@ -393,6 +402,7 @@ class CloudSaveData {
       showCrystalBall: storage.showCrystalBall,
       showCrystalBallPlus: storage.showCrystalBallPlus,
       crystalBallPlusSavedState: storage.crystalBallPlusSavedState,
+      giftBoxEnabled: storage.giftBoxEnabled,
       hasSeenStoryIntro: storage.hasSeenStoryIntro,
       hasSeenStoryReset: storage.hasSeenStoryReset,
       hasSeenStoryPredictability: storage.hasSeenStoryPredictability,
@@ -451,6 +461,7 @@ class CloudSaveData {
     await storage.setUnlockedNewSkin(unlockedNewSkin);
     await storage.setUnlockedCrystalBall(unlockedCrystalBall);
     await storage.setUnlockedCrystalBallPlus(unlockedCrystalBallPlus);
+    await storage.setGiftBoxUnlocked(giftBoxUnlocked);
 
     await storage.setShowReset(showReset);
     await storage.setShowPredictability(showPredictability);
@@ -465,6 +476,7 @@ class CloudSaveData {
     await storage.setShowCrystalBall(showCrystalBall);
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
+    await storage.setGiftBoxEnabled(giftBoxUnlocked ? giftBoxEnabled : false);
 
     await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
     await storage.setHasSeenStoryReset(hasSeenStoryReset);
@@ -532,6 +544,7 @@ class CloudSaveData {
       'unlockedNewSkin': unlockedNewSkin,
       'unlockedCrystalBall': unlockedCrystalBall,
       'unlockedCrystalBallPlus': unlockedCrystalBallPlus,
+      'giftBoxUnlocked': giftBoxUnlocked,
       'showReset': showReset,
       'showPredictability': showPredictability,
       'showRandom': showRandom,
@@ -545,6 +558,7 @@ class CloudSaveData {
       'showCrystalBall': showCrystalBall,
       'showCrystalBallPlus': showCrystalBallPlus,
       'crystalBallPlusSavedState': crystalBallPlusSavedState,
+      'giftBoxEnabled': giftBoxEnabled,
       'hasSeenStoryIntro': hasSeenStoryIntro,
       'hasSeenStoryReset': hasSeenStoryReset,
       'hasSeenStoryPredictability': hasSeenStoryPredictability,
@@ -645,6 +659,7 @@ class CloudSaveData {
       unlockedNewSkin: map['unlockedNewSkin'] as bool? ?? false,
       unlockedCrystalBall: map['unlockedCrystalBall'] as bool? ?? false,
       unlockedCrystalBallPlus: map['unlockedCrystalBallPlus'] as bool? ?? false,
+      giftBoxUnlocked: map['giftBoxUnlocked'] as bool? ?? false,
       showReset: map['showReset'] as bool? ?? false,
       showPredictability: map['showPredictability'] as bool? ?? false,
       showRandom: map['showRandom'] as bool? ?? false,
@@ -660,6 +675,7 @@ class CloudSaveData {
       showCrystalBallPlus: map['showCrystalBallPlus'] as bool? ?? false,
       crystalBallPlusSavedState:
           map['crystalBallPlusSavedState'] as bool? ?? false,
+      giftBoxEnabled: map['giftBoxEnabled'] as bool? ?? false,
       hasSeenStoryIntro: map['hasSeenStoryIntro'] as bool? ?? false,
       hasSeenStoryReset: map['hasSeenStoryReset'] as bool? ?? false,
       hasSeenStoryPredictability:

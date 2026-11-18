@@ -335,10 +335,41 @@ void main() {
     expect(controller.showReset, isFalse);
   });
 
-  test('Periodic gift claims +5 of EACH of the 5 Elemental Orbs', () async {
-    await createController(resetPreferences: true);
+  test('Periodic gift claims +5 of EACH of the 5 Elemental Orbs when unlocked and enabled', () async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 500,
+      'orbs_water': 500,
+      'orbs_wood': 500,
+      'orbs_earth': 500,
+      'orbs_metal': 500,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.giftBoxUnlocked, isFalse);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(controller.shouldShowGiftBox, isFalse);
+
+    // Locked Gift Box cannot be claimed
+    controller.claimGift();
+    expect(controller.fireOrbs, 500);
+
+    // Unlocking deducts 500 of each element and keeps Gift Box disabled initially
+    expect(controller.unlockGiftBox(), isTrue);
+    expect(controller.fireOrbs, 0);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.giftBoxUnlocked, isTrue);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(controller.shouldShowGiftBox, isFalse);
+
+    // Enabling Gift Box makes the periodic gift available and claimable
+    controller.toggleGiftBox(true);
+    expect(controller.giftBoxEnabled, isTrue);
     expect(controller.isGiftAvailable, isTrue);
-    expect(controller.totalOrbs, 0);
+    expect(controller.shouldShowGiftBox, isTrue);
 
     controller.claimGift();
 
@@ -353,6 +384,8 @@ void main() {
     expect(storage.earthOrbs, 5);
     expect(storage.metalOrbs, 5);
     expect(controller.isGiftAvailable, isFalse);
+    expect(controller.shouldShowGiftBox, isFalse);
+    expect(controller.isGiftTimerActive, isTrue);
     controller.cancelPendingTimers();
   });
 
@@ -1075,5 +1108,73 @@ void main() {
     expect(controller.pcScore, 1);
     expect(controller.totalRounds, 2);
     expect(controller.percentPredict, 50.0);
+  });
+
+  test('Gift Box requires 500 of ALL 5 Elemental Orbs, persists unlock/toggle, and pauses/resumes timer cleanly', () async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 500,
+      'orbs_water': 500,
+      'orbs_wood': 500,
+      'orbs_earth': 500,
+      'orbs_metal': 499, // Missing 1 Metal Orb
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.unlockGiftBox(), isFalse);
+    expect(controller.giftBoxUnlocked, isFalse);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(controller.shouldShowGiftBox, isFalse);
+    expect(controller.isGiftTimerActive, isFalse);
+
+    // Toggling before unlock is a no-op
+    controller.toggleGiftBox(true);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(storage.giftBoxEnabled, isFalse);
+
+    // Grant final Metal Orb and unlock
+    controller.addOrbForMove(HandMove.spock, 1);
+    expect(controller.metalOrbs, 500);
+    expect(controller.unlockGiftBox(), isTrue);
+    expect(controller.fireOrbs, 0);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.giftBoxUnlocked, isTrue);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(storage.giftBoxUnlocked, isTrue);
+    expect(storage.giftBoxEnabled, isFalse);
+    expect(controller.isGiftTimerActive, isFalse);
+
+    // Enable Gift Box, claim gift (starts cooldown timer)
+    controller.toggleGiftBox(true);
+    expect(storage.giftBoxEnabled, isTrue);
+    expect(controller.shouldShowGiftBox, isTrue);
+    controller.claimGift();
+    expect(controller.fireOrbs, 5);
+    expect(controller.isGiftAvailable, isFalse);
+    expect(controller.isGiftTimerActive, isTrue);
+    expect(controller.shouldShowGiftBox, isFalse);
+
+    // Toggling OFF pauses/stops background timer
+    controller.toggleGiftBox(false);
+    expect(controller.giftBoxEnabled, isFalse);
+    expect(storage.giftBoxEnabled, isFalse);
+    expect(controller.isGiftTimerActive, isFalse);
+    expect(controller.shouldShowGiftBox, isFalse);
+
+    // Toggling back ON resumes cooldown timer
+    controller.toggleGiftBox(true);
+    expect(controller.giftBoxEnabled, isTrue);
+    expect(controller.isGiftTimerActive, isTrue);
+    expect(controller.isGiftAvailable, isFalse);
+
+    // Re-create controller from storage to verify persistence
+    controller.cancelPendingTimers();
+    await createController();
+    expect(controller.giftBoxUnlocked, isTrue);
+    expect(controller.giftBoxEnabled, isTrue);
+    expect(controller.shouldShowGiftBox, isTrue);
   });
 }

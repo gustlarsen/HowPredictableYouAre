@@ -518,9 +518,10 @@ class _GameScreenState extends State<GameScreen>
               )
             : null,
         actions: [
-          // Periodic Gift button (matching Kodular ButtonGift / Clock1)
-          if (controller.isGiftAvailable)
+          // Periodic Gift button (unlocked & enabled in Shop, and cooldown ready)
+          if (controller.shouldShowGiftBox)
             IconButton(
+              key: const ValueKey('gift_box_button'),
               icon: const Text('🎁', style: TextStyle(fontSize: 22)),
               tooltip: loc.t(
                 'gift_tooltip',

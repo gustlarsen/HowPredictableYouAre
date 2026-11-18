@@ -567,6 +567,37 @@ class _ShopDialogState extends State<ShopDialog> {
                     ),
                     _buildShopItem(
                       context: context,
+                      title: loc.t('gift_box', fallback: 'Gift Box'),
+                      subtitle: loc.t(
+                        'gift_box_desc',
+                        fallback:
+                            'Unlocks a periodic 🎁 gift chest on the top bar granting +5 orbs of every element',
+                      ),
+                      cost: GameController.costGiftBox,
+                      productId: null,
+                      isUnlocked: controller.giftBoxUnlocked,
+                      isActive: controller.giftBoxEnabled,
+                      enabledLabel: enabledStr,
+                      disabledLabel: disabledStr,
+                      onUnlock: () {
+                        final ok = controller.unlockGiftBox();
+                        _handleUnlock(
+                          context,
+                          loc.t('gift_box', fallback: 'Gift Box'),
+                          ok,
+                        );
+                      },
+                      onToggle: (val) {
+                        controller.toggleGiftBox(val);
+                        _handleToggle(
+                          context,
+                          loc.t('gift_box', fallback: 'Gift Box'),
+                          val,
+                        );
+                      },
+                    ),
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string43', fallback: 'Optimal Suggestion'),
                       cost: GameController.costSuggestion,
                       productId: BillingService.productSuggestion,

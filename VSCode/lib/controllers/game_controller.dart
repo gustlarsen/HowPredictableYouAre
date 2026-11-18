@@ -17,6 +17,7 @@ import '../services/update_service.dart';
 class GameController extends ChangeNotifier {
   static const int rewardedAdOrbBonus = 50;
   static const int periodicGiftOrbBonus = 5;
+  static const Duration giftCooldownDuration = Duration(minutes: 1);
   static const int qaShortcutOrbBonus = 100000;
   static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
   static const String rewardedAdSnackBarMessage =
@@ -65,6 +66,13 @@ class GameController extends ChangeNotifier {
     wood: 600,
     earth: 300,
     metal: 300,
+  );
+  static const ElementalCost costGiftBox = ElementalCost(
+    fire: 500,
+    water: 500,
+    wood: 500,
+    earth: 500,
+    metal: 500,
   );
   static const ElementalCost costSuggestion = ElementalCost(
     fire: 1000,
@@ -196,6 +204,7 @@ class GameController extends ChangeNotifier {
   bool unlockedNewSkin = false;
   bool unlockedCrystalBall = false;
   bool unlockedCrystalBallPlus = false;
+  bool giftBoxUnlocked = false;
 
   // Active toggles
   bool showReset = false;
@@ -218,10 +227,17 @@ class GameController extends ChangeNotifier {
   bool showCrystalBall = false;
   bool showCrystalBallPlus = false;
   bool crystalBallPlusSavedState = false;
+  bool giftBoxEnabled = false;
 
   bool is100RoundsAlertPending = false;
   bool isGiftAvailable = true;
   Timer? _giftTimer;
+  DateTime? _giftCooldownUntil;
+  Duration _remainingGiftCooldown = Duration.zero;
+
+  bool get isGiftBoxActive => giftBoxUnlocked && giftBoxEnabled;
+  bool get shouldShowGiftBox => isGiftBoxActive && isGiftAvailable;
+  bool get isGiftTimerActive => _giftTimer?.isActive ?? false;
 
   // Rewarded Ad 2-minute Anti-Spam Cooldown State
   bool isRewardedAdOnCooldown = false;
@@ -460,6 +476,7 @@ class GameController extends ChangeNotifier {
     unlockedNewSkin = storage.unlockedNewSkin;
     unlockedCrystalBall = storage.unlockedCrystalBall;
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
+    giftBoxUnlocked = storage.giftBoxUnlocked;
 
     showReset = storage.showReset;
     showPredictability =
@@ -475,6 +492,16 @@ class GameController extends ChangeNotifier {
     crystalBallPlusSavedState = storage.crystalBallPlusSavedState;
     showCrystalBallPlus =
         showCrystalBall ? storage.showCrystalBallPlus : false;
+    giftBoxEnabled = giftBoxUnlocked ? storage.giftBoxEnabled : false;
+    if (!giftBoxUnlocked || !giftBoxEnabled) {
+      _pauseGiftTimer();
+      if (!giftBoxUnlocked) {
+        isGiftAvailable = true;
+        _remainingGiftCooldown = Duration.zero;
+      }
+    } else {
+      _resumeGiftTimerIfNeeded();
+    }
 
     hasSeenStoryIntro = storage.hasSeenStoryIntro;
     hasSeenStoryReset = storage.hasSeenStoryReset;
@@ -679,6 +706,11 @@ class GameController extends ChangeNotifier {
   /// scores, Markov matrices, and unlocked story chapters) while preserving
   /// the player's UI settings, and syncs the fresh state to the cloud if signed in.
   Future<void> resetAllProgress() async {
+    _giftTimer?.cancel();
+    _giftTimer = null;
+    _giftCooldownUntil = null;
+    _remainingGiftCooldown = Duration.zero;
+    isGiftAvailable = true;
     await storage.clearGameplayProgress(includeSettings: false);
     turnCount = 0;
     is100RoundsAlertPending = false;
@@ -958,6 +990,21 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  bool unlockGiftBox() {
+    return purchaseWithOrbs(
+      cost: costGiftBox,
+      onUnlock: () {
+        giftBoxUnlocked = true;
+        giftBoxEnabled = false;
+        storage.setGiftBoxUnlocked(true);
+        storage.setGiftBoxEnabled(false);
+        _pauseGiftTimer();
+        isGiftAvailable = true;
+        _remainingGiftCooldown = Duration.zero;
+      },
+    );
+  }
+
   /// Grants +50 of each of the 5 Elemental Orbs when the player finishes watching
   /// a rewarded ad, persists immediately to [SharedPreferences], triggers a
   /// [PlayGamesService] cloud save if signed in, and starts the 2-minute cooldown.
@@ -1169,7 +1216,7 @@ class GameController extends ChangeNotifier {
 
   /// Gift feature: periodic free +5 of each of the 5 Elemental Orbs
   void claimGift() {
-    if (!isGiftAvailable) return;
+    if (!giftBoxUnlocked || !giftBoxEnabled || !isGiftAvailable) return;
     fireOrbs += periodicGiftOrbBonus;
     waterOrbs += periodicGiftOrbBonus;
     woodOrbs += periodicGiftOrbBonus;
@@ -1179,13 +1226,65 @@ class GameController extends ChangeNotifier {
     isGiftAvailable = false;
     audio.playVibrate();
     _triggerCloudSave();
+    _startGiftTimer(giftCooldownDuration);
     notifyListeners();
+  }
 
+  void _startGiftTimer(Duration duration) {
     _giftTimer?.cancel();
-    _giftTimer = Timer(const Duration(minutes: 1), () {
+    if (!giftBoxUnlocked || !giftBoxEnabled) {
+      _giftTimer = null;
+      _giftCooldownUntil = null;
+      return;
+    }
+    if (duration <= Duration.zero) {
       isGiftAvailable = true;
+      _giftTimer = null;
+      _giftCooldownUntil = null;
+      _remainingGiftCooldown = Duration.zero;
       notifyListeners();
+      return;
+    }
+    isGiftAvailable = false;
+    _remainingGiftCooldown = duration;
+    _giftCooldownUntil = DateTime.now().add(duration);
+    _giftTimer = Timer(duration, () {
+      _giftTimer = null;
+      _giftCooldownUntil = null;
+      _remainingGiftCooldown = Duration.zero;
+      if (giftBoxUnlocked && giftBoxEnabled) {
+        isGiftAvailable = true;
+        notifyListeners();
+      }
     });
+  }
+
+  void _pauseGiftTimer() {
+    if (_giftTimer != null &&
+        _giftTimer!.isActive &&
+        _giftCooldownUntil != null) {
+      final remaining = _giftCooldownUntil!.difference(DateTime.now());
+      if (remaining.isNegative || remaining == Duration.zero) {
+        _remainingGiftCooldown = Duration.zero;
+      } else if (remaining > giftCooldownDuration) {
+        _remainingGiftCooldown = giftCooldownDuration;
+      } else {
+        _remainingGiftCooldown = remaining;
+      }
+    }
+    _giftTimer?.cancel();
+    _giftTimer = null;
+    _giftCooldownUntil = null;
+  }
+
+  void _resumeGiftTimerIfNeeded() {
+    if (!giftBoxUnlocked || !giftBoxEnabled) return;
+    if (isGiftAvailable || isGiftTimerActive) return;
+    if (_remainingGiftCooldown <= Duration.zero) {
+      isGiftAvailable = true;
+    } else {
+      _startGiftTimer(_remainingGiftCooldown);
+    }
   }
 
   /// 7-tap QA shortcut on the top-left Backpack icon: grants +100,000 of each
@@ -1261,6 +1360,19 @@ class GameController extends ChangeNotifier {
     removeAdsEnabled = val;
     storage.setRemoveAdsEnabled(val);
     adService.setAdsRemoved(isRemoveAdsActive);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  void toggleGiftBox(bool val) {
+    if (!giftBoxUnlocked) return;
+    giftBoxEnabled = val;
+    storage.setGiftBoxEnabled(val);
+    if (val) {
+      _resumeGiftTimerIfNeeded();
+    } else {
+      _pauseGiftTimer();
+    }
     _triggerCloudSave();
     notifyListeners();
   }
@@ -1414,6 +1526,8 @@ class GameController extends ChangeNotifier {
   void cancelPendingTimers() {
     _giftTimer?.cancel();
     _giftTimer = null;
+    _giftCooldownUntil = null;
+    _remainingGiftCooldown = Duration.zero;
     _rewardedAdCooldownTimer?.cancel();
     _rewardedAdCooldownTimer = null;
   }
