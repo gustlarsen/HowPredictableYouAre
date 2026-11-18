@@ -1949,14 +1949,56 @@ void main() {
     // Fire Orbs incremented by +1 (12 -> 13)
     expect(controller.fireOrbs, 13);
 
-    // Flying Orb VFX overlay is active during the 600ms flight
-    await tester.pump(const Duration(milliseconds: 250));
-    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsOneWidget);
-    expect(find.byKey(const ValueKey('flying_orb_fire')), findsOneWidget);
-
-    // Complete flight + backpack bounce
-    await tester.pump(const Duration(milliseconds: 750));
+    // Phase 1 — Launch (0ms -> <300ms): Collectible orb has not spawned yet before Mid-Arena Clash
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsNothing);
+
+    // Phase 2 — Mid-Arena Clash (~300ms): Collectible orb spawns at exact center of VersusArena (VS clash point)
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsOneWidget);
+    final flyingOrbFinder = find.byKey(const ValueKey('flying_orb_fire'));
+    expect(flyingOrbFinder, findsOneWidget);
+
+    final clashCenter = tester.getCenter(find.byKey(const ValueKey('vs_badge')));
+    final pcOrbCenter = tester.getCenter(find.byKey(const ValueKey('pc_orb_container')));
+    final backpackCenter = tester.getCenter(find.byType(RpgBackpackIcon));
+    final spawnOrbCenter = tester.getCenter(flyingOrbFinder);
+
+    expect(spawnOrbCenter.dx, closeTo(clashCenter.dx, 1.0));
+    expect(spawnOrbCenter.dy, closeTo(clashCenter.dy, 1.0));
+    expect((spawnOrbCenter.dx - pcOrbCenter.dx).abs(), greaterThan(50.0));
+
+    // Mid-flight (at 300ms + 325ms = 625ms, halfway through the 650ms curve):
+    // Orb preserves right-to-left momentum (already well to the left of horizontal midpoint)
+    // while staying lower vertically before sweeping steeply upward into the top-left Backpack
+    await tester.pump(const Duration(milliseconds: 325));
+    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsOneWidget);
+    final midFlightCenter = tester.getCenter(flyingOrbFinder);
+    final horizontalMidpoint = (spawnOrbCenter.dx + backpackCenter.dx) * 0.5;
+    final verticalMidpoint = (spawnOrbCenter.dy + backpackCenter.dy) * 0.5;
+    expect(midFlightCenter.dx, lessThan(horizontalMidpoint));
+    expect(midFlightCenter.dy, greaterThan(verticalMidpoint));
+    expect(midFlightCenter.dx, greaterThan(backpackCenter.dx));
+    expect(midFlightCenter.dy, lessThan(spawnOrbCenter.dy));
+
+    // Near end of flight (at 300ms + 550ms = 850ms): sweeping steeply upward toward Backpack
+    await tester.pump(const Duration(milliseconds: 225));
+    final lateFlightCenter = tester.getCenter(flyingOrbFinder);
+    expect(lateFlightCenter.dx, lessThan(midFlightCenter.dx));
+    expect(lateFlightCenter.dy, lessThan(midFlightCenter.dy));
+
+    // Complete 650ms flight (at 950ms) -> triggers Backpack scale bounce & elemental glow pulse
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 140));
+    final pulsingBackpack = tester.widget<RpgBackpackIcon>(
+      find.byType(RpgBackpackIcon),
+    );
+    expect(pulsingBackpack.glowStrength, greaterThan(0.0));
+    expect(pulsingBackpack.pulseColor, equals(HandMove.rock.elementalPrimaryColor));
+
+    // Finish Backpack pulse animation
+    await tester.pump(const Duration(milliseconds: 200));
 
     // 2. Tap top-left Backpack icon -> opens InventoryDialog showing all 5 orb counts
     final backpackBtn = find.byKey(const ValueKey('backpack_inventory_button'));

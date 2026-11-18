@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
@@ -21,6 +22,36 @@ import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
 
 class GameScreen extends StatefulWidget {
+  static const int orbSpawnDelayMs = VersusArena.clashTimeMs;
+  static const int orbFlightDurationMs = 650;
+  static const int backpackPulseDurationMs = 280;
+  static const int orbTotalSequenceMs =
+      orbSpawnDelayMs + orbFlightDurationMs + backpackPulseDurationMs;
+
+  static Offset calculateOrbControlPoint(Offset startPos, Offset endPos) {
+    return Offset(
+      ui.lerpDouble(endPos.dx, startPos.dx, 0.15)!,
+      ui.lerpDouble(startPos.dy, endPos.dy, 0.10)!,
+    );
+  }
+
+  static Offset evaluateOrbBezier(
+    Offset startPos,
+    Offset controlPoint,
+    Offset endPos,
+    double t,
+  ) {
+    final oneMinusT = 1.0 - t;
+    return Offset(
+      oneMinusT * oneMinusT * startPos.dx +
+          2 * oneMinusT * t * controlPoint.dx +
+          t * t * endPos.dx,
+      oneMinusT * oneMinusT * startPos.dy +
+          2 * oneMinusT * t * controlPoint.dy +
+          t * t * endPos.dy,
+    );
+  }
+
   const GameScreen({super.key});
 
   @override
@@ -37,10 +68,11 @@ class _GameScreenState extends State<GameScreen>
   final GlobalKey _rootStackKey = GlobalKey();
   final GlobalKey _backpackKey = GlobalKey();
   final GlobalKey _pcSlotKey = GlobalKey();
+  final GlobalKey _clashCenterKey = GlobalKey();
 
   late final AnimationController _flyingOrbController;
-  late final AnimationController _backpackPulseController;
   int _lastHandledOrbCollectionEventId = 0;
+  int _lastHandledTurnCount = 0;
   HandMove? _activeFlyingOrbMove;
   HandMove? _lastAbsorbedOrbMove;
 
@@ -50,16 +82,7 @@ class _GameScreenState extends State<GameScreen>
     WidgetsBinding.instance.addObserver(this);
     _flyingOrbController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          _lastAbsorbedOrbMove = _activeFlyingOrbMove;
-          _backpackPulseController.forward(from: 0.0);
-        }
-      });
-    _backpackPulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: GameScreen.orbTotalSequenceMs),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _hasCheckedForUpdate) return;
@@ -75,20 +98,27 @@ class _GameScreenState extends State<GameScreen>
     if (_controller != nextController) {
       _controller = nextController;
       _lastHandledOrbCollectionEventId = nextController.orbCollectionEventId;
+      _lastHandledTurnCount = nextController.turnCount;
     }
   }
 
   @override
   void dispose() {
     _flyingOrbController.dispose();
-    _backpackPulseController.dispose();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   void _checkFlyingOrbVfx(GameController controller) {
+    final turnChanged = controller.turnCount != _lastHandledTurnCount;
+    _lastHandledTurnCount = controller.turnCount;
+
     if (controller.orbCollectionEventId == _lastHandledOrbCollectionEventId) {
+      if (turnChanged) {
+        _flyingOrbController.stop();
+        _flyingOrbController.reset();
+      }
       return;
     }
     _lastHandledOrbCollectionEventId = controller.orbCollectionEventId;
@@ -98,8 +128,6 @@ class _GameScreenState extends State<GameScreen>
     _activeFlyingOrbMove = collectedMove;
     _lastAbsorbedOrbMove = collectedMove;
     if (controller.animationsEnabled) {
-      _backpackPulseController.stop();
-      _backpackPulseController.reset();
       _flyingOrbController.forward(from: 0.0);
     } else {
       _flyingOrbController.stop();
@@ -365,15 +393,20 @@ class _GameScreenState extends State<GameScreen>
     return const Offset(24.0, 28.0);
   }
 
-  Offset _resolvePcCombatantCenter(Size fallbackSize) {
+  Offset _resolveArenaClashCenter(Size fallbackSize) {
     final stackBox =
         _rootStackKey.currentContext?.findRenderObject() as RenderBox?;
-    final pcBox = _pcSlotKey.currentContext?.findRenderObject() as RenderBox?;
-    if (stackBox != null && pcBox != null && stackBox.hasSize && pcBox.hasSize) {
-      final globalCenter = pcBox.localToGlobal(pcBox.size.center(Offset.zero));
+    final clashBox =
+        _clashCenterKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox != null &&
+        clashBox != null &&
+        stackBox.hasSize &&
+        clashBox.hasSize) {
+      final globalCenter =
+          clashBox.localToGlobal(clashBox.size.center(Offset.zero));
       return stackBox.globalToLocal(globalCenter);
     }
-    return Offset(fallbackSize.width * 0.72, fallbackSize.height * 0.42);
+    return Offset(fallbackSize.width * 0.5, fallbackSize.height * 0.42);
   }
 
   @override
@@ -416,11 +449,20 @@ class _GameScreenState extends State<GameScreen>
               ),
               onPressed: () => _handleBackpackTap(context, controller),
               icon: AnimatedBuilder(
-                animation: _backpackPulseController,
+                animation: _flyingOrbController,
                 builder: (context, _) {
-                  final pulseT = _backpackPulseController.value;
-                  final isPulsing =
-                      _backpackPulseController.isAnimating && pulseT > 0.0;
+                  final elapsedMs = _flyingOrbController.value *
+                      GameScreen.orbTotalSequenceMs;
+                  const pulseStartMs = GameScreen.orbSpawnDelayMs +
+                      GameScreen.orbFlightDurationMs;
+                  final isPulsing = _flyingOrbController.isAnimating &&
+                      elapsedMs >= pulseStartMs &&
+                      elapsedMs < GameScreen.orbTotalSequenceMs;
+                  final pulseT = isPulsing
+                      ? ((elapsedMs - pulseStartMs) /
+                              GameScreen.backpackPulseDurationMs)
+                          .clamp(0.0, 1.0)
+                      : 0.0;
                   final scale = isPulsing
                       ? 1.0 + math.sin(pulseT * math.pi) * 0.24
                       : 1.0;
@@ -632,6 +674,7 @@ class _GameScreenState extends State<GameScreen>
                                   computerHp: controller.computerHp,
                                   elementalMode: controller.isElementalMode,
                                   pcSlotKey: _pcSlotKey,
+                                  clashCenterKey: _clashCenterKey,
                                   onImpactHaptic: controller.isElementalMode
                                       ? controller.audio.playTapVibrate
                                       : null,
@@ -791,17 +834,22 @@ class _GameScreenState extends State<GameScreen>
             ),
           ),
 
-          // Flying Elemental Orb VFX Overlay (from defeated PC slot to top-left Backpack icon)
+          // Flying Elemental Orb VFX Overlay (from Mid-Arena Clash center to top-left Backpack icon)
           Positioned.fill(
             child: IgnorePointer(
               child: AnimatedBuilder(
                 animation: _flyingOrbController,
                 builder: (context, _) {
                   final orbMove = _activeFlyingOrbMove;
+                  final elapsedMs = _flyingOrbController.value *
+                      GameScreen.orbTotalSequenceMs;
+                  const flightEndMs = GameScreen.orbSpawnDelayMs +
+                      GameScreen.orbFlightDurationMs;
                   final isFlying = controller.animationsEnabled &&
                       orbMove != null &&
                       _flyingOrbController.isAnimating &&
-                      _flyingOrbController.value < 1.0;
+                      elapsedMs + 1e-4 >= GameScreen.orbSpawnDelayMs &&
+                      elapsedMs < flightEndMs - 1e-4;
                   if (!isFlying) {
                     return const SizedBox.shrink();
                   }
@@ -812,26 +860,27 @@ class _GameScreenState extends State<GameScreen>
                         constraints.maxWidth,
                         constraints.maxHeight,
                       );
-                      final startPos = _resolvePcCombatantCenter(screenSize);
+                      final startPos = _resolveArenaClashCenter(screenSize);
                       final endPos = _resolveBackpackCenter(screenSize);
-                      final curvedT = Curves.easeInOutCubic
-                          .transform(_flyingOrbController.value);
+                      final controlPoint = GameScreen.calculateOrbControlPoint(
+                        startPos,
+                        endPos,
+                      );
+                      final flightRawT = ((elapsedMs -
+                                  GameScreen.orbSpawnDelayMs) /
+                              GameScreen.orbFlightDurationMs)
+                          .clamp(0.0, 1.0);
+                      final curvedT = Curves.easeInOutCubic.transform(
+                        flightRawT,
+                      );
 
-                      Offset bezierPoint(double t) {
-                        final controlPoint = Offset(
-                          (startPos.dx + endPos.dx) * 0.5 + 48.0,
-                          math.min(startPos.dy, endPos.dy) - 42.0,
-                        );
-                        final oneMinusT = 1.0 - t;
-                        return Offset(
-                          oneMinusT * oneMinusT * startPos.dx +
-                              2 * oneMinusT * t * controlPoint.dx +
-                              t * t * endPos.dx,
-                          oneMinusT * oneMinusT * startPos.dy +
-                              2 * oneMinusT * t * controlPoint.dy +
-                              t * t * endPos.dy,
-                        );
-                      }
+                      Offset bezierPoint(double t) =>
+                          GameScreen.evaluateOrbBezier(
+                            startPos,
+                            controlPoint,
+                            endPos,
+                            t,
+                          );
 
                       final currentOrbPos = bezierPoint(curvedT);
                       final primary = orbMove.elementalPrimaryColor;

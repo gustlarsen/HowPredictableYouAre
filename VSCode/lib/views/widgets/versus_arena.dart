@@ -39,6 +39,7 @@ class VersusArena extends StatefulWidget {
   final bool elementalMode;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
+  final Key? clashCenterKey;
 
   const VersusArena({
     super.key,
@@ -53,6 +54,7 @@ class VersusArena extends StatefulWidget {
     this.elementalMode = false,
     this.onImpactHaptic,
     this.pcSlotKey,
+    this.clashCenterKey,
   });
 
   @override
@@ -425,6 +427,7 @@ class _VersusArenaState extends State<VersusArena>
                 key: const ValueKey('vs_badge'),
                 alignment: Alignment.center,
                 child: SizedBox(
+                  key: widget.clashCenterKey,
                   width: vsWidth,
                   child: Center(
                     child: Container(
