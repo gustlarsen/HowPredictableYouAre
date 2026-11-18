@@ -13,6 +13,8 @@ import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
+import '../widgets/rpg_backpack_icon.dart';
+import '../widgets/adaptive_rewarded_ad_button.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
@@ -360,7 +362,7 @@ class _GameScreenState extends State<GameScreen>
           backpackBox.localToGlobal(backpackBox.size.center(Offset.zero));
       return stackBox.globalToLocal(globalCenter);
     }
-    return const Offset(36.0, 42.0);
+    return const Offset(24.0, 28.0);
   }
 
   Offset _resolvePcCombatantCenter(Size fallbackSize) {
@@ -392,124 +394,88 @@ class _GameScreenState extends State<GameScreen>
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: AnimatedBuilder(
-            animation: _backpackPulseController,
-            builder: (context, _) {
-              final pulseT = _backpackPulseController.value;
-              final isPulsing =
-                  _backpackPulseController.isAnimating && pulseT > 0.0;
-              final scale = isPulsing
-                  ? 1.0 + math.sin(pulseT * math.pi) * 0.24
-                  : 1.0;
-              final pulseColor =
-                  _lastAbsorbedOrbMove?.elementalPrimaryColor ?? Colors.amber;
-              final glowStrength =
-                  isPulsing ? math.sin(pulseT * math.pi) : 0.0;
+        automaticallyImplyLeading: false,
+        leadingWidth: 48,
+        leading: Center(
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton(
+              key: const ValueKey('backpack_inventory_button'),
+              padding: EdgeInsets.zero,
+              iconSize: 28,
+              constraints: const BoxConstraints(
+                minWidth: 36,
+                maxWidth: 36,
+                minHeight: 36,
+                maxHeight: 36,
+              ),
+              tooltip: loc.t(
+                'inventory_title',
+                fallback: "Cleric's Backpack",
+              ),
+              onPressed: () => _handleBackpackTap(context, controller),
+              icon: AnimatedBuilder(
+                animation: _backpackPulseController,
+                builder: (context, _) {
+                  final pulseT = _backpackPulseController.value;
+                  final isPulsing =
+                      _backpackPulseController.isAnimating && pulseT > 0.0;
+                  final scale = isPulsing
+                      ? 1.0 + math.sin(pulseT * math.pi) * 0.24
+                      : 1.0;
+                  final pulseColor =
+                      _lastAbsorbedOrbMove?.elementalPrimaryColor ??
+                          Colors.amber;
+                  final glowStrength =
+                      isPulsing ? math.sin(pulseT * math.pi) : 0.0;
 
-              return Transform.scale(
-                scale: scale,
-                child: Tooltip(
-                  message: loc.t(
-                    'inventory_title',
-                    fallback: "Cleric's Backpack",
-                  ),
-                  child: InkWell(
-                    key: const ValueKey('backpack_inventory_button'),
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () => _handleBackpackTap(context, controller),
-                    child: Container(
-                      key: _backpackKey,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF151821).withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isPulsing
-                              ? Color.lerp(
-                                  Colors.amber.withValues(alpha: 0.55),
-                                  pulseColor,
-                                  glowStrength,
-                                )!
-                              : Colors.amber.withValues(alpha: 0.45),
-                          width: isPulsing ? 1.6 : 1.1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (isPulsing ? pulseColor : Colors.amber)
-                                .withValues(
-                                  alpha: isPulsing
-                                      ? 0.28 + 0.45 * glowStrength
-                                      : 0.22,
-                                ),
-                            blurRadius: isPulsing ? 14 : 8,
-                            spreadRadius: isPulsing ? 1.8 * glowStrength : 0.5,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.backpack_rounded,
-                        size: 20,
-                        color: isPulsing
-                            ? Color.lerp(
-                                Colors.amber,
-                                pulseColor,
-                                glowStrength * 0.7,
-                              )
-                            : Colors.amber,
+                  return Transform.scale(
+                    scale: scale,
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: RpgBackpackIcon(
+                        key: _backpackKey,
+                        size: 28,
+                        pulseColor: isPulsing ? pulseColor : null,
+                        glowStrength: glowStrength,
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          // Voluntary Rewarded Video Ad ("Watch Ad +50 Orbs") button with explicit disclosure,
-          // shown only when a rewarded ad is preloaded and not on cooldown
-          if (controller.isRewardedAdReady)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              child: Tooltip(
-                message: loc.t(
-                  'rewarded_ad_desc',
-                  fallback: 'Watch a video ad for +50 of each Elemental Orb',
-                ),
-                child: InkWell(
-                  key: const ValueKey('watch_rewarded_ad_button'),
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _handleWatchRewardedAd(context, controller),
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.55),
-                      ),
-                    ),
-                    child: const Text(
-                      AdService.rewardedAdButtonLabel,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10.5,
-                        color: Colors.amber,
-                      ),
-                    ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
+          ),
+        ),
+        titleSpacing: 4,
+        title: controller.isRewardedAdReady
+            ? LayoutBuilder(
+                builder: (context, constraints) {
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
+                      child: AdaptiveRewardedAdButton(
+                        maxWidth: constraints.maxWidth,
+                        onTap: () =>
+                            _handleWatchRewardedAd(context, controller),
+                        tooltip: loc.t(
+                          'rewarded_ad_desc',
+                          fallback:
+                              'Watch a video ad for +50 of each Elemental Orb',
+                        ),
+                        label: AdService.rewardedAdButtonLabel,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : null,
+        actions: [
           // Periodic Gift button (matching Kodular ButtonGift / Clock1)
           if (controller.isGiftAvailable)
             IconButton(

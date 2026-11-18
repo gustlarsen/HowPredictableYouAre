@@ -22,6 +22,9 @@ import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
+import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
+import 'package:how_predictable/views/widgets/adaptive_rewarded_ad_button.dart';
+import 'package:how_predictable/views/screens/game_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +57,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AppBar),
-        matching: find.byIcon(Icons.backpack_rounded),
+        matching: find.byType(RpgBackpackIcon),
       ),
       findsOneWidget,
     );
@@ -2307,6 +2310,230 @@ void main() {
     expect(tester.getRect(spockBtnFinder), equals(spockRectBeforeScroll));
     expect(tester.getRect(randomBtnFinder), equals(randomRectBeforeScroll));
     expect(tester.getRect(bannerContainerFinder), equals(bannerRectBeforeScroll));
+  });
+
+  testWidgets('Backpack button maintains strict fixed size (36x36 with 28px icon) and does not shrink when all top bar icons are active on narrow screens', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final adMobClient = _LayoutTestAdMobClient();
+    final adService = AdService(client: adMobClient);
+    final audio = AudioService();
+    final playGames = PlayGamesService(
+      storage: storage,
+      client: _SettingsTestPlayGamesClient(),
+    );
+    final localization = LocalizationService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+      playGames: playGames,
+      adService: adService,
+    );
+
+    // Initial top bar with minimal icons (no Reset unlocked)
+    await tester.pumpWidget(
+      ChangeNotifierProvider<GameController>.value(
+        value: controller,
+        child: const MaterialApp(home: GameScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final backpackFinder =
+        find.byKey(const ValueKey('backpack_inventory_button'));
+    expect(backpackFinder, findsOneWidget);
+    final initialSize = tester.getSize(backpackFinder);
+    expect(initialSize, equals(const Size(36.0, 36.0)));
+
+    final backpackIconFinder = find.byType(RpgBackpackIcon);
+    expect(backpackIconFinder, findsOneWidget);
+    final initialIconSize = tester.getSize(backpackIconFinder);
+    expect(initialIconSize, equals(const Size(28.0, 28.0)));
+
+    // Activate ALL top bar icons: Rewarded Ad, Gift, Reset, Cart, Settings
+    controller.showReset = true;
+    controller.unlockedReset = true;
+    await controller.adService.loadRewardedAd();
+    controller.notifyListeners();
+    await tester.pumpAndSettle();
+
+    // Verify all 5 action buttons / items are active
+    expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
+    expect(find.text('🎁'), findsOneWidget);
+    expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+    expect(find.byIcon(Icons.shopping_cart_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+
+    // The Backpack button maintains strict fixed size outside any Flexible wrapper
+    final crowdedSize = tester.getSize(backpackFinder);
+    expect(crowdedSize, equals(const Size(36.0, 36.0)));
+    expect(crowdedSize, equals(initialSize));
+
+    final crowdedIconSize = tester.getSize(backpackIconFinder);
+    expect(crowdedIconSize, equals(const Size(28.0, 28.0)));
+    expect(crowdedIconSize, equals(initialIconSize));
+  });
+
+  testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final adMobClient = _LayoutTestAdMobClient();
+    final adService = AdService(client: adMobClient);
+    final audio = AudioService();
+    final playGames = PlayGamesService(
+      storage: storage,
+      client: _SettingsTestPlayGamesClient(),
+    );
+    final localization = LocalizationService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+      playGames: playGames,
+      adService: adService,
+    );
+
+    await controller.adService.loadRewardedAd();
+    controller.showReset = true;
+    controller.unlockedReset = true;
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<GameController>.value(
+        value: controller,
+        child: const MaterialApp(home: GameScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Ample horizontal space (width 800): renders full pill label
+    expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
+    expect(find.text(AdService.rewardedAdButtonLabel), findsOneWidget);
+    expect(find.byIcon(Icons.ondemand_video_rounded), findsNothing);
+
+    // 2. Crowded narrow screen (width 360 with Backpack, Ad, Gift, Reset, Cart, Settings):
+    // LayoutBuilder automatically switches to compact video-icon +50 pill
+    tester.view.physicalSize = const Size(360, 640);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
+    expect(find.text(AdService.rewardedAdButtonLabel), findsNothing);
+    expect(find.byIcon(Icons.ondemand_video_rounded), findsOneWidget);
+    expect(find.text('+50'), findsOneWidget);
+
+    // 3. As soon as icons are hidden/removed and horizontal space opens up:
+    // User claims periodic gift -> Gift icon disappears
+    controller.showReset = false;
+    await tester.tap(find.text('🎁'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('🎁'), findsNothing);
+    expect(find.byIcon(Icons.restart_alt), findsNothing);
+
+    // Space opens up -> automatically switches back to full "Watch Ad +50 Orbs" text pill
+    expect(find.byIcon(Icons.ondemand_video_rounded), findsNothing);
+    expect(find.text(AdService.rewardedAdButtonLabel), findsOneWidget);
+
+    // Tap rewarded ad in full mode -> grants +50 elemental orbs and enters cooldown
+    await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
+    await tester.pump();
+
+    // 5 periodic gift orbs + 50 rewarded ad orbs = 55
+    expect(controller.fireOrbs, equals(55));
+    expect(controller.waterOrbs, equals(55));
+    expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsNothing);
+  });
+
+  testWidgets('AdaptiveRewardedAdButton switches between full label and compact video icon +50 based on maxWidth constraints', (WidgetTester tester) async {
+    bool tapped = false;
+
+    // Ample space (width = 250)
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 250,
+              child: AdaptiveRewardedAdButton(
+                onTap: () => tapped = true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text(AdService.rewardedAdButtonLabel), findsOneWidget);
+    expect(find.byIcon(Icons.ondemand_video_rounded), findsNothing);
+    expect(find.text('+50'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
+    expect(tapped, isTrue);
+
+    tapped = false;
+    // Constrained space (width = 90)
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 90,
+              child: AdaptiveRewardedAdButton(
+                onTap: () => tapped = true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text(AdService.rewardedAdButtonLabel), findsNothing);
+    expect(find.byIcon(Icons.ondemand_video_rounded), findsOneWidget);
+    expect(find.text('+50'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('RpgBackpackIcon renders rich brown leather adventurer backpack with custom painter and handles pulse glow', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: RpgBackpackIcon(
+              size: 28.0,
+              pulseColor: Colors.deepOrange,
+              glowStrength: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(RpgBackpackIcon), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
+    final size = tester.getSize(find.byType(RpgBackpackIcon));
+    expect(size, equals(const Size(28.0, 28.0)));
   });
 }
 
