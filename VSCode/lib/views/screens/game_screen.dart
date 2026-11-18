@@ -673,6 +673,7 @@ class _GameScreenState extends State<GameScreen>
                                   roundId: controller.turnCount,
                                   userHp: controller.userHp,
                                   computerHp: controller.computerHp,
+                                  remainingMana: controller.remainingMana,
                                   elementalMode: controller.isElementalMode,
                                   pcSlotKey: _pcSlotKey,
                                   clashCenterKey: _clashCenterKey,

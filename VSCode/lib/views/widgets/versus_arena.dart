@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../models/move.dart';
 import '../../services/localization_service.dart';
+import 'mana_pool_orb.dart';
 import 'rpg_hp_bar.dart';
 
 /// Phases of the 750ms VersusArena projectile clash & impact VFX sequence.
@@ -36,6 +37,7 @@ class VersusArena extends StatefulWidget {
   final int roundId;
   final int userHp;
   final int computerHp;
+  final int remainingMana;
   final bool elementalMode;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
@@ -51,6 +53,7 @@ class VersusArena extends StatefulWidget {
     required this.roundId,
     this.userHp = 100,
     this.computerHp = 100,
+    this.remainingMana = 100,
     this.elementalMode = false,
     this.onImpactHaptic,
     this.pcSlotKey,
@@ -423,39 +426,57 @@ class _VersusArenaState extends State<VersusArena>
               final centerX = rowWidth / 2.0;
               const orbCenterY = 67.0;
 
-              final vsBadge = Align(
-                key: const ValueKey('vs_badge'),
-                alignment: Alignment.center,
-                child: SizedBox(
-                  key: widget.clashCenterKey,
-                  width: vsWidth,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+              final centerColumn = Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ManaPoolOrb(
+                        key: const ValueKey('mana_pool_orb'),
+                        remainingMana: widget.remainingMana,
+                        localization: widget.localization,
+                        animationsEnabled: widget.animationsEnabled,
                       ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
+                      const SizedBox(height: 6),
+                      KeyedSubtree(
+                        key: const ValueKey('vs_badge'),
+                        child: SizedBox(
+                          key: widget.clashCenterKey,
+                          width: vsWidth,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'VS',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                  fontSize: 16,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        'VS',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontSize: 16,
-                          letterSpacing: 1,
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               );
@@ -641,11 +662,12 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              // Ensure the winning hand renders on top of both the VS badge and the opponent hand,
-              // with the alpha-transparent projectile & explosion VFX layer rendered above all cards.
+              // Ensure the winning hand renders on top of both the center column (Mana Orb + VS badge)
+              // and the opponent hand, with the alpha-transparent projectile & explosion VFX layer
+              // rendered above all cards.
               final stackChildren = userWins
-                  ? <Widget>[vsBadge, pcCard, userCard, vfxOverlay]
-                  : <Widget>[vsBadge, userCard, pcCard, vfxOverlay];
+                  ? <Widget>[centerColumn, pcCard, userCard, vfxOverlay]
+                  : <Widget>[centerColumn, userCard, pcCard, vfxOverlay];
 
               return Stack(
                 alignment: Alignment.center,

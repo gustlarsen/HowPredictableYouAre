@@ -1177,4 +1177,63 @@ void main() {
     expect(controller.giftBoxEnabled, isTrue);
     expect(controller.shouldShowGiftBox, isTrue);
   });
+
+  test('remainingMana tracks 100-to-0 match countdown, clamps at 0 on 100 rounds, and resets back to 100', () async {
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.totalRounds, 0);
+    expect(controller.remainingMana, 100);
+
+    // Win a round -> totalRounds = 1, remainingMana = 99
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock);
+    expect(controller.totalRounds, 1);
+    expect(controller.remainingMana, 99);
+
+    // Lose a round -> totalRounds = 2, remainingMana = 98
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.rock);
+    expect(controller.totalRounds, 2);
+    expect(controller.remainingMana, 98);
+
+    // Draw does not increment totalRounds -> remainingMana stays 98
+    controller.crystalBallMove = HandMove.rock;
+    controller.playTurn(HandMove.rock);
+    expect(controller.totalRounds, 2);
+    expect(controller.remainingMana, 98);
+
+    // Reset restores remainingMana to 100
+    controller.resetGame();
+    expect(controller.totalRounds, 0);
+    expect(controller.remainingMana, 100);
+
+    // Play to 100 rounds -> remainingMana hits 0 and triggers 100-rounds alert
+    SharedPreferences.setMockInitialValues({
+      'userScore': 50,
+      'pcScore': 49,
+      'total': 99,
+      'musicEnabled': false,
+    });
+    await createController();
+    expect(controller.remainingMana, 1);
+    expect(controller.is100RoundsAlertPending, isFalse);
+
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock);
+    expect(controller.totalRounds, 100);
+    expect(controller.remainingMana, 0);
+    expect(controller.is100RoundsAlertPending, isTrue);
+
+    // Further turns at 100 rounds do not drop remainingMana below 0
+    controller.playTurn(HandMove.rock);
+    expect(controller.remainingMana, 0);
+
+    // resetAllProgress also restores remainingMana to 100
+    await controller.resetAllProgress();
+    expect(controller.totalRounds, 0);
+    expect(controller.remainingMana, 100);
+  });
 }

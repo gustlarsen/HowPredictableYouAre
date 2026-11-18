@@ -2824,6 +2824,121 @@ void main() {
     expect(controller.isGiftAvailable, isTrue);
     expect(find.byKey(const ValueKey('gift_box_button')), findsOneWidget);
   });
+
+  testWidgets(
+    'ManaPoolOrb inside VersusArena counts down 100->99->98 in GameScreen, preserves pinned bottom buttons & ScoreHeader Total, and resets to 100',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedPredictability': true,
+        'showPredictability': true,
+        'unlockedReset': true,
+        'showReset': true,
+        'musicEnabled': false,
+        'animationsEnabled': false,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      final audio = AudioService();
+
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: audio,
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: controller,
+          child: const HowPredictableApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Pinned bottom move deck & VersusArena coordinates before any rounds
+      final arenaFinder = find.byType(VersusArena);
+      final moveCardFinder = find.byKey(const ValueKey('move_selection_card'));
+      final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
+      final initialArenaHeight = tester.getSize(arenaFinder).height;
+      final initialMoveCardRect = tester.getRect(moveCardFinder);
+      final initialRockRect = tester.getRect(rockBtnFinder);
+
+      // Mana Pool Orb sits inside VersusArena directly above VS badge, starting at 100
+      final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
+      final vsBadgeFinder = find.byKey(const ValueKey('vs_badge'));
+      expect(
+        find.descendant(of: arenaFinder, matching: manaOrbFinder),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(manaOrbFinder).bottom,
+        lessThanOrEqualTo(tester.getRect(vsBadgeFinder).top),
+      );
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('100')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('0')),
+        findsWidgets,
+      );
+
+      // Round 1 (Win): Mana decrements 100 -> 99, ScoreHeader Total increments 0 -> 1
+      controller.crystalBallMove = HandMove.scissors;
+      await tester.tap(rockBtnFinder);
+      await tester.pumpAndSettle();
+      expect(controller.remainingMana, 99);
+      expect(controller.totalRounds, 1);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('99')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('1')),
+        findsWidgets,
+      );
+
+      // Round 2 (Loss): Mana decrements 99 -> 98, ScoreHeader Total increments 1 -> 2
+      controller.crystalBallMove = HandMove.paper;
+      await tester.tap(rockBtnFinder);
+      await tester.pumpAndSettle();
+      expect(controller.remainingMana, 98);
+      expect(controller.totalRounds, 2);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('98')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('2')),
+        findsOneWidget,
+      );
+
+      // VersusArena fixed height and pinned bottom move deck remain completely unaffected
+      expect(tester.getSize(arenaFinder).height, equals(initialArenaHeight));
+      expect(
+        tester.getRect(moveCardFinder).bottom,
+        equals(initialMoveCardRect.bottom),
+      );
+
+      // Trigger AppBar Reset -> Mana Pool resets back to 100 and deck matches initial bounds
+      await tester.tap(find.byIcon(Icons.restart_alt));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'RESET'));
+      await tester.pumpAndSettle();
+
+      expect(controller.remainingMana, 100);
+      expect(controller.totalRounds, 0);
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('100')),
+        findsOneWidget,
+      );
+      expect(tester.getSize(arenaFinder).height, equals(initialArenaHeight));
+      expect(tester.getRect(moveCardFinder), equals(initialMoveCardRect));
+      expect(tester.getRect(rockBtnFinder), equals(initialRockRect));
+    },
+  );
 }
 
 class _SettingsTestPlayGamesClient implements PlayGamesClient {

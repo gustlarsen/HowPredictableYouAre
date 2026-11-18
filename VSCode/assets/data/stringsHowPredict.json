@@ -830,5 +830,9 @@
     "de_suggestion_desc": "Empfiehlt den oder die optimalen Gegenzüge, um den nächsten Zug der KI zu schlagen",
     "de_remove_ads_desc": "Entfernt alle Banner- und Videoanzeigen in der gesamten App",
     "de_crystal_ball_desc": "Enthüllt exakt den nächsten Zug der KI, bevor du wählst",
-    "de_crystal_ball_plus_desc": "Verbessert die Kristallkugel für garantierte 100 % Voraussicht in jeder einzelnen Runde"
+    "de_crystal_ball_plus_desc": "Verbessert die Kristallkugel für garantierte 100 % Voraussicht in jeder einzelnen Runde",
+    "en_mana_label": "MANA",
+    "pt_mana_label": "MANA",
+    "es_mana_label": "MANÁ",
+    "de_mana_label": "MANA"
 }

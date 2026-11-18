@@ -23,6 +23,7 @@ class GameController extends ChangeNotifier {
   static const String rewardedAdSnackBarMessage =
       '+50 Elemental Orbs earned!';
   static const int maxHp = 100;
+  static const int maxMana = 100;
   static const int damagePerLoss = 1;
 
   // Shop Upgrade Elemental Orb Costs
@@ -181,6 +182,7 @@ class GameController extends ChangeNotifier {
   int get playerScore => userScore;
   int pcScore = 0;
   int totalRounds = 0;
+  int get remainingMana => (maxMana - totalRounds).clamp(0, maxMana);
   int turnCount = 0;
   int userHp = maxHp;
   int computerHp = maxHp;
