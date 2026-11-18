@@ -478,8 +478,8 @@ void main() {
           await tester.pump(const Duration(milliseconds: 220)); // Impact phase (620ms)
         }
 
-        // Let final animation settle completely with zero pending timers
-        await tester.pumpAndSettle();
+        // Let final round animation settle cleanly (ManaPoolOrb wave runs continuously)
+        await tester.pump(const Duration(milliseconds: 800));
         expect(tester.takeException(), isNull);
       },
     );

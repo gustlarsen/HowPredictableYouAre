@@ -901,7 +901,8 @@ void main() {
             child: const HowPredictableApp(),
           ),
         );
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
 
         expect(controller.fireOrbs, 420);
         expect(find.byIcon(Icons.restart_alt), findsOneWidget);
@@ -922,7 +923,8 @@ void main() {
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
 
         // UI immediately updates: orbs reset to 0, Reset button disappears
         expect(find.byIcon(Icons.restart_alt), findsNothing);
@@ -931,7 +933,8 @@ void main() {
 
         // Open SettingsDialog -> shows AccountBeta's profile
         await tester.tap(find.byIcon(Icons.settings_outlined));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
         expect(find.text('AccountBeta'), findsOneWidget);
         expect(find.text('ID: player_beta'), findsOneWidget);
       },

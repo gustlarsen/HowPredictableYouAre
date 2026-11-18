@@ -10,7 +10,7 @@ void main() {
 
   group('ManaPoolOrb & VersusArena Integration Tests', () {
     testWidgets(
-      'ManaPoolOrb renders compact circular orb with liquid fill, meniscus, remaining value, and localized MANA labels',
+      'ManaPoolOrb renders compact ornate RPG crystal orb with wavy liquid CustomPainter, meniscus, bubbles, remaining value, and localized MANA labels',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
@@ -36,6 +36,13 @@ void main() {
           await tester.pump();
         }
 
+        ManaPoolLiquidPainter readLiquidPainter() {
+          final paint = tester.widget<CustomPaint>(
+            find.byKey(const ValueKey('mana_liquid_paint')),
+          );
+          return paint.painter! as ManaPoolLiquidPainter;
+        }
+
         // English at 100 Mana
         await pumpOrb(mana: 100, lang: 'en');
         expect(find.text('100'), findsOneWidget);
@@ -46,20 +53,36 @@ void main() {
         expect(orbRect.height, inInclusiveRange(44.0, 48.0));
         expect(orbRect.width, equals(orbRect.height));
 
-        final fullFill = tester.widget<FractionallySizedBox>(
-          find.byKey(const ValueKey('mana_liquid_fill')),
+        // Ornate frame painter and 3D glass highlight painter are mounted
+        final framePaint = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('mana_orb_frame_paint')),
         );
-        expect(fullFill.heightFactor, closeTo(1.0, 1e-4));
-        expect(find.byKey(const ValueKey('mana_liquid_meniscus')), findsOneWidget);
+        expect(framePaint.painter, isA<ManaPoolFramePainter>());
+        final glassPaint = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('mana_glass_highlight_paint')),
+        );
+        expect(glassPaint.painter, isA<ManaPoolGlassPainter>());
+
+        final fullLiquid = readLiquidPainter();
+        expect(fullLiquid.fillRatio, closeTo(1.0, 1e-4));
+        expect(fullLiquid.hasLiquid, isTrue);
+        expect(fullLiquid.hasMeniscus, isTrue);
+        expect(
+          fullLiquid.computeVisibleBubbles(const Size(38, 38)).length,
+          inInclusiveRange(3, 4),
+        );
 
         // Portuguese at 50 Mana
         await pumpOrb(mana: 50, lang: 'pt');
         expect(find.text('50'), findsOneWidget);
         expect(find.text('MANA'), findsOneWidget);
-        final halfFill = tester.widget<FractionallySizedBox>(
-          find.byKey(const ValueKey('mana_liquid_fill')),
-        );
-        expect(halfFill.heightFactor, closeTo(0.5, 1e-4));
+        final halfLiquid = readLiquidPainter();
+        expect(halfLiquid.fillRatio, closeTo(0.5, 1e-4));
+        expect(halfLiquid.hasMeniscus, isTrue);
+        // Sine-wave surface varies across x rather than remaining flat
+        final yLeft = halfLiquid.surfaceYAt(4.0, const Size(38, 38));
+        final yRight = halfLiquid.surfaceYAt(14.0, const Size(38, 38));
+        expect(yLeft, isNot(equals(yRight)));
 
         // Spanish at 25 Mana
         await pumpOrb(mana: 25, lang: 'es');
@@ -70,18 +93,25 @@ void main() {
         await pumpOrb(mana: 0, lang: 'de');
         expect(find.text('0'), findsOneWidget);
         expect(find.text('MANA'), findsOneWidget);
-        final emptyFill = tester.widget<FractionallySizedBox>(
-          find.byKey(const ValueKey('mana_liquid_fill')),
-        );
-        expect(emptyFill.heightFactor, closeTo(0.0, 1e-4));
-        expect(find.byKey(const ValueKey('mana_liquid_meniscus')), findsNothing);
+        final emptyLiquid = readLiquidPainter();
+        expect(emptyLiquid.fillRatio, closeTo(0.0, 1e-4));
+        expect(emptyLiquid.hasLiquid, isFalse);
+        expect(emptyLiquid.hasMeniscus, isFalse);
+        expect(emptyLiquid.computeVisibleBubbles(const Size(38, 38)), isEmpty);
       },
     );
 
     testWidgets(
-      'ManaPoolOrb smoothly drains liquid over 300ms and shows floating cyan -1 indicator when Mana decreases',
+      'ManaPoolOrb smoothly drains wavy liquid over 300ms, advances wave phase, and shows floating cyan -1 indicator when Mana decreases',
       (WidgetTester tester) async {
         final localization = LocalizationService();
+
+        ManaPoolLiquidPainter readLiquidPainter() {
+          final paint = tester.widget<CustomPaint>(
+            find.byKey(const ValueKey('mana_liquid_paint')),
+          );
+          return paint.painter! as ManaPoolLiquidPainter;
+        }
 
         await tester.pumpWidget(
           MaterialApp(
@@ -98,6 +128,11 @@ void main() {
         );
         await tester.pump();
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
+        final initialWavePhase = readLiquidPainter().wavePhase;
+
+        // Advance 200ms: continuous sine-wave motion advances wavePhase smoothly
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(readLiquidPainter().wavePhase, isNot(equals(initialWavePhase)));
 
         // Decrement by 1 -> 99
         await tester.pumpWidget(
@@ -124,11 +159,9 @@ void main() {
         final earlyY = tester
             .getTopLeft(find.byKey(const ValueKey('mana_drain_indicator')))
             .dy;
-        final midFill = tester.widget<FractionallySizedBox>(
-          find.byKey(const ValueKey('mana_liquid_fill')),
-        );
-        expect(midFill.heightFactor, greaterThan(0.99));
-        expect(midFill.heightFactor, lessThan(1.0));
+        final midFill = readLiquidPainter().fillRatio;
+        expect(midFill, greaterThan(0.99));
+        expect(midFill, lessThan(1.0));
 
         // Advance another 150ms (total 300ms): liquid finishes draining, -1 drifts higher upward
         await tester.pump(const Duration(milliseconds: 150));
@@ -137,13 +170,11 @@ void main() {
             .dy;
         expect(laterY, lessThan(earlyY));
 
-        final settledFill = tester.widget<FractionallySizedBox>(
-          find.byKey(const ValueKey('mana_liquid_fill')),
-        );
-        expect(settledFill.heightFactor, closeTo(0.99, 1e-4));
+        final settledFill = readLiquidPainter().fillRatio;
+        expect(settledFill, closeTo(0.99, 1e-4));
 
-        // Finish indicator fade-out animation
-        await tester.pumpAndSettle();
+        // Finish 550ms indicator fade-out animation (300ms + 300ms = 600ms)
+        await tester.pump(const Duration(milliseconds: 300));
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
 
         // Resetting Mana back up to 100 does NOT trigger a -1 indicator
@@ -162,7 +193,6 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 150));
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
-        await tester.pumpAndSettle();
       },
     );
 
@@ -227,6 +257,18 @@ void main() {
         final lowDecorAt650 = lowFrameAt650.decoration! as BoxDecoration;
         final lowShadowAt650 = lowDecorAt650.boxShadow!.first;
         expect(lowShadowAt650.blurRadius, isNot(equals(lowShadowAt200.blurRadius)));
+
+        final lowFramePainter = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('mana_orb_frame_paint')),
+        ).painter! as ManaPoolFramePainter;
+        expect(lowFramePainter.isLowMana, isTrue);
+
+        final lowLiquidPainter = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('mana_liquid_paint')),
+        ).painter! as ManaPoolLiquidPainter;
+        expect(lowLiquidPainter.isLowMana, isTrue);
+        expect(lowLiquidPainter.fillRatio, closeTo(0.20, 1e-4));
+        expect(lowLiquidPainter.hasMeniscus, isTrue);
       },
     );
 

@@ -90,6 +90,7 @@ void main() {
       'userScore': 50,
       'pcScore': 50,
       'total': 100,
+      'animationsEnabled': false,
     });
     final storage = StorageService();
     await storage.init();
@@ -2222,7 +2223,8 @@ void main() {
 
     // 3. Tap "Open Shop / Altar" button in InventoryDialog -> jumps straight to ShopDialog
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.byType(InventoryDialog), findsNothing);
     expect(find.byType(ShopDialog), findsOneWidget);
@@ -3176,7 +3178,8 @@ void main() {
           child: const HowPredictableApp(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
 
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
       final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
@@ -3212,12 +3215,13 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 650));
 
       // Round 2 (Win): Mana decrements 99 -> 98, Gauge = 100.0%
       controller.crystalBallMove = HandMove.scissors;
       await tester.tap(rockBtnFinder);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1100));
       expect(controller.remainingMana, 98);
       expect(controller.totalRounds, 2);
       expect(controller.userHp, 100);
@@ -3253,7 +3257,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 650));
 
       // Advance to 99 total rounds (60 wins, 20 losses, 19 draws) and play a Draw on turn 100
       SharedPreferences.setMockInitialValues({
