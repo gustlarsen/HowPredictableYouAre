@@ -1913,6 +1913,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     expect(find.byType(InventoryDialog), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('inventory_header_backpack_icon')),
+        matching: find.byType(RpgBackpackIcon),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.backpack_rounded), findsNothing);
     expect(controller.totalOrbs, 0);
 
     // Next 6 taps on the Backpack icon inside InventoryDialog reach 7 taps total
@@ -2030,6 +2038,14 @@ void main() {
 
     expect(find.byType(InventoryDialog), findsOneWidget);
     expect(find.text("Cleric's Backpack"), findsOneWidget);
+    expect(find.byIcon(Icons.backpack_rounded), findsNothing);
+    final headerBackpack = tester.widget<RpgBackpackIcon>(
+      find.descendant(
+        of: find.byKey(const ValueKey('inventory_header_backpack_icon')),
+        matching: find.byType(RpgBackpackIcon),
+      ),
+    );
+    expect(headerBackpack.size, inInclusiveRange(32.0, 36.0));
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('inventory_orb_count_fire')),
@@ -2598,6 +2614,39 @@ void main() {
     expect(find.byType(CustomPaint), findsWidgets);
     final size = tester.getSize(find.byType(RpgBackpackIcon));
     expect(size, equals(const Size(28.0, 28.0)));
+  });
+
+  testWidgets("InventoryDialog header displays brown leather RpgBackpackIcon unified with AppBar visual identity (size 32px-36px)", (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: InventoryDialog(controller: controller),
+        ),
+      ),
+    );
+
+    expect(find.byType(InventoryDialog), findsOneWidget);
+    expect(find.byIcon(Icons.backpack_rounded), findsNothing);
+
+    final headerBackpackFinder = find.descendant(
+      of: find.byKey(const ValueKey('inventory_header_backpack_icon')),
+      matching: find.byType(RpgBackpackIcon),
+    );
+    expect(headerBackpackFinder, findsOneWidget);
+
+    final backpackWidget = tester.widget<RpgBackpackIcon>(headerBackpackFinder);
+    expect(backpackWidget.size, inInclusiveRange(32.0, 36.0));
   });
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../services/play_games_service.dart';
+import '../widgets/rpg_backpack_icon.dart';
 import 'shop_dialog.dart';
 
 class InventoryDialog extends StatelessWidget {
@@ -61,7 +62,7 @@ class InventoryDialog extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         onTap: () => _handleBackpackIconTap(context),
                         child: Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: Colors.amber.withValues(alpha: 0.16),
                             borderRadius: BorderRadius.circular(12),
@@ -75,10 +76,8 @@ class InventoryDialog extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.backpack_rounded,
-                            color: Colors.amber,
-                            size: 22,
+                          child: const RpgBackpackIcon(
+                            size: 34,
                           ),
                         ),
                       ),
