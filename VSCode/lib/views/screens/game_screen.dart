@@ -491,7 +491,7 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
         titleSpacing: 4,
-        title: controller.isRewardedAdReady
+        title: (controller.isRewardedAdReady && !controller.isRemoveAdsActive)
             ? LayoutBuilder(
                 builder: (context, constraints) {
                   return Align(

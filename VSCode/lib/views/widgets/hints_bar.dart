@@ -112,6 +112,9 @@ class HintsBar extends StatelessWidget {
 }
 
 class _HintChip extends StatelessWidget {
+  static const double pillHeight = 34.0;
+  static const double iconSlotSize = 16.0;
+
   final IconData icon;
   final String label;
   final String value;
@@ -130,54 +133,102 @@ class _HintChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 32),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 15, color: color),
-              const SizedBox(width: 3),
-              Text(
-                label,
-                maxLines: 1,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-              const SizedBox(width: 3),
-              if (elementalMode && moves.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (int i = 0; i < moves.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 2),
-                      Icon(
-                        moves[i].elementalIcon,
-                        size: 15,
-                        color: moves[i].elementalPrimaryColor,
-                      ),
-                    ],
-                  ],
-                )
-              else
-                Text(
-                  value,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+    return SizedBox(
+      height: pillHeight,
+      child: Container(
+        height: pillHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(
+              height: iconSlotSize,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: iconSlotSize,
+                    height: iconSlotSize,
+                    child: Center(
+                      child: Icon(icon, size: 15, color: color),
+                    ),
                   ),
-                ),
-            ],
+                  const SizedBox(width: 3),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      height: 1.0,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  if (elementalMode && moves.isNotEmpty)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        for (int i = 0; i < moves.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 2),
+                          SizedBox(
+                            width: iconSlotSize,
+                            height: iconSlotSize,
+                            child: Center(
+                              child: Icon(
+                                moves[i].elementalIcon,
+                                size: 15,
+                                color: moves[i].elementalPrimaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    )
+                  else if (value == '?')
+                    SizedBox(
+                      width: iconSlotSize,
+                      height: iconSlotSize,
+                      child: Center(
+                        child: Text(
+                          '?',
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.0,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: iconSlotSize,
+                      child: Center(
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.0,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

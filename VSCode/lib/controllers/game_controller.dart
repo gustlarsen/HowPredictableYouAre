@@ -214,6 +214,7 @@ class GameController extends ChangeNotifier {
   bool get isHandsTheme => showNewSkin;
   bool showNextMove = false;
   bool showSuggestion = false;
+  bool removeAdsEnabled = false;
   bool showCrystalBall = false;
   bool showCrystalBallPlus = false;
   bool crystalBallPlusSavedState = false;
@@ -316,11 +317,13 @@ class GameController extends ChangeNotifier {
   /// True when the Remove Ads shop upgrade (`unlock_remove_ads` / `unlockedAds`) is owned.
   bool get unlockedRemoveAds => unlockedAds;
 
-  /// True when the bottom banner ad should be displayed on screen.
-  bool get shouldShowBannerAd => !unlockedAds && adService.isBannerAdLoaded;
+  /// True when Remove Ads is both owned (`unlockedAds`) and actively enabled (`removeAdsEnabled`).
+  bool get isRemoveAdsActive => unlockedAds && removeAdsEnabled;
 
-  /// True when the optional Rewarded Video ad (+50 💎) is preloaded and not on cooldown.
-  /// Remains available even if Remove Ads is purchased, as it is a voluntary bonus.
+  /// True when the bottom banner ad should be displayed on screen.
+  bool get shouldShowBannerAd => !isRemoveAdsActive && adService.isBannerAdLoaded;
+
+  /// True when the optional Rewarded Video ad (+50 Orbs) is preloaded and not on cooldown.
   bool get isRewardedAdReady =>
       adService.isRewardedAdReady && !isRewardedAdOnCooldown;
 
@@ -452,7 +455,8 @@ class GameController extends ChangeNotifier {
     unlockedNextMove = storage.unlockedNextMove;
     unlockedSuggestion = storage.unlockedSuggestion;
     unlockedAds = storage.unlockedAds;
-    adService.setAdsRemoved(unlockedAds);
+    removeAdsEnabled = unlockedAds ? storage.removeAdsEnabled : false;
+    adService.setAdsRemoved(isRemoveAdsActive);
     unlockedNewSkin = storage.unlockedNewSkin;
     unlockedCrystalBall = storage.unlockedCrystalBall;
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
@@ -932,7 +936,9 @@ class GameController extends ChangeNotifier {
       cost: costRemoveAds,
       onUnlock: () {
         unlockedAds = true;
+        removeAdsEnabled = true;
         storage.setUnlockedAds(true);
+        storage.setRemoveAdsEnabled(true);
         adService.setAdsRemoved(true);
       },
     );
@@ -1100,7 +1106,9 @@ class GameController extends ChangeNotifier {
         break;
       case BillingService.productRemoveAds:
         unlockedAds = true;
+        removeAdsEnabled = true;
         storage.setUnlockedAds(true);
+        storage.setRemoveAdsEnabled(true);
         adService.setAdsRemoved(true);
         break;
       case BillingService.productCrystalBall:
@@ -1244,6 +1252,15 @@ class GameController extends ChangeNotifier {
   void toggleShowSuggestion(bool val) {
     showSuggestion = val;
     storage.setShowSuggestion(val);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  void toggleRemoveAds(bool val) {
+    if (!unlockedAds) return;
+    removeAdsEnabled = val;
+    storage.setRemoveAdsEnabled(val);
+    adService.setAdsRemoved(isRemoveAdsActive);
     _triggerCloudSave();
     notifyListeners();
   }

@@ -200,6 +200,11 @@ class StorageService {
     await _prefs.setBool('unlock_remove_ads', val);
   }
 
+  bool get removeAdsEnabled =>
+      _prefs.getBool('removeAdsEnabled') ?? unlockedAds;
+  Future<void> setRemoveAdsEnabled(bool val) =>
+      _prefs.setBool('removeAdsEnabled', val);
+
   bool get unlockedNewSkin => _prefs.getBool('unlockedNewSkin') ?? false;
   Future<void> setUnlockedNewSkin(bool val) =>
       _prefs.setBool('unlockedNewSkin', val);
@@ -418,6 +423,7 @@ class StorageService {
       setUnlockedNextMove(false),
       setUnlockedSuggestion(false),
       setUnlockedAds(false),
+      setRemoveAdsEnabled(false),
       setUnlockedNewSkin(false),
       setUnlockedCrystalBall(false),
       setUnlockedCrystalBallPlus(false),

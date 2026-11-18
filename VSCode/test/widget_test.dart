@@ -1065,7 +1065,7 @@ void main() {
     expect(find.descendant(of: scoreCardFinder, matching: find.text('100.0%')), findsOneWidget);
 
     // Verify dynamic semantic RPG gauge colors:
-    // 1. Low predictability (< 40%, e.g. 0.0% and 25.0%) -> Emerald Green (0xFF2ECC71)
+    // 1. Low percentages (< 30%, e.g. 0.0% and 25.0%) -> Crimson Red (0xFFE74C3C)
     controller.userScore = 0;
     controller.pcScore = 10;
     controller.totalRounds = 10;
@@ -1075,7 +1075,7 @@ void main() {
     Text gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('0.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
 
     controller.userScore = 1;
     controller.pcScore = 3;
@@ -1086,9 +1086,20 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('25.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
 
-    // 2. Moderate predictability (40%–65%, e.g. 40.0%, 50.0%, 65.0%) -> Amber/Gold (0xFFFFB300)
+    // 2. Moderate percentages (30%–59%, e.g. 30.0%, 40.0%, 50.0%, 59.0%) -> Amber/Gold (0xFFFFB300)
+    controller.userScore = 3;
+    controller.pcScore = 7;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('30.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
+
     controller.userScore = 4;
     controller.pcScore = 6;
     controller.totalRounds = 10;
@@ -1111,18 +1122,29 @@ void main() {
     );
     expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
 
-    controller.userScore = 13;
-    controller.pcScore = 7;
-    controller.totalRounds = 20;
+    controller.userScore = 59;
+    controller.pcScore = 41;
+    controller.totalRounds = 100;
     controller.notifyListeners();
     await tester.pump();
 
     gaugeValueText = tester.widget<Text>(
-      find.descendant(of: scoreCardFinder, matching: find.text('65.0%')),
+      find.descendant(of: scoreCardFinder, matching: find.text('59.0%')),
     );
     expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
 
-    // 3. High predictability (> 65%, e.g. 75.0% and 100.0%) -> Crimson Red (0xFFE74C3C)
+    // 3. High percentages (>= 60%, e.g. 60.0%, 75.0%, and 100.0%) -> Emerald Green (0xFF2ECC71)
+    controller.userScore = 6;
+    controller.pcScore = 4;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('60.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
+
     controller.userScore = 3;
     controller.pcScore = 1;
     controller.totalRounds = 4;
@@ -1132,7 +1154,7 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('75.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
 
     controller.userScore = 10;
     controller.pcScore = 0;
@@ -1143,7 +1165,7 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('100.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
 
     // Toggling OFF hides the entire ScoreHeader again
     controller.toggleShowPredictability(false);

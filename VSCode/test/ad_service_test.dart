@@ -395,8 +395,9 @@ void main() {
           findsOneWidget,
         );
 
-        // Unlock Remove Ads -> bottom banner immediately disappears, while Watch Ad button stays available
+        // Unlock Remove Ads -> both bottom banner and top AppBar Watch Ad pill immediately disappear
         expect(controller.unlockAds(), isTrue);
+        expect(controller.isRemoveAdsActive, isTrue);
         await tester.pump();
 
         expect(
@@ -405,7 +406,55 @@ void main() {
         );
         expect(
           find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsNothing,
+        );
+
+        // Open ShopDialog -> rewarded ad card is also hidden when Remove Ads is active
+        await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('shop_rewarded_ad_card')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('shop_watch_rewarded_ad_button')),
+          findsNothing,
+        );
+
+        // Toggle Remove Ads OFF in the shop -> rewarded ad card in shop and top AppBar pill reappear
+        controller.toggleRemoveAds(false);
+        expect(controller.isRemoveAdsActive, isFalse);
+        await tester.pumpAndSettle();
+
+        final shopAdCardFinder = find.byKey(
+          const ValueKey('shop_rewarded_ad_card'),
+        );
+        await tester.scrollUntilVisible(
+          shopAdCardFinder,
+          250,
+          scrollable: find.descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(shopAdCardFinder, findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
           findsOneWidget,
+        );
+
+        // Toggle Remove Ads back ON -> top AppBar rewarded ad pill is hidden again
+        controller.toggleRemoveAds(true);
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsNothing,
         );
       },
     );

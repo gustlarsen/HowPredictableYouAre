@@ -116,6 +116,7 @@ class CloudSaveData {
   final bool showYourPrediction;
   final bool showNextMove;
   final bool showSuggestion;
+  final bool removeAdsEnabled;
   final bool showCrystalBall;
   final bool showCrystalBallPlus;
   final bool crystalBallPlusSavedState;
@@ -180,6 +181,7 @@ class CloudSaveData {
     this.showYourPrediction = false,
     this.showNextMove = false,
     this.showSuggestion = false,
+    bool? removeAdsEnabled,
     this.showCrystalBall = false,
     this.showCrystalBallPlus = false,
     this.crystalBallPlusSavedState = false,
@@ -203,7 +205,7 @@ class CloudSaveData {
     this.vibrationEnabled = true,
     this.animationsEnabled = true,
     this.updatedAtMillis = 0,
-  });
+  }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -320,6 +322,7 @@ class CloudSaveData {
       showYourPrediction: showYourPrediction,
       showNextMove: showNextMove,
       showSuggestion: showSuggestion,
+      removeAdsEnabled: removeAdsEnabled,
       showCrystalBall: showCrystalBall,
       showCrystalBallPlus: showCrystalBallPlus,
       crystalBallPlusSavedState: crystalBallPlusSavedState,
@@ -386,6 +389,7 @@ class CloudSaveData {
       showYourPrediction: storage.showYourPrediction,
       showNextMove: storage.showNextMove,
       showSuggestion: storage.showSuggestion,
+      removeAdsEnabled: storage.removeAdsEnabled,
       showCrystalBall: storage.showCrystalBall,
       showCrystalBallPlus: storage.showCrystalBallPlus,
       crystalBallPlusSavedState: storage.crystalBallPlusSavedState,
@@ -457,6 +461,7 @@ class CloudSaveData {
     await storage.setShowYourPrediction(showYourPrediction);
     await storage.setShowNextMove(showNextMove);
     await storage.setShowSuggestion(showSuggestion);
+    await storage.setRemoveAdsEnabled(removeAdsEnabled);
     await storage.setShowCrystalBall(showCrystalBall);
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
@@ -536,6 +541,7 @@ class CloudSaveData {
       'showYourPrediction': showYourPrediction,
       'showNextMove': showNextMove,
       'showSuggestion': showSuggestion,
+      'removeAdsEnabled': removeAdsEnabled,
       'showCrystalBall': showCrystalBall,
       'showCrystalBallPlus': showCrystalBallPlus,
       'crystalBallPlusSavedState': crystalBallPlusSavedState,
@@ -648,6 +654,8 @@ class CloudSaveData {
       showYourPrediction: map['showYourPrediction'] as bool? ?? false,
       showNextMove: map['showNextMove'] as bool? ?? false,
       showSuggestion: map['showSuggestion'] as bool? ?? false,
+      removeAdsEnabled:
+          map['removeAdsEnabled'] as bool? ?? (map['unlockedAds'] as bool? ?? false),
       showCrystalBall: map['showCrystalBall'] as bool? ?? false,
       showCrystalBallPlus: map['showCrystalBallPlus'] as bool? ?? false,
       crystalBallPlusSavedState:

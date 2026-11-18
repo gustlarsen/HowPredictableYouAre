@@ -11,14 +11,14 @@ class ScoreHeader extends StatelessWidget {
   static const Color crimsonRed = Color(0xFFE74C3C);
 
   /// Returns a semantic color matching the RPG HP bar aesthetic:
-  /// - Emerald green (`0xFF2ECC71`) when low predictability (< 40%)
-  /// - Amber/gold (`0xFFFFB300`) when moderate (40%–65%)
-  /// - Crimson red (`0xFFE74C3C`) when highly predictable (> 65%)
+  /// - Emerald green (`0xFF2ECC71`) for high percentages (>= 60%)
+  /// - Amber/gold (`0xFFFFB300`) for moderate percentages (30%–59%)
+  /// - Crimson red (`0xFFE74C3C`) for low percentages (< 30%)
   static Color gaugeColor(double percentPredict) {
     final clamped = percentPredict.clamp(0.0, 100.0);
-    if (clamped < 40.0) {
+    if (clamped >= 60.0) {
       return emeraldGreen;
-    } else if (clamped <= 65.0) {
+    } else if (clamped >= 30.0) {
       return amberGold;
     } else {
       return crimsonRed;

@@ -253,6 +253,139 @@ void main() {
       expect(tester.getTopLeft(yourChip).dy, equals(tester.getTopLeft(pcChip).dy));
     });
 
+    testWidgets('HintsBar pills maintain the exact same fixed height (34.0) whether showing ? or element icons or classic emojis without shifting VersusArena', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedYourPrediction': true,
+        'showYourPrediction': true,
+        'unlockedNextMove': true,
+        'showNextMove': true,
+        'unlockedSuggestion': true,
+        'showSuggestion': true,
+        'unlockedCrystalBall': true,
+        'showCrystalBall': true,
+        'animationsEnabled': false,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: AudioService(),
+      );
+
+      final arenaKey = const ValueKey('test_versus_arena_box');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 360,
+                      child: HintsBar(controller: controller),
+                    ),
+                    Container(
+                      key: arenaKey,
+                      width: 360,
+                      height: 150,
+                      color: Colors.black,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      // 1. Initial state: Your Choice, PC's Choice, and Suggestion show '?' (no prior Markov history)
+      expect(controller.predictedUserMoves, isEmpty);
+      expect(controller.pcNextMoves, isEmpty);
+      expect(controller.suggestedMoves, isEmpty);
+      expect(find.text('?'), findsNWidgets(3));
+
+      final yourChipFinder = find.ancestor(
+        of: find.text('Your Choice:'),
+        matching: find.byType(Container),
+      ).first;
+      final pcChipFinder = find.ancestor(
+        of: find.text("PC's Choice:"),
+        matching: find.byType(Container),
+      ).first;
+      final suggChipFinder = find.ancestor(
+        of: find.text('Suggestion:'),
+        matching: find.byType(Container),
+      ).first;
+      final cbChipFinder = find.ancestor(
+        of: find.text('Crystal Ball:'),
+        matching: find.byType(Container),
+      ).first;
+
+      final initialHintsBarHeight = tester.getSize(find.byType(HintsBar)).height;
+      final initialArenaTop = tester.getTopLeft(find.byKey(arenaKey)).dy;
+
+      expect(tester.getSize(yourChipFinder).height, equals(34.0));
+      expect(tester.getSize(pcChipFinder).height, equals(34.0));
+      expect(tester.getSize(suggChipFinder).height, equals(34.0));
+      expect(tester.getSize(cbChipFinder).height, equals(34.0));
+
+      // 2. Elemental mode with single element icon in each pill
+      controller.predictedUserMoves = [HandMove.rock];
+      controller.pcNextMoves = [HandMove.paper];
+      controller.suggestedMoves = [HandMove.scissors];
+      controller.notifyListeners();
+      await tester.pump();
+
+      expect(find.text('?'), findsNothing);
+      expect(tester.getSize(yourChipFinder).height, equals(34.0));
+      expect(tester.getSize(pcChipFinder).height, equals(34.0));
+      expect(tester.getSize(suggChipFinder).height, equals(34.0));
+      expect(tester.getSize(cbChipFinder).height, equals(34.0));
+      expect(tester.getSize(find.byType(HintsBar)).height, equals(initialHintsBarHeight));
+      expect(tester.getTopLeft(find.byKey(arenaKey)).dy, equals(initialArenaTop));
+
+      // 3. Elemental mode with multiple tied element icons
+      controller.predictedUserMoves = [HandMove.rock, HandMove.paper];
+      controller.pcNextMoves = [HandMove.paper, HandMove.scissors];
+      controller.suggestedMoves = [HandMove.scissors, HandMove.rock];
+      controller.notifyListeners();
+      await tester.pump();
+
+      expect(tester.getSize(yourChipFinder).height, equals(34.0));
+      expect(tester.getSize(pcChipFinder).height, equals(34.0));
+      expect(tester.getSize(suggChipFinder).height, equals(34.0));
+      expect(tester.getSize(cbChipFinder).height, equals(34.0));
+      expect(tester.getSize(find.byType(HintsBar)).height, equals(initialHintsBarHeight));
+      expect(tester.getTopLeft(find.byKey(arenaKey)).dy, equals(initialArenaTop));
+
+      // 4. Classic Hands mode (emojis) and back to '?'
+      controller.toggleShowNewSkin(true);
+      await tester.pump();
+
+      expect(tester.getSize(yourChipFinder).height, equals(34.0));
+      expect(tester.getSize(pcChipFinder).height, equals(34.0));
+      expect(tester.getSize(suggChipFinder).height, equals(34.0));
+      expect(tester.getSize(cbChipFinder).height, equals(34.0));
+      expect(tester.getSize(find.byType(HintsBar)).height, equals(initialHintsBarHeight));
+      expect(tester.getTopLeft(find.byKey(arenaKey)).dy, equals(initialArenaTop));
+
+      controller.resetGame();
+      await tester.pump();
+      expect(find.text('?'), findsNWidgets(3));
+      expect(tester.getSize(yourChipFinder).height, equals(34.0));
+      expect(tester.getSize(pcChipFinder).height, equals(34.0));
+      expect(tester.getSize(suggChipFinder).height, equals(34.0));
+      expect(tester.getSize(cbChipFinder).height, equals(34.0));
+      expect(tester.getSize(find.byType(HintsBar)).height, equals(initialHintsBarHeight));
+      expect(tester.getTopLeft(find.byKey(arenaKey)).dy, equals(initialArenaTop));
+    });
+
     test('Localization strings JSON in en, pt, es, de are concise and correct', () {
       final jsonFile = File('assets/data/stringsHowPredict.json');
       final data = json.decode(jsonFile.readAsStringSync()) as Map<String, dynamic>;
