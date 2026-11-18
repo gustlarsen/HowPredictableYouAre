@@ -373,7 +373,25 @@ class _ShopDialogState extends State<ShopDialog> {
               const SizedBox(height: 6),
               // Compact Horizontal Summary Bar of all 5 Elemental Orb Balances
               _buildOrbSummaryBar(),
-              const Divider(height: 14),
+              // Pinned "Free Elemental Orbs" rewarded ad card directly below the balance box
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: !controller.isRemoveAdsActive
+                      ? Padding(
+                          key: const ValueKey('shop_rewarded_ad_pinned'),
+                          padding: const EdgeInsets.only(top: 10),
+                          child: _buildRewardedAdCard(context),
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey('shop_rewarded_ad_hidden'),
+                        ),
+                ),
+              ),
+              const Divider(height: 18),
 
               // Shop items list (ordered ascending by Elemental Orb cost)
               Expanded(
@@ -795,130 +813,6 @@ class _ShopDialogState extends State<ShopDialog> {
                         },
                       ),
 
-                    if (!controller.isRemoveAdsActive) ...[
-                      const SizedBox(height: 12),
-                      // Voluntary Rewarded Video Ad (+50 of each Elemental Orb) action
-                      Card(
-                        key: const ValueKey('shop_rewarded_ad_card'),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        color: Colors.amber.withValues(alpha: 0.12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(
-                            color: Colors.amber.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final textColumn = Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      loc.t(
-                                        'string45',
-                                        fallback: 'Free Elemental Orbs',
-                                      ),
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    controller.isRewardedAdOnCooldown
-                                        ? 'Cooldown active (2m)'
-                                        : loc.t(
-                                            'rewarded_ad_desc',
-                                            fallback:
-                                                'Watch a video ad for +50 of each Elemental Orb',
-                                          ),
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: controller.isRewardedAdOnCooldown
-                                          ? Colors.grey
-                                          : Colors.amber,
-                                    ),
-                                  ),
-                                ],
-                              );
-
-                              final actionButton = ElevatedButton.icon(
-                                key: const ValueKey(
-                                  'shop_watch_rewarded_ad_button',
-                                ),
-                                onPressed: controller.isRewardedAdReady
-                                    ? () {
-                                        controller.watchRewardedAd(
-                                          onRewardEarned: () {
-                                            if (!context.mounted) return;
-                                            ScaffoldMessenger.of(context)
-                                              ..hideCurrentSnackBar()
-                                              ..showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    GameController
-                                                        .rewardedAdSnackBarMessage,
-                                                  ),
-                                                  duration: Duration(seconds: 2),
-                                                ),
-                                              );
-                                          },
-                                        );
-                                      }
-                                    : null,
-                                icon: const Icon(
-                                  Icons.play_circle_fill_rounded,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  controller.isRewardedAdOnCooldown
-                                      ? 'Wait 2m'
-                                      : AdService.rewardedAdButtonLabel,
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber,
-                                  foregroundColor: Colors.black87,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                ),
-                              );
-
-                              if (constraints.maxWidth < 360) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    textColumn,
-                                    const SizedBox(height: 10),
-                                    actionButton,
-                                  ],
-                                );
-                              }
-
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(child: textColumn),
-                                  const SizedBox(width: 12),
-                                  actionButton,
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -956,6 +850,129 @@ class _ShopDialogState extends State<ShopDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRewardedAdCard(BuildContext context) {
+    final loc = controller.localization;
+    return Card(
+      key: const ValueKey('shop_rewarded_ad_card'),
+      margin: EdgeInsets.zero,
+      color: Colors.amber.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: Colors.amber.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textColumn = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    loc.t(
+                      'string45',
+                      fallback: 'Free Elemental Orbs',
+                    ),
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  controller.isRewardedAdOnCooldown
+                      ? 'Cooldown active (2m)'
+                      : loc.t(
+                          'rewarded_ad_desc',
+                          fallback:
+                              'Watch a video ad for +50 of each Elemental Orb',
+                        ),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: controller.isRewardedAdOnCooldown
+                        ? Colors.grey
+                        : Colors.amber,
+                  ),
+                ),
+              ],
+            );
+
+            final actionButton = ElevatedButton.icon(
+              key: const ValueKey(
+                'shop_watch_rewarded_ad_button',
+              ),
+              onPressed: controller.isRewardedAdReady
+                  ? () {
+                      controller.watchRewardedAd(
+                        onRewardEarned: () {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  GameController.rewardedAdSnackBarMessage,
+                                ),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                        },
+                      );
+                    }
+                  : null,
+              icon: const Icon(
+                Icons.play_circle_fill_rounded,
+                size: 16,
+              ),
+              label: Text(
+                controller.isRewardedAdOnCooldown
+                    ? 'Wait 2m'
+                    : AdService.rewardedAdButtonLabel,
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                foregroundColor: Colors.black87,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+              ),
+            );
+
+            if (constraints.maxWidth < 360) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  textColumn,
+                  const SizedBox(height: 10),
+                  actionButton,
+                ],
+              );
+            }
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: textColumn),
+                const SizedBox(width: 12),
+                actionButton,
+              ],
+            );
+          },
         ),
       ),
     );

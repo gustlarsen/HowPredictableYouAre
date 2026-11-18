@@ -946,9 +946,12 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey('diamond_unlock_unlock_reset_button')),
+    final resetUnlockBtn = find.byKey(
+      const ValueKey('diamond_unlock_unlock_reset_button'),
     );
+    await tester.ensureVisible(resetUnlockBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(resetUnlockBtn);
     await tester.pumpAndSettle();
 
     // Reset Button comic cutscene should open immediately
@@ -961,11 +964,14 @@ void main() {
     expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
 
     // Toggling the Reset switch off and on in the shop should NOT re-trigger the comic
-    await tester.tap(find.byType(Switch).first);
+    final resetSwitch = find.byType(Switch).first;
+    await tester.ensureVisible(resetSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(resetSwitch);
     await tester.pumpAndSettle();
     expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
 
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(resetSwitch);
     await tester.pumpAndSettle();
     expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
 
@@ -1227,13 +1233,32 @@ void main() {
     final newHandsTitle = find.text('New Hands');
     expect(predTitle, findsOneWidget);
     expect(resetTitle, findsOneWidget);
-    expect(newHandsTitle, findsOneWidget);
 
     final predY = tester.getTopLeft(predTitle).dy;
-    final resetY = tester.getTopLeft(resetTitle).dy;
-    final newHandsY = tester.getTopLeft(newHandsTitle).dy;
-    expect(predY, lessThan(resetY));
-    expect(resetY, lessThan(newHandsY));
+    final initialResetY = tester.getTopLeft(resetTitle).dy;
+    expect(predY, lessThan(initialResetY));
+
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      newHandsTitle,
+      120,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(newHandsTitle, findsOneWidget);
+    if (resetTitle.evaluate().isNotEmpty) {
+      expect(
+        tester.getTopLeft(resetTitle).dy,
+        lessThan(tester.getTopLeft(newHandsTitle).dy),
+      );
+    }
+
+    // Scroll back to top so Predictability Score card is fully visible
+    tester.state<ScrollableState>(shopScrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
 
     final predUnlockBtn = find.byKey(
       const ValueKey('diamond_unlock_unlock_predictability_score'),
@@ -1253,6 +1278,8 @@ void main() {
     );
 
     // Unlock Predictability Score with 15 Fire + 15 Water + 15 Wood
+    await tester.ensureVisible(predUnlockBtn);
+    await tester.pumpAndSettle();
     await tester.tap(predUnlockBtn);
     await tester.pumpAndSettle();
     expect(controller.unlockedPredictability, isTrue);
@@ -1866,17 +1893,28 @@ void main() {
         predictabilityWordBoxes.map((b) => b.top.round()).toSet();
     expect(predictabilityLineTops.length, 1);
 
-    // 2. Scroll to the Rewarded Ad card at the bottom of the Shop list
+    // 2. Pinned Rewarded Ad card is immediately visible below the balance bar and above the ListView without scrolling
+    final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
     final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
-    await tester.scrollUntilVisible(
-      adCardFinder,
-      250,
-      scrollable: find.descendant(
-        of: find.byType(Dialog),
-        matching: find.byType(Scrollable),
-      ),
+    final listViewFinder = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(ListView),
     );
-    await tester.pumpAndSettle();
+    expect(balanceBarFinder, findsOneWidget);
+    expect(adCardFinder, findsOneWidget);
+    expect(listViewFinder, findsOneWidget);
+    expect(
+      find.descendant(of: listViewFinder, matching: adCardFinder),
+      findsNothing,
+    );
+    expect(
+      tester.getRect(adCardFinder).top,
+      greaterThan(tester.getRect(balanceBarFinder).bottom),
+    );
+    expect(
+      tester.getRect(adCardFinder).bottom,
+      lessThanOrEqualTo(tester.getRect(listViewFinder).top),
+    );
 
     final freeOrbsFinder = find.text('Free Elemental Orbs');
     final subtitleFinder =
@@ -1899,6 +1937,84 @@ void main() {
     expect(freeOrbsRect.bottom, lessThanOrEqualTo(subtitleRect.top + 4));
     expect(subtitleRect.bottom, lessThan(watchAdBtnRect.top));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ShopDialog pins Free Elemental Orbs card below balance bar while scrolling and collapses smoothly when Remove Ads is enabled', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'orbs_fire': 5000,
+      'orbs_water': 5000,
+      'orbs_wood': 5000,
+      'orbs_earth': 5000,
+      'orbs_metal': 5000,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          body: ShopDialog(controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
+    final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
+    final listViewFinder = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(ListView),
+    );
+
+    expect(adCardFinder, findsOneWidget);
+    final initialAdRect = tester.getRect(adCardFinder);
+    expect(
+      initialAdRect.top,
+      greaterThan(tester.getRect(balanceBarFinder).bottom),
+    );
+    expect(
+      initialAdRect.bottom,
+      lessThanOrEqualTo(tester.getRect(listViewFinder).top),
+    );
+
+    // Scroll upgrades list down to Crystal Ball -> pinned ad card remains stationary
+    await tester.scrollUntilVisible(
+      find.text('Crystal Ball'),
+      250,
+      scrollable: find.descendant(
+        of: listViewFinder,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Crystal Ball'), findsOneWidget);
+    expect(adCardFinder, findsOneWidget);
+    expect(tester.getRect(adCardFinder), equals(initialAdRect));
+
+    // Unlock Remove Ads while inside ShopDialog -> card smoothly collapses and hides
+    expect(controller.unlockAds(), isTrue);
+    await tester.pumpAndSettle();
+    expect(adCardFinder, findsNothing);
+
+    // Toggle Remove Ads OFF -> card expands back into pinned top position
+    controller.toggleRemoveAds(false);
+    await tester.pumpAndSettle();
+    expect(adCardFinder, findsOneWidget);
+    expect(tester.getRect(adCardFinder), equals(initialAdRect));
   });
 
   testWidgets('7-tap QA shortcut on Backpack icon grants +100,000 of each Elemental Orb in UI', (WidgetTester tester) async {

@@ -10,6 +10,7 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 
 class FakeAdMobClient implements AdMobClient {
   bool shouldSucceedInit;
@@ -422,7 +423,7 @@ void main() {
           findsNothing,
         );
 
-        // Toggle Remove Ads OFF in the shop -> rewarded ad card in shop and top AppBar pill reappear
+        // Toggle Remove Ads OFF in the shop -> pinned rewarded ad card in shop and top AppBar pill reappear immediately without scrolling
         controller.toggleRemoveAds(false);
         expect(controller.isRemoveAdsActive, isFalse);
         await tester.pumpAndSettle();
@@ -430,16 +431,17 @@ void main() {
         final shopAdCardFinder = find.byKey(
           const ValueKey('shop_rewarded_ad_card'),
         );
-        await tester.scrollUntilVisible(
-          shopAdCardFinder,
-          250,
-          scrollable: find.descendant(
-            of: find.byType(Dialog),
-            matching: find.byType(Scrollable),
-          ),
-        );
-        await tester.pumpAndSettle();
         expect(shopAdCardFinder, findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.descendant(
+              of: find.byType(ShopDialog),
+              matching: find.byType(ListView),
+            ),
+            matching: shopAdCardFinder,
+          ),
+          findsNothing,
+        );
 
         await tester.tap(find.byKey(const ValueKey('shop_close_button')));
         await tester.pumpAndSettle();
@@ -637,19 +639,10 @@ void main() {
         await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
         await tester.pumpAndSettle();
 
+        // Pinned Rewarded Ad card & button are immediately visible without scrolling
         final shopAdBtnFinder = find.byKey(
           const ValueKey('shop_watch_rewarded_ad_button'),
         );
-        await tester.scrollUntilVisible(
-          shopAdBtnFinder,
-          250,
-          scrollable: find.descendant(
-            of: find.byType(Dialog),
-            matching: find.byType(Scrollable),
-          ),
-        );
-        await tester.pumpAndSettle();
-
         expect(shopAdBtnFinder, findsOneWidget);
         expect(
           find.descendant(
