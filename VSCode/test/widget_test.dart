@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:how_predictable/main.dart';
 import 'package:how_predictable/models/move.dart';
+import 'package:how_predictable/services/ad_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
@@ -16,6 +18,7 @@ import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
+import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
@@ -1940,6 +1943,187 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SettingsDialog), findsNothing);
   });
+
+  testWidgets('Move buttons and RANDOM button remain visible and stationary at the bottom above the banner ad both in minimal start UI and when MarkovTransitionMatrix is scrolled', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 760);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'unlockedRandom': true,
+      'showRandom': true,
+      'unlockedPredictability': false,
+      'showPredictability': false,
+      'unlockedYourPrediction': false,
+      'showYourPrediction': false,
+      'unlockedNextMove': false,
+      'showNextMove': false,
+      'unlockedSuggestion': false,
+      'showSuggestion': false,
+      'unlockedAlgorithm': false,
+      'showAlgorithm': false,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+    final adService = AdService(client: _LayoutTestAdMobClient());
+    await adService.initialize();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+      adService: adService,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollViewFinder = find.byKey(const ValueKey('game_upper_scroll_view'));
+    final moveCardFinder = find.byKey(const ValueKey('move_selection_card'));
+    final bannerContainerFinder = find.byKey(const ValueKey('bottom_banner_ad_container'));
+    final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
+    final paperBtnFinder = find.byKey(const ValueKey('hand_button_paper'));
+    final scissorsBtnFinder = find.byKey(const ValueKey('hand_button_scissors'));
+    final randomBtnFinder = find.byKey(const ValueKey('random_move_button'));
+
+    // 1. Minimal Start Screen UI (ScoreHeader, HintsBar, and MarkovMatrixView hidden):
+    expect(find.byType(ScoreHeader), findsNothing);
+    expect(find.byType(MarkovMatrixView), findsNothing);
+    expect(scrollViewFinder, findsOneWidget);
+    expect(moveCardFinder, findsOneWidget);
+    expect(bannerContainerFinder, findsOneWidget);
+    expect(rockBtnFinder, findsOneWidget);
+    expect(paperBtnFinder, findsOneWidget);
+    expect(scissorsBtnFinder, findsOneWidget);
+    expect(randomBtnFinder, findsOneWidget);
+
+    // Move selection card is outside the SingleChildScrollView, while VersusArena is inside it
+    expect(
+      find.descendant(of: scrollViewFinder, matching: find.byType(VersusArena)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: scrollViewFinder, matching: moveCardFinder),
+      findsNothing,
+    );
+
+    // Visual separation: move selection card has subtle border and upward BoxShadow
+    final moveCardContainer = tester.widget<Container>(moveCardFinder);
+    final moveCardDecoration = moveCardContainer.decoration! as BoxDecoration;
+    expect(moveCardDecoration.border, isNotNull);
+    expect(moveCardDecoration.boxShadow, isNotNull);
+    expect(moveCardDecoration.boxShadow!.first.offset.dy, lessThan(0));
+
+    // Safe Ad Spacing: 8px-12px vertical padding between bottom of move-selection card and top of banner ad
+    final minimalCardRect = tester.getRect(moveCardFinder);
+    final minimalBannerRect = tester.getRect(bannerContainerFinder);
+    final adGap = minimalBannerRect.top - minimalCardRect.bottom;
+    expect(adGap, greaterThanOrEqualTo(8.0));
+    expect(adGap, lessThanOrEqualTo(12.0));
+
+    // VersusArena is cleanly centered inside the upper scrollable viewport in minimal UI
+    final scrollViewportRect = tester.getRect(scrollViewFinder);
+    final minimalArenaRect = tester.getRect(find.byType(VersusArena));
+    expect(
+      minimalArenaRect.center.dy,
+      closeTo(scrollViewportRect.center.dy, 16.0),
+    );
+
+    final minimalRockRect = tester.getRect(rockBtnFinder);
+    final minimalPaperRect = tester.getRect(paperBtnFinder);
+    final minimalScissorsRect = tester.getRect(scissorsBtnFinder);
+    final minimalRandomRect = tester.getRect(randomBtnFinder);
+
+    // 2. Enable ScoreHeader, HintsBar, and MarkovTransitionMatrix:
+    controller.unlockedPredictability = true;
+    controller.showPredictability = true;
+    controller.unlockedYourPrediction = true;
+    controller.showYourPrediction = true;
+    controller.unlockedNextMove = true;
+    controller.showNextMove = true;
+    controller.unlockedSuggestion = true;
+    controller.showSuggestion = true;
+    controller.unlockedAlgorithm = true;
+    controller.showAlgorithm = true;
+    controller.notifyListeners();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ScoreHeader), findsOneWidget);
+    expect(find.byType(HintsBar), findsOneWidget);
+    expect(find.byType(VersusArena), findsOneWidget);
+    expect(find.byType(MarkovMatrixView), findsOneWidget);
+
+    // Move selection card and buttons remain anchored at the exact same bottom coordinates as in minimal UI
+    expect(tester.getRect(moveCardFinder), equals(minimalCardRect));
+    expect(tester.getRect(rockBtnFinder), equals(minimalRockRect));
+    expect(tester.getRect(paperBtnFinder), equals(minimalPaperRect));
+    expect(tester.getRect(scissorsBtnFinder), equals(minimalScissorsRect));
+    expect(tester.getRect(randomBtnFinder), equals(minimalRandomRect));
+    expect(tester.getRect(bannerContainerFinder), equals(minimalBannerRect));
+
+    // ScoreHeader, HintsBar, and VersusArena are comfortably visible above the pinned move card before scrolling
+    expect(tester.getRect(find.byType(ScoreHeader)).top, greaterThanOrEqualTo(scrollViewportRect.top));
+    expect(tester.getRect(find.byType(VersusArena)).bottom, lessThanOrEqualTo(minimalCardRect.top));
+
+    // 3. Enable New Hands (5 elements: FIRE, WATER, WOOD, EARTH, METAL) and scroll MarkovTransitionMatrix:
+    controller.unlockedNewHands = true;
+    controller.toggleShowNewHands(true);
+    await tester.pumpAndSettle();
+
+    final lizardBtnFinder = find.byKey(const ValueKey('hand_button_lizard'));
+    final spockBtnFinder = find.byKey(const ValueKey('hand_button_spock'));
+    expect(lizardBtnFinder, findsOneWidget);
+    expect(spockBtnFinder, findsOneWidget);
+
+    final cardRectBeforeScroll = tester.getRect(moveCardFinder);
+    final rockRectBeforeScroll = tester.getRect(rockBtnFinder);
+    final paperRectBeforeScroll = tester.getRect(paperBtnFinder);
+    final scissorsRectBeforeScroll = tester.getRect(scissorsBtnFinder);
+    final lizardRectBeforeScroll = tester.getRect(lizardBtnFinder);
+    final spockRectBeforeScroll = tester.getRect(spockBtnFinder);
+    final randomRectBeforeScroll = tester.getRect(randomBtnFinder);
+    final bannerRectBeforeScroll = tester.getRect(bannerContainerFinder);
+    final matrixTopBeforeScroll = tester.getTopLeft(find.byType(MarkovMatrixView)).dy;
+    final arenaTopBeforeScroll = tester.getTopLeft(find.byType(VersusArena)).dy;
+
+    // Scroll the upper SingleChildScrollView upward to bring MarkovTransitionMatrix up
+    await tester.drag(scrollViewFinder, const Offset(0, -220));
+    await tester.pumpAndSettle();
+
+    // Upper informational sections (VersusArena and MarkovMatrixView) scrolled upward
+    expect(
+      tester.getTopLeft(find.byType(MarkovMatrixView)).dy,
+      lessThan(matrixTopBeforeScroll),
+    );
+    expect(
+      tester.getTopLeft(find.byType(VersusArena)).dy,
+      lessThan(arenaTopBeforeScroll),
+    );
+
+    // Pinned bottom move-selection card, all 5 element buttons, RANDOM button, and banner ad remain completely stationary
+    expect(tester.getRect(moveCardFinder), equals(cardRectBeforeScroll));
+    expect(tester.getRect(rockBtnFinder), equals(rockRectBeforeScroll));
+    expect(tester.getRect(paperBtnFinder), equals(paperRectBeforeScroll));
+    expect(tester.getRect(scissorsBtnFinder), equals(scissorsRectBeforeScroll));
+    expect(tester.getRect(lizardBtnFinder), equals(lizardRectBeforeScroll));
+    expect(tester.getRect(spockBtnFinder), equals(spockRectBeforeScroll));
+    expect(tester.getRect(randomBtnFinder), equals(randomRectBeforeScroll));
+    expect(tester.getRect(bannerContainerFinder), equals(bannerRectBeforeScroll));
+  });
 }
 
 class _SettingsTestPlayGamesClient implements PlayGamesClient {
@@ -1958,4 +2142,54 @@ class _SettingsTestPlayGamesClient implements PlayGamesClient {
 
   @override
   Future<String?> loadGame({required String name}) async => null;
+}
+
+class _LayoutTestAdMobClient extends AdMobClient {
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<void> loadBanner({
+    required String adUnitId,
+    required AdSize size,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    onLoaded();
+  }
+
+  @override
+  Widget? buildBannerWidget() {
+    return const SizedBox(
+      key: ValueKey('test_banner_ad_widget'),
+      width: 320,
+      height: 50,
+    );
+  }
+
+  @override
+  void disposeBanner() {}
+
+  @override
+  Future<void> loadRewarded({
+    required String adUnitId,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    onLoaded();
+  }
+
+  @override
+  Future<bool> showRewarded({
+    required VoidCallback onUserEarnedReward,
+    required VoidCallback onDismissed,
+    required VoidCallback onFailedToShow,
+  }) async {
+    onUserEarnedReward();
+    onDismissed();
+    return true;
+  }
+
+  @override
+  void disposeRewarded() {}
 }

@@ -424,175 +424,228 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Main Scrollable Game Layout + Safe Bottom Banner Area
+          // Main Game Layout: Scrollable Upper Region + Pinned Bottom Move-Selection Deck + Safe Bottom Banner Area
           SafeArea(
             child: Column(
               children: [
+                // 1. Scrollable Upper Region (ScoreHeader, HintsBar, VersusArena, MarkovMatrixView)
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          12,
-                          16,
-                          controller.shouldShowBannerAd ? 24 : 12,
-                        ),
-                        child: Column(
-                          children: [
-                            // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeInOut,
-                              child: AnimatedSwitcher(
-                                duration: controller.animationsEnabled
-                                    ? const Duration(milliseconds: 250)
-                                    : Duration.zero,
-                                child: (controller.unlockedPredictability &&
-                                        controller.showPredictability)
-                                    ? Padding(
-                                        key: const ValueKey(
-                                          'score_header_visible',
-                                        ),
-                                        padding: const EdgeInsets.only(
-                                          bottom: 10,
-                                        ),
-                                        child: ScoreHeader(
-                                          controller: controller,
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(
-                                        key: ValueKey('score_header_hidden'),
-                                      ),
-                              ),
+                  child: LayoutBuilder(
+                    builder: (context, viewportConstraints) {
+                      final hasVisibleHints = controller.showYourPrediction ||
+                          controller.showNextMove ||
+                          controller.showSuggestion ||
+                          controller.showCrystalBall;
+
+                      return SingleChildScrollView(
+                        key: const ValueKey('game_upper_scroll_view'),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: 480,
+                              minHeight: (viewportConstraints.maxHeight - 20)
+                                  .clamp(0.0, double.infinity),
                             ),
-
-                            // Unlocked Hint Pills (Prediction, Next move, Suggestion)
-                            HintsBar(controller: controller),
-                            const SizedBox(height: 10),
-
-                            // Versus Arena: Classic Hand-Lunge (New Skin OFF) or Stationary Orbs + Projectile Clash VFX (New Skin ON)
-                            VersusArena(
-                              userMove: controller.currentUserMove,
-                              computerMove: controller.currentComputerMove,
-                              winner: controller.lastWinner,
-                              localization: loc,
-                              animationsEnabled: controller.animationsEnabled,
-                              roundId: controller.turnCount,
-                              userHp: controller.userHp,
-                              computerHp: controller.computerHp,
-                              elementalMode: controller.isElementalMode,
-                              onImpactHaptic: controller.isElementalMode
-                                  ? controller.audio.playTapVibrate
-                                  : null,
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Live Markov Transition Matrix (if unlocked & enabled)
-                            if (controller.showAlgorithm) ...[
-                              MarkovMatrixView(
-                                engine: controller.engine,
-                                lastUserMove: controller.lastUserMove,
-                                elementalMode: controller.isElementalMode,
-                                localization: loc,
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-
-                            // Move Controls Section
-                            Card(
-                              elevation: 4,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surface.withValues(alpha: 0.9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 10,
-                                ),
-                                child: Column(
-                                  children: [
-                                    // Hand move buttons (single row for 3 classic or all 5 hands)
-                                    Row(
-                                      key: const ValueKey('hand_buttons_row'),
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        for (final move in [
-                                          HandMove.rock,
-                                          HandMove.paper,
-                                          HandMove.scissors,
-                                          if (controller.showNewHands) ...[
-                                            HandMove.lizard,
-                                            HandMove.spock,
-                                          ],
-                                        ])
-                                          _HandActionButton(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                  child: AnimatedSwitcher(
+                                    duration: controller.animationsEnabled
+                                        ? const Duration(milliseconds: 250)
+                                        : Duration.zero,
+                                    child: (controller.unlockedPredictability &&
+                                            controller.showPredictability)
+                                        ? Padding(
+                                            key: const ValueKey(
+                                              'score_header_visible',
+                                            ),
+                                            padding: const EdgeInsets.only(
+                                              bottom: 8,
+                                            ),
+                                            child: ScoreHeader(
+                                              controller: controller,
+                                            ),
+                                          )
+                                        : const SizedBox.shrink(
                                             key: ValueKey(
-                                              'hand_button_${move.name}',
-                                            ),
-                                            move: move,
-                                            compact: controller.showNewHands,
-                                            elementalMode:
-                                                controller.isElementalMode,
-                                            isSelected:
-                                                controller.currentUserMove ==
-                                                move,
-                                            localization: loc,
-                                            animationsEnabled:
-                                                controller.animationsEnabled,
-                                            onPressed: () =>
-                                                controller.playTurn(move),
-                                          ),
-                                      ],
-                                    ),
-
-                                    // Optional Random move button (if unlocked & enabled)
-                                    if (controller.showRandom) ...[
-                                      const SizedBox(height: 10),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          onPressed: controller.playRandom,
-                                          icon: const Icon(
-                                            Icons.casino_outlined,
-                                            size: 18,
-                                          ),
-                                          label: Text(
-                                            loc.t(
-                                              'string16',
-                                              fallback: 'RANDOM MOVE',
+                                              'score_header_hidden',
                                             ),
                                           ),
-                                          style: OutlinedButton.styleFrom(
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                  ),
                                 ),
-                              ),
+
+                                // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
+                                HintsBar(controller: controller),
+                                if (hasVisibleHints) const SizedBox(height: 8),
+
+                                // Versus Arena: Classic Hand-Lunge (New Skin OFF) or Stationary Orbs + Projectile Clash VFX (New Skin ON)
+                                VersusArena(
+                                  userMove: controller.currentUserMove,
+                                  computerMove: controller.currentComputerMove,
+                                  winner: controller.lastWinner,
+                                  localization: loc,
+                                  animationsEnabled:
+                                      controller.animationsEnabled,
+                                  roundId: controller.turnCount,
+                                  userHp: controller.userHp,
+                                  computerHp: controller.computerHp,
+                                  elementalMode: controller.isElementalMode,
+                                  onImpactHaptic: controller.isElementalMode
+                                      ? controller.audio.playTapVibrate
+                                      : null,
+                                ),
+
+                                // Live Markov Transition Matrix (if unlocked & enabled)
+                                if (controller.showAlgorithm) ...[
+                                  const SizedBox(height: 12),
+                                  MarkovMatrixView(
+                                    engine: controller.engine,
+                                    lastUserMove: controller.lastUserMove,
+                                    elementalMode: controller.isElementalMode,
+                                    localization: loc,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                // 2. Pinned Bottom Controls (Move Selection Card)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        4,
+                        16,
+                        controller.shouldShowBannerAd ? 10 : 8,
+                      ),
+                      child: Container(
+                        key: const ValueKey('move_selection_card'),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.amber.withValues(alpha: 0.25),
+                            width: 1.0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              blurRadius: 12,
+                              spreadRadius: 1,
+                              offset: const Offset(0, -4),
                             ),
                           ],
+                        ),
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          elevation: 0,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0.94),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 10,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Hand move buttons (single row for 3 classic or all 5 hands)
+                                Row(
+                                  key: const ValueKey('hand_buttons_row'),
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    for (final move in [
+                                      HandMove.rock,
+                                      HandMove.paper,
+                                      HandMove.scissors,
+                                      if (controller.showNewHands) ...[
+                                        HandMove.lizard,
+                                        HandMove.spock,
+                                      ],
+                                    ])
+                                      _HandActionButton(
+                                        key: ValueKey(
+                                          'hand_button_${move.name}',
+                                        ),
+                                        move: move,
+                                        compact: controller.showNewHands,
+                                        elementalMode:
+                                            controller.isElementalMode,
+                                        isSelected:
+                                            controller.currentUserMove == move,
+                                        localization: loc,
+                                        animationsEnabled:
+                                            controller.animationsEnabled,
+                                        onPressed: () =>
+                                            controller.playTurn(move),
+                                      ),
+                                  ],
+                                ),
+
+                                // Optional Random move button (if unlocked & enabled)
+                                if (controller.showRandom) ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      key: const ValueKey('random_move_button'),
+                                      onPressed: controller.playRandom,
+                                      icon: const Icon(
+                                        Icons.casino_outlined,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        loc.t(
+                                          'string16',
+                                          fallback: 'RANDOM MOVE',
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
 
-                // Bottom Banner Ad: placed at the very bottom inside SafeArea with generous top spacing
+                // 3. Bottom Banner Ad: anchored at the very bottom inside SafeArea
                 if (controller.shouldShowBannerAd)
                   Padding(
                     key: const ValueKey('bottom_banner_ad_container'),
-                    padding: const EdgeInsets.only(top: 16, bottom: 4),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Center(
                       child: controller.adService.buildBannerWidget(),
                     ),
