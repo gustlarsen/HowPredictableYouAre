@@ -41,6 +41,9 @@ abstract class PlayGamesClient {
 /// Default production implementation of [PlayGamesClient] backed by
 /// the `games_services` plugin.
 class DefaultPlayGamesClient implements PlayGamesClient {
+  static const Duration defaultProfileTimeout = Duration(seconds: 8);
+  static const Duration defaultCloudTimeout = Duration(seconds: 12);
+
   const DefaultPlayGamesClient();
 
   @override
@@ -50,7 +53,7 @@ class DefaultPlayGamesClient implements PlayGamesClient {
   Future<String?> getPlayerName() async {
     try {
       return await GamesServices.getPlayerName().timeout(
-        const Duration(seconds: 2),
+        defaultProfileTimeout,
       );
     } catch (_) {
       return null;
@@ -61,7 +64,7 @@ class DefaultPlayGamesClient implements PlayGamesClient {
   Future<String?> getPlayerID() async {
     try {
       return await GamesServices.getPlayerID().timeout(
-        const Duration(seconds: 2),
+        defaultProfileTimeout,
       );
     } catch (_) {
       return null;
@@ -69,12 +72,19 @@ class DefaultPlayGamesClient implements PlayGamesClient {
   }
 
   @override
-  Future<String?> saveGame({required String data, required String name}) =>
-      GamesServices.saveGame(data: data, name: name);
+  Future<String?> saveGame({required String data, required String name}) async {
+    try {
+      return await GamesServices.saveGame(data: data, name: name).timeout(
+        defaultCloudTimeout,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<String?> loadGame({required String name}) =>
-      GamesServices.loadGame(name: name);
+      GamesServices.loadGame(name: name).timeout(defaultCloudTimeout);
 }
 
 /// Serializable snapshot of the player's full progression state for
@@ -719,9 +729,15 @@ class CloudSaveData {
 /// and Saved Games cloud synchronization with offline-first fallback.
 class PlayGamesService extends ChangeNotifier {
   static const String saveSlotName = 'how_predictable_cloud_save';
+  static const String placeholderPlayerId = StorageService.placeholderPlayerId;
   static const int qaBonusOrbs = 100000;
   static const String qaBonusSnackBarMessage =
       'Tester Bonus: +100,000 Elemental Orbs';
+
+  /// Returns true only when [playerId] is a real, non-empty Google Play Games
+  /// player ID and not the legacy placeholder (`GPG-PLAYER`).
+  static bool isValidPlayerId(String? playerId) =>
+      StorageService.isValidPlayerId(playerId);
 
   /// Authorized QA tester Google Play Games player IDs (primary check).
   static const Set<String> qaTesterIds = {
@@ -750,6 +766,9 @@ class PlayGamesService extends ChangeNotifier {
 
   final StorageService storage;
   final PlayGamesClient _client;
+  final Duration _silentAuthTimeout;
+  final Duration _retryBaseDelay;
+  final int _maxAutoRetries;
 
   bool _isSignedIn = false;
   bool _isAuthenticating = false;
@@ -757,27 +776,39 @@ class PlayGamesService extends ChangeNotifier {
   String? _playerID;
   String? _lastPlayerID;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
+  Timer? _retryTimer;
+  int _retryAttempt = 0;
   VoidCallback? onCloudDataRestored;
   VoidCallback? onQaBonusGranted;
 
   PlayGamesService({
     required this.storage,
     PlayGamesClient? client,
+    Duration silentAuthTimeout = const Duration(seconds: 10),
+    Duration retryBaseDelay = const Duration(seconds: 4),
+    int maxAutoRetries = 2,
     this.onCloudDataRestored,
     this.onQaBonusGranted,
-  }) : _client = client ?? const DefaultPlayGamesClient();
+  }) : _client = client ?? const DefaultPlayGamesClient(),
+       _silentAuthTimeout = silentAuthTimeout,
+       _retryBaseDelay = retryBaseDelay,
+       _maxAutoRetries = maxAutoRetries;
 
-  bool get isSignedIn => _isSignedIn;
+  bool get isSignedIn => _isSignedIn && isValidPlayerId(_playerID);
   bool get isAuthenticating => _isAuthenticating;
-  String? get playerName => _playerName;
-  String? get playerID => _playerID;
-  String? get lastPlayerID => _lastPlayerID ?? storage.lastPlayerId;
-  CloudSyncStatus get syncStatus => _syncStatus;
+  bool get isRetryScheduled => _retryTimer?.isActive ?? false;
+  String? get playerName => isSignedIn ? _playerName : null;
+  String? get playerID => isValidPlayerId(_playerID) ? _playerID : null;
+  String? get lastPlayerID =>
+      isValidPlayerId(_lastPlayerID) ? _lastPlayerID : storage.lastPlayerId;
+  CloudSyncStatus get syncStatus =>
+      isSignedIn ? _syncStatus : CloudSyncStatus.offline;
 
   /// Attempts silent sign-in on app startup and merges cloud progression if
   /// the cloud save holds a higher progression state or diamond count.
   /// Gracefully falls back to offline `SharedPreferences` cache if declined or offline.
   Future<bool> initialize() async {
+    _retryAttempt = 0;
     return signIn(silent: true);
   }
 
@@ -785,6 +816,7 @@ class PlayGamesService extends ChangeNotifier {
   /// from the background (`AppLifecycleState.resumed`), detecting any OS-level
   /// account switch or sign-out performed in the Google Play Games app.
   Future<bool> handleAppResumed() {
+    _retryAttempt = 0;
     return signIn(silent: true);
   }
 
@@ -796,36 +828,88 @@ class PlayGamesService extends ChangeNotifier {
     }
   }
 
+  /// Cancels any scheduled automatic background sign-in retry timer.
+  void cancelPendingRetries() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryAttempt = 0;
+  }
+
+  @override
+  void dispose() {
+    cancelPendingRetries();
+    super.dispose();
+  }
+
+  void _scheduleRetryIfNeeded() {
+    if (_retryAttempt >= _maxAutoRetries) return;
+    if (_retryTimer != null && _retryTimer!.isActive) return;
+    final delay = _retryBaseDelay * (1 << _retryAttempt);
+    _retryAttempt++;
+    _retryTimer = Timer(delay, () {
+      _retryTimer = null;
+      if (!isSignedIn && !_isAuthenticating) {
+        unawaited(signIn(silent: true));
+      }
+    });
+  }
+
   /// Signs in with Google Play Games Services (`GamesServices.signIn()`).
-  /// When [silent] is true, errors are silently ignored and the game continues
-  /// in offline mode.
+  /// When [silent] is true, errors or slow timeouts fall back gracefully to
+  /// offline mode without overwriting local user settings or triggering a false
+  /// multi-account reset, and schedule bounded retries.
   Future<bool> signIn({bool silent = false}) async {
-    if (_isAuthenticating) return _isSignedIn;
+    if (_isAuthenticating) return isSignedIn;
+
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    if (!silent) {
+      _retryAttempt = 0;
+    }
 
     _isAuthenticating = true;
     notifyListeners();
 
     try {
-      final result = await _client.signIn();
+      final signInFuture = _client.signIn();
+      final result = silent
+          ? await signInFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
+          : await signInFuture;
       if (result == null) {
         _setDisconnectedState();
+        if (silent) {
+          _scheduleRetryIfNeeded();
+        }
         return false;
       }
 
-      final fetchedName = await _client.getPlayerName();
-      final fetchedId = await _client.getPlayerID();
+      final nameFuture = _client.getPlayerName();
+      final idFuture = _client.getPlayerID();
+      final fetchedName = silent
+          ? await nameFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
+          : await nameFuture;
+      final fetchedId = silent
+          ? await idFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
+          : await idFuture;
 
+      if (!isValidPlayerId(fetchedId)) {
+        _setDisconnectedState();
+        if (silent) {
+          _scheduleRetryIfNeeded();
+        }
+        return false;
+      }
+
+      final resolvedId = fetchedId!.trim();
       final resolvedName = (fetchedName != null && fetchedName.trim().isNotEmpty)
           ? fetchedName.trim()
           : 'Play Games Player';
-      final resolvedId = (fetchedId != null && fetchedId.trim().isNotEmpty)
-          ? fetchedId.trim()
-          : 'GPG-PLAYER';
 
-      final previousPlayerId = _lastPlayerID ?? storage.lastPlayerId;
+      final previousPlayerId = lastPlayerID;
       final bool playerChanged =
           previousPlayerId != null && previousPlayerId != resolvedId;
 
+      _retryAttempt = 0;
       _isSignedIn = true;
       _playerName = resolvedName;
       _playerID = resolvedId;
@@ -844,6 +928,9 @@ class PlayGamesService extends ChangeNotifier {
       return true;
     } catch (_) {
       _setDisconnectedState();
+      if (silent) {
+        _scheduleRetryIfNeeded();
+      }
       return false;
     }
   }
@@ -856,7 +943,7 @@ class PlayGamesService extends ChangeNotifier {
   /// holds a higher (or equal) progression state or diamond count; if local data
   /// has higher progression, pushes the local state to cloud.
   Future<bool> loadAndResolveCloudSave({bool isAccountSwitch = false}) async {
-    if (!_isSignedIn) {
+    if (!isSignedIn) {
       _syncStatus = CloudSyncStatus.offline;
       notifyListeners();
       return false;
@@ -868,9 +955,9 @@ class PlayGamesService extends ChangeNotifier {
     try {
       if (!isAccountSwitch) {
         final fetchedId = await _client.getPlayerID();
-        if (fetchedId != null && fetchedId.trim().isNotEmpty) {
-          final resolvedId = fetchedId.trim();
-          final previousPlayerId = _lastPlayerID ?? storage.lastPlayerId;
+        if (isValidPlayerId(fetchedId)) {
+          final resolvedId = fetchedId!.trim();
+          final previousPlayerId = lastPlayerID;
           if (previousPlayerId != null && previousPlayerId != resolvedId) {
             isAccountSwitch = true;
             _playerID = resolvedId;
@@ -927,7 +1014,7 @@ class PlayGamesService extends ChangeNotifier {
 
       await checkAndGrantQaBonusIfEligible(cloudData: cloudData);
 
-      _syncStatus = CloudSyncStatus.synced;
+      _syncStatus = isSignedIn ? CloudSyncStatus.synced : CloudSyncStatus.offline;
       notifyListeners();
       return restoredFromCloud;
     } catch (_) {
@@ -943,8 +1030,9 @@ class PlayGamesService extends ChangeNotifier {
           data: localData.toJsonString(),
           name: saveSlotName,
         );
-        _syncStatus =
-            saveRes != null ? CloudSyncStatus.synced : CloudSyncStatus.offline;
+        _syncStatus = (isSignedIn && saveRes != null)
+            ? CloudSyncStatus.synced
+            : CloudSyncStatus.offline;
       } catch (_) {
         _syncStatus = CloudSyncStatus.offline;
       }
@@ -958,8 +1046,8 @@ class PlayGamesService extends ChangeNotifier {
   /// grants +100,000 of each Elemental Orb once, sets `hasClaimedQaBonus = true`,
   /// immediately saves to Google Play Saved Games, and notifies listeners.
   Future<bool> checkAndGrantQaBonusIfEligible({CloudSaveData? cloudData}) async {
-    if (!_isSignedIn) return false;
-    if (!isQaTester(playerId: _playerID, playerName: _playerName)) {
+    if (!isSignedIn) return false;
+    if (!isQaTester(playerId: playerID, playerName: _playerName)) {
       return false;
     }
 
@@ -994,7 +1082,7 @@ class PlayGamesService extends ChangeNotifier {
   /// Saves the player's current progression state from [storage] to
   /// Google Play Saved Games (`GamesServices.saveGame`).
   Future<bool> saveCloudData() async {
-    if (!_isSignedIn) {
+    if (!isSignedIn) {
       _syncStatus = CloudSyncStatus.offline;
       notifyListeners();
       return false;
@@ -1009,7 +1097,7 @@ class PlayGamesService extends ChangeNotifier {
         data: snapshot.toJsonString(),
         name: saveSlotName,
       );
-      if (result != null) {
+      if (isSignedIn && result != null) {
         _syncStatus = CloudSyncStatus.synced;
         notifyListeners();
         return true;

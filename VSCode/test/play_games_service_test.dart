@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1669,4 +1670,326 @@ void main() {
       },
     );
   });
+
+  group('Slow / Failed Play Games Startup & Placeholder ID Guard Tests', () {
+    test(
+      'Rejects placeholder GPG-PLAYER and null/empty playerIDs without wiping local settings or triggering false account switch',
+      () async {
+        for (final invalidId in [null, '', '   ', 'GPG-PLAYER', 'gpg-player']) {
+          SharedPreferences.setMockInitialValues({
+            'has_seen_story_intro': true,
+            'language': 'pt',
+            'darkMode': false,
+            'soundEnabled': false,
+            'musicEnabled': false,
+            'orbs_fire': 450,
+            'unlockedReset': true,
+            'last_player_id': 'g01804264806540615668',
+          });
+          final storage = StorageService();
+          await storage.init();
+
+          final localization = LocalizationService();
+          localization.setLanguage(storage.language);
+
+          final fakeClient = FakePlayGamesClient(
+            shouldSucceedSignIn: true,
+            mockPlayerName: 'gustlarsen',
+            mockPlayerId: invalidId,
+          );
+          final playGames = PlayGamesService(
+            storage: storage,
+            client: fakeClient,
+            maxAutoRetries: 0,
+          );
+          addTearDown(playGames.dispose);
+
+          final controller = GameController(
+            storage: storage,
+            localization: localization,
+            audio: AudioService(),
+            playGames: playGames,
+          );
+          addTearDown(controller.dispose);
+
+          final signedIn = await playGames.initialize();
+
+          expect(signedIn, isFalse, reason: 'Should reject id="$invalidId"');
+          expect(playGames.isSignedIn, isFalse);
+          expect(playGames.playerID, isNull);
+          expect(playGames.playerName, isNull);
+          expect(playGames.syncStatus, CloudSyncStatus.offline);
+          expect(storage.lastPlayerId, 'g01804264806540615668');
+          expect(storage.language, 'pt');
+          expect(localization.currentLanguage, 'pt');
+          expect(controller.darkMode, isFalse);
+          expect(controller.soundEnabled, isFalse);
+          expect(controller.fireOrbs, 450);
+          expect(controller.unlockedReset, isTrue);
+          expect(controller.pendingQaBonusSnackBar, isNull);
+        }
+      },
+    );
+
+    test(
+      'Ignores legacy GPG-PLAYER persisted in SharedPreferences so real sign-in does not trigger false account reset',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'language': 'de',
+          'orbs_fire': 320,
+          'unlockedReset': true,
+          'musicEnabled': false,
+          'last_player_id': 'GPG-PLAYER',
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        expect(storage.lastPlayerId, isNull);
+        await storage.setLastPlayerId('GPG-PLAYER');
+        expect(storage.lastPlayerId, isNull);
+
+        final localization = LocalizationService();
+        localization.setLanguage(storage.language);
+
+        final fakeClient = FakePlayGamesClient(
+          shouldSucceedSignIn: true,
+          mockPlayerName: 'RealPlayer',
+          mockPlayerId: 'player_real_777',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: fakeClient,
+        );
+        addTearDown(playGames.dispose);
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          playGames: playGames,
+        );
+        addTearDown(controller.dispose);
+
+        final signedIn = await playGames.initialize();
+
+        expect(signedIn, isTrue);
+        expect(playGames.isSignedIn, isTrue);
+        expect(playGames.playerID, 'player_real_777');
+        expect(storage.lastPlayerId, 'player_real_777');
+        expect(playGames.syncStatus, CloudSyncStatus.synced);
+        expect(storage.language, 'de');
+        expect(localization.currentLanguage, 'de');
+        expect(controller.fireOrbs, 320);
+        expect(controller.unlockedReset, isTrue);
+      },
+    );
+
+    test(
+      'Slow startup sign-in timeout falls back to Offline without overwriting settings and retries gracefully when network recovers',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'language': 'es',
+          'orbs_fire': 180,
+          'musicEnabled': false,
+          'last_player_id': 'player_slow_net',
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        localization.setLanguage(storage.language);
+
+        final slowClient = _SlowPlayGamesClient(
+          delayFirstAttempt: const Duration(milliseconds: 120),
+          mockPlayerName: 'RecoveredUser',
+          mockPlayerId: 'player_slow_net',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: slowClient,
+          silentAuthTimeout: const Duration(milliseconds: 30),
+          retryBaseDelay: const Duration(milliseconds: 40),
+          maxAutoRetries: 2,
+        );
+        addTearDown(playGames.dispose);
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          playGames: playGames,
+        );
+        addTearDown(controller.dispose);
+
+        final firstResult = await playGames.initialize();
+
+        expect(firstResult, isFalse);
+        expect(playGames.isSignedIn, isFalse);
+        expect(playGames.playerID, isNull);
+        expect(playGames.syncStatus, CloudSyncStatus.offline);
+        expect(playGames.isRetryScheduled, isTrue);
+        expect(storage.language, 'es');
+        expect(localization.currentLanguage, 'es');
+        expect(controller.fireOrbs, 180);
+
+        // Wait for the scheduled graceful retry to run and succeed
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+
+        expect(playGames.isSignedIn, isTrue);
+        expect(playGames.playerName, 'RecoveredUser');
+        expect(playGames.playerID, 'player_slow_net');
+        expect(playGames.syncStatus, CloudSyncStatus.synced);
+        expect(storage.language, 'es');
+        expect(localization.currentLanguage, 'es');
+        expect(controller.fireOrbs, 180);
+      },
+    );
+
+    testWidgets(
+      'SettingsDialog shows Connecting... while startup auth is slow, then Offline (never GPG-PLAYER or Synced), preserving language',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'language': 'pt',
+          'orbs_fire': 250,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+          'last_player_id': 'player_existing_pt',
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await localization.load();
+        localization.setLanguage(storage.language);
+
+        final gate = Completer<String?>();
+        final slowClient = _CompleterPlayGamesClient(
+          signInGate: gate,
+          mockPlayerName: 'gustlarsen',
+          mockPlayerId: 'GPG-PLAYER',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: slowClient,
+          retryBaseDelay: const Duration(seconds: 30),
+          maxAutoRetries: 1,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          playGames: playGames,
+        );
+        addTearDown(() {
+          controller.dispose();
+          playGames.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pump();
+
+        // Start silent initialization while network is still pending
+        final initFuture = playGames.initialize();
+        await tester.pump();
+
+        // Open SettingsDialog while authentication is in progress
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pump();
+        await tester.pump();
+
+        // Should show Connecting... (both badge and disabled button), never Synced or GPG-PLAYER
+        expect(find.text('Connecting...'), findsNWidgets(2));
+        expect(find.text('Synced'), findsNothing);
+        expect(find.textContaining('GPG-PLAYER'), findsNothing);
+        expect(find.text('Português 🇧🇷'), findsOneWidget);
+
+        // Complete sign-in where getPlayerID returns placeholder 'GPG-PLAYER'
+        gate.complete('success');
+        final ok = await initFuture;
+        expect(ok, isFalse);
+        await tester.pump();
+        await tester.pump();
+
+        // Should show Offline & Sign in button, preserve Portuguese, and never show GPG-PLAYER or Synced
+        expect(find.text('Offline'), findsOneWidget);
+        expect(find.text('Sign in with Google Play'), findsOneWidget);
+        expect(find.text('Synced'), findsNothing);
+        expect(find.textContaining('GPG-PLAYER'), findsNothing);
+        expect(find.text('Português 🇧🇷'), findsOneWidget);
+        expect(storage.language, 'pt');
+        expect(controller.fireOrbs, 250);
+      },
+    );
+  });
+}
+
+class _SlowPlayGamesClient implements PlayGamesClient {
+  final Duration delayFirstAttempt;
+  final String mockPlayerName;
+  final String mockPlayerId;
+  int _attempt = 0;
+
+  _SlowPlayGamesClient({
+    required this.delayFirstAttempt,
+    required this.mockPlayerName,
+    required this.mockPlayerId,
+  });
+
+  @override
+  Future<String?> signIn() async {
+    _attempt++;
+    if (_attempt == 1) {
+      await Future<void>.delayed(delayFirstAttempt);
+    }
+    return 'success';
+  }
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => mockPlayerId;
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
+}
+
+class _CompleterPlayGamesClient implements PlayGamesClient {
+  final Completer<String?> signInGate;
+  final String? mockPlayerName;
+  final String? mockPlayerId;
+
+  _CompleterPlayGamesClient({
+    required this.signInGate,
+    required this.mockPlayerName,
+    required this.mockPlayerId,
+  });
+
+  @override
+  Future<String?> signIn() => signInGate.future;
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => mockPlayerId;
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
 }

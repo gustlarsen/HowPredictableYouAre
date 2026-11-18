@@ -1538,6 +1538,7 @@ class GameController extends ChangeNotifier {
     _remainingGiftCooldown = Duration.zero;
     _rewardedAdCooldownTimer?.cancel();
     _rewardedAdCooldownTimer = null;
+    playGames.cancelPendingRetries();
   }
 
   @override

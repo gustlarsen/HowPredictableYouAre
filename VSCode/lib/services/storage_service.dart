@@ -109,13 +109,30 @@ class StorageService {
   Future<void> setHasClaimedQaBonus(bool val) =>
       _prefs.setBool('hasClaimedQaBonus', val);
 
+  static const String placeholderPlayerId = 'GPG-PLAYER';
+
+  /// Returns true only when [id] is a real, non-empty Google Play Games
+  /// player ID and not the legacy placeholder (`GPG-PLAYER`).
+  static bool isValidPlayerId(String? id) {
+    if (id == null) return false;
+    final trimmed = id.trim();
+    if (trimmed.isEmpty) return false;
+    if (trimmed.toUpperCase() == placeholderPlayerId) return false;
+    return true;
+  }
+
   // Last Signed-In Google Play Games Player ID
-  String? get lastPlayerId => _prefs.getString('last_player_id');
+  String? get lastPlayerId {
+    final raw = _prefs.getString('last_player_id');
+    if (!isValidPlayerId(raw)) return null;
+    return raw!.trim();
+  }
+
   Future<void> setLastPlayerId(String? id) {
-    if (id == null) {
+    if (!isValidPlayerId(id)) {
       return _prefs.remove('last_player_id');
     }
-    return _prefs.setString('last_player_id', id);
+    return _prefs.setString('last_player_id', id!.trim());
   }
 
   int get userScore => _prefs.getInt('userScore') ?? 0;

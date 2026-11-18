@@ -98,9 +98,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   Future<void> _handleCopyPlayerId(BuildContext context) async {
     final rawId = controller.playGames.playerID;
-    if (rawId == null || rawId.isEmpty) return;
+    if (!PlayGamesService.isValidPlayerId(rawId)) return;
+    final cleanId = rawId!.trim();
     controller.audio.playTapVibrate();
-    await Clipboard.setData(ClipboardData(text: rawId));
+    await Clipboard.setData(ClipboardData(text: cleanId));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..removeCurrentSnackBar()
@@ -863,7 +864,10 @@ class _PlayerProfileSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isConnected = playGames.isSignedIn;
+    final hasVerifiedPlayerId = PlayGamesService.isValidPlayerId(
+      playGames.playerID,
+    );
+    final isConnected = playGames.isSignedIn && hasVerifiedPlayerId;
     final isBusy =
         playGames.isAuthenticating ||
         playGames.syncStatus == CloudSyncStatus.syncing;
@@ -918,6 +922,7 @@ class _PlayerProfileSection extends StatelessWidget {
               const SizedBox(width: 6),
               _CloudSyncStatusBadge(
                 status: playGames.syncStatus,
+                isConnected: isConnected,
                 isAuthenticating: playGames.isAuthenticating,
                 onTap: isConnected && !isBusy ? onManualSync : null,
               ),
@@ -1049,29 +1054,37 @@ class _PlayerProfileSection extends StatelessWidget {
 
 class _CloudSyncStatusBadge extends StatelessWidget {
   final CloudSyncStatus status;
+  final bool isConnected;
   final bool isAuthenticating;
   final VoidCallback? onTap;
 
   const _CloudSyncStatusBadge({
     required this.status,
+    required this.isConnected,
     required this.isAuthenticating,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool isConnecting = isAuthenticating && !isConnected;
     final bool isSyncing =
-        isAuthenticating || status == CloudSyncStatus.syncing;
+        isConnected && (isAuthenticating || status == CloudSyncStatus.syncing);
+    final bool isBusy = isConnecting || isSyncing;
 
     final IconData icon;
     final String label;
     final Color color;
 
-    if (isSyncing) {
+    if (isConnecting) {
+      icon = Icons.cloud_sync_outlined;
+      label = 'Connecting...';
+      color = Colors.amber;
+    } else if (isSyncing) {
       icon = Icons.cloud_sync_outlined;
       label = 'Syncing...';
       color = Colors.amber;
-    } else if (status == CloudSyncStatus.synced) {
+    } else if (isConnected && status == CloudSyncStatus.synced) {
       icon = Icons.cloud_done_outlined;
       label = 'Synced';
       color = Colors.greenAccent;
@@ -1095,7 +1108,7 @@ class _CloudSyncStatusBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isSyncing)
+            if (isBusy)
               SizedBox(
                 width: 10,
                 height: 10,
