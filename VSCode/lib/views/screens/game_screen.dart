@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
@@ -6,11 +7,13 @@ import '../../models/move.dart';
 import '../../models/story_chapter.dart';
 import '../../services/ad_service.dart';
 import '../../services/localization_service.dart';
+import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
+import '../dialogs/inventory_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
@@ -22,15 +25,40 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
+class _GameScreenState extends State<GameScreen>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   bool _isIntroDialogScheduled = false;
   bool _hasCheckedForUpdate = false;
+  bool _isInventoryDialogOpen = false;
   GameController? _controller;
+
+  final GlobalKey _rootStackKey = GlobalKey();
+  final GlobalKey _backpackKey = GlobalKey();
+  final GlobalKey _pcSlotKey = GlobalKey();
+
+  late final AnimationController _flyingOrbController;
+  late final AnimationController _backpackPulseController;
+  int _lastHandledOrbCollectionEventId = 0;
+  HandMove? _activeFlyingOrbMove;
+  HandMove? _lastAbsorbedOrbMove;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _flyingOrbController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          _lastAbsorbedOrbMove = _activeFlyingOrbMove;
+          _backpackPulseController.forward(from: 0.0);
+        }
+      });
+    _backpackPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _hasCheckedForUpdate) return;
       _hasCheckedForUpdate = true;
@@ -41,14 +69,64 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _controller = context.read<GameController>();
+    final nextController = context.read<GameController>();
+    if (_controller != nextController) {
+      _controller = nextController;
+      _lastHandledOrbCollectionEventId = nextController.orbCollectionEventId;
+    }
   }
 
   @override
   void dispose() {
+    _flyingOrbController.dispose();
+    _backpackPulseController.dispose();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _checkFlyingOrbVfx(GameController controller) {
+    if (controller.orbCollectionEventId == _lastHandledOrbCollectionEventId) {
+      return;
+    }
+    _lastHandledOrbCollectionEventId = controller.orbCollectionEventId;
+    final collectedMove = controller.lastCollectedOrbMove;
+    if (collectedMove == null) return;
+
+    _activeFlyingOrbMove = collectedMove;
+    _lastAbsorbedOrbMove = collectedMove;
+    if (controller.animationsEnabled) {
+      _backpackPulseController.stop();
+      _backpackPulseController.reset();
+      _flyingOrbController.forward(from: 0.0);
+    } else {
+      _flyingOrbController.stop();
+      _flyingOrbController.reset();
+    }
+  }
+
+  void _handleBackpackTap(BuildContext context, GameController controller) {
+    controller.audio.playTapVibrate();
+    final grantedQa = controller.registerBackpackQaTap();
+    if (grantedQa && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(PlayGamesService.qaBonusSnackBarMessage),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+    if (!_isInventoryDialogOpen) {
+      _isInventoryDialogOpen = true;
+      showDialog(
+        context: context,
+        builder: (_) => InventoryDialog(controller: controller),
+      ).whenComplete(() {
+        _isInventoryDialogOpen = false;
+      });
+    }
   }
 
   @override
@@ -269,6 +347,33 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
+  Offset _resolveBackpackCenter(Size fallbackSize) {
+    final stackBox =
+        _rootStackKey.currentContext?.findRenderObject() as RenderBox?;
+    final backpackBox =
+        _backpackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox != null &&
+        backpackBox != null &&
+        stackBox.hasSize &&
+        backpackBox.hasSize) {
+      final globalCenter =
+          backpackBox.localToGlobal(backpackBox.size.center(Offset.zero));
+      return stackBox.globalToLocal(globalCenter);
+    }
+    return const Offset(36.0, 42.0);
+  }
+
+  Offset _resolvePcCombatantCenter(Size fallbackSize) {
+    final stackBox =
+        _rootStackKey.currentContext?.findRenderObject() as RenderBox?;
+    final pcBox = _pcSlotKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox != null && pcBox != null && stackBox.hasSize && pcBox.hasSize) {
+      final globalCenter = pcBox.localToGlobal(pcBox.size.center(Offset.zero));
+      return stackBox.globalToLocal(globalCenter);
+    }
+    return Offset(fallbackSize.width * 0.72, fallbackSize.height * 0.42);
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<GameController>();
@@ -279,6 +384,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _check100RoundAlert(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
+    _checkFlyingOrbVfx(controller);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -289,37 +395,92 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         title: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('💎', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 6),
-                Text(
-                  '${controller.diamonds}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+          child: AnimatedBuilder(
+            animation: _backpackPulseController,
+            builder: (context, _) {
+              final pulseT = _backpackPulseController.value;
+              final isPulsing =
+                  _backpackPulseController.isAnimating && pulseT > 0.0;
+              final scale = isPulsing
+                  ? 1.0 + math.sin(pulseT * math.pi) * 0.24
+                  : 1.0;
+              final pulseColor =
+                  _lastAbsorbedOrbMove?.elementalPrimaryColor ?? Colors.amber;
+              final glowStrength =
+                  isPulsing ? math.sin(pulseT * math.pi) : 0.0;
+
+              return Transform.scale(
+                scale: scale,
+                child: Tooltip(
+                  message: loc.t(
+                    'inventory_title',
+                    fallback: "Cleric's Backpack",
+                  ),
+                  child: InkWell(
+                    key: const ValueKey('backpack_inventory_button'),
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => _handleBackpackTap(context, controller),
+                    child: Container(
+                      key: _backpackKey,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF151821).withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isPulsing
+                              ? Color.lerp(
+                                  Colors.amber.withValues(alpha: 0.55),
+                                  pulseColor,
+                                  glowStrength,
+                                )!
+                              : Colors.amber.withValues(alpha: 0.45),
+                          width: isPulsing ? 1.6 : 1.1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isPulsing ? pulseColor : Colors.amber)
+                                .withValues(
+                                  alpha: isPulsing
+                                      ? 0.28 + 0.45 * glowStrength
+                                      : 0.22,
+                                ),
+                            blurRadius: isPulsing ? 14 : 8,
+                            spreadRadius: isPulsing ? 1.8 * glowStrength : 0.5,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.backpack_rounded,
+                        size: 20,
+                        color: isPulsing
+                            ? Color.lerp(
+                                Colors.amber,
+                                pulseColor,
+                                glowStrength * 0.7,
+                              )
+                            : Colors.amber,
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
         actions: [
-          // Voluntary Rewarded Video Ad ("Watch Ad +50 💎") button with explicit disclosure,
+          // Voluntary Rewarded Video Ad ("Watch Ad +50 Orbs") button with explicit disclosure,
           // shown only when a rewarded ad is preloaded and not on cooldown
           if (controller.isRewardedAdReady)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Tooltip(
-                message: 'Watch a video ad to earn +50 💎',
+                message: loc.t(
+                  'rewarded_ad_desc',
+                  fallback: 'Watch a video ad for +50 of each Elemental Orb',
+                ),
                 child: InkWell(
                   key: const ValueKey('watch_rewarded_ad_button'),
                   borderRadius: BorderRadius.circular(20),
@@ -353,13 +514,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           if (controller.isGiftAvailable)
             IconButton(
               icon: const Text('🎁', style: TextStyle(fontSize: 22)),
-              tooltip: 'Claim Free 5 💎 Gift',
+              tooltip: loc.t(
+                'gift_tooltip',
+                fallback: 'Claim Free +5 Elemental Orbs Gift',
+              ),
               onPressed: () {
                 controller.claimGift();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('🎁 +5 💎 Gift Claimed!'),
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: Text(
+                      loc.t(
+                        'gift_claimed_msg',
+                        fallback: '🎁 +5 Elemental Orbs Gift Claimed!',
+                      ),
+                    ),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
@@ -394,6 +563,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         ],
       ),
       body: Stack(
+        key: _rootStackKey,
         children: [
           // Dynamic Background Image with Animated Fade Transition
           Positioned.fill(
@@ -495,6 +665,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                   userHp: controller.userHp,
                                   computerHp: controller.computerHp,
                                   elementalMode: controller.isElementalMode,
+                                  pcSlotKey: _pcSlotKey,
                                   onImpactHaptic: controller.isElementalMode
                                       ? controller.audio.playTapVibrate
                                       : null,
@@ -651,6 +822,138 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     ),
                   ),
               ],
+            ),
+          ),
+
+          // Flying Elemental Orb VFX Overlay (from defeated PC slot to top-left Backpack icon)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _flyingOrbController,
+                builder: (context, _) {
+                  final orbMove = _activeFlyingOrbMove;
+                  final isFlying = controller.animationsEnabled &&
+                      orbMove != null &&
+                      _flyingOrbController.isAnimating &&
+                      _flyingOrbController.value < 1.0;
+                  if (!isFlying) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final screenSize = Size(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      );
+                      final startPos = _resolvePcCombatantCenter(screenSize);
+                      final endPos = _resolveBackpackCenter(screenSize);
+                      final curvedT = Curves.easeInOutCubic
+                          .transform(_flyingOrbController.value);
+
+                      Offset bezierPoint(double t) {
+                        final controlPoint = Offset(
+                          (startPos.dx + endPos.dx) * 0.5 + 48.0,
+                          math.min(startPos.dy, endPos.dy) - 42.0,
+                        );
+                        final oneMinusT = 1.0 - t;
+                        return Offset(
+                          oneMinusT * oneMinusT * startPos.dx +
+                              2 * oneMinusT * t * controlPoint.dx +
+                              t * t * endPos.dx,
+                          oneMinusT * oneMinusT * startPos.dy +
+                              2 * oneMinusT * t * controlPoint.dy +
+                              t * t * endPos.dy,
+                        );
+                      }
+
+                      final currentOrbPos = bezierPoint(curvedT);
+                      final primary = orbMove.elementalPrimaryColor;
+                      final secondary = orbMove.elementalSecondaryColor;
+
+                      return Stack(
+                        key: const ValueKey('flying_orb_vfx_overlay'),
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Subtle glowing trail particles along the curved arc
+                          for (var i = 1; i <= 4; i++)
+                            if (curvedT - i * 0.045 > 0.0)
+                              Builder(
+                                builder: (context) {
+                                  final trailT =
+                                      (curvedT - i * 0.045).clamp(0.0, 1.0);
+                                  final trailPos = bezierPoint(trailT);
+                                  final radius = 9.0 - i * 1.6;
+                                  return Positioned(
+                                    left: trailPos.dx - radius,
+                                    top: trailPos.dy - radius,
+                                    child: Container(
+                                      width: radius * 2,
+                                      height: radius * 2,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: primary.withValues(
+                                          alpha: (0.48 - i * 0.09)
+                                              .clamp(0.05, 0.5),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: primary.withValues(
+                                              alpha: 0.35 - i * 0.06,
+                                            ),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          // Main Flying Elemental Energy Orb
+                          Positioned(
+                            left: currentOrbPos.dx - 14,
+                            top: currentOrbPos.dy - 14,
+                            child: Container(
+                              key: ValueKey('flying_orb_${orbMove.orbKey}'),
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Colors.white,
+                                    primary,
+                                    secondary,
+                                  ],
+                                  stops: const [0.0, 0.55, 1.0],
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  width: 1.3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: primary.withValues(alpha: 0.85),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  orbMove.elementalIcon,
+                                  size: 15,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],

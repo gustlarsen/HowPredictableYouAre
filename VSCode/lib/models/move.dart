@@ -293,6 +293,96 @@ enum HandMove {
         return HandMove.paper;
     }
   }
+
+  /// Storage key identifier for this move's elemental orb balance.
+  String get orbKey {
+    switch (this) {
+      case HandMove.rock:
+        return 'fire';
+      case HandMove.paper:
+        return 'water';
+      case HandMove.scissors:
+        return 'wood';
+      case HandMove.lizard:
+        return 'earth';
+      case HandMove.spock:
+        return 'metal';
+    }
+  }
+
+  /// Returns the localized Elemental Orb name (e.g., "Fire Orb" or "FIRE").
+  String elementalOrbName(LocalizationService? localization) {
+    if (localization != null) {
+      switch (this) {
+        case HandMove.rock:
+          return localization.t('orb_fire', fallback: 'Fire Orb');
+        case HandMove.paper:
+          return localization.t('orb_water', fallback: 'Water Orb');
+        case HandMove.scissors:
+          return localization.t('orb_wood', fallback: 'Wood Orb');
+        case HandMove.lizard:
+          return localization.t('orb_earth', fallback: 'Earth Orb');
+        case HandMove.spock:
+          return localization.t('orb_metal', fallback: 'Metal Orb');
+      }
+    }
+    return '$elementalLabel Orb';
+  }
+}
+
+/// Structured Elemental Energy Orb cost for shop upgrades.
+class ElementalCost {
+  final int fire;
+  final int water;
+  final int wood;
+  final int earth;
+  final int metal;
+
+  const ElementalCost({
+    this.fire = 0,
+    this.water = 0,
+    this.wood = 0,
+    this.earth = 0,
+    this.metal = 0,
+  });
+
+  int get total => fire + water + wood + earth + metal;
+
+  int forMove(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return fire;
+      case HandMove.paper:
+        return water;
+      case HandMove.scissors:
+        return wood;
+      case HandMove.lizard:
+        return earth;
+      case HandMove.spock:
+        return metal;
+    }
+  }
+
+  List<MapEntry<HandMove, int>> get nonZeroEntries => [
+    if (fire > 0) MapEntry(HandMove.rock, fire),
+    if (water > 0) MapEntry(HandMove.paper, water),
+    if (wood > 0) MapEntry(HandMove.scissors, wood),
+    if (earth > 0) MapEntry(HandMove.lizard, earth),
+    if (metal > 0) MapEntry(HandMove.spock, metal),
+  ];
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ElementalCost &&
+          fire == other.fire &&
+          water == other.water &&
+          wood == other.wood &&
+          earth == other.earth &&
+          metal == other.metal;
+
+  @override
+  int get hashCode => Object.hash(fire, water, wood, earth, metal);
 }
 
 enum RoundWinner {

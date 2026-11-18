@@ -259,7 +259,7 @@ class AdService extends ChangeNotifier {
       isDebug ? testRewardedAdUnitId : productionRewardedAdUnitId;
 
   /// Explicit policy-compliant disclosure label for the rewarded video ad button.
-  static const String rewardedAdButtonLabel = 'Watch Ad +50 💎';
+  static const String rewardedAdButtonLabel = 'Watch Ad +50 Orbs';
 
   final AdMobClient _client;
 

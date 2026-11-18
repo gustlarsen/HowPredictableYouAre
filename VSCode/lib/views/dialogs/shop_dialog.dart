@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../models/move.dart';
 import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
 import 'story_dialog.dart';
@@ -169,7 +170,9 @@ class _ShopDialogState extends State<ShopDialog> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('string79', fallback: 'Not enough Diamonds')),
+          content: Text(
+            loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -244,7 +247,7 @@ class _ShopDialogState extends State<ShopDialog> {
     required BuildContext context,
     required String title,
     String? subtitle,
-    required int cost,
+    required ElementalCost cost,
     required String? productId,
     required bool isUnlocked,
     required bool isActive,
@@ -284,6 +287,50 @@ class _ShopDialogState extends State<ShopDialog> {
     );
   }
 
+  Widget _buildOrbSummaryBar() {
+    return Container(
+      key: const ValueKey('shop_orb_summary_bar'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151821),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: 0.32),
+        ),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceEvenly,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final move in HandMove.values)
+            Row(
+              key: ValueKey('shop_header_orb_${move.orbKey}'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  move.elementalIcon,
+                  size: 14,
+                  color: move.elementalPrimaryColor,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  '${controller.orbsFor(move)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: move.elementalPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
@@ -313,7 +360,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Upgrades & Shop',
+                        loc.t('shop_title', fallback: 'Upgrades & Shop'),
                         maxLines: 1,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -321,33 +368,14 @@ class _ShopDialogState extends State<ShopDialog> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('💎', style: TextStyle(fontSize: 14)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${controller.diamonds}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
-              const Divider(height: 24),
+              const SizedBox(height: 6),
+              // Compact Horizontal Summary Bar of all 5 Elemental Orb Balances
+              _buildOrbSummaryBar(),
+              const Divider(height: 14),
 
-              // Shop items list (ordered ascending by diamond cost)
+              // Shop items list (ordered ascending by Elemental Orb cost)
               Expanded(
                 child: ListView(
                   cacheExtent: 1000,
@@ -363,7 +391,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         fallback:
                             'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
                       ),
-                      cost: 50,
+                      cost: GameController.costPredictability,
                       productId: BillingService.productPredictabilityScore,
                       isUnlocked: controller.unlockedPredictability,
                       isActive: controller.showPredictability,
@@ -389,7 +417,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string37', fallback: 'Reset Button'),
-                      cost: 100,
+                      cost: GameController.costReset,
                       productId: BillingService.productResetButton,
                       isUnlocked: controller.unlockedReset,
                       isActive: controller.showReset,
@@ -418,7 +446,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         'string56',
                         fallback: 'New Hands (Lizard & Spock)',
                       ),
-                      cost: 100,
+                      cost: GameController.costNewHands,
                       productId: BillingService.productNewHands,
                       isUnlocked: controller.unlockedNewHands,
                       isActive: controller.showNewHands,
@@ -430,7 +458,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string39', fallback: 'Random Move Button'),
-                      cost: 300,
+                      cost: GameController.costRandom,
                       productId: BillingService.productRandomButton,
                       isUnlocked: controller.unlockedRandom,
                       isActive: controller.showRandom,
@@ -459,7 +487,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         'string40',
                         fallback: 'Show Markov Algorithm',
                       ),
-                      cost: 500,
+                      cost: GameController.costAlgorithm,
                       productId: BillingService.productShowAlgorithm,
                       isUnlocked: controller.unlockedAlgorithm,
                       isActive: controller.showAlgorithm,
@@ -488,7 +516,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         'string41',
                         fallback: 'Your Prediction Hint',
                       ),
-                      cost: 1000,
+                      cost: GameController.costYourPrediction,
                       productId: BillingService.productYourPrediction,
                       isUnlocked: controller.unlockedYourPrediction,
                       isActive: controller.showYourPrediction,
@@ -514,7 +542,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string42', fallback: 'PC Next Move Reveal'),
-                      cost: 3000,
+                      cost: GameController.costNextMove,
                       productId: BillingService.productPcNextMove,
                       isUnlocked: controller.unlockedNextMove,
                       isActive: controller.showNextMove,
@@ -540,7 +568,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string43', fallback: 'Optimal Suggestion'),
-                      cost: 5000,
+                      cost: GameController.costSuggestion,
                       productId: BillingService.productSuggestion,
                       isUnlocked: controller.unlockedSuggestion,
                       isActive: controller.showSuggestion,
@@ -566,7 +594,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string44', fallback: 'Remove Ads'),
-                      cost: 10000,
+                      cost: GameController.costRemoveAds,
                       productId: BillingService.productRemoveAds,
                       isUnlocked: controller.unlockedAds,
                       isActive: controller.unlockedAds,
@@ -589,7 +617,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         'new_skin_desc',
                         fallback: 'Hands Theme (Rock, Paper, Scissors)',
                       ),
-                      cost: 10000,
+                      cost: GameController.costNewSkin,
                       productId: null,
                       isUnlocked: controller.unlockedNewSkin,
                       isActive: controller.showNewSkin,
@@ -615,7 +643,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string80', fallback: 'Crystal Ball'),
-                      cost: 20000,
+                      cost: GameController.costCrystalBall,
                       productId: BillingService.productCrystalBall,
                       isUnlocked: controller.unlockedCrystalBall,
                       isActive: controller.showCrystalBall,
@@ -642,7 +670,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       _buildShopItem(
                         context: context,
                         title: loc.t('string82', fallback: 'Crystal Ball+'),
-                        cost: 50000,
+                        cost: GameController.costCrystalBallPlus,
                         productId: null,
                         isUnlocked: controller.unlockedCrystalBallPlus,
                         isActive: controller.showCrystalBallPlus,
@@ -680,7 +708,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       ),
 
                     const SizedBox(height: 12),
-                    // Voluntary Rewarded Video Ad (+50 💎) action
+                    // Voluntary Rewarded Video Ad (+50 of each Elemental Orb) action
                     Card(
                       key: const ValueKey('shop_rewarded_ad_card'),
                       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -701,20 +729,32 @@ class _ShopDialogState extends State<ShopDialog> {
                             final textColumn = Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  loc.t('string45', fallback: 'Free Diamonds'),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    loc.t(
+                                      'string45',
+                                      fallback: 'Free Elemental Orbs',
+                                    ),
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   controller.isRewardedAdOnCooldown
                                       ? 'Cooldown active (2m)'
-                                      : 'Watch a video ad for +50 💎',
+                                      : loc.t(
+                                          'rewarded_ad_desc',
+                                          fallback:
+                                              'Watch a video ad for +50 of each Elemental Orb',
+                                        ),
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                     color: controller.isRewardedAdOnCooldown
                                         ? Colors.grey
                                         : Colors.amber,
@@ -835,7 +875,7 @@ class _ShopDialogState extends State<ShopDialog> {
 class _ShopItemTile extends StatelessWidget {
   final String title;
   final String? subtitle;
-  final int cost;
+  final ElementalCost cost;
   final String? productId;
   final String? localizedPrice;
   final bool isPurchasePending;
@@ -876,10 +916,14 @@ class _ShopItemTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(12),
         border: isUnlocked && isActive
-            ? Border.all(color: Colors.green.withValues(alpha: 0.4), width: 1.2)
+            ? Border.all(
+                color: Colors.green.withValues(alpha: 0.4),
+                width: 1.2,
+              )
             : null,
       ),
       child: Material(
@@ -967,8 +1011,10 @@ class _ShopItemTile extends StatelessWidget {
   }
 
   Widget _buildLockedContent(bool hasRealMoneyPrice) {
+    final entries = cost.nonZeroEntries;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           title,
@@ -990,77 +1036,104 @@ class _ShopItemTile extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 6),
-        Row(
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Expanded(
-              child: Text(
-                'Unlock',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
+            const Text(
+              'Unlock',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
               ),
             ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              key: ValueKey(
-                'diamond_unlock_${productId ?? title}',
-              ),
-              onPressed: isPurchasePending ? null : onUnlock,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                minimumSize: const Size(56, 34),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                '$cost 💎',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.amber,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            if (productId != null) ...[
-              const SizedBox(width: 6),
-              OutlinedButton(
-                key: ValueKey('real_money_unlock_$productId'),
-                onPressed: (!isPurchasePending &&
-                        !isLoadingStore &&
-                        hasRealMoneyPrice)
-                    ? onRealMoneyUnlock
-                    : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ElevatedButton(
+                  key: ValueKey(
+                    'diamond_unlock_${productId ?? title}',
                   ),
-                  minimumSize: const Size(56, 34),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onPressed: isPurchasePending ? null : onUnlock,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    minimumSize: const Size(52, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final entry in entries)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              entry.key.elementalIcon,
+                              size: 12,
+                              color: entry.key.elementalPrimaryColor,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${entry.value}',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: entry.key.elementalPrimaryColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
-                child: (isPurchasePending || isLoadingStore)
-                    ? const SizedBox(
-                        key: ValueKey('purchase_loading_indicator'),
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        hasRealMoneyPrice ? localizedPrice! : 'Unavailable',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                if (productId != null)
+                  OutlinedButton(
+                    key: ValueKey('real_money_unlock_$productId'),
+                    onPressed: (!isPurchasePending &&
+                            !isLoadingStore &&
+                            hasRealMoneyPrice)
+                        ? onRealMoneyUnlock
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
                       ),
-              ),
-            ],
+                      minimumSize: const Size(52, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: (isPurchasePending || isLoadingStore)
+                        ? const SizedBox(
+                            key: ValueKey('purchase_loading_indicator'),
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            hasRealMoneyPrice ? localizedPrice! : 'Unavailable',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+              ],
+            ),
           ],
         ),
       ],

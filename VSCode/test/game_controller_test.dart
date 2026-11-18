@@ -79,7 +79,6 @@ void main() {
   Future<void> createController({bool resetPreferences = false}) async {
     if (resetPreferences) {
       SharedPreferences.setMockInitialValues({
-        'diamonds': 0,
         'musicEnabled': false,
       });
     }
@@ -93,26 +92,145 @@ void main() {
     );
   }
 
-  test('Game starts with 0 diamonds by default', () async {
+  test('Game starts with 0 Elemental Orbs across all 5 elements by default', () async {
     SharedPreferences.setMockInitialValues({
       'musicEnabled': false,
     });
     await createController();
 
-    expect(storage.diamonds, 0);
-    expect(controller.diamonds, 0);
+    expect(storage.fireOrbs, 0);
+    expect(storage.waterOrbs, 0);
+    expect(storage.woodOrbs, 0);
+    expect(storage.earthOrbs, 0);
+    expect(storage.metalOrbs, 0);
+    expect(storage.totalOrbs, 0);
+    expect(controller.fireOrbs, 0);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.totalOrbs, 0);
   });
 
-  test('Reset purchase unlocks the reset action without automatically enabling it', () async {
+  test('Legacy save migration converts legacy diamonds > 0 once into Elemental Orbs when orbs are 0', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 100,
+      'diamonds': 125,
       'musicEnabled': false,
     });
     await createController();
 
-    controller.unlockReset();
+    expect(controller.fireOrbs, 125);
+    expect(controller.waterOrbs, 125);
+    expect(controller.woodOrbs, 125);
+    expect(controller.earthOrbs, 125);
+    expect(controller.metalOrbs, 125);
+    expect(storage.legacyDiamonds, 0);
 
-    expect(controller.diamonds, 0);
+    // Spend some Fire orbs and re-init -> does not re-migrate
+    controller.unlockPredictability(); // costs 15 Fire + 15 Water + 15 Wood
+    expect(controller.fireOrbs, 110);
+    expect(controller.waterOrbs, 110);
+    expect(controller.woodOrbs, 110);
+    expect(controller.earthOrbs, 125);
+    expect(controller.metalOrbs, 125);
+
+    await createController();
+    expect(controller.fireOrbs, 110);
+    expect(controller.waterOrbs, 110);
+    expect(controller.woodOrbs, 110);
+    expect(controller.earthOrbs, 125);
+    expect(controller.metalOrbs, 125);
+  });
+
+  test('Battle collection rule: winning a round grants +1 Elemental Orb of the defeated AI/PC element, while ties and losses grant 0 orbs', () async {
+    SharedPreferences.setMockInitialValues({
+      'unlockedNewHands': true,
+      'showNewHands': true,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    // 1. Defeat AI Fire (rock) with Water (paper) -> +1 Fire Orb
+    controller.crystalBallMove = HandMove.rock;
+    controller.playTurn(HandMove.paper);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.fireOrbs, 1);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.lastCollectedOrbMove, HandMove.rock);
+    expect(controller.orbCollectionEventId, 1);
+
+    // 2. Defeat AI Water (paper) with Wood (scissors) -> +1 Water Orb
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.scissors);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.fireOrbs, 1);
+    expect(controller.waterOrbs, 1);
+    expect(controller.woodOrbs, 0);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.lastCollectedOrbMove, HandMove.paper);
+    expect(controller.orbCollectionEventId, 2);
+
+    // 3. Defeat AI Wood (scissors) with Fire (rock) -> +1 Wood Orb
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.fireOrbs, 1);
+    expect(controller.waterOrbs, 1);
+    expect(controller.woodOrbs, 1);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
+    expect(controller.lastCollectedOrbMove, HandMove.scissors);
+    expect(controller.orbCollectionEventId, 3);
+
+    // 4. Defeat AI Earth (lizard) with Wood (scissors) -> +1 Earth Orb
+    controller.crystalBallMove = HandMove.lizard;
+    controller.playTurn(HandMove.scissors);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.earthOrbs, 1);
+    expect(controller.lastCollectedOrbMove, HandMove.lizard);
+    expect(controller.orbCollectionEventId, 4);
+
+    // 5. Defeat AI Metal (spock) with Fire (rock) -> +1 Metal Orb
+    controller.crystalBallMove = HandMove.spock;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.user);
+    expect(controller.metalOrbs, 1);
+    expect(controller.lastCollectedOrbMove, HandMove.spock);
+    expect(controller.orbCollectionEventId, 5);
+
+    // 6. Tie round -> awards 0 orbs
+    controller.crystalBallMove = HandMove.rock;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.draw);
+    expect(controller.totalOrbs, 5);
+    expect(controller.orbCollectionEventId, 5);
+
+    // 7. Loss round -> awards 0 orbs
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.rock);
+    expect(controller.lastWinner, RoundWinner.computer);
+    expect(controller.totalOrbs, 5);
+    expect(controller.orbCollectionEventId, 5);
+  });
+
+  test('Reset purchase deducts 30 Fire + 30 Water + 30 Wood and unlocks the reset action without automatically enabling it', () async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 30,
+      'orbs_water': 30,
+      'orbs_wood': 30,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.unlockReset(), isTrue);
+
+    expect(controller.fireOrbs, 0);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
     expect(controller.unlockedReset, isTrue);
     expect(controller.showReset, isFalse);
     expect(storage.unlockedReset, isTrue);
@@ -127,7 +245,9 @@ void main() {
     'Shop activation changes persist independently from ownership',
     () async {
       SharedPreferences.setMockInitialValues({
-        'diamonds': 100,
+        'orbs_fire': 30,
+        'orbs_water': 30,
+        'orbs_wood': 30,
         'musicEnabled': false,
       });
       await createController();
@@ -196,9 +316,11 @@ void main() {
     },
   );
 
-  test('Insufficient diamonds prevents unlock', () async {
+  test('Insufficient Elemental Orbs in any required element prevents unlock', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 50,
+      'orbs_fire': 30,
+      'orbs_water': 30,
+      'orbs_wood': 29, // Reset Button requires 30 Wood
       'musicEnabled': false,
     });
     await createController();
@@ -206,25 +328,56 @@ void main() {
     final result = controller.unlockReset();
 
     expect(result, isFalse);
-    expect(controller.diamonds, 50);
+    expect(controller.fireOrbs, 30);
+    expect(controller.waterOrbs, 30);
+    expect(controller.woodOrbs, 29);
     expect(controller.unlockedReset, isFalse);
     expect(controller.showReset, isFalse);
   });
 
-  test('Periodic gift claims 5 diamonds', () async {
+  test('Periodic gift claims +5 of EACH of the 5 Elemental Orbs', () async {
     await createController(resetPreferences: true);
     expect(controller.isGiftAvailable, isTrue);
-    expect(controller.diamonds, 0);
+    expect(controller.totalOrbs, 0);
 
     controller.claimGift();
 
-    expect(controller.diamonds, 5);
+    expect(controller.fireOrbs, 5);
+    expect(controller.waterOrbs, 5);
+    expect(controller.woodOrbs, 5);
+    expect(controller.earthOrbs, 5);
+    expect(controller.metalOrbs, 5);
+    expect(storage.fireOrbs, 5);
+    expect(storage.waterOrbs, 5);
+    expect(storage.woodOrbs, 5);
+    expect(storage.earthOrbs, 5);
+    expect(storage.metalOrbs, 5);
     expect(controller.isGiftAvailable, isFalse);
+    controller.cancelPendingTimers();
   });
 
-  test('Reset game clears scores and round stats without altering diamonds or hasClaimedQaBonus', () async {
+  test('7-tap QA shortcut on Backpack icon grants +100,000 of each Elemental Orb on the 7th tap', () async {
     await createController(resetPreferences: true);
-    controller.diamonds = 250;
+    expect(controller.totalOrbs, 0);
+
+    for (var i = 1; i <= 6; i++) {
+      expect(controller.registerBackpackQaTap(), isFalse);
+      expect(controller.totalOrbs, 0);
+    }
+
+    expect(controller.registerBackpackQaTap(), isTrue);
+    expect(controller.fireOrbs, 100000);
+    expect(controller.waterOrbs, 100000);
+    expect(controller.woodOrbs, 100000);
+    expect(controller.earthOrbs, 100000);
+    expect(controller.metalOrbs, 100000);
+    expect(storage.fireOrbs, 100000);
+    expect(storage.metalOrbs, 100000);
+  });
+
+  test('Reset game clears scores and round stats without altering Elemental Orbs or hasClaimedQaBonus', () async {
+    await createController(resetPreferences: true);
+    controller.addAllOrbs(250);
     controller.hasClaimedQaBonus = true;
     controller.userScore = 10;
     controller.pcScore = 5;
@@ -237,7 +390,11 @@ void main() {
     expect(controller.pcScore, 0);
     expect(controller.totalRounds, 0);
     expect(controller.turnCount, 0);
-    expect(controller.diamonds, 250);
+    expect(controller.fireOrbs, 250);
+    expect(controller.waterOrbs, 250);
+    expect(controller.woodOrbs, 250);
+    expect(controller.earthOrbs, 250);
+    expect(controller.metalOrbs, 250);
     expect(controller.hasClaimedQaBonus, isTrue);
   });
 
@@ -252,9 +409,13 @@ void main() {
     expect(controller.turnCount, 2);
   });
 
-  test('Crystal Ball purchase costs 20000 diamonds, starts disabled, and can be toggled', () async {
+  test('Crystal Ball purchase costs 3500 Fire/Water/Wood + 2500 Earth/Metal, starts disabled, and can be toggled', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 100000,
+      'orbs_fire': 10000,
+      'orbs_water': 10000,
+      'orbs_wood': 10000,
+      'orbs_earth': 10000,
+      'orbs_metal': 10000,
       'musicEnabled': false,
     });
     await createController();
@@ -264,7 +425,11 @@ void main() {
 
     final ok = controller.unlockCrystalBall();
     expect(ok, isTrue);
-    expect(controller.diamonds, 80000);
+    expect(controller.fireOrbs, 6500);
+    expect(controller.waterOrbs, 6500);
+    expect(controller.woodOrbs, 6500);
+    expect(controller.earthOrbs, 7500);
+    expect(controller.metalOrbs, 7500);
     expect(controller.unlockedCrystalBall, isTrue);
     expect(controller.showCrystalBall, isFalse);
     expect(storage.unlockedCrystalBall, isTrue);
@@ -305,7 +470,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'musicEnabled': false,
       'has_seen_story_intro': true,
-      'diamonds': 500,
+      'orbs_fire': 500,
       'total': 10,
     });
     await createController();
@@ -329,7 +494,11 @@ void main() {
 
   test('All 8 shop story chapters trigger on first unlock, persist flags, and do not re-trigger on toggle', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 100000,
+      'orbs_fire': 100000,
+      'orbs_water': 100000,
+      'orbs_wood': 100000,
+      'orbs_earth': 100000,
+      'orbs_metal': 100000,
       'musicEnabled': false,
       'has_seen_story_intro': true,
     });
@@ -433,7 +602,9 @@ void main() {
 
   test('hasGameStarted reflects whether any hand has been chosen and resets on toggleShowNewHands', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 500,
+      'orbs_fire': 500,
+      'orbs_water': 500,
+      'orbs_wood': 500,
       'musicEnabled': false,
     });
     await createController();
@@ -471,20 +642,28 @@ void main() {
     expect(controller.lastUserMove, isNull);
   });
 
-  test('Purchasing any store item leaves it disabled until the user explicitly enables it', () async {
+  test('Purchasing any store item deducts exact Elemental Orb costs and leaves item disabled until explicitly enabled', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 200000,
+      'orbs_fire': 100000,
+      'orbs_water': 100000,
+      'orbs_wood': 100000,
+      'orbs_earth': 100000,
+      'orbs_metal': 100000,
       'musicEnabled': false,
     });
     await createController();
+
+    expect(controller.unlockPredictability(), isTrue);
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.showPredictability, isFalse);
 
     expect(controller.unlockReset(), isTrue);
     expect(controller.unlockedReset, isTrue);
     expect(controller.showReset, isFalse);
 
-    expect(controller.unlockPredictability(), isTrue);
-    expect(controller.unlockedPredictability, isTrue);
-    expect(controller.showPredictability, isFalse);
+    expect(controller.unlockNewHands(), isTrue);
+    expect(controller.unlockedNewHands, isTrue);
+    expect(controller.showNewHands, isFalse);
 
     expect(controller.unlockRandom(), isTrue);
     expect(controller.unlockedRandom, isTrue);
@@ -493,10 +672,6 @@ void main() {
     expect(controller.unlockAlgorithm(), isTrue);
     expect(controller.unlockedAlgorithm, isTrue);
     expect(controller.showAlgorithm, isFalse);
-
-    expect(controller.unlockNewHands(), isTrue);
-    expect(controller.unlockedNewHands, isTrue);
-    expect(controller.showNewHands, isFalse);
 
     expect(controller.unlockYourPrediction(), isTrue);
     expect(controller.unlockedYourPrediction, isTrue);
@@ -510,6 +685,13 @@ void main() {
     expect(controller.unlockedSuggestion, isTrue);
     expect(controller.showSuggestion, isFalse);
 
+    expect(controller.unlockNewSkin(), isTrue);
+    expect(controller.unlockedNewSkin, isTrue);
+    expect(controller.showNewSkin, isFalse);
+
+    expect(controller.unlockAds(), isTrue);
+    expect(controller.unlockedAds, isTrue);
+
     expect(controller.unlockCrystalBall(), isTrue);
     expect(controller.unlockedCrystalBall, isTrue);
     expect(controller.showCrystalBall, isFalse);
@@ -518,14 +700,23 @@ void main() {
     expect(controller.unlockedCrystalBallPlus, isTrue);
     expect(controller.showCrystalBallPlus, isFalse);
 
-    expect(controller.unlockNewSkin(), isTrue);
-    expect(controller.unlockedNewSkin, isTrue);
-    expect(controller.showNewSkin, isFalse);
+    // Total deducted for all 11 standard items + CrystalBall+:
+    // Fire/Water/Wood: 15+30+40+80+120+250+600+1000+1500+2000+3500+5000 = 14,135
+    // Earth/Metal: 50+100+300+500+1000+1500+2500+5000 = 10,950
+    expect(controller.fireOrbs, 100000 - 14135);
+    expect(controller.waterOrbs, 100000 - 14135);
+    expect(controller.woodOrbs, 100000 - 14135);
+    expect(controller.earthOrbs, 100000 - 10950);
+    expect(controller.metalOrbs, 100000 - 10950);
   });
 
-  test('New Skin purchase costs 10000 diamonds, starts disabled, and toggling ON/OFF applies seamlessly without resetting match, scores, or Markov matrix', () async {
+  test('New Skin purchase costs 1500 Fire/Water/Wood + 1000 Earth/Metal, starts disabled, and toggling ON/OFF applies seamlessly without resetting match, scores, or Markov matrix', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 25000,
+      'orbs_fire': 2000,
+      'orbs_water': 2000,
+      'orbs_wood': 2000,
+      'orbs_earth': 1500,
+      'orbs_metal': 1500,
       'musicEnabled': false,
     });
     await createController();
@@ -545,10 +736,11 @@ void main() {
     expect(savedMatrix01, 1);
     expect(savedMatrix10, 1);
 
-    // Purchase New Skin (10,000 diamonds): unlocks without enabling or resetting
-    final diamondsBefore = controller.diamonds;
+    final fireBefore = controller.fireOrbs;
+    final earthBefore = controller.earthOrbs;
     expect(controller.unlockNewSkin(), isTrue);
-    expect(controller.diamonds, diamondsBefore - 10000);
+    expect(controller.fireOrbs, fireBefore - 1500);
+    expect(controller.earthOrbs, earthBefore - 1000);
     expect(controller.unlockedNewSkin, isTrue);
     expect(controller.showNewSkin, isFalse);
     expect(storage.unlockedNewSkin, isTrue);
@@ -576,21 +768,24 @@ void main() {
     expect(controller.engine.matrix[0][1], savedMatrix01);
     expect(controller.engine.matrix[1][0], savedMatrix10);
 
-    // Rejects New Skin purchase when player has fewer than 10,000 diamonds
+    // Rejects New Skin purchase when player lacks required Earth/Metal orbs
     SharedPreferences.setMockInitialValues({
-      'diamonds': 9999,
+      'orbs_fire': 1500,
+      'orbs_water': 1500,
+      'orbs_wood': 1500,
+      'orbs_earth': 999,
+      'orbs_metal': 1000,
       'musicEnabled': false,
     });
     await createController();
     expect(controller.unlockNewSkin(), isFalse);
-    expect(controller.diamonds, 9999);
+    expect(controller.earthOrbs, 999);
     expect(controller.unlockedNewSkin, isFalse);
     expect(controller.showNewSkin, isFalse);
   });
 
   test('Wu Xing 3-element and 5-element win/loss/tie resolution in GameController and dynamic lastWinner update on skin toggle', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 30000,
       'unlockedNewHands': true,
       'showNewHands': true,
       'unlockedNewSkin': true,
@@ -619,12 +814,13 @@ void main() {
     expect(controller.pcScore, 1);
     expect(controller.turnCount, 1);
 
-    // Play a round in Hands mode (RPSLS): Rock vs Scissors -> Rock crushes Scissors (User wins!)
+    // Play a round in Hands mode (RPSLS): Rock vs Scissors -> Rock crushes Scissors (User wins +1 Wood orb!)
     controller.crystalBallMove = HandMove.scissors;
     controller.playTurn(HandMove.rock);
     expect(controller.lastWinner, RoundWinner.user);
     expect(controller.userScore, 1);
     expect(controller.pcScore, 1);
+    expect(controller.woodOrbs, 1);
 
     // Play a round in Hands mode: Rock vs Paper -> Paper covers Rock (Computer wins!)
     controller.crystalBallMove = HandMove.paper;
@@ -686,9 +882,13 @@ void main() {
     expect(controller.lastWinner, isNull);
   });
 
-  test('Completing a rewarded ad increments diamonds by 50, persists to SharedPreferences, and activates 2-minute cooldown', () async {
+  test('Completing a rewarded ad increments all 5 Elemental Orbs by 50, persists to SharedPreferences, and activates 2-minute cooldown', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 25,
+      'orbs_fire': 10,
+      'orbs_water': 20,
+      'orbs_wood': 30,
+      'orbs_earth': 5,
+      'orbs_metal': 15,
       'musicEnabled': false,
     });
     storage = StorageService();
@@ -706,7 +906,6 @@ void main() {
     );
     addTearDown(() => controller.dispose());
 
-    expect(controller.diamonds, 25);
     expect(controller.isRewardedAdReady, isTrue);
 
     bool rewardCallbackTriggered = false;
@@ -718,15 +917,27 @@ void main() {
 
     expect(rewarded, isTrue);
     expect(rewardCallbackTriggered, isTrue);
-    expect(controller.diamonds, 75);
-    expect(storage.diamonds, 75);
+    expect(controller.fireOrbs, 60);
+    expect(controller.waterOrbs, 70);
+    expect(controller.woodOrbs, 80);
+    expect(controller.earthOrbs, 55);
+    expect(controller.metalOrbs, 65);
+    expect(storage.fireOrbs, 60);
+    expect(storage.waterOrbs, 70);
+    expect(storage.woodOrbs, 80);
+    expect(storage.earthOrbs, 55);
+    expect(storage.metalOrbs, 65);
     expect(controller.isRewardedAdOnCooldown, isTrue);
     expect(controller.isRewardedAdReady, isFalse);
   });
 
-  test('Unlocking Remove Ads disables banner display and disposes banner while keeping rewarded ad available', () async {
+  test('Unlocking Remove Ads deducts 2000 Fire/Water/Wood + 1500 Earth/Metal, disables banner display, and keeps rewarded ad available', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 15000,
+      'orbs_fire': 2500,
+      'orbs_water': 2500,
+      'orbs_wood': 2500,
+      'orbs_earth': 2000,
+      'orbs_metal': 2000,
       'musicEnabled': false,
     });
     storage = StorageService();
@@ -751,7 +962,11 @@ void main() {
 
     final unlocked = controller.unlockAds();
     expect(unlocked, isTrue);
-    expect(controller.diamonds, 5000);
+    expect(controller.fireOrbs, 500);
+    expect(controller.waterOrbs, 500);
+    expect(controller.woodOrbs, 500);
+    expect(controller.earthOrbs, 500);
+    expect(controller.metalOrbs, 500);
     expect(controller.unlockedAds, isTrue);
     expect(controller.unlockedRemoveAds, isTrue);
     expect(storage.unlockedAds, isTrue);
@@ -772,8 +987,6 @@ void main() {
     expect(storage.userHp, 100);
     expect(storage.pcHp, 100);
 
-    // Play rounds until user and pc both experience outcomes
-    // Play with predictable moves against empty engine
     controller.playTurn(HandMove.rock);
     expect(controller.userHp, inInclusiveRange(0, 100));
     expect(controller.computerHp, inInclusiveRange(0, 100));
@@ -813,23 +1026,25 @@ void main() {
     expect(storage.pcHp, 100);
   });
 
-  test('Predictability Score costs 50 diamonds, starts disabled, and tracks live stats in background while hidden', () async {
+  test('Predictability Score costs 15 Fire + 15 Water + 15 Wood, starts disabled, and tracks live stats in background while hidden', () async {
     SharedPreferences.setMockInitialValues({
-      'diamonds': 49,
+      'orbs_fire': 14,
+      'orbs_water': 15,
+      'orbs_wood': 15,
       'musicEnabled': false,
     });
     await createController();
 
-    // 49 diamonds is insufficient for 50-diamond Predictability Score
+    // 14 Fire Orbs is insufficient for Predictability Score (15 Fire + 15 Water + 15 Wood)
     expect(controller.unlockPredictability(), isFalse);
-    expect(controller.diamonds, 49);
+    expect(controller.fireOrbs, 14);
     expect(controller.unlockedPredictability, isFalse);
     expect(controller.showPredictability, isFalse);
     expect(controller.isPredictabilityEnabled, isFalse);
 
-    // Play turns while ScoreHeader is locked & hidden -> background tracking still records scores
-    controller.crystalBallMove = HandMove.scissors;
-    controller.playTurn(HandMove.rock); // User wins
+    // Defeat AI Fire (rock) with Water (paper) -> awards +1 Fire Orb (now 15 Fire Orbs!)
+    controller.crystalBallMove = HandMove.rock;
+    controller.playTurn(HandMove.paper); // User wins +1 Fire Orb
     controller.crystalBallMove = HandMove.paper;
     controller.playTurn(HandMove.rock); // PC wins
 
@@ -839,10 +1054,12 @@ void main() {
     expect(controller.totalRounds, 2);
     expect(controller.percentPredict, 50.0);
 
-    // User now has 50 diamonds (49 + 1 win) -> unlocks Predictability Score for 50 diamonds
-    expect(controller.diamonds, 50);
+    // User now has 15 Fire, 15 Water, 15 Wood -> unlocks Predictability Score
+    expect(controller.fireOrbs, 15);
     expect(controller.unlockPredictability(), isTrue);
-    expect(controller.diamonds, 0);
+    expect(controller.fireOrbs, 0);
+    expect(controller.waterOrbs, 0);
+    expect(controller.woodOrbs, 0);
     expect(controller.unlockedPredictability, isTrue);
     expect(controller.showPredictability, isFalse);
     expect(controller.isPredictabilityEnabled, isFalse);

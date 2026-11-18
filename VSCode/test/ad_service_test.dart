@@ -190,10 +190,14 @@ void main() {
     );
 
     test(
-      '(a) Completing a rewarded ad increments diamonds by 50, saves to SharedPreferences and PlayGamesService cloud save, and auto-reloads next ad',
+      '(a) Completing a rewarded ad increments all 5 Elemental Orbs by 50, saves to SharedPreferences and PlayGamesService cloud save, and auto-reloads next ad',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 100,
+          'orbs_fire': 100,
+          'orbs_water': 100,
+          'orbs_wood': 100,
+          'orbs_earth': 100,
+          'orbs_metal': 100,
           'musicEnabled': false,
           'has_seen_story_intro': true,
         });
@@ -221,16 +225,24 @@ void main() {
         );
         addTearDown(() => controller.dispose());
 
-        expect(controller.diamonds, 100);
+        expect(controller.fireOrbs, 100);
         expect(adService.isRewardedAdLoaded, isTrue);
         expect(fakeAdClient.loadRewardedCallCount, 1);
 
         final earned = await controller.watchRewardedAd();
         expect(earned, isTrue);
 
-        // +50 diamonds granted and persisted
-        expect(controller.diamonds, 150);
-        expect(storage.diamonds, 150);
+        // +50 of each Elemental Orb granted and persisted
+        expect(controller.fireOrbs, 150);
+        expect(controller.waterOrbs, 150);
+        expect(controller.woodOrbs, 150);
+        expect(controller.earthOrbs, 150);
+        expect(controller.metalOrbs, 150);
+        expect(storage.fireOrbs, 150);
+        expect(storage.waterOrbs, 150);
+        expect(storage.woodOrbs, 150);
+        expect(storage.earthOrbs, 150);
+        expect(storage.metalOrbs, 150);
 
         // Cloud save triggered
         expect(fakePlayGamesClient.saveCallCount, greaterThan(initialSaves));
@@ -249,7 +261,11 @@ void main() {
       '(b) Unlocking Remove Ads permanently hides and disposes banner ad while keeping voluntary Rewarded Ad available',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 12000,
+          'orbs_fire': 2500,
+          'orbs_water': 2500,
+          'orbs_wood': 2500,
+          'orbs_earth': 2000,
+          'orbs_metal': 2000,
           'musicEnabled': false,
           'has_seen_story_intro': true,
         });
@@ -272,10 +288,11 @@ void main() {
         expect(adService.isBannerAdLoaded, isTrue);
         expect(adService.bannerHeight, 50.0);
 
-        // Purchase Remove Ads (cost: 10000)
+        // Purchase Remove Ads (cost: 2000 Fire/Water/Wood + 1500 Earth/Metal)
         final success = controller.unlockAds();
         expect(success, isTrue);
-        expect(controller.diamonds, 2000);
+        expect(controller.fireOrbs, 500);
+        expect(controller.earthOrbs, 500);
         expect(controller.unlockedAds, isTrue);
         expect(controller.shouldShowBannerAd, isFalse);
         expect(adService.isBannerAdLoaded, isFalse);
@@ -288,11 +305,15 @@ void main() {
     );
 
     testWidgets(
-      'GameScreen displays bottom banner and "Watch Ad +50 💎" button, grants +50 💎 with SnackBar and 2m cooldown, and hides banner when Remove Ads is unlocked',
+      'GameScreen displays bottom banner and "Watch Ad +50 Orbs" button, grants +50 of each orb with SnackBar and 2m cooldown, and hides banner when Remove Ads is unlocked',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
-          'diamonds': 10000,
+          'orbs_fire': 2000,
+          'orbs_water': 2000,
+          'orbs_wood': 2000,
+          'orbs_earth': 1500,
+          'orbs_metal': 1500,
           'animationsEnabled': false,
           'musicEnabled': false,
         });
@@ -318,7 +339,7 @@ void main() {
         );
         await tester.pump();
 
-        // Bottom banner ad and Watch Ad +50 💎 button are both visible with explicit disclosure
+        // Bottom banner ad and Watch Ad +50 Orbs button are both visible with explicit disclosure
         expect(
           find.byKey(const ValueKey('bottom_banner_ad_container')),
           findsOneWidget,
@@ -339,19 +360,26 @@ void main() {
         );
         final watchAdTextFinder = find.descendant(
           of: watchAdButtonFinder,
-          matching: find.text('Watch Ad +50 💎'),
+          matching: find.text(AdService.rewardedAdButtonLabel),
         );
         expect(watchAdTextFinder, findsOneWidget);
         final watchAdText = tester.widget<Text>(watchAdTextFinder);
         expect(watchAdText.style?.fontSize, equals(10.5));
 
-        // Tap Watch Ad +50 💎 button
+        // Tap Watch Ad +50 Orbs button
         await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
         await tester.pump();
 
-        // Diamonds increased by 50 (10000 -> 10050) and celebratory SnackBar is shown
-        expect(controller.diamonds, 10050);
-        expect(find.text('+50 💎 earned!'), findsOneWidget);
+        // All 5 Elemental Orbs increased by 50 and celebratory SnackBar is shown
+        expect(controller.fireOrbs, 2050);
+        expect(controller.waterOrbs, 2050);
+        expect(controller.woodOrbs, 2050);
+        expect(controller.earthOrbs, 1550);
+        expect(controller.metalOrbs, 1550);
+        expect(
+          find.text(GameController.rewardedAdSnackBarMessage),
+          findsOneWidget,
+        );
 
         // Watch Ad button is hidden during the 2-minute anti-spam cooldown
         expect(
@@ -383,10 +411,10 @@ void main() {
     );
 
     test(
-      'Rewarded ad grants +50 💎 exclusively inside onUserEarnedReward and does not grant reward if dismissed early',
+      'Rewarded ad grants +50 Elemental Orbs exclusively inside onUserEarnedReward and does not grant reward if dismissed early',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 100,
+          'orbs_fire': 100,
           'musicEnabled': false,
           'has_seen_story_intro': true,
         });
@@ -408,8 +436,8 @@ void main() {
         // Ad is shown, but user dismisses before earning reward (onUserEarnedReward not called)
         final earned = await controller.watchRewardedAd();
         expect(earned, isFalse);
-        expect(controller.diamonds, 100);
-        expect(storage.diamonds, 100);
+        expect(controller.fireOrbs, 100);
+        expect(storage.fireOrbs, 100);
         expect(controller.isRewardedAdOnCooldown, isFalse);
       },
     );
@@ -419,7 +447,7 @@ void main() {
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
-          'diamonds': 100,
+          'orbs_fire': 100,
           'animationsEnabled': false,
           'musicEnabled': false,
         });
@@ -450,7 +478,7 @@ void main() {
           find.byKey(const ValueKey('watch_rewarded_ad_button')),
           findsNothing,
         );
-        expect(find.text('Watch Ad +50 💎'), findsNothing);
+        expect(find.text(AdService.rewardedAdButtonLabel), findsNothing);
       },
     );
 
@@ -522,11 +550,15 @@ void main() {
     );
 
     testWidgets(
-      'ShopDialog rewarded ad button displays explicit "Watch Ad +50 💎" disclosure, disables when not ready, and grants +50 💎 on completion',
+      'ShopDialog rewarded ad button displays explicit "Watch Ad +50 Orbs" disclosure, disables when not ready, and grants +50 of each orb on completion',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
-          'diamonds': 100,
+          'orbs_fire': 100,
+          'orbs_water': 100,
+          'orbs_wood': 100,
+          'orbs_earth': 100,
+          'orbs_metal': 100,
           'animationsEnabled': false,
           'musicEnabled': false,
         });
@@ -577,14 +609,24 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.text('Watch a video ad for +50 💎'), findsOneWidget);
+        expect(
+          find.text('Watch a video ad for +50 of each Elemental Orb'),
+          findsOneWidget,
+        );
 
-        // Tap the Shop rewarded ad button -> grants +50 💎 and enters 2m cooldown (disabled)
+        // Tap the Shop rewarded ad button -> grants +50 of each orb and enters 2m cooldown (disabled)
         await tester.tap(shopAdBtnFinder);
         await tester.pump();
 
-        expect(controller.diamonds, 150);
-        expect(find.text('+50 💎 earned!'), findsOneWidget);
+        expect(controller.fireOrbs, 150);
+        expect(controller.waterOrbs, 150);
+        expect(controller.woodOrbs, 150);
+        expect(controller.earthOrbs, 150);
+        expect(controller.metalOrbs, 150);
+        expect(
+          find.text(GameController.rewardedAdSnackBarMessage),
+          findsOneWidget,
+        );
         expect(controller.isRewardedAdReady, isFalse);
         expect(
           find.descendant(

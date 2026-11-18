@@ -15,11 +15,92 @@ import '../services/billing_service.dart';
 import '../services/update_service.dart';
 
 class GameController extends ChangeNotifier {
-  static const int rewardedAdDiamondBonus = 50;
+  static const int rewardedAdOrbBonus = 50;
+  static const int periodicGiftOrbBonus = 5;
+  static const int qaShortcutOrbBonus = 100000;
   static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
-  static const String rewardedAdSnackBarMessage = '+50 💎 earned!';
+  static const String rewardedAdSnackBarMessage =
+      '+50 Elemental Orbs earned!';
   static const int maxHp = 100;
   static const int damagePerLoss = 1;
+
+  // Shop Upgrade Elemental Orb Costs
+  static const ElementalCost costPredictability = ElementalCost(
+    fire: 15,
+    water: 15,
+    wood: 15,
+  );
+  static const ElementalCost costReset = ElementalCost(
+    fire: 30,
+    water: 30,
+    wood: 30,
+  );
+  static const ElementalCost costNewHands = ElementalCost(
+    fire: 40,
+    water: 40,
+    wood: 40,
+  );
+  static const ElementalCost costRandom = ElementalCost(
+    fire: 80,
+    water: 80,
+    wood: 80,
+  );
+  static const ElementalCost costAlgorithm = ElementalCost(
+    fire: 120,
+    water: 120,
+    wood: 120,
+    earth: 50,
+    metal: 50,
+  );
+  static const ElementalCost costYourPrediction = ElementalCost(
+    fire: 250,
+    water: 250,
+    wood: 250,
+    earth: 100,
+    metal: 100,
+  );
+  static const ElementalCost costNextMove = ElementalCost(
+    fire: 600,
+    water: 600,
+    wood: 600,
+    earth: 300,
+    metal: 300,
+  );
+  static const ElementalCost costSuggestion = ElementalCost(
+    fire: 1000,
+    water: 1000,
+    wood: 1000,
+    earth: 500,
+    metal: 500,
+  );
+  static const ElementalCost costNewSkin = ElementalCost(
+    fire: 1500,
+    water: 1500,
+    wood: 1500,
+    earth: 1000,
+    metal: 1000,
+  );
+  static const ElementalCost costRemoveAds = ElementalCost(
+    fire: 2000,
+    water: 2000,
+    wood: 2000,
+    earth: 1500,
+    metal: 1500,
+  );
+  static const ElementalCost costCrystalBall = ElementalCost(
+    fire: 3500,
+    water: 3500,
+    wood: 3500,
+    earth: 2500,
+    metal: 2500,
+  );
+  static const ElementalCost costCrystalBallPlus = ElementalCost(
+    fire: 5000,
+    water: 5000,
+    wood: 5000,
+    earth: 5000,
+    metal: 5000,
+  );
 
   final StorageService storage;
   final LocalizationService localization;
@@ -47,7 +128,47 @@ class GameController extends ChangeNotifier {
 
   RoundWinner? lastWinner;
 
-  int diamonds = 0;
+  // 5 Elemental Energy Orbs Inventory
+  int fireOrbs = 0;
+  int waterOrbs = 0;
+  int woodOrbs = 0;
+  int earthOrbs = 0;
+  int metalOrbs = 0;
+
+  int get totalOrbs =>
+      fireOrbs + waterOrbs + woodOrbs + earthOrbs + metalOrbs;
+
+  Map<HandMove, int> get elementalOrbs => {
+    HandMove.rock: fireOrbs,
+    HandMove.paper: waterOrbs,
+    HandMove.scissors: woodOrbs,
+    HandMove.lizard: earthOrbs,
+    HandMove.spock: metalOrbs,
+  };
+
+  int orbsFor(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return fireOrbs;
+      case HandMove.paper:
+        return waterOrbs;
+      case HandMove.scissors:
+        return woodOrbs;
+      case HandMove.lizard:
+        return earthOrbs;
+      case HandMove.spock:
+        return metalOrbs;
+    }
+  }
+
+  // Flying Orb VFX tracking for round wins
+  HandMove? lastCollectedOrbMove;
+  int orbCollectionEventId = 0;
+
+  // 7-tap QA shortcut counter on top-left Backpack icon
+  int _backpackQaTapCount = 0;
+  DateTime? _lastBackpackQaTapTime;
+
   int userScore = 0;
   int get playerScore => userScore;
   int pcScore = 0;
@@ -219,9 +340,52 @@ class GameController extends ChangeNotifier {
 
   void _handleQaBonusGranted() {
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
-    diamonds = storage.diamonds;
+    _syncOrbsFromStorage();
     pendingQaBonusSnackBar = PlayGamesService.qaBonusSnackBarMessage;
     notifyListeners();
+  }
+
+  void _syncOrbsFromStorage() {
+    fireOrbs = storage.fireOrbs;
+    waterOrbs = storage.waterOrbs;
+    woodOrbs = storage.woodOrbs;
+    earthOrbs = storage.earthOrbs;
+    metalOrbs = storage.metalOrbs;
+  }
+
+  void _persistOrbsToStorage() {
+    storage.setAllOrbs(
+      fire: fireOrbs,
+      water: waterOrbs,
+      wood: woodOrbs,
+      earth: earthOrbs,
+      metal: metalOrbs,
+    );
+  }
+
+  void _incrementOrbForMove(HandMove move, int delta) {
+    switch (move) {
+      case HandMove.rock:
+        fireOrbs += delta;
+        storage.setFireOrbs(fireOrbs);
+        break;
+      case HandMove.paper:
+        waterOrbs += delta;
+        storage.setWaterOrbs(waterOrbs);
+        break;
+      case HandMove.scissors:
+        woodOrbs += delta;
+        storage.setWoodOrbs(woodOrbs);
+        break;
+      case HandMove.lizard:
+        earthOrbs += delta;
+        storage.setEarthOrbs(earthOrbs);
+        break;
+      case HandMove.spock:
+        metalOrbs += delta;
+        storage.setMetalOrbs(metalOrbs);
+        break;
+    }
   }
 
   String? consumePendingQaBonusSnackBar() {
@@ -252,7 +416,7 @@ class GameController extends ChangeNotifier {
   }
 
   void _loadState({bool restartAudio = true}) {
-    diamonds = storage.diamonds;
+    _syncOrbsFromStorage();
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
@@ -423,10 +587,12 @@ class GameController extends ChangeNotifier {
     )) {
       lastWinner = RoundWinner.user;
       userScore += 1;
-      diamonds += 1;
+      // Grant +1 Elemental Orb of the defeated AI/PC element
+      _incrementOrbForMove(currentComputerMove!, 1);
+      lastCollectedOrbMove = currentComputerMove;
+      orbCollectionEventId += 1;
       computerHp = math.max(0, computerHp - damagePerLoss);
       storage.setUserScore(userScore);
-      storage.setDiamonds(diamonds);
       storage.setPcHp(computerHp);
       audio.playWin();
     } else {
@@ -505,7 +671,7 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Wipes all gameplay progression (diamonds, shop unlocks, active toggles,
+  /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,
   /// scores, Markov matrices, and unlocked story chapters) while preserving
   /// the player's UI settings, and syncs the fresh state to the cloud if signed in.
   Future<void> resetAllProgress() async {
@@ -520,15 +686,30 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  // Shop Purchases
-  bool purchaseItem({required int cost, required VoidCallback onUnlock}) {
-    if (diamonds < cost) {
+  // Shop Purchases (Elemental Orbs)
+  bool canAfford(ElementalCost cost) {
+    return fireOrbs >= cost.fire &&
+        waterOrbs >= cost.water &&
+        woodOrbs >= cost.wood &&
+        earthOrbs >= cost.earth &&
+        metalOrbs >= cost.metal;
+  }
+
+  bool purchaseWithOrbs({
+    required ElementalCost cost,
+    required VoidCallback onUnlock,
+  }) {
+    if (!canAfford(cost)) {
       audio.playVibrate();
       return false;
     }
 
-    diamonds -= cost;
-    storage.setDiamonds(diamonds);
+    fireOrbs -= cost.fire;
+    waterOrbs -= cost.water;
+    woodOrbs -= cost.wood;
+    earthOrbs -= cost.earth;
+    metalOrbs -= cost.metal;
+    _persistOrbsToStorage();
     onUnlock();
     _triggerCloudSave();
     notifyListeners();
@@ -644,8 +825,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockReset() {
-    return purchaseItem(
-      cost: 100,
+    return purchaseWithOrbs(
+      cost: costReset,
       onUnlock: () {
         unlockedReset = true;
         showReset = false;
@@ -657,8 +838,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockPredictability() {
-    return purchaseItem(
-      cost: 50,
+    return purchaseWithOrbs(
+      cost: costPredictability,
       onUnlock: () {
         unlockedPredictability = true;
         showPredictability = false;
@@ -670,8 +851,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockRandom() {
-    return purchaseItem(
-      cost: 300,
+    return purchaseWithOrbs(
+      cost: costRandom,
       onUnlock: () {
         unlockedRandom = true;
         showRandom = false;
@@ -683,8 +864,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockAlgorithm() {
-    return purchaseItem(
-      cost: 500,
+    return purchaseWithOrbs(
+      cost: costAlgorithm,
       onUnlock: () {
         unlockedAlgorithm = true;
         showAlgorithm = false;
@@ -696,8 +877,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockNewHands() {
-    return purchaseItem(
-      cost: 100,
+    return purchaseWithOrbs(
+      cost: costNewHands,
       onUnlock: () {
         unlockedNewHands = true;
         showNewHands = false;
@@ -708,8 +889,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockYourPrediction() {
-    return purchaseItem(
-      cost: 1000,
+    return purchaseWithOrbs(
+      cost: costYourPrediction,
       onUnlock: () {
         unlockedYourPrediction = true;
         showYourPrediction = false;
@@ -721,8 +902,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockNextMove() {
-    return purchaseItem(
-      cost: 3000,
+    return purchaseWithOrbs(
+      cost: costNextMove,
       onUnlock: () {
         unlockedNextMove = true;
         showNextMove = false;
@@ -734,8 +915,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockSuggestion() {
-    return purchaseItem(
-      cost: 5000,
+    return purchaseWithOrbs(
+      cost: costSuggestion,
       onUnlock: () {
         unlockedSuggestion = true;
         showSuggestion = false;
@@ -747,8 +928,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockAds() {
-    return purchaseItem(
-      cost: 10000,
+    return purchaseWithOrbs(
+      cost: costRemoveAds,
       onUnlock: () {
         unlockedAds = true;
         storage.setUnlockedAds(true);
@@ -760,8 +941,8 @@ class GameController extends ChangeNotifier {
   bool unlockRemoveAds() => unlockAds();
 
   bool unlockNewSkin() {
-    return purchaseItem(
-      cost: 10000,
+    return purchaseWithOrbs(
+      cost: costNewSkin,
       onUnlock: () {
         unlockedNewSkin = true;
         showNewSkin = false;
@@ -771,12 +952,16 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  /// Grants +50 diamonds when the player finishes watching a rewarded ad,
-  /// persists immediately to [SharedPreferences], triggers a [PlayGamesService]
-  /// cloud save if signed in, and starts the 2-minute anti-spam cooldown.
+  /// Grants +50 of each of the 5 Elemental Orbs when the player finishes watching
+  /// a rewarded ad, persists immediately to [SharedPreferences], triggers a
+  /// [PlayGamesService] cloud save if signed in, and starts the 2-minute cooldown.
   void completeRewardedAd() {
-    diamonds += rewardedAdDiamondBonus;
-    storage.setDiamonds(diamonds);
+    fireOrbs += rewardedAdOrbBonus;
+    waterOrbs += rewardedAdOrbBonus;
+    woodOrbs += rewardedAdOrbBonus;
+    earthOrbs += rewardedAdOrbBonus;
+    metalOrbs += rewardedAdOrbBonus;
+    _persistOrbsToStorage();
     isRewardedAdOnCooldown = true;
     _rewardedAdCooldownUntil = DateTime.now().add(rewardedAdCooldownDuration);
     _rewardedAdCooldownTimer?.cancel();
@@ -789,9 +974,9 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Displays the preloaded rewarded video ad if ready, granting +50 diamonds
-  /// via [completeRewardedAd] exclusively inside `onUserEarnedReward` and
-  /// invoking [onRewardEarned] upon completion.
+  /// Displays the preloaded rewarded video ad if ready, granting +50 of each
+  /// Elemental Orb via [completeRewardedAd] exclusively inside `onUserEarnedReward`
+  /// and invoking [onRewardEarned] upon completion.
   Future<bool> watchRewardedAd({VoidCallback? onRewardEarned}) async {
     if (!isRewardedAdReady) return false;
     bool earned = false;
@@ -806,8 +991,8 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockCrystalBall() {
-    return purchaseItem(
-      cost: 20000,
+    return purchaseWithOrbs(
+      cost: costCrystalBall,
       onUnlock: () {
         unlockedCrystalBall = true;
         showCrystalBall = false;
@@ -823,8 +1008,8 @@ class GameController extends ChangeNotifier {
       audio.playVibrate();
       return false;
     }
-    return purchaseItem(
-      cost: 50000,
+    return purchaseWithOrbs(
+      cost: costCrystalBallPlus,
       onUnlock: () {
         unlockedCrystalBallPlus = true;
         showCrystalBallPlus = false;
@@ -974,11 +1159,15 @@ class GameController extends ChangeNotifier {
     return billingService.restorePurchases();
   }
 
-  /// Gift feature: periodic free diamonds (matching Kodular ButtonGift / Clock1)
+  /// Gift feature: periodic free +5 of each of the 5 Elemental Orbs
   void claimGift() {
     if (!isGiftAvailable) return;
-    diamonds += 5;
-    storage.setDiamonds(diamonds);
+    fireOrbs += periodicGiftOrbBonus;
+    waterOrbs += periodicGiftOrbBonus;
+    woodOrbs += periodicGiftOrbBonus;
+    earthOrbs += periodicGiftOrbBonus;
+    metalOrbs += periodicGiftOrbBonus;
+    _persistOrbsToStorage();
     isGiftAvailable = false;
     audio.playVibrate();
     _triggerCloudSave();
@@ -989,6 +1178,24 @@ class GameController extends ChangeNotifier {
       isGiftAvailable = true;
       notifyListeners();
     });
+  }
+
+  /// 7-tap QA shortcut on the top-left Backpack icon: grants +100,000 of each
+  /// of the 5 Elemental Orbs on the 7th tap.
+  bool registerBackpackQaTap() {
+    final now = DateTime.now();
+    if (_lastBackpackQaTapTime != null &&
+        now.difference(_lastBackpackQaTapTime!) > const Duration(seconds: 3)) {
+      _backpackQaTapCount = 0;
+    }
+    _lastBackpackQaTapTime = now;
+    _backpackQaTapCount += 1;
+    if (_backpackQaTapCount >= 7) {
+      _backpackQaTapCount = 0;
+      addAllOrbs(qaShortcutOrbBonus);
+      return true;
+    }
+    return false;
   }
 
   // Toggles for active unlocks
@@ -1168,9 +1375,21 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addFreeDiamonds(int amount) {
-    diamonds += amount;
-    storage.setDiamonds(diamonds);
+  /// Grants [amount] of each of the 5 Elemental Orbs.
+  void addAllOrbs(int amount) {
+    fireOrbs += amount;
+    waterOrbs += amount;
+    woodOrbs += amount;
+    earthOrbs += amount;
+    metalOrbs += amount;
+    _persistOrbsToStorage();
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  /// Grants [amount] of a specific element's orb.
+  void addOrbForMove(HandMove move, int amount) {
+    _incrementOrbForMove(move, amount);
     _triggerCloudSave();
     notifyListeners();
   }

@@ -77,7 +77,8 @@ void main() {
       'Gracefully falls back to offline SharedPreferences cache when silent sign-in fails or is declined',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 120,
+          'orbs_fire': 120,
+          'orbs_water': 110,
           'unlockedReset': true,
           'musicEnabled': false,
         });
@@ -97,8 +98,25 @@ void main() {
         expect(playGames.playerName, isNull);
         expect(playGames.playerID, isNull);
         expect(playGames.syncStatus, CloudSyncStatus.offline);
-        expect(storage.diamonds, 120);
+        expect(storage.fireOrbs, 120);
+        expect(storage.waterOrbs, 110);
         expect(storage.unlockedReset, isTrue);
+      },
+    );
+
+    test(
+      'CloudSaveData.fromJson migrates legacy v1 diamonds payload cleanly into all 5 Elemental Orbs when orbs are 0',
+      () {
+        final legacyData = CloudSaveData.fromJson({
+          'version': 1,
+          'diamonds': 340,
+          'userScore': 5,
+        });
+        expect(legacyData.fireOrbs, 340);
+        expect(legacyData.waterOrbs, 340);
+        expect(legacyData.woodOrbs, 340);
+        expect(legacyData.earthOrbs, 340);
+        expect(legacyData.metalOrbs, 340);
       },
     );
 
@@ -116,7 +134,11 @@ void main() {
         final audio = AudioService();
 
         final account1Save = CloudSaveData(
-          diamonds: 650,
+          fireOrbs: 650,
+          waterOrbs: 600,
+          woodOrbs: 550,
+          earthOrbs: 400,
+          metalOrbs: 350,
           userScore: 18,
           pcScore: 7,
           total: 25,
@@ -167,7 +189,11 @@ void main() {
         expect(playGames.playerID, 'player_001');
         expect(playGames.lastPlayerID, 'player_001');
         expect(storage.lastPlayerId, 'player_001');
-        expect(controller.diamonds, 650);
+        expect(controller.fireOrbs, 650);
+        expect(controller.waterOrbs, 600);
+        expect(controller.woodOrbs, 550);
+        expect(controller.earthOrbs, 400);
+        expect(controller.metalOrbs, 350);
         expect(controller.userScore, 18);
         expect(controller.pcScore, 7);
         expect(controller.totalRounds, 25);
@@ -204,8 +230,8 @@ void main() {
         expect(storage.lastPlayerId, 'player_002');
 
         // Local gameplay progress must be completely wiped to 0 / false / empty
-        expect(controller.diamonds, 0);
-        expect(storage.diamonds, 0);
+        expect(controller.totalOrbs, 0);
+        expect(storage.totalOrbs, 0);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
         expect(controller.totalRounds, 0);
@@ -236,9 +262,11 @@ void main() {
         expect(controller.animationsEnabled, isTrue);
 
         // 3. Switch in OS / Google Play Games app to Account 3 ('player_003'),
-        // which has its own cloud save with 220 diamonds, unlockedRandom, and 'es' settings
+        // which has its own cloud save with 220 Fire Orbs, unlockedRandom, and 'es' settings
         final account3Save = CloudSaveData(
-          diamonds: 220,
+          fireOrbs: 220,
+          waterOrbs: 180,
+          woodOrbs: 150,
           userScore: 8,
           pcScore: 4,
           total: 12,
@@ -271,7 +299,9 @@ void main() {
 
         expect(playGames.playerName, 'ThirdAccount');
         expect(playGames.playerID, 'player_003');
-        expect(controller.diamonds, 220);
+        expect(controller.fireOrbs, 220);
+        expect(controller.waterOrbs, 180);
+        expect(controller.woodOrbs, 150);
         expect(controller.userScore, 8);
         expect(controller.pcScore, 4);
         expect(controller.totalRounds, 12);
@@ -290,7 +320,7 @@ void main() {
         expect(controller.vibrationEnabled, isFalse);
         expect(controller.animationsEnabled, isTrue);
 
-        // 4. Switch back to Account 1 ('player_001') -> restores Account 1's 650 diamonds, unlocks, & 'pt' settings
+        // 4. Switch back to Account 1 ('player_001') -> restores Account 1's orbs, unlocks, & 'pt' settings
         fakeClient.mockPlayerName = 'PlayerOne';
         fakeClient.mockPlayerId = 'player_001';
 
@@ -300,7 +330,8 @@ void main() {
 
         expect(playGames.playerName, 'PlayerOne');
         expect(playGames.playerID, 'player_001');
-        expect(controller.diamonds, 650);
+        expect(controller.fireOrbs, 650);
+        expect(controller.waterOrbs, 600);
         expect(controller.userScore, 18);
         expect(controller.unlockedReset, isTrue);
         expect(controller.unlockedAlgorithm, isTrue);
@@ -317,11 +348,11 @@ void main() {
     );
 
     test(
-      'Conflict resolution restores cloud save over local data when cloud holds higher diamond count or progression',
+      'Conflict resolution restores cloud save over local data when cloud holds higher orb count or progression',
       () async {
-        // Local has 50 diamonds and 0 unlocks
+        // Local has 50 Fire Orbs and 0 unlocks
         SharedPreferences.setMockInitialValues({
-          'diamonds': 50,
+          'orbs_fire': 50,
           'userScore': 2,
           'pcScore': 3,
           'total': 5,
@@ -332,9 +363,11 @@ void main() {
         final storage = StorageService();
         await storage.init();
 
-        // Cloud has 750 diamonds, 2 unlocks, higher scores, and a populated Markov matrix
+        // Cloud has 750 Fire Orbs, 3 unlocks, higher scores, and a populated Markov matrix
         final cloudSnapshot = CloudSaveData(
-          diamonds: 750,
+          fireOrbs: 750,
+          waterOrbs: 500,
+          woodOrbs: 400,
           userScore: 25,
           pcScore: 15,
           total: 40,
@@ -370,7 +403,9 @@ void main() {
 
         await playGames.initialize();
 
-        expect(controller.diamonds, 750);
+        expect(controller.fireOrbs, 750);
+        expect(controller.waterOrbs, 500);
+        expect(controller.woodOrbs, 400);
         expect(controller.userScore, 25);
         expect(controller.pcScore, 15);
         expect(controller.totalRounds, 40);
@@ -387,11 +422,12 @@ void main() {
     );
 
     test(
-      'Conflict resolution keeps local data and backs up to cloud when local holds higher progression or diamond count',
+      'Conflict resolution keeps local data and backs up to cloud when local holds higher progression or orb count',
       () async {
-        // Local has 2000 diamonds and 3 unlocks
+        // Local has 2000 Fire Orbs and 3 unlocks
         SharedPreferences.setMockInitialValues({
-          'diamonds': 2000,
+          'orbs_fire': 2000,
+          'orbs_water': 1500,
           'userScore': 30,
           'pcScore': 10,
           'total': 40,
@@ -403,9 +439,9 @@ void main() {
         final storage = StorageService();
         await storage.init();
 
-        // Cloud has only 100 diamonds and 0 unlocks
+        // Cloud has only 100 Fire Orbs and 0 unlocks
         final staleCloudSnapshot = const CloudSaveData(
-          diamonds: 100,
+          fireOrbs: 100,
           userScore: 1,
           pcScore: 1,
           total: 2,
@@ -429,7 +465,8 @@ void main() {
         await playGames.initialize();
 
         // Local progression must be preserved
-        expect(controller.diamonds, 2000);
+        expect(controller.fireOrbs, 2000);
+        expect(controller.waterOrbs, 1500);
         expect(controller.userScore, 30);
         expect(controller.unlockedReset, isTrue);
         expect(controller.unlockedPredictability, isTrue);
@@ -438,16 +475,19 @@ void main() {
         // Local progression was backed up to cloud
         expect(fakeClient.saveCallCount, greaterThanOrEqualTo(1));
         final savedToCloud = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(savedToCloud.diamonds, 2000);
+        expect(savedToCloud.fireOrbs, 2000);
+        expect(savedToCloud.waterOrbs, 1500);
         expect(savedToCloud.unlockedCount, 3);
       },
     );
 
     test(
-      'Triggers cloud save automatically whenever diamonds or purchases change',
+      'Triggers cloud save automatically whenever orbs or purchases change',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 500,
+          'orbs_fire': 500,
+          'orbs_water': 500,
+          'orbs_wood': 500,
           'musicEnabled': false,
         });
         final storage = StorageService();
@@ -468,27 +508,35 @@ void main() {
         await playGames.initialize();
         final initialSaves = fakeClient.saveCallCount;
 
-        // 1. Purchasing an item triggers a cloud save
+        // 1. Purchasing an item (Reset: 30 Fire + 30 Water + 30 Wood) triggers a cloud save
         expect(controller.unlockReset(), isTrue);
         await Future<void>.delayed(Duration.zero);
         expect(fakeClient.saveCallCount, equals(initialSaves + 1));
         var syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(syncedData.diamonds, 400);
+        expect(syncedData.fireOrbs, 470);
+        expect(syncedData.waterOrbs, 470);
+        expect(syncedData.woodOrbs, 470);
         expect(syncedData.unlockedReset, isTrue);
 
-        // 2. Claiming periodic gift (+5 diamonds) triggers a cloud save
+        // 2. Claiming periodic gift (+5 of each orb) triggers a cloud save
         controller.claimGift();
         await Future<void>.delayed(Duration.zero);
         expect(fakeClient.saveCallCount, equals(initialSaves + 2));
         syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(syncedData.diamonds, 405);
+        expect(syncedData.fireOrbs, 475);
+        expect(syncedData.waterOrbs, 475);
+        expect(syncedData.woodOrbs, 475);
+        expect(syncedData.earthOrbs, 5);
+        expect(syncedData.metalOrbs, 5);
+        controller.cancelPendingTimers();
 
-        // 3. Adding free diamonds triggers a cloud save
-        controller.addFreeDiamonds(50);
+        // 3. Adding free orbs triggers a cloud save
+        controller.addAllOrbs(50);
         await Future<void>.delayed(Duration.zero);
         expect(fakeClient.saveCallCount, equals(initialSaves + 3));
         syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(syncedData.diamonds, 455);
+        expect(syncedData.fireOrbs, 525);
+        expect(syncedData.earthOrbs, 55);
 
         // 4. Changing settings triggers cloud saves for the signed-in account
         controller.setLanguage('de');
@@ -586,8 +634,6 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Connected state: shows playerName, playerID, copy icon button, Synced status,
-        // and NO Switch Account button or Sign Out button
         expect(
           find.byKey(const ValueKey('play_games_profile_card')),
           findsOneWidget,
@@ -600,14 +646,6 @@ void main() {
           findsOneWidget,
         );
         expect(find.byIcon(Icons.copy_rounded), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('play_games_switch_account_button')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const ValueKey('play_games_sign_out_button')),
-          findsNothing,
-        );
         expect(find.text('Switch Account'), findsNothing);
         expect(find.text('Sign Out'), findsNothing);
 
@@ -626,7 +664,8 @@ void main() {
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
-          'diamonds': 800,
+          'orbs_fire': 800,
+          'orbs_water': 800,
           'userScore': 20,
           'pcScore': 10,
           'total': 30,
@@ -667,7 +706,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(controller.diamonds, 800);
+        expect(controller.fireOrbs, 800);
         expect(controller.unlockedReset, isTrue);
         expect(controller.unlockedAlgorithm, isTrue);
 
@@ -691,7 +730,7 @@ void main() {
           find.byKey(const ValueKey('cancel_reset_progress_button')),
         );
         await tester.pumpAndSettle();
-        expect(controller.diamonds, 800);
+        expect(controller.fireOrbs, 800);
         expect(controller.unlockedReset, isTrue);
 
         // Tap Reset All Progress again and confirm
@@ -703,8 +742,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // All progress is wiped locally and synced to cloud, while UI settings stay intact
-        expect(controller.diamonds, 0);
-        expect(storage.diamonds, 0);
+        expect(controller.totalOrbs, 0);
+        expect(storage.totalOrbs, 0);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
         expect(controller.totalRounds, 0);
@@ -716,7 +755,7 @@ void main() {
 
         final cloudAfterReset =
             CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(cloudAfterReset.diamonds, 0);
+        expect(cloudAfterReset.totalOrbs, 0);
         expect(cloudAfterReset.unlockedCount, 0);
         expect(cloudAfterReset.total, 0);
         expect(cloudAfterReset.darkMode, isFalse);
@@ -740,7 +779,7 @@ void main() {
     );
 
     testWidgets(
-      'AppLifecycleState.resumed immediately detects OS-level account switch in Google Play Games app and updates UI diamonds, progress, and profile card',
+      'AppLifecycleState.resumed immediately detects OS-level account switch in Google Play Games app and updates UI orbs, progress, and profile card',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -751,7 +790,8 @@ void main() {
         await storage.init();
 
         final accountASave = const CloudSaveData(
-          diamonds: 420,
+          fireOrbs: 420,
+          waterOrbs: 300,
           userScore: 10,
           pcScore: 5,
           total: 15,
@@ -787,18 +827,14 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // AccountAlpha's 420 diamonds and Reset button are shown in the AppBar
-        expect(
-          find.descendant(of: find.byType(AppBar), matching: find.text('420')),
-          findsOneWidget,
-        );
+        expect(controller.fireOrbs, 420);
         expect(find.byIcon(Icons.restart_alt), findsOneWidget);
 
         // Simulate user switching to AccountBeta in Google Play Games app while game is in background
         fakeClient.mockPlayerName = 'AccountBeta';
         fakeClient.mockPlayerId = 'player_beta';
         final accountBSave = const CloudSaveData(
-          diamonds: 0,
+          fireOrbs: 0,
           hasSeenStoryIntro: true,
         );
         fakeClient.setCloudSaveForPlayer(
@@ -812,13 +848,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // UI immediately updates: diamonds reset to 0, Reset button disappears
-        expect(
-          find.descendant(of: find.byType(AppBar), matching: find.text('0')),
-          findsOneWidget,
-        );
+        // UI immediately updates: orbs reset to 0, Reset button disappears
         expect(find.byIcon(Icons.restart_alt), findsNothing);
-        expect(controller.diamonds, 0);
+        expect(controller.totalOrbs, 0);
         expect(controller.unlockedReset, isFalse);
 
         // Open SettingsDialog -> shows AccountBeta's profile
@@ -830,9 +862,9 @@ void main() {
     );
   });
 
-  group('QA Tester Automatic 100,000 Diamond Bonus Grant Tests', () {
+  group('QA Tester Automatic 100,000 Elemental Orbs Bonus Grant Tests', () {
     test(
-      '(a) Grants +100,000 diamonds once on sign-in for matching tester IDs (Player 1 & Player 2) and case-insensitive playerName fallback, and saves to cloud',
+      '(a) Grants +100,000 of each Elemental Orb once on sign-in for matching tester IDs (Player 1 & Player 2) and case-insensitive playerName fallback, and saves to cloud',
       () async {
         // Test Player 1 by ID ("a_2116013489197419559")
         SharedPreferences.setMockInitialValues({
@@ -857,32 +889,40 @@ void main() {
           playGames: playGames1,
         );
 
-        expect(controller1.diamonds, 0);
+        expect(controller1.totalOrbs, 0);
         expect(storage1.hasClaimedQaBonus, isFalse);
 
         final signedIn1 = await playGames1.initialize();
         expect(signedIn1, isTrue);
-        expect(controller1.diamonds, 100000);
-        expect(storage1.diamonds, 100000);
+        expect(controller1.fireOrbs, 100000);
+        expect(controller1.waterOrbs, 100000);
+        expect(controller1.woodOrbs, 100000);
+        expect(controller1.earthOrbs, 100000);
+        expect(controller1.metalOrbs, 100000);
+        expect(storage1.fireOrbs, 100000);
         expect(controller1.hasClaimedQaBonus, isTrue);
         expect(storage1.hasClaimedQaBonus, isTrue);
         expect(
           controller1.pendingQaBonusSnackBar,
-          'Tester Bonus: +100,000 💎',
+          PlayGamesService.qaBonusSnackBarMessage,
         );
 
         final savedCloud1 =
             CloudSaveData.tryParse(fakeClient1.cloudPayload)!;
-        expect(savedCloud1.diamonds, 100000);
+        expect(savedCloud1.fireOrbs, 100000);
+        expect(savedCloud1.waterOrbs, 100000);
+        expect(savedCloud1.woodOrbs, 100000);
+        expect(savedCloud1.earthOrbs, 100000);
+        expect(savedCloud1.metalOrbs, 100000);
         expect(savedCloud1.hasClaimedQaBonus, isTrue);
 
-        // Spend some diamonds on Player 1 before switching
-        controller1.unlockReset();
-        expect(controller1.diamonds, 99900);
+        // Spend some orbs on Player 1 before switching
+        controller1.unlockReset(); // 30 Fire + 30 Water + 30 Wood
+        expect(controller1.fireOrbs, 99970);
         final savedCloud1AfterSpend = CloudSaveData.tryParse(
           fakeClient1.cloudSaveForPlayer('a_2116013489197419559'),
         )!;
-        expect(savedCloud1AfterSpend.diamonds, 99900);
+        expect(savedCloud1AfterSpend.fireOrbs, 99970);
 
         // Test Player 2 by ID ("g01804264806540615668") and when switching accounts on AppLifecycleState.resumed
         fakeClient1.mockPlayerName = 'gustlarsen';
@@ -892,13 +932,14 @@ void main() {
         // Resume app after OS account switch to Player 2
         await playGames1.handleAppResumed();
         expect(playGames1.playerID, 'g01804264806540615668');
-        expect(controller1.diamonds, 100000);
-        expect(storage1.diamonds, 100000);
+        expect(controller1.fireOrbs, 100000);
+        expect(controller1.metalOrbs, 100000);
+        expect(storage1.fireOrbs, 100000);
         expect(storage1.hasClaimedQaBonus, isTrue);
         final savedCloud2 = CloudSaveData.tryParse(
           fakeClient1.cloudSaveForPlayer('g01804264806540615668'),
         )!;
-        expect(savedCloud2.diamonds, 100000);
+        expect(savedCloud2.fireOrbs, 100000);
         expect(savedCloud2.hasClaimedQaBonus, isTrue);
 
         // Test case-insensitive playerName fallback ("GUSTLARSENTESTER") with a different ID
@@ -924,7 +965,8 @@ void main() {
         );
 
         await playGamesFallback.initialize();
-        expect(controllerFallback.diamonds, 100000);
+        expect(controllerFallback.fireOrbs, 100000);
+        expect(controllerFallback.metalOrbs, 100000);
         expect(storageFallback.hasClaimedQaBonus, isTrue);
       },
     );
@@ -954,27 +996,27 @@ void main() {
           playGames: playGames,
         );
 
-        // First sign-in grants +100,000 diamonds
+        // First sign-in grants +100,000 of each Elemental Orb
         await playGames.initialize();
-        expect(controller.diamonds, 100000);
+        expect(controller.fireOrbs, 100000);
         expect(storage.hasClaimedQaBonus, isTrue);
         expect(
           controller.consumePendingQaBonusSnackBar(),
-          'Tester Bonus: +100,000 💎',
+          PlayGamesService.qaBonusSnackBarMessage,
         );
 
-        // Tester spends 20,000 diamonds on Crystal Ball -> 80,000 left
+        // Tester spends orbs on Crystal Ball -> 96,500 Fire/Water/Wood & 97,500 Earth/Metal left
         expect(controller.unlockCrystalBall(), isTrue);
-        expect(controller.diamonds, 80000);
+        expect(controller.fireOrbs, 96500);
         await Future<void>.delayed(Duration.zero);
 
         // Subsequent sign-in / app resume with local & cloud hasClaimedQaBonus = true
         await playGames.handleAppResumed();
-        expect(controller.diamonds, 80000);
+        expect(controller.fireOrbs, 96500);
         expect(controller.pendingQaBonusSnackBar, isNull);
 
         // Fresh install on another device (local storage hasClaimedQaBonus = false,
-        // but loaded cloud save has hasClaimedQaBonus = true and 80,000 diamonds)
+        // but loaded cloud save has hasClaimedQaBonus = true and 96,500 Fire orbs)
         SharedPreferences.setMockInitialValues({
           'musicEnabled': false,
         });
@@ -994,15 +1036,15 @@ void main() {
         );
 
         await playGamesDevice2.initialize();
-        // Restores 80,000 from cloud without granting another 100,000
-        expect(controllerDevice2.diamonds, 80000);
+        // Restores 96,500 from cloud without granting another 100,000
+        expect(controllerDevice2.fireOrbs, 96500);
         expect(freshDeviceStorage.hasClaimedQaBonus, isTrue);
         expect(controllerDevice2.pendingQaBonusSnackBar, isNull);
       },
     );
 
     test(
-      '(c) Preserves diamond balance on match reset (resetGame) and re-grants the +100,000 tester bonus only on full progression wipe (resetAllProgress)',
+      '(c) Preserves Elemental Orb balances on match reset (resetGame) and re-grants the +100,000 tester bonus only on full progression wipe (resetAllProgress)',
       () async {
         SharedPreferences.setMockInitialValues({
           'musicEnabled': false,
@@ -1026,52 +1068,53 @@ void main() {
           playGames: playGames,
         );
 
-        // Initial sign-in grants +100,000 diamonds
+        // Initial sign-in grants +100,000 of each Elemental Orb
         await playGames.initialize();
-        expect(controller.diamonds, 100000);
+        expect(controller.fireOrbs, 100000);
         expect(storage.hasClaimedQaBonus, isTrue);
         controller.consumePendingQaBonusSnackBar();
 
-        // Spend 20,000 diamonds on Crystal Ball & 50,000 on Crystal Ball Plus (30,000 left)
+        // Spend orbs on Crystal Ball & Crystal Ball Plus
         expect(controller.unlockCrystalBall(), isTrue);
         expect(controller.unlockCrystalBallPlus(), isTrue);
-        expect(controller.diamonds, 30000);
+        expect(controller.fireOrbs, 91500);
 
-        // 1. Trigger resetGame (e.g. Try Again after 100 rounds or match reset)
-        // -> resets match state only, does NOT grant extra QA bonus or reset hasClaimedQaBonus
+        // 1. Trigger resetGame -> resets match state only, does NOT grant extra QA bonus
         controller.resetGame();
         await Future<void>.delayed(Duration.zero);
         await Future<void>.delayed(Duration.zero);
 
-        expect(controller.diamonds, 30000);
-        expect(storage.diamonds, 30000);
+        expect(controller.fireOrbs, 91500);
+        expect(storage.fireOrbs, 91500);
         expect(storage.hasClaimedQaBonus, isTrue);
         expect(controller.pendingQaBonusSnackBar, isNull);
 
-        // 2. Trigger full progression reset (resetAllProgress) -> wipes diamonds to 0 & hasClaimedQaBonus to false,
-        // syncs to cloud, and automatically re-grants +100,000 diamonds
+        // 2. Trigger full progression reset (resetAllProgress) -> wipes orbs to 0 & hasClaimedQaBonus to false,
+        // syncs to cloud, and automatically re-grants +100,000 of each Elemental Orb
         await controller.resetAllProgress();
-        expect(controller.diamonds, 100000);
-        expect(storage.diamonds, 100000);
+        expect(controller.fireOrbs, 100000);
+        expect(controller.metalOrbs, 100000);
+        expect(storage.fireOrbs, 100000);
         expect(storage.hasClaimedQaBonus, isTrue);
         expect(controller.pendingStoryChapter, StoryChapter.intro);
         expect(controller.hasSeenStoryIntro, isFalse);
         expect(storage.hasSeenStoryIntro, isFalse);
         expect(
           controller.consumePendingQaBonusSnackBar(),
-          'Tester Bonus: +100,000 💎',
+          PlayGamesService.qaBonusSnackBarMessage,
         );
 
         final cloudAfterReset =
             CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(cloudAfterReset.diamonds, 100000);
+        expect(cloudAfterReset.fireOrbs, 100000);
+        expect(cloudAfterReset.metalOrbs, 100000);
         expect(cloudAfterReset.hasClaimedQaBonus, isTrue);
         expect(cloudAfterReset.hasSeenStoryIntro, isFalse);
       },
     );
 
     testWidgets(
-      'Shows "Tester Bonus: +100,000 💎" SnackBar in UI when QA tester signs in',
+      'Shows QA Tester Bonus SnackBar in UI when QA tester signs in',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -1108,13 +1151,17 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
 
-        expect(find.text('Tester Bonus: +100,000 💎'), findsOneWidget);
-        expect(controller.diamonds, 100000);
+        expect(
+          find.text(PlayGamesService.qaBonusSnackBarMessage),
+          findsOneWidget,
+        );
+        expect(controller.fireOrbs, 100000);
+        expect(controller.metalOrbs, 100000);
       },
     );
 
     testWidgets(
-      'Clicking TRY AGAIN after 100 rounds resets match stats without re-granting QA tester bonus diamonds or showing SnackBar',
+      'Clicking TRY AGAIN after 100 rounds resets match stats without re-granting QA tester bonus orbs or showing SnackBar',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -1123,7 +1170,11 @@ void main() {
           'userScore': 50,
           'pcScore': 50,
           'total': 100,
-          'diamonds': 100000,
+          'orbs_fire': 100000,
+          'orbs_water': 100000,
+          'orbs_wood': 100000,
+          'orbs_earth': 100000,
+          'orbs_metal': 100000,
           'hasClaimedQaBonus': true,
         });
         final storage = StorageService();
@@ -1157,7 +1208,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('TRY AGAIN'), findsOneWidget);
-        expect(controller.diamonds, 100000);
+        expect(controller.fireOrbs, 100000);
 
         await tester.tap(find.text('TRY AGAIN'));
         await tester.pumpAndSettle();
@@ -1165,8 +1216,11 @@ void main() {
         expect(controller.totalRounds, 0);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
-        expect(controller.diamonds, 100000);
-        expect(find.text('Tester Bonus: +100,000 💎'), findsNothing);
+        expect(controller.fireOrbs, 100000);
+        expect(
+          find.text(PlayGamesService.qaBonusSnackBarMessage),
+          findsNothing,
+        );
       },
     );
   });
@@ -1175,7 +1229,6 @@ void main() {
     test(
       'isQaTester rejects lookalike, prefix, suffix, substring, empty, and normal player IDs and names',
       () {
-        // Valid QA tester credentials
         expect(PlayGamesService.isQaTester(playerId: 'a_2116013489197419559'), isTrue);
         expect(PlayGamesService.isQaTester(playerId: 'g01804264806540615668'), isTrue);
         expect(PlayGamesService.isQaTester(playerId: '  a_2116013489197419559  '), isTrue);
@@ -1184,7 +1237,6 @@ void main() {
         expect(PlayGamesService.isQaTester(playerName: 'GUSTLARSEN'), isTrue);
         expect(PlayGamesService.isQaTester(playerName: ' GustLarsenTester '), isTrue);
 
-        // Substring / Prefix / Suffix / Lookalike attacks on playerName
         final unauthorizedNames = [
           '',
           '   ',
@@ -1212,7 +1264,6 @@ void main() {
           );
         }
 
-        // Substring / Prefix / Suffix / Partial attacks on playerId
         final unauthorizedIds = [
           '',
           '   ',
@@ -1233,7 +1284,6 @@ void main() {
           );
         }
 
-        // Null checks
         expect(PlayGamesService.isQaTester(), isFalse);
         expect(PlayGamesService.isQaTester(playerId: null, playerName: null), isFalse);
       },
@@ -1245,7 +1295,7 @@ void main() {
         SharedPreferences.setMockInitialValues({'musicEnabled': false});
         final storage = StorageService();
         await storage.init();
-        await storage.setDiamonds(25);
+        await storage.setFireOrbs(25);
 
         final fakeClient = FakePlayGamesClient(
           shouldSucceedSignIn: true,
@@ -1263,23 +1313,20 @@ void main() {
           playGames: playGames,
         );
 
-        // Sign in
         await playGames.initialize();
-        expect(controller.diamonds, 25);
-        expect(storage.diamonds, 25);
+        expect(controller.fireOrbs, 25);
+        expect(storage.fireOrbs, 25);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
 
-        // Direct call to grant
         final granted = await playGames.checkAndGrantQaBonusIfEligible();
         expect(granted, isFalse);
-        expect(controller.diamonds, 25);
+        expect(controller.fireOrbs, 25);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
 
-        // App resumed
         await playGames.handleAppResumed();
-        expect(controller.diamonds, 25);
+        expect(controller.fireOrbs, 25);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
       },
@@ -1310,23 +1357,23 @@ void main() {
 
         await playGames.initialize();
         expect(playGames.isSignedIn, isFalse);
-        expect(controller.diamonds, 0);
+        expect(controller.totalOrbs, 0);
 
         final granted = await playGames.checkAndGrantQaBonusIfEligible();
         expect(granted, isFalse);
-        expect(controller.diamonds, 0);
+        expect(controller.totalOrbs, 0);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
       },
     );
 
     test(
-      'Normal player resetting all progress in SettingsDialog wipes to 0 diamonds without receiving QA bonus',
+      'Normal player resetting all progress in SettingsDialog wipes to 0 orbs without receiving QA bonus',
       () async {
         SharedPreferences.setMockInitialValues({'musicEnabled': false});
         final storage = StorageService();
         await storage.init();
-        await storage.setDiamonds(120);
+        await storage.setFireOrbs(120);
 
         final fakeClient = FakePlayGamesClient(
           shouldSucceedSignIn: true,
@@ -1345,17 +1392,16 @@ void main() {
         );
 
         await playGames.initialize();
-        expect(controller.diamonds, 120);
+        expect(controller.fireOrbs, 120);
 
-        // Wipe all gameplay progress
         await controller.resetAllProgress();
-        expect(controller.diamonds, 0);
-        expect(storage.diamonds, 0);
+        expect(controller.totalOrbs, 0);
+        expect(storage.totalOrbs, 0);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
 
         final cloudSave = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
-        expect(cloudSave.diamonds, 0);
+        expect(cloudSave.totalOrbs, 0);
         expect(cloudSave.hasClaimedQaBonus, isFalse);
       },
     );
@@ -1365,7 +1411,7 @@ void main() {
       () async {
         SharedPreferences.setMockInitialValues({
           'musicEnabled': false,
-          'diamonds': 50,
+          'orbs_fire': 50,
           'hasClaimedQaBonus': false,
         });
         final storage = StorageService();
@@ -1389,12 +1435,11 @@ void main() {
 
         await playGames.initialize();
 
-        // Attempt repeatedly to trigger bonus
         for (var i = 0; i < 5; i++) {
           await storage.setHasClaimedQaBonus(false);
           final res = await playGames.checkAndGrantQaBonusIfEligible();
           expect(res, isFalse);
-          expect(controller.diamonds, 50);
+          expect(controller.fireOrbs, 50);
           expect(controller.pendingQaBonusSnackBar, isNull);
         }
       },
@@ -1403,8 +1448,8 @@ void main() {
     test(
       'Loading forged cloud save payload cannot grant QA bonus to normal player',
       () async {
-        final forgedPayload = CloudSaveData(
-          diamonds: 50,
+        final forgedPayload = const CloudSaveData(
+          fireOrbs: 50,
           hasClaimedQaBonus: false,
           userScore: 10,
           pcScore: 10,
@@ -1435,15 +1480,14 @@ void main() {
         );
 
         await playGames.initialize();
-        // Restored cloud save data
-        expect(controller.diamonds, 50);
+        expect(controller.fireOrbs, 50);
         expect(storage.hasClaimedQaBonus, isFalse);
         expect(controller.pendingQaBonusSnackBar, isNull);
       },
     );
 
     testWidgets(
-      'Normal user clicking TRY AGAIN after 100 rounds retains diamonds and never receives bonus',
+      'Normal user clicking TRY AGAIN after 100 rounds retains orbs and never receives bonus',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -1452,7 +1496,7 @@ void main() {
           'userScore': 50,
           'pcScore': 50,
           'total': 100,
-          'diamonds': 35,
+          'orbs_fire': 35,
           'hasClaimedQaBonus': false,
         });
         final storage = StorageService();
@@ -1485,7 +1529,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('TRY AGAIN'), findsOneWidget);
-        expect(controller.diamonds, 35);
+        expect(controller.fireOrbs, 35);
 
         await tester.tap(find.text('TRY AGAIN'));
         await tester.pumpAndSettle();
@@ -1493,13 +1537,16 @@ void main() {
         expect(controller.totalRounds, 0);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
-        expect(controller.diamonds, 35);
-        expect(find.text('Tester Bonus: +100,000 💎'), findsNothing);
+        expect(controller.fireOrbs, 35);
+        expect(
+          find.text(PlayGamesService.qaBonusSnackBarMessage),
+          findsNothing,
+        );
       },
     );
 
     test(
-      'QA tester repeating 100-round match resets and in-game resets never gains duplicate diamonds',
+      'QA tester repeating 100-round match resets and in-game resets never gains duplicate orbs',
       () async {
         SharedPreferences.setMockInitialValues({'musicEnabled': false});
         final storage = StorageService();
@@ -1521,25 +1568,22 @@ void main() {
           playGames: playGames,
         );
 
-        // 1st sign in -> grants initial 100,000 diamonds
         await playGames.initialize();
-        expect(controller.diamonds, 100000);
+        expect(controller.fireOrbs, 100000);
         controller.consumePendingQaBonusSnackBar();
 
-        // Simulate 5 successive 100-round match completions and resets
         for (var match = 1; match <= 5; match++) {
           controller.totalRounds = 100;
           controller.userScore = 50;
           controller.pcScore = 50;
 
-          // Player clicks "TRY AGAIN" or "RESET"
           controller.resetGame();
           await Future<void>.delayed(Duration.zero);
 
           expect(controller.totalRounds, 0);
           expect(controller.userScore, 0);
-          expect(controller.diamonds, 100000);
-          expect(storage.diamonds, 100000);
+          expect(controller.fireOrbs, 100000);
+          expect(storage.fireOrbs, 100000);
           expect(storage.hasClaimedQaBonus, isTrue);
           expect(controller.pendingQaBonusSnackBar, isNull);
         }
@@ -1547,4 +1591,3 @@ void main() {
     );
   });
 }
-

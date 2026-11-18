@@ -7,11 +7,102 @@ class StorageService {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    await _migrateLegacyDiamondsIfNeeded();
   }
 
-  // Currency & Scores
-  int get diamonds => _prefs.getInt('diamonds') ?? 0;
-  Future<void> setDiamonds(int val) => _prefs.setInt('diamonds', val);
+  /// Migrates legacy `diamonds` balance once into Elemental Orbs if the player
+  /// had legacy diamonds > 0 and all 5 elemental orb counts are currently 0.
+  Future<void> _migrateLegacyDiamondsIfNeeded() async {
+    final legacy = _prefs.getInt('diamonds') ?? 0;
+    if (legacy > 0 && totalOrbs == 0) {
+      await setAllOrbs(
+        fire: legacy,
+        water: legacy,
+        wood: legacy,
+        earth: legacy,
+        metal: legacy,
+      );
+      await _prefs.setInt('diamonds', 0);
+      await _prefs.setBool('legacy_diamonds_migrated', true);
+    }
+  }
+
+  // Elemental Orbs Inventory (Fire, Water, Wood, Earth, Metal)
+  int get fireOrbs => _prefs.getInt('orbs_fire') ?? 0;
+  Future<void> setFireOrbs(int val) => _prefs.setInt('orbs_fire', val);
+
+  int get waterOrbs => _prefs.getInt('orbs_water') ?? 0;
+  Future<void> setWaterOrbs(int val) => _prefs.setInt('orbs_water', val);
+
+  int get woodOrbs => _prefs.getInt('orbs_wood') ?? 0;
+  Future<void> setWoodOrbs(int val) => _prefs.setInt('orbs_wood', val);
+
+  int get earthOrbs => _prefs.getInt('orbs_earth') ?? 0;
+  Future<void> setEarthOrbs(int val) => _prefs.setInt('orbs_earth', val);
+
+  int get metalOrbs => _prefs.getInt('orbs_metal') ?? 0;
+  Future<void> setMetalOrbs(int val) => _prefs.setInt('orbs_metal', val);
+
+  int get totalOrbs =>
+      fireOrbs + waterOrbs + woodOrbs + earthOrbs + metalOrbs;
+
+  Map<HandMove, int> get elementalOrbs => {
+    HandMove.rock: fireOrbs,
+    HandMove.paper: waterOrbs,
+    HandMove.scissors: woodOrbs,
+    HandMove.lizard: earthOrbs,
+    HandMove.spock: metalOrbs,
+  };
+
+  int orbsFor(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return fireOrbs;
+      case HandMove.paper:
+        return waterOrbs;
+      case HandMove.scissors:
+        return woodOrbs;
+      case HandMove.lizard:
+        return earthOrbs;
+      case HandMove.spock:
+        return metalOrbs;
+    }
+  }
+
+  Future<void> setOrbsFor(HandMove move, int val) {
+    switch (move) {
+      case HandMove.rock:
+        return setFireOrbs(val);
+      case HandMove.paper:
+        return setWaterOrbs(val);
+      case HandMove.scissors:
+        return setWoodOrbs(val);
+      case HandMove.lizard:
+        return setEarthOrbs(val);
+      case HandMove.spock:
+        return setMetalOrbs(val);
+    }
+  }
+
+  Future<void> setAllOrbs({
+    required int fire,
+    required int water,
+    required int wood,
+    required int earth,
+    required int metal,
+  }) {
+    return Future.wait([
+      setFireOrbs(fire),
+      setWaterOrbs(water),
+      setWoodOrbs(wood),
+      setEarthOrbs(earth),
+      setMetalOrbs(metal),
+    ]);
+  }
+
+  // Legacy diamond key accessor (used only for one-time legacy save migration)
+  int get legacyDiamonds => _prefs.getInt('diamonds') ?? 0;
+  Future<void> clearLegacyDiamonds() => _prefs.setInt('diamonds', 0);
 
   // QA Tester Bonus Persistence
   bool get hasClaimedQaBonus => _prefs.getBool('hasClaimedQaBonus') ?? false;
@@ -303,14 +394,15 @@ class StorageService {
     ]);
   }
 
-  /// Wipes all local gameplay progression (diamonds, scores, shop unlocks,
+  /// Wipes all local gameplay progression (elemental orbs, scores, shop unlocks,
   /// active toggles, story chapter flags, last moves, and Markov matrices).
   /// When [includeSettings] is true (e.g., on multi-account switch), also resets
   /// UI settings back to defaults so settings are isolated per account.
   Future<void> clearGameplayProgress({bool includeSettings = false}) {
     return Future.wait([
       if (includeSettings) resetSettingsToDefault(),
-      setDiamonds(0),
+      setAllOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
+      clearLegacyDiamonds(),
       setHasClaimedQaBonus(false),
       setUserScore(0),
       setPcScore(0),

@@ -230,10 +230,14 @@ void main() {
     );
 
     test(
-      'PurchaseStatus.purchased and PurchaseStatus.restored unlock all 10 items in GameController without deducting diamonds, persist to SharedPreferences, trigger cloud save, and call completePurchase',
+      'PurchaseStatus.purchased and PurchaseStatus.restored unlock all 10 items in GameController without deducting Elemental Orbs, persist to SharedPreferences, trigger cloud save, and call completePurchase',
       () async {
         SharedPreferences.setMockInitialValues({
-          'diamonds': 500,
+          'orbs_fire': 500,
+          'orbs_water': 500,
+          'orbs_wood': 500,
+          'orbs_earth': 500,
+          'orbs_metal': 500,
           'musicEnabled': false,
           'has_seen_story_intro': true,
         });
@@ -295,9 +299,13 @@ void main() {
           await Future<void>.delayed(Duration.zero);
         }
 
-        // Diamonds are NOT deducted for real-money purchases/restores
-        expect(controller.diamonds, 500);
-        expect(storage.diamonds, 500);
+        // Elemental Orbs are NOT deducted for real-money purchases/restores
+        expect(controller.fireOrbs, 500);
+        expect(controller.waterOrbs, 500);
+        expect(controller.woodOrbs, 500);
+        expect(controller.earthOrbs, 500);
+        expect(controller.metalOrbs, 500);
+        expect(storage.fireOrbs, 500);
 
         // All 10 items are unlocked in GameController and persisted in SharedPreferences
         expect(controller.unlockedReset, isTrue);
@@ -361,12 +369,14 @@ void main() {
     );
 
     testWidgets(
-      'ShopDialog displays side-by-side Diamond and Real Money buttons, shows loading indicator and SnackBar feedback on purchase/restore/cancel/error',
+      'ShopDialog displays side-by-side Elemental Orb and Real Money buttons, shows loading indicator and SnackBar feedback on purchase/restore/cancel/error',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
           'has_seen_story_predictability': true,
-          'diamonds': 200,
+          'orbs_fire': 200,
+          'orbs_water': 200,
+          'orbs_wood': 200,
           'animationsEnabled': false,
           'musicEnabled': false,
         });
@@ -400,18 +410,18 @@ void main() {
         await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
         await tester.pumpAndSettle();
 
-        // Verify side-by-side Diamond and Real Money buttons for Reset Button
-        final diamondBtn = find.byKey(
+        // Verify side-by-side Elemental Orb and Real Money buttons for Reset Button
+        final orbBtn = find.byKey(
           const ValueKey('diamond_unlock_unlock_reset_button'),
         );
         final realMoneyBtn = find.byKey(
           const ValueKey('real_money_unlock_unlock_reset_button'),
         );
-        expect(diamondBtn, findsOneWidget);
+        expect(orbBtn, findsOneWidget);
         expect(realMoneyBtn, findsOneWidget);
         expect(
-          find.descendant(of: diamondBtn, matching: find.text('100 💎')),
-          findsOneWidget,
+          find.descendant(of: orbBtn, matching: find.text('30')),
+          findsNWidgets(3),
         );
         expect(
           find.descendant(of: realMoneyBtn, matching: find.text(r'$0.99')),
@@ -450,7 +460,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
 
         expect(controller.unlockedPredictability, isTrue);
-        expect(controller.diamonds, 200); // Diamonds untouched
+        expect(controller.fireOrbs, 200); // Orbs untouched
         expect(find.text('Predictability Score: Unlocked!'), findsOneWidget);
 
         // Clear unlock SnackBar before testing cancellation feedback

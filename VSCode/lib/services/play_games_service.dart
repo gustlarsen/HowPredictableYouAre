@@ -80,7 +80,11 @@ class DefaultPlayGamesClient implements PlayGamesClient {
 /// Serializable snapshot of the player's full progression state for
 /// Google Play Saved Games cloud synchronization.
 class CloudSaveData {
-  final int diamonds;
+  final int fireOrbs;
+  final int waterOrbs;
+  final int woodOrbs;
+  final int earthOrbs;
+  final int metalOrbs;
   final bool hasClaimedQaBonus;
   final int userScore;
   final int pcScore;
@@ -144,7 +148,11 @@ class CloudSaveData {
   final int updatedAtMillis;
 
   const CloudSaveData({
-    this.diamonds = 0,
+    this.fireOrbs = 0,
+    this.waterOrbs = 0,
+    this.woodOrbs = 0,
+    this.earthOrbs = 0,
+    this.metalOrbs = 0,
     this.hasClaimedQaBonus = false,
     this.userScore = 0,
     this.pcScore = 0,
@@ -197,6 +205,10 @@ class CloudSaveData {
     this.updatedAtMillis = 0,
   });
 
+  /// Total sum of all 5 Elemental Orbs in this snapshot.
+  int get totalOrbs =>
+      fireOrbs + waterOrbs + woodOrbs + earthOrbs + metalOrbs;
+
   /// Number of shop items unlocked in this save snapshot.
   int get unlockedCount {
     int count = 0;
@@ -215,21 +227,21 @@ class CloudSaveData {
     return count;
   }
 
-  /// Total diamond value of all unlocked shop items in this snapshot.
+  /// Total Elemental Orb value of all unlocked shop items in this snapshot.
   int get unlockedShopValue {
     int value = 0;
-    if (unlockedReset) value += 100;
-    if (unlockedPredictability) value += 50;
-    if (unlockedRandom) value += 300;
-    if (unlockedAlgorithm) value += 500;
-    if (unlockedNewHands) value += 100;
-    if (unlockedYourPrediction) value += 1000;
-    if (unlockedNextMove) value += 3000;
-    if (unlockedSuggestion) value += 5000;
-    if (unlockedAds) value += 10000;
-    if (unlockedNewSkin) value += 10000;
-    if (unlockedCrystalBall) value += 20000;
-    if (unlockedCrystalBallPlus) value += 50000;
+    if (unlockedPredictability) value += 45;
+    if (unlockedReset) value += 90;
+    if (unlockedNewHands) value += 120;
+    if (unlockedRandom) value += 240;
+    if (unlockedAlgorithm) value += 460;
+    if (unlockedYourPrediction) value += 950;
+    if (unlockedNextMove) value += 2400;
+    if (unlockedSuggestion) value += 4000;
+    if (unlockedNewSkin) value += 6500;
+    if (unlockedAds) value += 9000;
+    if (unlockedCrystalBall) value += 15500;
+    if (unlockedCrystalBallPlus) value += 25000;
     return value;
   }
 
@@ -254,13 +266,13 @@ class CloudSaveData {
   }
 
   /// Returns true if [this] cloud save holds a higher progression state or
-  /// diamond count than [local].
-  bool hasHigherProgressionOrDiamondsThan(CloudSaveData local) {
-    if (diamonds > local.diamonds) return true;
+  /// elemental orb count than [local].
+  bool hasHigherProgressionOrOrbsThan(CloudSaveData local) {
+    if (totalOrbs > local.totalOrbs) return true;
     if (unlockedCount > local.unlockedCount) return true;
     if (unlockedShopValue > local.unlockedShopValue) return true;
     if (unlockedCount == local.unlockedCount &&
-        diamonds == local.diamonds &&
+        totalOrbs == local.totalOrbs &&
         (total > local.total ||
             userScore > local.userScore ||
             markovTransitionsCount > local.markovTransitionsCount)) {
@@ -269,11 +281,15 @@ class CloudSaveData {
     return false;
   }
 
-  /// Merges [this] cloud save over [local] when cloud has higher progression or diamonds,
+  /// Merges [this] cloud save over [local] when cloud has higher progression or orbs,
   /// preserving any locally unlocked items or seen story chapters.
   CloudSaveData mergeOverLocal(CloudSaveData local) {
     return CloudSaveData(
-      diamonds: diamonds >= local.diamonds ? diamonds : diamonds,
+      fireOrbs: fireOrbs,
+      waterOrbs: waterOrbs,
+      woodOrbs: woodOrbs,
+      earthOrbs: earthOrbs,
+      metalOrbs: metalOrbs,
       hasClaimedQaBonus: hasClaimedQaBonus || local.hasClaimedQaBonus,
       userScore: userScore,
       pcScore: pcScore,
@@ -338,7 +354,11 @@ class CloudSaveData {
 
   factory CloudSaveData.fromStorage(StorageService storage) {
     return CloudSaveData(
-      diamonds: storage.diamonds,
+      fireOrbs: storage.fireOrbs,
+      waterOrbs: storage.waterOrbs,
+      woodOrbs: storage.woodOrbs,
+      earthOrbs: storage.earthOrbs,
+      metalOrbs: storage.metalOrbs,
       hasClaimedQaBonus: storage.hasClaimedQaBonus,
       userScore: storage.userScore,
       pcScore: storage.pcScore,
@@ -393,7 +413,14 @@ class CloudSaveData {
   }
 
   Future<void> applyToStorage(StorageService storage) async {
-    await storage.setDiamonds(diamonds);
+    await storage.setAllOrbs(
+      fire: fireOrbs,
+      water: waterOrbs,
+      wood: woodOrbs,
+      earth: earthOrbs,
+      metal: metalOrbs,
+    );
+    await storage.clearLegacyDiamonds();
     await storage.setHasClaimedQaBonus(hasClaimedQaBonus);
     await storage.setUserScore(userScore);
     await storage.setPcScore(pcScore);
@@ -469,8 +496,19 @@ class CloudSaveData {
 
   Map<String, dynamic> toJson() {
     return {
-      'version': 1,
-      'diamonds': diamonds,
+      'version': 2,
+      'orbs': {
+        'fire': fireOrbs,
+        'water': waterOrbs,
+        'wood': woodOrbs,
+        'earth': earthOrbs,
+        'metal': metalOrbs,
+      },
+      'fireOrbs': fireOrbs,
+      'waterOrbs': waterOrbs,
+      'woodOrbs': woodOrbs,
+      'earthOrbs': earthOrbs,
+      'metalOrbs': metalOrbs,
       'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
@@ -540,8 +578,49 @@ class CloudSaveData {
   }
 
   factory CloudSaveData.fromJson(Map<String, dynamic> map) {
+    final orbsMap = map['orbs'] is Map ? map['orbs'] as Map : null;
+    int fire =
+        (orbsMap?['fire'] as num?)?.toInt() ??
+        (map['fireOrbs'] as num?)?.toInt() ??
+        0;
+    int water =
+        (orbsMap?['water'] as num?)?.toInt() ??
+        (map['waterOrbs'] as num?)?.toInt() ??
+        0;
+    int wood =
+        (orbsMap?['wood'] as num?)?.toInt() ??
+        (map['woodOrbs'] as num?)?.toInt() ??
+        0;
+    int earth =
+        (orbsMap?['earth'] as num?)?.toInt() ??
+        (map['earthOrbs'] as num?)?.toInt() ??
+        0;
+    int metal =
+        (orbsMap?['metal'] as num?)?.toInt() ??
+        (map['metalOrbs'] as num?)?.toInt() ??
+        0;
+
+    // One-time legacy diamond migration for v1 cloud saves
+    final legacyDiamonds = (map['diamonds'] as num?)?.toInt() ?? 0;
+    if (legacyDiamonds > 0 &&
+        fire == 0 &&
+        water == 0 &&
+        wood == 0 &&
+        earth == 0 &&
+        metal == 0) {
+      fire = legacyDiamonds;
+      water = legacyDiamonds;
+      wood = legacyDiamonds;
+      earth = legacyDiamonds;
+      metal = legacyDiamonds;
+    }
+
     return CloudSaveData(
-      diamonds: (map['diamonds'] as num?)?.toInt() ?? 0,
+      fireOrbs: fire,
+      waterOrbs: water,
+      woodOrbs: wood,
+      earthOrbs: earth,
+      metalOrbs: metal,
       hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
@@ -616,8 +695,9 @@ class CloudSaveData {
 /// and Saved Games cloud synchronization with offline-first fallback.
 class PlayGamesService extends ChangeNotifier {
   static const String saveSlotName = 'how_predictable_cloud_save';
-  static const int qaBonusDiamonds = 100000;
-  static const String qaBonusSnackBarMessage = 'Tester Bonus: +100,000 💎';
+  static const int qaBonusOrbs = 100000;
+  static const String qaBonusSnackBarMessage =
+      'Tester Bonus: +100,000 Elemental Orbs';
 
   /// Authorized QA tester Google Play Games player IDs (primary check).
   static const Set<String> qaTesterIds = {
@@ -794,12 +874,12 @@ class PlayGamesService extends ChangeNotifier {
         }
         onCloudDataRestored?.call();
       } else if (cloudData != null &&
-          cloudData.hasHigherProgressionOrDiamondsThan(localData)) {
+          cloudData.hasHigherProgressionOrOrbsThan(localData)) {
         final merged = cloudData.mergeOverLocal(localData);
         await merged.applyToStorage(storage);
         restoredFromCloud = true;
         onCloudDataRestored?.call();
-      } else if (localData.hasHigherProgressionOrDiamondsThan(
+      } else if (localData.hasHigherProgressionOrOrbsThan(
             cloudData ?? const CloudSaveData(),
           )) {
         if (cloudData != null &&
@@ -814,7 +894,7 @@ class PlayGamesService extends ChangeNotifier {
           name: saveSlotName,
         );
       } else if (cloudData != null) {
-        // Equal progression/diamonds: apply cloud save (including account settings)
+        // Equal progression/orbs: apply cloud save (including account settings)
         final merged = cloudData.mergeOverLocal(localData);
         await merged.applyToStorage(storage);
         restoredFromCloud = true;
@@ -851,8 +931,8 @@ class PlayGamesService extends ChangeNotifier {
 
   /// If the currently signed-in player is an authorized QA tester and
   /// `hasClaimedQaBonus` is false in both local storage and [cloudData],
-  /// grants +100,000 diamonds once, sets `hasClaimedQaBonus = true`, immediately
-  /// saves to Google Play Saved Games, and notifies listeners.
+  /// grants +100,000 of each Elemental Orb once, sets `hasClaimedQaBonus = true`,
+  /// immediately saves to Google Play Saved Games, and notifies listeners.
   Future<bool> checkAndGrantQaBonusIfEligible({CloudSaveData? cloudData}) async {
     if (!_isSignedIn) return false;
     if (!isQaTester(playerId: _playerID, playerName: _playerName)) {
@@ -868,8 +948,13 @@ class PlayGamesService extends ChangeNotifier {
       return false;
     }
 
-    final updatedDiamonds = storage.diamonds + qaBonusDiamonds;
-    await storage.setDiamonds(updatedDiamonds);
+    await storage.setAllOrbs(
+      fire: storage.fireOrbs + qaBonusOrbs,
+      water: storage.waterOrbs + qaBonusOrbs,
+      wood: storage.woodOrbs + qaBonusOrbs,
+      earth: storage.earthOrbs + qaBonusOrbs,
+      metal: storage.metalOrbs + qaBonusOrbs,
+    );
     await storage.setHasClaimedQaBonus(true);
     onCloudDataRestored?.call();
     onQaBonusGranted?.call();

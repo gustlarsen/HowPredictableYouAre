@@ -38,6 +38,7 @@ class VersusArena extends StatefulWidget {
   final int computerHp;
   final bool elementalMode;
   final VoidCallback? onImpactHaptic;
+  final Key? pcSlotKey;
 
   const VersusArena({
     super.key,
@@ -51,6 +52,7 @@ class VersusArena extends StatefulWidget {
     this.computerHp = 100,
     this.elementalMode = false,
     this.onImpactHaptic,
+    this.pcSlotKey,
   });
 
   @override
@@ -546,53 +548,56 @@ class _VersusArenaState extends State<VersusArena>
                                   : 0.0)
                               : (pcWins ? _punchAnim.value : 0.0))
                           : 0.0;
-                      return _MoveCard(
-                        label: widget.localization.t(
-                          'string52',
-                          fallback: 'PC Chose:',
-                        ),
-                        move: widget.computerMove,
-                        isLeft: false,
-                        isWinner: pcWins,
-                        elementalMode: widget.elementalMode,
-                        localization: widget.localization,
-                        pulseProgress: pulseProgress,
-                        hp: widget.computerHp,
-                        hpBarKey: const ValueKey('pc_hp_bar'),
-                        isDamaged: isDamaged,
-                        flashOpacity: _calculateFlash(isDamaged),
-                        shakeOffset: _calculateShake(isDamaged),
-                        damageIndicatorProgress:
-                            _calculateDamageProgress(isDamaged),
-                        damageAmount: 1,
-                        handBuilder: (context, handWidget) {
-                          Widget animatedChild = handWidget;
-                          if (!widget.elementalMode &&
-                              widget.animationsEnabled &&
-                              widget.roundId > 0) {
-                            if (pcWins) {
-                              animatedChild = Transform.translate(
-                                offset: Offset(
-                                  -(_punchAnim.value * targetDistance),
-                                  0,
-                                ),
-                                child: animatedChild,
-                              );
-                            } else if (userWins) {
-                              // Right hand beaten: rotate 360° clockwise (positive radians)
-                              animatedChild = Transform.rotate(
-                                angle: _defeatRotationAnim.value,
-                                child: animatedChild,
-                              );
-                            } else if (isDraw) {
-                              animatedChild = Transform.rotate(
-                                angle: _drawRotationAnim.value,
-                                child: animatedChild,
-                              );
+                      return KeyedSubtree(
+                        key: widget.pcSlotKey,
+                        child: _MoveCard(
+                          label: widget.localization.t(
+                            'string52',
+                            fallback: 'PC Chose:',
+                          ),
+                          move: widget.computerMove,
+                          isLeft: false,
+                          isWinner: pcWins,
+                          elementalMode: widget.elementalMode,
+                          localization: widget.localization,
+                          pulseProgress: pulseProgress,
+                          hp: widget.computerHp,
+                          hpBarKey: const ValueKey('pc_hp_bar'),
+                          isDamaged: isDamaged,
+                          flashOpacity: _calculateFlash(isDamaged),
+                          shakeOffset: _calculateShake(isDamaged),
+                          damageIndicatorProgress:
+                              _calculateDamageProgress(isDamaged),
+                          damageAmount: 1,
+                          handBuilder: (context, handWidget) {
+                            Widget animatedChild = handWidget;
+                            if (!widget.elementalMode &&
+                                widget.animationsEnabled &&
+                                widget.roundId > 0) {
+                              if (pcWins) {
+                                animatedChild = Transform.translate(
+                                  offset: Offset(
+                                    -(_punchAnim.value * targetDistance),
+                                    0,
+                                  ),
+                                  child: animatedChild,
+                                );
+                              } else if (userWins) {
+                                // Right hand beaten: rotate 360° clockwise (positive radians)
+                                animatedChild = Transform.rotate(
+                                  angle: _defeatRotationAnim.value,
+                                  child: animatedChild,
+                                );
+                              } else if (isDraw) {
+                                animatedChild = Transform.rotate(
+                                  angle: _drawRotationAnim.value,
+                                  child: animatedChild,
+                                );
+                              }
                             }
-                          }
-                          return animatedChild;
-                        },
+                            return animatedChild;
+                          },
+                        ),
                       );
                     },
                   ),

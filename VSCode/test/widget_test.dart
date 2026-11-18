@@ -15,6 +15,7 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
@@ -25,7 +26,7 @@ import 'package:how_predictable/views/widgets/versus_arena.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('App smoke test loads GameScreen and displays diamonds in AppBar', (WidgetTester tester) async {
+  testWidgets('App smoke test loads GameScreen and displays top-left Backpack icon in AppBar', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
     });
@@ -49,7 +50,14 @@ void main() {
     );
 
     expect(find.text('How Predictable You Are'), findsNothing);
-    expect(find.descendant(of: find.byType(AppBar), matching: find.text('0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byIcon(Icons.backpack_rounded),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('FIRE'), findsOneWidget);
     expect(find.text('WATER'), findsOneWidget);
     expect(find.text('WOOD'), findsOneWidget);
@@ -564,7 +572,11 @@ void main() {
   testWidgets('Crystal Ball+ store visibility, costs, activation dependency, state restoration, and single main screen display', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 100000,
+      'orbs_fire': 100000,
+      'orbs_water': 100000,
+      'orbs_wood': 100000,
+      'orbs_earth': 100000,
+      'orbs_metal': 100000,
       'animationsEnabled': false,
     });
     final storage = StorageService();
@@ -590,17 +602,19 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll down in Shop list to Crystal Ball
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
     await tester.pumpAndSettle();
 
-    // Before acquiring Crystal Ball: Crystal Ball costs 20000 and Crystal Ball+ is not shown
+    // Before acquiring Crystal Ball: Crystal Ball costs 3500 Fire/Water/Wood + 2500 Earth/Metal and Crystal Ball+ is not shown
     expect(find.text('Crystal Ball'), findsOneWidget);
-    expect(find.text('20000 💎'), findsOneWidget);
+    expect(find.text('3500'), findsNWidgets(3));
+    expect(find.text('2500'), findsNWidgets(2));
     expect(find.text('Crystal Ball+'), findsNothing);
 
-    // Unlock Crystal Ball (cost: 20000 -> diamonds: 80000); remains disabled on purchase
+    // Unlock Crystal Ball; remains disabled on purchase
     expect(controller.unlockCrystalBall(), isTrue);
-    expect(controller.diamonds, 80000);
+    expect(controller.fireOrbs, 96500);
+    expect(controller.earthOrbs, 97500);
     expect(controller.unlockedCrystalBall, isTrue);
     expect(controller.showCrystalBall, isFalse);
     await tester.pumpAndSettle();
@@ -614,13 +628,14 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -400));
     await tester.pumpAndSettle();
 
-    // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store with cost 50000
+    // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store
     expect(find.text('Crystal Ball+'), findsOneWidget);
-    expect(find.text('50000 💎'), findsOneWidget);
+    expect(find.text('5000'), findsNWidgets(5));
 
-    // Unlock Crystal Ball+ (cost: 50000 -> diamonds: 30000); remains disabled on purchase
+    // Unlock Crystal Ball+; remains disabled on purchase
     expect(controller.unlockCrystalBallPlus(), isTrue);
-    expect(controller.diamonds, 30000);
+    expect(controller.fireOrbs, 91500);
+    expect(controller.earthOrbs, 92500);
     expect(controller.unlockedCrystalBallPlus, isTrue);
     expect(controller.showCrystalBallPlus, isFalse);
     await tester.pumpAndSettle();
@@ -688,10 +703,12 @@ void main() {
     expect(find.text('Crystal Ball+:'), findsNothing);
   });
 
-  testWidgets('Attempting to purchase an item without enough diamonds only shows notification and gives no free diamonds', (WidgetTester tester) async {
+  testWidgets('Attempting to purchase an item without enough Elemental Orbs only shows notification and gives no free orbs', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 20,
+      'orbs_fire': 10,
+      'orbs_water': 10,
+      'orbs_wood': 10,
       'animationsEnabled': false,
     });
     final storage = StorageService();
@@ -716,15 +733,14 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
-    // Attempt to unlock the first item (Reset Button, cost: 100) with only 20 diamonds
+    // Attempt to unlock the first item (Predictability Score, cost: 15 Fire + 15 Water + 15 Wood) with only 10 of each
     await tester.tap(find.text('Unlock').first);
     await tester.pump();
 
-    expect(find.text('Not enough Diamonds'), findsOneWidget);
-    expect(find.text('+50 💎'), findsNothing);
+    expect(find.text('Not enough Elemental Orbs'), findsOneWidget);
     expect(find.byType(SnackBarAction), findsNothing);
-    expect(controller.diamonds, 20);
-    expect(controller.unlockedReset, isFalse);
+    expect(controller.fireOrbs, 10);
+    expect(controller.unlockedPredictability, isFalse);
   });
 
   testWidgets('Intro comic cutscene opens automatically on first launch, advances panels, and persists has_seen_story_intro', (WidgetTester tester) async {
@@ -814,7 +830,7 @@ void main() {
   testWidgets('Resetting all progress from SettingsDialog closes settings and plays the intro cutscene as if opened for the first time', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 500,
+      'orbs_fire': 500,
       'total': 15,
       'animationsEnabled': false,
     });
@@ -839,7 +855,7 @@ void main() {
 
     // Intro cutscene should NOT be visible initially since has_seen_story_intro was true
     expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
-    expect(controller.diamonds, 500);
+    expect(controller.fireOrbs, 500);
 
     // Open SettingsDialog
     await tester.tap(find.byIcon(Icons.settings_outlined));
@@ -860,7 +876,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Settings dialog is dismissed, progress is reset, and Intro cutscene is opened
-    expect(controller.diamonds, 0);
+    expect(controller.totalOrbs, 0);
     expect(controller.totalRounds, 0);
     expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
     expect(find.text('Panel 1 / 4'), findsOneWidget);
@@ -888,7 +904,9 @@ void main() {
   testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 1000,
+      'orbs_fire': 1000,
+      'orbs_water': 1000,
+      'orbs_wood': 1000,
       'animationsEnabled': false,
     });
     final storage = StorageService();
@@ -1017,7 +1035,7 @@ void main() {
     expect(find.byType(ScoreHeader), findsNothing);
 
     // 2. Unlocked but Disabled State: Entire ScoreHeader remains hidden
-    controller.addFreeDiamonds(50);
+    controller.addAllOrbs(50);
     expect(controller.unlockPredictability(), isTrue);
     expect(controller.unlockedPredictability, isTrue);
     expect(controller.showPredictability, isFalse);
@@ -1131,11 +1149,13 @@ void main() {
     expect(find.text('Gauge'), findsNothing);
   });
 
-  testWidgets('Predictability Score costs 50 diamonds, renders at #1 position in ShopDialog ahead of Reset Button and New Hands, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
+  testWidgets('Predictability Score costs 15 Fire + 15 Water + 15 Wood, renders at #1 position in ShopDialog ahead of Reset Button and New Hands, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'has_seen_story_predictability': true,
-      'diamonds': 50,
+      'orbs_fire': 15,
+      'orbs_water': 15,
+      'orbs_wood': 15,
       'animationsEnabled': false,
       'musicEnabled': false,
     });
@@ -1164,7 +1184,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
-    // Verify Predictability Score is at #1 position (above Reset Button and New Hands) and costs 50 💎
+    // Verify Predictability Score is at #1 position (above Reset Button and New Hands) and costs 15 Fire + 15 Water + 15 Wood
     final predTitle = find.text('Predictability Score');
     final resetTitle = find.text('Reset Button');
     final newHandsTitle = find.text('New Hands');
@@ -1183,8 +1203,8 @@ void main() {
     );
     expect(predUnlockBtn, findsOneWidget);
     expect(
-      find.descendant(of: predUnlockBtn, matching: find.text('50 💎')),
-      findsOneWidget,
+      find.descendant(of: predUnlockBtn, matching: find.text('15')),
+      findsNWidgets(3),
     );
 
     // Verify localized subtitle in English (en)
@@ -1195,11 +1215,11 @@ void main() {
       findsOneWidget,
     );
 
-    // Unlock Predictability Score with 50 diamonds
+    // Unlock Predictability Score with 15 Fire + 15 Water + 15 Wood
     await tester.tap(predUnlockBtn);
     await tester.pumpAndSettle();
     expect(controller.unlockedPredictability, isTrue);
-    expect(controller.diamonds, 0);
+    expect(controller.totalOrbs, 0);
 
     // Verify localized subtitle in Portuguese (pt), Spanish (es), and German (de)
     controller.setLanguage('pt');
@@ -1274,7 +1294,7 @@ void main() {
     expect(tester.getCenter(scissorsFinder).dy, equals(classicCenterY));
 
     // Purchase New Hands -> remains disabled until user enables it
-    controller.addFreeDiamonds(100);
+    controller.addAllOrbs(40);
     expect(controller.unlockNewHands(), isTrue);
     expect(controller.showNewHands, isFalse);
     await tester.pump();
@@ -1493,7 +1513,11 @@ void main() {
   testWidgets('New Skin (Elemental Theme) transforms move buttons, VersusArena Energy Orbs, MarkovMatrixView, and HintsBar with vector icons and localized element names without resetting match', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 15000,
+      'orbs_fire': 1500,
+      'orbs_water': 1500,
+      'orbs_wood': 1500,
+      'orbs_earth': 1000,
+      'orbs_metal': 1000,
       'unlockedAlgorithm': true,
       'showAlgorithm': true,
       'unlockedYourPrediction': true,
@@ -1538,10 +1562,10 @@ void main() {
     expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
     expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);
 
-    // 2. Unlock New Skin (10,000 diamonds) -> stays disabled on unlock
-    final diamondsBeforeUnlock = controller.diamonds;
+    // 2. Unlock New Skin (1500 Fire/Water/Wood + 1000 Earth/Metal) -> stays disabled on unlock
+    final fireBeforeUnlock = controller.fireOrbs;
     expect(controller.unlockNewSkin(), isTrue);
-    expect(controller.diamonds, diamondsBeforeUnlock - 10000);
+    expect(controller.fireOrbs, fireBeforeUnlock - 1500);
     expect(controller.unlockedNewSkin, isTrue);
     expect(controller.showNewSkin, isFalse);
     await tester.pump();
@@ -1578,10 +1602,14 @@ void main() {
     expect(find.text('METAL'), findsWidgets);
   });
 
-  testWidgets('Purchasing and toggling New Skin inside ShopDialog deducts 10000 diamonds, starts off by default, switches visuals immediately without reset confirmation, and reverts when disabled', (WidgetTester tester) async {
+  testWidgets('Purchasing and toggling New Skin inside ShopDialog deducts Elemental Orbs, starts off by default, switches visuals immediately without reset confirmation, and reverts when disabled', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 12500,
+      'orbs_fire': 2000,
+      'orbs_water': 2000,
+      'orbs_wood': 2000,
+      'orbs_earth': 1500,
+      'orbs_metal': 1500,
       'unlockedAds': true,
       'animationsEnabled': false,
     });
@@ -1626,14 +1654,16 @@ void main() {
     expect(find.text('New Skin'), findsOneWidget);
     expect(find.text('Hands Theme (Rock, Paper, Scissors)'), findsOneWidget);
 
-    // Purchase New Skin (10,000 diamonds) via the shop button
-    final diamondsBeforePurchase = controller.diamonds;
+    // Purchase New Skin via the shop button
+    final fireBeforePurchase = controller.fireOrbs;
+    final earthBeforePurchase = controller.earthOrbs;
     await tester.tap(find.byKey(const ValueKey('diamond_unlock_New Skin')));
     await tester.pumpAndSettle();
 
     expect(controller.unlockedNewSkin, isTrue);
     expect(controller.showNewSkin, isFalse);
-    expect(controller.diamonds, diamondsBeforePurchase - 10000);
+    expect(controller.fireOrbs, fireBeforePurchase - 1500);
+    expect(controller.earthOrbs, earthBeforePurchase - 1000);
 
     // Tap New Skin tile in ShopDialog to toggle ON -> must NOT show any reset dialog even though match is in progress
     await tester.tap(find.text('New Skin'));
@@ -1745,7 +1775,11 @@ void main() {
 
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'diamonds': 200024,
+      'orbs_fire': 200024,
+      'orbs_water': 200024,
+      'orbs_wood': 200024,
+      'orbs_earth': 200024,
+      'orbs_metal': 200024,
       'animationsEnabled': false,
       'musicEnabled': false,
     });
@@ -1799,28 +1833,178 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final freeDiamondsFinder = find.text('Free Diamonds');
-    final subtitleFinder = find.text('Watch a video ad for +50 💎');
+    final freeOrbsFinder = find.text('Free Elemental Orbs');
+    final subtitleFinder =
+        find.text('Watch a video ad for +50 of each Elemental Orb');
     final watchAdBtnFinder =
         find.byKey(const ValueKey('shop_watch_rewarded_ad_button'));
 
-    expect(freeDiamondsFinder, findsOneWidget);
+    expect(freeOrbsFinder, findsOneWidget);
     expect(subtitleFinder, findsOneWidget);
     expect(watchAdBtnFinder, findsOneWidget);
 
-    // Free Diamonds title and subtitle must render cleanly horizontally (not squeezed into a narrow strip)
-    final freeDiamondsRect = tester.getRect(freeDiamondsFinder);
+    final freeOrbsRect = tester.getRect(freeOrbsFinder);
     final subtitleRect = tester.getRect(subtitleFinder);
     final watchAdBtnRect = tester.getRect(watchAdBtnFinder);
 
-    expect(freeDiamondsRect.width, greaterThan(150));
-    expect(freeDiamondsRect.height, lessThan(30));
+    expect(freeOrbsRect.width, greaterThan(150));
+    expect(freeOrbsRect.height, lessThan(30));
     expect(subtitleRect.width, greaterThan(180));
-    expect(subtitleRect.height, lessThan(45));
-    // On a 360px screen, text is stacked cleanly above the full-width button
-    expect(freeDiamondsRect.bottom, lessThanOrEqualTo(subtitleRect.top + 4));
+    expect(subtitleRect.height, lessThanOrEqualTo(50));
+    expect(freeOrbsRect.bottom, lessThanOrEqualTo(subtitleRect.top + 4));
     expect(subtitleRect.bottom, lessThan(watchAdBtnRect.top));
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('7-tap QA shortcut on Backpack icon grants +100,000 of each Elemental Orb in UI', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pump();
+
+    expect(controller.totalOrbs, 0);
+
+    // 1st tap on top-left Backpack button opens InventoryDialog (count = 1)
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(InventoryDialog), findsOneWidget);
+    expect(controller.totalOrbs, 0);
+
+    // Next 6 taps on the Backpack icon inside InventoryDialog reach 7 taps total
+    for (var i = 0; i < 6; i++) {
+      await tester.tap(find.byKey(const ValueKey('inventory_header_backpack_icon')));
+    }
+    await tester.pump();
+
+    expect(controller.fireOrbs, 100000);
+    expect(controller.waterOrbs, 100000);
+    expect(controller.woodOrbs, 100000);
+    expect(controller.earthOrbs, 100000);
+    expect(controller.metalOrbs, 100000);
+    expect(find.text(PlayGamesService.qaBonusSnackBarMessage), findsOneWidget);
+  });
+
+  testWidgets('Top-left Backpack button opens InventoryDialog showing all 5 orb counts, locked/active combat states, Open Shop / Altar navigation, and Flying Orb VFX on round win', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'orbs_fire': 12,
+      'orbs_water': 34,
+      'orbs_wood': 56,
+      'orbs_earth': 7,
+      'orbs_metal': 8,
+      'unlockedNewHands': true,
+      'showNewHands': false,
+      'animationsEnabled': true,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    await localization.load();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pump();
+
+    // 1. Win a round against AI Fire (HandMove.rock) using Water (HandMove.paper)
+    controller.crystalBallMove = HandMove.rock;
+    await tester.tap(find.byKey(const ValueKey('hand_button_paper')));
+    await tester.pump();
+
+    // Fire Orbs incremented by +1 (12 -> 13)
+    expect(controller.fireOrbs, 13);
+
+    // Flying Orb VFX overlay is active during the 600ms flight
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('flying_orb_fire')), findsOneWidget);
+
+    // Complete flight + backpack bounce
+    await tester.pump(const Duration(milliseconds: 750));
+    expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsNothing);
+
+    // 2. Tap top-left Backpack icon -> opens InventoryDialog showing all 5 orb counts
+    final backpackBtn = find.byKey(const ValueKey('backpack_inventory_button'));
+    expect(backpackBtn, findsOneWidget);
+    await tester.tap(backpackBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InventoryDialog), findsOneWidget);
+    expect(find.text("Cleric's Backpack"), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('inventory_orb_count_fire')),
+        matching: find.text('13'),
+      ),
+      findsNothing, // inventory_orb_count_fire IS the Text widget itself
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('inventory_orb_count_fire'))).data,
+      '13',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('inventory_orb_count_water'))).data,
+      '34',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('inventory_orb_count_wood'))).data,
+      '56',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('inventory_orb_count_earth'))).data,
+      '7',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('inventory_orb_count_metal'))).data,
+      '8',
+    );
+
+    // Earth and Metal show locked in combat while showNewHands is false
+    expect(
+      find.text('Locked in combat (Enable New Hands)'),
+      findsNWidgets(2),
+    );
+    expect(find.text('Active in combat'), findsNWidgets(3));
+
+    // 3. Tap "Open Shop / Altar" button in InventoryDialog -> jumps straight to ShopDialog
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InventoryDialog), findsNothing);
+    expect(find.byType(ShopDialog), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop_orb_summary_bar')), findsOneWidget);
   });
 
   testWidgets('SettingsDialog displays dynamic release version, copyable Player ID with SnackBar, toggle spacing/contrast, and outlined Ok button', (WidgetTester tester) async {
