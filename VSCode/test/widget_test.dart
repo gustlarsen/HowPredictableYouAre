@@ -605,7 +605,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll down in Shop list to Crystal Ball
-    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Crystal Ball'),
+      250,
+      scrollable: shopScrollable,
+    );
     await tester.pumpAndSettle();
 
     // Before acquiring Crystal Ball: Crystal Ball costs 3500 Fire/Water/Wood + 2500 Earth/Metal and Crystal Ball+ is not shown
@@ -628,7 +636,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Scroll down further to reveal the newly added Crystal Ball+ tile in the ListView
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.scrollUntilVisible(
+      find.text('Crystal Ball+'),
+      250,
+      scrollable: shopScrollable,
+    );
     await tester.pumpAndSettle();
 
     // After acquiring Crystal Ball: Crystal Ball+ is displayed in the store
@@ -1671,9 +1683,15 @@ void main() {
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('New Skin'),
+      250,
+      scrollable: shopScrollable,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('New Skin'), findsOneWidget);
@@ -1716,9 +1734,11 @@ void main() {
     // Reopen ShopDialog and toggle New Skin OFF -> reverts to Elemental Theme without resetting match
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.scrollUntilVisible(
+      find.text('New Skin'),
+      250,
+      scrollable: shopScrollable,
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('New Skin'));

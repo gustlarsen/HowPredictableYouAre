@@ -16,10 +16,10 @@ class LocalizationService {
       return;
     }
     try {
-      final jsonString = await rootBundle.loadString(
+      final byteData = await rootBundle.load(
         'assets/data/stringsHowPredict.json',
-        cache: false,
       );
+      final jsonString = utf8.decode(Uint8List.sublistView(byteData));
       _strings = json.decode(jsonString) as Map<String, dynamic>;
       _cachedStrings = _strings;
     } catch (e) {

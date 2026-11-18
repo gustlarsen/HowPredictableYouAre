@@ -417,6 +417,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string37', fallback: 'Reset Button'),
+                      subtitle: loc.t(
+                        'reset_button_desc',
+                        fallback:
+                            'Adds a Reset button to clear the current match and Markov matrix anytime',
+                      ),
                       cost: GameController.costReset,
                       productId: BillingService.productResetButton,
                       isUnlocked: controller.unlockedReset,
@@ -446,6 +451,11 @@ class _ShopDialogState extends State<ShopDialog> {
                         'string56',
                         fallback: 'New Hands (Lizard & Spock)',
                       ),
+                      subtitle: loc.t(
+                        'new_hands_desc',
+                        fallback:
+                            'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
+                      ),
                       cost: GameController.costNewHands,
                       productId: BillingService.productNewHands,
                       isUnlocked: controller.unlockedNewHands,
@@ -458,6 +468,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string39', fallback: 'Random Move Button'),
+                      subtitle: loc.t(
+                        'random_button_desc',
+                        fallback:
+                            'Adds a Random button to play unpredictable moves and outsmart the AI',
+                      ),
                       cost: GameController.costRandom,
                       productId: BillingService.productRandomButton,
                       isUnlocked: controller.unlockedRandom,
@@ -486,6 +501,11 @@ class _ShopDialogState extends State<ShopDialog> {
                       title: loc.t(
                         'string40',
                         fallback: 'Show Markov Algorithm',
+                      ),
+                      subtitle: loc.t(
+                        'show_algorithm_desc',
+                        fallback:
+                            'Reveals the live Markov Transition Matrix tracking your move patterns',
                       ),
                       cost: GameController.costAlgorithm,
                       productId: BillingService.productShowAlgorithm,
@@ -516,6 +536,11 @@ class _ShopDialogState extends State<ShopDialog> {
                         'string41',
                         fallback: 'Your Prediction Hint',
                       ),
+                      subtitle: loc.t(
+                        'your_prediction_desc',
+                        fallback:
+                            'Displays the move(s) the AI predicts you will play next',
+                      ),
                       cost: GameController.costYourPrediction,
                       productId: BillingService.productYourPrediction,
                       isUnlocked: controller.unlockedYourPrediction,
@@ -542,6 +567,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string42', fallback: 'PC Next Move Reveal'),
+                      subtitle: loc.t(
+                        'pc_next_move_desc',
+                        fallback:
+                            'Reveals the move(s) the AI is preparing to play against you',
+                      ),
                       cost: GameController.costNextMove,
                       productId: BillingService.productPcNextMove,
                       isUnlocked: controller.unlockedNextMove,
@@ -599,6 +629,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string43', fallback: 'Optimal Suggestion'),
+                      subtitle: loc.t(
+                        'suggestion_desc',
+                        fallback:
+                            "Recommends the optimal counter-move(s) to beat the AI's next play",
+                      ),
                       cost: GameController.costSuggestion,
                       productId: BillingService.productSuggestion,
                       isUnlocked: controller.unlockedSuggestion,
@@ -625,6 +660,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string44', fallback: 'Remove Ads'),
+                      subtitle: loc.t(
+                        'remove_ads_desc',
+                        fallback:
+                            'Removes all banner and video ad prompts across the entire app',
+                      ),
                       cost: GameController.costRemoveAds,
                       productId: BillingService.productRemoveAds,
                       isUnlocked: controller.unlockedAds,
@@ -681,6 +721,11 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('string80', fallback: 'Crystal Ball'),
+                      subtitle: loc.t(
+                        'crystal_ball_desc',
+                        fallback:
+                            'Reveals the exact next move the AI will play before you choose',
+                      ),
                       cost: GameController.costCrystalBall,
                       productId: BillingService.productCrystalBall,
                       isUnlocked: controller.unlockedCrystalBall,
@@ -708,6 +753,11 @@ class _ShopDialogState extends State<ShopDialog> {
                       _buildShopItem(
                         context: context,
                         title: loc.t('string82', fallback: 'Crystal Ball+'),
+                        subtitle: loc.t(
+                          'crystal_ball_plus_desc',
+                          fallback:
+                              'Upgrades Crystal Ball to guarantee 100% foresight on every single round',
+                        ),
                         cost: GameController.costCrystalBallPlus,
                         productId: null,
                         isUnlocked: controller.unlockedCrystalBallPlus,
@@ -1007,13 +1057,14 @@ class _ShopItemTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle!,
+                  softWrap: true,
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.amber.withValues(alpha: 0.85),
                   ),
                 ),
               ],
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1069,6 +1120,7 @@ class _ShopItemTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             subtitle!,
+            softWrap: true,
             style: TextStyle(
               fontSize: 11,
               color: Colors.amber.withValues(alpha: 0.85),
