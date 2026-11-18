@@ -812,4 +812,51 @@ void main() {
     expect(storage.userHp, 100);
     expect(storage.pcHp, 100);
   });
+
+  test('Predictability Score costs 50 diamonds, starts disabled, and tracks live stats in background while hidden', () async {
+    SharedPreferences.setMockInitialValues({
+      'diamonds': 49,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    // 49 diamonds is insufficient for 50-diamond Predictability Score
+    expect(controller.unlockPredictability(), isFalse);
+    expect(controller.diamonds, 49);
+    expect(controller.unlockedPredictability, isFalse);
+    expect(controller.showPredictability, isFalse);
+    expect(controller.isPredictabilityEnabled, isFalse);
+
+    // Play turns while ScoreHeader is locked & hidden -> background tracking still records scores
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock); // User wins
+    controller.crystalBallMove = HandMove.paper;
+    controller.playTurn(HandMove.rock); // PC wins
+
+    expect(controller.userScore, 1);
+    expect(controller.playerScore, 1);
+    expect(controller.pcScore, 1);
+    expect(controller.totalRounds, 2);
+    expect(controller.percentPredict, 50.0);
+
+    // User now has 50 diamonds (49 + 1 win) -> unlocks Predictability Score for 50 diamonds
+    expect(controller.diamonds, 50);
+    expect(controller.unlockPredictability(), isTrue);
+    expect(controller.diamonds, 0);
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.showPredictability, isFalse);
+    expect(controller.isPredictabilityEnabled, isFalse);
+    expect(storage.unlockedPredictability, isTrue);
+    expect(storage.showPredictability, isFalse);
+
+    // Toggling Predictability Score ON enables it with live background-tracked stats intact
+    controller.toggleShowPredictability(true);
+    expect(controller.showPredictability, isTrue);
+    expect(controller.isPredictabilityEnabled, isTrue);
+    expect(storage.showPredictability, isTrue);
+    expect(controller.userScore, 1);
+    expect(controller.pcScore, 1);
+    expect(controller.totalRounds, 2);
+    expect(controller.percentPredict, 50.0);
+  });
 }

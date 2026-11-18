@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 class LocalizationService {
   static const List<String> supportedLanguages = ['en', 'de', 'pt', 'es'];
+  static Map<String, dynamic>? _cachedStrings;
 
   String _currentLanguage = 'en';
   Map<String, dynamic> _strings = {};
@@ -10,9 +11,17 @@ class LocalizationService {
   String get currentLanguage => _currentLanguage;
 
   Future<void> load() async {
+    if (_cachedStrings != null) {
+      _strings = _cachedStrings!;
+      return;
+    }
     try {
-      final jsonString = await rootBundle.loadString('assets/data/stringsHowPredict.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/data/stringsHowPredict.json',
+        cache: false,
+      );
       _strings = json.decode(jsonString) as Map<String, dynamic>;
+      _cachedStrings = _strings;
     } catch (e) {
       _strings = {};
     }

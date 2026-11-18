@@ -906,11 +906,13 @@ void main() {
       ),
     );
 
-    // Open ShopDialog and unlock Reset Button (first item)
+    // Open ShopDialog and unlock Reset Button
     await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Unlock').first);
+    await tester.tap(
+      find.byKey(const ValueKey('diamond_unlock_unlock_reset_button')),
+    );
     await tester.pumpAndSettle();
 
     // Reset Button comic cutscene should open immediately
@@ -970,10 +972,10 @@ void main() {
     expect(find.text('Panel 1 / 4'), findsOneWidget);
   });
 
-  testWidgets('ScoreHeader displays Gauge column inside scoreboard card with red-yellow-green heatmap color', (WidgetTester tester) async {
+  testWidgets('ScoreHeader is completely hidden by default and when disabled, and reveals all 4 metrics with semantic RPG gauge colors when unlocked and enabled', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
-      'unlockedPredictability': true,
+      'unlockedPredictability': false,
       'showPredictability': false,
       'animationsEnabled': false,
     });
@@ -995,14 +997,37 @@ void main() {
       ),
     );
 
-    // When disabled, Gauge column is not shown
-    expect(find.descendant(of: find.byType(ScoreHeader), matching: find.text('Gauge')), findsNothing);
+    // 1. Default / Locked State: Entire ScoreHeader is hidden (no You, PC, Total, or Gauge)
+    expect(find.byType(ScoreHeader), findsNothing);
+    expect(find.text('You'), findsNothing);
+    expect(find.text('Your Score:'), findsNothing);
+    expect(find.text('Total'), findsNothing);
+    expect(find.text('Total:'), findsNothing);
+    expect(find.text('Gauge'), findsNothing);
 
-    // Enable predictability gauge
+    // Background tracking continues while hidden
+    controller.crystalBallMove = HandMove.scissors;
+    controller.playTurn(HandMove.rock); // User win (1-0)
+    await tester.pump();
+    expect(controller.userScore, 1);
+    expect(controller.totalRounds, 1);
+    expect(find.byType(ScoreHeader), findsNothing);
+
+    // 2. Unlocked but Disabled State: Entire ScoreHeader remains hidden
+    controller.addFreeDiamonds(50);
+    expect(controller.unlockPredictability(), isTrue);
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.showPredictability, isFalse);
+    await tester.pump();
+    expect(find.byType(ScoreHeader), findsNothing);
+    expect(find.text('You'), findsNothing);
+    expect(find.text('Total'), findsNothing);
+    expect(find.text('Gauge'), findsNothing);
+
+    // 3. Unlocked AND Enabled State: Entire ScoreHeader appears with all 4 metrics side-by-side
     controller.toggleShowPredictability(true);
     await tester.pump();
 
-    // Gauge column is inside the ScoreHeader Card alongside You, PC, Total
     final scoreCardFinder = find.descendant(
       of: find.byType(ScoreHeader),
       matching: find.byType(Card),
@@ -1012,10 +1037,11 @@ void main() {
     expect(find.descendant(of: scoreCardFinder, matching: find.text('PC')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('Total')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('Gauge')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('0.0%')), findsOneWidget);
+    // Background-tracked stats (1 win, 0 losses, 1 total, 100.0%) are immediately shown
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('100.0%')), findsOneWidget);
 
-    // Verify heatmap color progression:
-    // 1. User has no wins (0% score, bad result) -> Pure Red
+    // Verify dynamic semantic RPG gauge colors:
+    // 1. Low predictability (< 40%, e.g. 0.0% and 25.0%) -> Emerald Green (0xFF2ECC71)
     controller.userScore = 0;
     controller.pcScore = 10;
     controller.totalRounds = 10;
@@ -1025,9 +1051,8 @@ void main() {
     Text gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('0.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(Colors.red));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
 
-    // 2. PC has more wins (25% score) -> Between Red and Yellow
     controller.userScore = 1;
     controller.pcScore = 3;
     controller.totalRounds = 4;
@@ -1037,12 +1062,20 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('25.0%')),
     );
-    expect(
-      gaugeValueText.style?.color,
-      equals(Color.lerp(Colors.red, Colors.yellow, 0.5)),
-    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
 
-    // 3. Draw (50% score) -> Yellow in the middle
+    // 2. Moderate predictability (40%–65%, e.g. 40.0%, 50.0%, 65.0%) -> Amber/Gold (0xFFFFB300)
+    controller.userScore = 4;
+    controller.pcScore = 6;
+    controller.totalRounds = 10;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('40.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
+
     controller.userScore = 5;
     controller.pcScore = 5;
     controller.totalRounds = 10;
@@ -1052,9 +1085,20 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('50.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(Colors.yellow));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
 
-    // 4. User has more wins (75% score) -> Between Yellow and Green
+    controller.userScore = 13;
+    controller.pcScore = 7;
+    controller.totalRounds = 20;
+    controller.notifyListeners();
+    await tester.pump();
+
+    gaugeValueText = tester.widget<Text>(
+      find.descendant(of: scoreCardFinder, matching: find.text('65.0%')),
+    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.amberGold));
+
+    // 3. High predictability (> 65%, e.g. 75.0% and 100.0%) -> Crimson Red (0xFFE74C3C)
     controller.userScore = 3;
     controller.pcScore = 1;
     controller.totalRounds = 4;
@@ -1064,12 +1108,8 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('75.0%')),
     );
-    expect(
-      gaugeValueText.style?.color,
-      equals(Color.lerp(Colors.yellow, Colors.green, 0.5)),
-    );
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
 
-    // 5. User has all wins (100% score, good result) -> Pure Green
     controller.userScore = 10;
     controller.pcScore = 0;
     controller.totalRounds = 10;
@@ -1079,7 +1119,112 @@ void main() {
     gaugeValueText = tester.widget<Text>(
       find.descendant(of: scoreCardFinder, matching: find.text('100.0%')),
     );
-    expect(gaugeValueText.style?.color, equals(Colors.green));
+    expect(gaugeValueText.style?.color, equals(ScoreHeader.crimsonRed));
+
+    // Toggling OFF hides the entire ScoreHeader again
+    controller.toggleShowPredictability(false);
+    await tester.pumpAndSettle();
+    expect(find.byType(ScoreHeader), findsNothing);
+    expect(find.text('Gauge'), findsNothing);
+  });
+
+  testWidgets('Predictability Score costs 50 diamonds, renders at #1 position in ShopDialog ahead of Reset Button and New Hands, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'has_seen_story_intro': true,
+      'has_seen_story_predictability': true,
+      'diamonds': 50,
+      'animationsEnabled': false,
+      'musicEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    await localization.load();
+    final audio = AudioService();
+
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: const HowPredictableApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open ShopDialog
+    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.pumpAndSettle();
+
+    // Verify Predictability Score is at #1 position (above Reset Button and New Hands) and costs 50 💎
+    final predTitle = find.text('Predictability Score');
+    final resetTitle = find.text('Reset Button');
+    final newHandsTitle = find.text('New Hands');
+    expect(predTitle, findsOneWidget);
+    expect(resetTitle, findsOneWidget);
+    expect(newHandsTitle, findsOneWidget);
+
+    final predY = tester.getTopLeft(predTitle).dy;
+    final resetY = tester.getTopLeft(resetTitle).dy;
+    final newHandsY = tester.getTopLeft(newHandsTitle).dy;
+    expect(predY, lessThan(resetY));
+    expect(resetY, lessThan(newHandsY));
+
+    final predUnlockBtn = find.byKey(
+      const ValueKey('diamond_unlock_unlock_predictability_score'),
+    );
+    expect(predUnlockBtn, findsOneWidget);
+    expect(
+      find.descendant(of: predUnlockBtn, matching: find.text('50 💎')),
+      findsOneWidget,
+    );
+
+    // Verify localized subtitle in English (en)
+    expect(
+      find.text(
+        'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
+      ),
+      findsOneWidget,
+    );
+
+    // Unlock Predictability Score with 50 diamonds
+    await tester.tap(predUnlockBtn);
+    await tester.pumpAndSettle();
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.diamonds, 0);
+
+    // Verify localized subtitle in Portuguese (pt), Spanish (es), and German (de)
+    controller.setLanguage('pt');
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Desbloqueia o Placar da Partida (Sua pontuação, Pontuação PC, Total) e o Medidor de Previsibilidade %',
+      ),
+      findsOneWidget,
+    );
+
+    controller.setLanguage('es');
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Desbloquea el Marcador de la Partida (Tu Puntuación, Puntuación PC, Total) y el Medidor de Previsibilidad %',
+      ),
+      findsOneWidget,
+    );
+
+    controller.setLanguage('de');
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Schaltet die Spiel-Punktetafel (Ihre Punktzahl, PC Score, Gesamt) & Vorhersagbarkeits-Anzeige % frei',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Enabling new hands keeps all 5 hand buttons on the same line with reduced size, and disabling restores classic 3-hand size', (WidgetTester tester) async {

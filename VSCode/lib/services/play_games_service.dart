@@ -219,7 +219,7 @@ class CloudSaveData {
   int get unlockedShopValue {
     int value = 0;
     if (unlockedReset) value += 100;
-    if (unlockedPredictability) value += 150;
+    if (unlockedPredictability) value += 50;
     if (unlockedRandom) value += 300;
     if (unlockedAlgorithm) value += 500;
     if (unlockedNewHands) value += 100;

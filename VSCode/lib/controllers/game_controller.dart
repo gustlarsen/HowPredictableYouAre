@@ -49,6 +49,7 @@ class GameController extends ChangeNotifier {
 
   int diamonds = 0;
   int userScore = 0;
+  int get playerScore => userScore;
   int pcScore = 0;
   int totalRounds = 0;
   int turnCount = 0;
@@ -293,7 +294,8 @@ class GameController extends ChangeNotifier {
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
 
     showReset = storage.showReset;
-    showPredictability = storage.showPredictability;
+    showPredictability =
+        unlockedPredictability ? storage.showPredictability : false;
     showRandom = storage.showRandom;
     showAlgorithm = storage.showAlgorithm;
     showNewHands = storage.showNewHands;
@@ -384,6 +386,10 @@ class GameController extends ChangeNotifier {
     if (totalRounds == 0) return 0.0;
     return (userScore / totalRounds) * 100.0;
   }
+
+  /// True when the Predictability Score upgrade is both unlocked and toggled ON.
+  bool get isPredictabilityEnabled =>
+      unlockedPredictability && showPredictability;
 
   EvaluationTier get evaluationTier {
     final pcPredictPercent =
@@ -652,7 +658,7 @@ class GameController extends ChangeNotifier {
 
   bool unlockPredictability() {
     return purchaseItem(
-      cost: 150,
+      cost: 50,
       onUnlock: () {
         unlockedPredictability = true;
         showPredictability = false;

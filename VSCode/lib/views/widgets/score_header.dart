@@ -6,24 +6,31 @@ class ScoreHeader extends StatelessWidget {
 
   const ScoreHeader({super.key, required this.controller});
 
-  /// Returns a heat-map color interpolating from red (0%, no wins / bad result)
-  /// through yellow (50%, draw) to green (100%, all wins / good result).
+  static const Color emeraldGreen = Color(0xFF2ECC71);
+  static const Color amberGold = Color(0xFFFFB300);
+  static const Color crimsonRed = Color(0xFFE74C3C);
+
+  /// Returns a semantic color matching the RPG HP bar aesthetic:
+  /// - Emerald green (`0xFF2ECC71`) when low predictability (< 40%)
+  /// - Amber/gold (`0xFFFFB300`) when moderate (40%–65%)
+  /// - Crimson red (`0xFFE74C3C`) when highly predictable (> 65%)
   static Color gaugeColor(double percentPredict) {
     final clamped = percentPredict.clamp(0.0, 100.0);
-    if (clamped <= 0.0) return Colors.red;
-    if (clamped == 50.0) return Colors.yellow;
-    if (clamped >= 100.0) return Colors.green;
-    if (clamped < 50.0) {
-      final t = clamped / 50.0;
-      return Color.lerp(Colors.red, Colors.yellow, t)!;
+    if (clamped < 40.0) {
+      return emeraldGreen;
+    } else if (clamped <= 65.0) {
+      return amberGold;
     } else {
-      final t = (clamped - 50.0) / 50.0;
-      return Color.lerp(Colors.yellow, Colors.green, t)!;
+      return crimsonRed;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!controller.unlockedPredictability || !controller.showPredictability) {
+      return const SizedBox.shrink();
+    }
+
     final theme = Theme.of(context);
     final loc = controller.localization;
 
@@ -52,14 +59,12 @@ class ScoreHeader extends StatelessWidget {
               value: '${controller.totalRounds}',
               color: Colors.grey,
             ),
-            if (controller.showPredictability) ...[
-              Container(width: 1, height: 28, color: theme.dividerColor),
-              _ScoreItem(
-                label: loc.t('string5', fallback: 'Gauge'),
-                value: '${controller.percentPredict.toStringAsFixed(1)}%',
-                color: gaugeColor(controller.percentPredict),
-              ),
-            ],
+            Container(width: 1, height: 28, color: theme.dividerColor),
+            _ScoreItem(
+              label: loc.t('string5', fallback: 'Gauge'),
+              value: '${controller.percentPredict.toStringAsFixed(1)}%',
+              color: gaugeColor(controller.percentPredict),
+            ),
           ],
         ),
       ),

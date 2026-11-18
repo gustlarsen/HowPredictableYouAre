@@ -441,9 +441,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         ),
                         child: Column(
                           children: [
-                            // Score & Diamonds Header
-                            ScoreHeader(controller: controller),
-                            const SizedBox(height: 10),
+                            // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
+                              child: AnimatedSwitcher(
+                                duration: controller.animationsEnabled
+                                    ? const Duration(milliseconds: 250)
+                                    : Duration.zero,
+                                child: (controller.unlockedPredictability &&
+                                        controller.showPredictability)
+                                    ? Padding(
+                                        key: const ValueKey(
+                                          'score_header_visible',
+                                        ),
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: ScoreHeader(
+                                          controller: controller,
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(
+                                        key: ValueKey('score_header_hidden'),
+                                      ),
+                              ),
+                            ),
 
                             // Unlocked Hint Pills (Prediction, Next move, Suggestion)
                             HintsBar(controller: controller),

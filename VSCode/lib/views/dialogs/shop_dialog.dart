@@ -347,11 +347,45 @@ class _ShopDialogState extends State<ShopDialog> {
               ),
               const Divider(height: 24),
 
-              // Shop items list
+              // Shop items list (ordered ascending by diamond cost)
               Expanded(
                 child: ListView(
                   cacheExtent: 1000,
                   children: [
+                    _buildShopItem(
+                      context: context,
+                      title: loc.t(
+                        'string38',
+                        fallback: 'Predictability Score',
+                      ),
+                      subtitle: loc.t(
+                        'predictability_score_desc',
+                        fallback:
+                            'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
+                      ),
+                      cost: 50,
+                      productId: BillingService.productPredictabilityScore,
+                      isUnlocked: controller.unlockedPredictability,
+                      isActive: controller.showPredictability,
+                      enabledLabel: enabledStr,
+                      disabledLabel: disabledStr,
+                      onUnlock: () {
+                        final ok = controller.unlockPredictability();
+                        _handleUnlock(
+                          context,
+                          loc.t('string38', fallback: 'Predictability Score'),
+                          ok,
+                        );
+                      },
+                      onToggle: (val) {
+                        controller.toggleShowPredictability(val);
+                        _handleToggle(
+                          context,
+                          loc.t('string38', fallback: 'Predictability Score'),
+                          val,
+                        );
+                      },
+                    ),
                     _buildShopItem(
                       context: context,
                       title: loc.t('string37', fallback: 'Reset Button'),
@@ -381,31 +415,17 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t(
-                        'string38',
-                        fallback: 'Predictability Score',
+                        'string56',
+                        fallback: 'New Hands (Lizard & Spock)',
                       ),
-                      cost: 150,
-                      productId: BillingService.productPredictabilityScore,
-                      isUnlocked: controller.unlockedPredictability,
-                      isActive: controller.showPredictability,
+                      cost: 100,
+                      productId: BillingService.productNewHands,
+                      isUnlocked: controller.unlockedNewHands,
+                      isActive: controller.showNewHands,
                       enabledLabel: enabledStr,
                       disabledLabel: disabledStr,
-                      onUnlock: () {
-                        final ok = controller.unlockPredictability();
-                        _handleUnlock(
-                          context,
-                          loc.t('string38', fallback: 'Predictability Score'),
-                          ok,
-                        );
-                      },
-                      onToggle: (val) {
-                        controller.toggleShowPredictability(val);
-                        _handleToggle(
-                          context,
-                          loc.t('string38', fallback: 'Predictability Score'),
-                          val,
-                        );
-                      },
+                      onUnlock: () => _handleNewHandsUnlock(context),
+                      onToggle: (val) => _handleNewHandsToggle(context, val),
                     ),
                     _buildShopItem(
                       context: context,
@@ -461,21 +481,6 @@ class _ShopDialogState extends State<ShopDialog> {
                           val,
                         );
                       },
-                    ),
-                    _buildShopItem(
-                      context: context,
-                      title: loc.t(
-                        'string56',
-                        fallback: 'New Hands (Lizard & Spock)',
-                      ),
-                      cost: 100,
-                      productId: BillingService.productNewHands,
-                      isUnlocked: controller.unlockedNewHands,
-                      isActive: controller.showNewHands,
-                      enabledLabel: enabledStr,
-                      disabledLabel: disabledStr,
-                      onUnlock: () => _handleNewHandsUnlock(context),
-                      onToggle: (val) => _handleNewHandsToggle(context, val),
                     ),
                     _buildShopItem(
                       context: context,
@@ -579,6 +584,36 @@ class _ShopDialogState extends State<ShopDialog> {
                     ),
                     _buildShopItem(
                       context: context,
+                      title: loc.t('new_skin', fallback: 'New Skin'),
+                      subtitle: loc.t(
+                        'new_skin_desc',
+                        fallback: 'Hands Theme (Rock, Paper, Scissors)',
+                      ),
+                      cost: 10000,
+                      productId: null,
+                      isUnlocked: controller.unlockedNewSkin,
+                      isActive: controller.showNewSkin,
+                      enabledLabel: enabledStr,
+                      disabledLabel: disabledStr,
+                      onUnlock: () {
+                        final ok = controller.unlockNewSkin();
+                        _handleUnlock(
+                          context,
+                          loc.t('new_skin', fallback: 'New Skin'),
+                          ok,
+                        );
+                      },
+                      onToggle: (val) {
+                        controller.toggleShowNewSkin(val);
+                        _handleToggle(
+                          context,
+                          loc.t('new_skin', fallback: 'New Skin'),
+                          val,
+                        );
+                      },
+                    ),
+                    _buildShopItem(
+                      context: context,
                       title: loc.t('string80', fallback: 'Crystal Ball'),
                       cost: 20000,
                       productId: BillingService.productCrystalBall,
@@ -643,36 +678,6 @@ class _ShopDialogState extends State<ShopDialog> {
                           );
                         },
                       ),
-                    _buildShopItem(
-                      context: context,
-                      title: loc.t('new_skin', fallback: 'New Skin'),
-                      subtitle: loc.t(
-                        'new_skin_desc',
-                        fallback: 'Hands Theme (Rock, Paper, Scissors)',
-                      ),
-                      cost: 10000,
-                      productId: null,
-                      isUnlocked: controller.unlockedNewSkin,
-                      isActive: controller.showNewSkin,
-                      enabledLabel: enabledStr,
-                      disabledLabel: disabledStr,
-                      onUnlock: () {
-                        final ok = controller.unlockNewSkin();
-                        _handleUnlock(
-                          context,
-                          loc.t('new_skin', fallback: 'New Skin'),
-                          ok,
-                        );
-                      },
-                      onToggle: (val) {
-                        controller.toggleShowNewSkin(val);
-                        _handleToggle(
-                          context,
-                          loc.t('new_skin', fallback: 'New Skin'),
-                          val,
-                        );
-                      },
-                    ),
 
                     const SizedBox(height: 12),
                     // Voluntary Rewarded Video Ad (+50 💎) action
