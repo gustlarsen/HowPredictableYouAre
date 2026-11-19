@@ -9,7 +9,7 @@ import 'services/ad_service.dart';
 import 'services/billing_service.dart';
 import 'services/update_service.dart';
 import 'controllers/game_controller.dart';
-import 'views/screens/game_screen.dart';
+import 'views/screens/world_map_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +53,9 @@ void main() async {
 }
 
 class HowPredictableApp extends StatelessWidget {
-  const HowPredictableApp({super.key});
+  final Widget? home;
+
+  const HowPredictableApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +89,7 @@ class HowPredictableApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF0D0E12),
       ),
-      home: const GameScreen(),
+      home: home ?? const WorldMapScreen(),
     );
   }
 }

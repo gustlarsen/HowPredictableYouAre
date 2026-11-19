@@ -182,6 +182,7 @@ class CloudSaveData {
   final int total;
   final int userHp;
   final int pcHp;
+  final int currentWeek;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -253,6 +254,7 @@ class CloudSaveData {
     this.total = 0,
     this.userHp = 100,
     this.pcHp = 100,
+    this.currentWeek = 1,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -372,7 +374,8 @@ class CloudSaveData {
     if (unlockedShopValue > local.unlockedShopValue) return true;
     if (unlockedCount == local.unlockedCount &&
         totalOrbs == local.totalOrbs &&
-        (total > local.total ||
+        (currentWeek > local.currentWeek ||
+            total > local.total ||
             userScore > local.userScore ||
             markovTransitionsCount > local.markovTransitionsCount)) {
       return true;
@@ -395,6 +398,8 @@ class CloudSaveData {
       total: total,
       userHp: userHp,
       pcHp: pcHp,
+      currentWeek:
+          currentWeek > local.currentWeek ? currentWeek : local.currentWeek,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -467,6 +472,7 @@ class CloudSaveData {
       total: storage.total,
       userHp: storage.userHp,
       pcHp: storage.pcHp,
+      currentWeek: storage.currentWeek,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -532,6 +538,7 @@ class CloudSaveData {
     await storage.setTotal(total);
     await storage.setUserHp(userHp);
     await storage.setPcHp(pcHp);
+    await storage.setCurrentWeek(currentWeek);
 
     await storage.setLanguage(language);
     await storage.setDarkMode(darkMode);
@@ -623,6 +630,7 @@ class CloudSaveData {
       'total': total,
       'userHp': userHp,
       'pcHp': pcHp,
+      'currentWeek': currentWeek,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -738,6 +746,9 @@ class CloudSaveData {
       total: (map['total'] as num?)?.toInt() ?? 0,
       userHp: (map['userHp'] as num?)?.toInt() ?? 100,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
+      currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 1
+          ? 1
+          : ((map['currentWeek'] as num?)?.toInt() ?? 1),
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

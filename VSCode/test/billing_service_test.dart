@@ -406,8 +406,8 @@ void main() {
         );
         await tester.pump();
 
-        // Open ShopDialog
-        await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+        // Open ShopDialog via Sacred Temple (Altar of Offerings) on WorldMapScreen
+        await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
         await tester.pumpAndSettle();
 
         // Verify side-by-side Elemental Orb and Real Money buttons for Reset Button

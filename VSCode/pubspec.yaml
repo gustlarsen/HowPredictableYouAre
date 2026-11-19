@@ -69,6 +69,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/kingdom_map.jpeg
     - assets/images/story/
     - assets/data/
     - assets/audio/

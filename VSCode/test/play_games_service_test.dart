@@ -12,6 +12,7 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/screens/game_screen.dart';
 
 class FakePlayGamesClient implements PlayGamesClient {
   bool shouldSucceedSignIn;
@@ -899,7 +900,7 @@ void main() {
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: controller,
-            child: const HowPredictableApp(),
+            child: const HowPredictableApp(home: GameScreen()),
           ),
         );
         await tester.pump();
@@ -1282,15 +1283,20 @@ void main() {
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: controller,
-            child: const HowPredictableApp(),
+            child: const HowPredictableApp(home: GameScreen()),
           ),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('TRY AGAIN'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('battle_return_to_map_button')),
+          findsOneWidget,
+        );
         expect(controller.fireOrbs, 100000);
 
-        await tester.tap(find.text('TRY AGAIN'));
+        await tester.tap(
+          find.byKey(const ValueKey('battle_return_to_map_button')),
+        );
         await tester.pumpAndSettle();
 
         expect(controller.totalRounds, 0);
@@ -1603,15 +1609,20 @@ void main() {
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: controller,
-            child: const HowPredictableApp(),
+            child: const HowPredictableApp(home: GameScreen()),
           ),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('TRY AGAIN'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('battle_return_to_map_button')),
+          findsOneWidget,
+        );
         expect(controller.fireOrbs, 35);
 
-        await tester.tap(find.text('TRY AGAIN'));
+        await tester.tap(
+          find.byKey(const ValueKey('battle_return_to_map_button')),
+        );
         await tester.pumpAndSettle();
 
         expect(controller.totalRounds, 0);

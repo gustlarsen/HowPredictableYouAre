@@ -281,10 +281,50 @@ class _GameScreenState extends State<GameScreen>
                             color: palette.secondaryText,
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.rewardedAdCardSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: palette.rewardedAdCardBorder,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 15,
+                                color: palette.amberIcon,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  loc.t(
+                                    'battle_week_advanced',
+                                    fallback:
+                                        '+1 Week Passed — Returning to the Kingdom Map',
+                                  ),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: palette.amberText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     actions: [
                       ElevatedButton(
+                        key: const ValueKey('battle_return_to_map_button'),
                         style: palette.isDark
                             ? null
                             : ElevatedButton.styleFrom(
@@ -293,10 +333,14 @@ class _GameScreenState extends State<GameScreen>
                               ),
                         onPressed: () {
                           Navigator.of(ctx).pop();
-                          controller.resetGame();
+                          controller.completeBattleWeek();
+                          if (context.mounted &&
+                              Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop(true);
+                          }
                         },
                         child: Text(
-                          loc.t('string76', fallback: 'TRY AGAIN'),
+                          loc.t('map_return_to_map', fallback: 'Return to Map'),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -454,67 +498,95 @@ class _GameScreenState extends State<GameScreen>
         elevation: 0,
         centerTitle: false,
         automaticallyImplyLeading: false,
-        leadingWidth: 48,
-        leading: Center(
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: IconButton(
-              key: const ValueKey('backpack_inventory_button'),
-              padding: EdgeInsets.zero,
-              iconSize: 28,
-              constraints: const BoxConstraints(
-                minWidth: 36,
-                maxWidth: 36,
-                minHeight: 36,
-                maxHeight: 36,
-              ),
-              tooltip: loc.t(
-                'inventory_title',
-                fallback: "Cleric's Backpack",
-              ),
-              onPressed: () => _handleBackpackTap(context, controller),
-              icon: AnimatedBuilder(
-                animation: _flyingOrbController,
-                builder: (context, _) {
-                  final elapsedMs = _flyingOrbController.value *
-                      GameScreen.orbTotalSequenceMs;
-                  const pulseStartMs = GameScreen.orbSpawnDelayMs +
-                      GameScreen.orbFlightDurationMs;
-                  final isPulsing = _flyingOrbController.isAnimating &&
-                      elapsedMs >= pulseStartMs &&
-                      elapsedMs < GameScreen.orbTotalSequenceMs;
-                  final pulseT = isPulsing
-                      ? ((elapsedMs - pulseStartMs) /
-                              GameScreen.backpackPulseDurationMs)
-                          .clamp(0.0, 1.0)
-                      : 0.0;
-                  final scale = isPulsing
-                      ? 1.0 + math.sin(pulseT * math.pi) * 0.24
-                      : 1.0;
-                  final pulseColor =
-                      _lastAbsorbedOrbMove?.elementalPrimaryColor ??
-                          Colors.amber;
-                  final glowStrength =
-                      isPulsing ? math.sin(pulseT * math.pi) : 0.0;
-
-                  return Transform.scale(
-                    scale: scale,
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: RpgBackpackIcon(
-                        key: _backpackKey,
-                        size: 28,
-                        pulseColor: isPulsing ? pulseColor : null,
-                        glowStrength: glowStrength,
-                      ),
-                    ),
-                  );
+        leadingWidth: 80,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: IconButton(
+                key: const ValueKey('game_retreat_button'),
+                padding: EdgeInsets.zero,
+                iconSize: 22,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  maxWidth: 36,
+                  minHeight: 36,
+                  maxHeight: 36,
+                ),
+                tooltip: loc.t('map_return_to_map', fallback: 'Return to Map'),
+                onPressed: () {
+                  controller.audio.playTapVibrate();
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop(false);
+                  }
                 },
+                icon: const Icon(Icons.arrow_back_rounded),
               ),
             ),
-          ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: IconButton(
+                key: const ValueKey('backpack_inventory_button'),
+                padding: EdgeInsets.zero,
+                iconSize: 28,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  maxWidth: 36,
+                  minHeight: 36,
+                  maxHeight: 36,
+                ),
+                tooltip: loc.t(
+                  'inventory_title',
+                  fallback: "Cleric's Backpack",
+                ),
+                onPressed: () => _handleBackpackTap(context, controller),
+                icon: AnimatedBuilder(
+                  animation: _flyingOrbController,
+                  builder: (context, _) {
+                    final elapsedMs = _flyingOrbController.value *
+                        GameScreen.orbTotalSequenceMs;
+                    const pulseStartMs = GameScreen.orbSpawnDelayMs +
+                        GameScreen.orbFlightDurationMs;
+                    final isPulsing = _flyingOrbController.isAnimating &&
+                        elapsedMs >= pulseStartMs &&
+                        elapsedMs < GameScreen.orbTotalSequenceMs;
+                    final pulseT = isPulsing
+                        ? ((elapsedMs - pulseStartMs) /
+                                GameScreen.backpackPulseDurationMs)
+                            .clamp(0.0, 1.0)
+                        : 0.0;
+                    final scale = isPulsing
+                        ? 1.0 + math.sin(pulseT * math.pi) * 0.24
+                        : 1.0;
+                    final pulseColor =
+                        _lastAbsorbedOrbMove?.elementalPrimaryColor ??
+                            Colors.amber;
+                    final glowStrength =
+                        isPulsing ? math.sin(pulseT * math.pi) : 0.0;
+
+                    return Transform.scale(
+                      scale: scale,
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: RpgBackpackIcon(
+                          key: _backpackKey,
+                          size: 28,
+                          pulseColor: isPulsing ? pulseColor : null,
+                          glowStrength: glowStrength,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
         titleSpacing: 4,
         title: (controller.isRewardedAdReady && !controller.isRemoveAdsActive)

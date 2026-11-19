@@ -18,6 +18,7 @@ import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
+import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/adaptive_rewarded_ad_button.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
@@ -497,7 +498,7 @@ void main() {
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: controller,
-            child: const HowPredictableApp(),
+            child: const HowPredictableApp(home: GameScreen()),
           ),
         );
         await tester.pumpAndSettle();

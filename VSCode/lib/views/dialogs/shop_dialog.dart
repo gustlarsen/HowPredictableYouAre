@@ -8,8 +8,13 @@ import 'story_dialog.dart';
 
 class ShopDialog extends StatefulWidget {
   final GameController controller;
+  final bool fromTemple;
 
-  const ShopDialog({super.key, required this.controller});
+  const ShopDialog({
+    super.key,
+    required this.controller,
+    this.fromTemple = false,
+  });
 
   @override
   State<ShopDialog> createState() => _ShopDialogState();
@@ -360,7 +365,9 @@ class _ShopDialogState extends State<ShopDialog> {
               Row(
                 children: [
                   Icon(
-                    Icons.shopping_cart_outlined,
+                    widget.fromTemple
+                        ? Icons.auto_awesome_rounded
+                        : Icons.shopping_cart_outlined,
                     color: palette.amberIcon,
                   ),
                   const SizedBox(width: 8),
@@ -369,7 +376,12 @@ class _ShopDialogState extends State<ShopDialog> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        loc.t('shop_title', fallback: 'Upgrades & Shop'),
+                        widget.fromTemple
+                            ? loc.t(
+                                'sacred_temple_altar_title',
+                                fallback: 'Altar of Offerings',
+                              )
+                            : loc.t('shop_title', fallback: 'Upgrades & Shop'),
                         maxLines: 1,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,

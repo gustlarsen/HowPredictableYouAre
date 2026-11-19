@@ -24,6 +24,7 @@ class GameController extends ChangeNotifier {
       '+50 Elemental Orbs earned!';
   static const int maxHp = 100;
   static const int maxMana = 100;
+  static const int maxCampaignWeeks = 40;
   static const int damagePerLoss = 1;
 
   // Shop Upgrade Elemental Orb Costs
@@ -186,6 +187,7 @@ class GameController extends ChangeNotifier {
   int turnCount = 0;
   int userHp = maxHp;
   int computerHp = maxHp;
+  int currentWeek = 1;
 
   bool darkMode = true;
   bool soundEnabled = true;
@@ -446,6 +448,7 @@ class GameController extends ChangeNotifier {
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
+    currentWeek = storage.currentWeek;
     if (storage.userHpRaw != null) {
       userHp = storage.userHp;
     } else {
@@ -708,6 +711,21 @@ class GameController extends ChangeNotifier {
     _computeNextHints();
     _triggerCloudSave();
     notifyListeners();
+  }
+
+  /// Starts a fresh 100-round battle (100 Mana) from the World Map while
+  /// preserving Elemental Orbs, shop unlocks, and campaign week progress.
+  void startNewBattle() {
+    resetGame();
+  }
+
+  /// Advances the campaign calendar by +1 Week upon completing a 100-round
+  /// battle, persists locally, resets the battle arena for the next encounter,
+  /// and syncs with Cloud Save if signed in.
+  void completeBattleWeek() {
+    currentWeek += 1;
+    storage.setCurrentWeek(currentWeek);
+    resetGame();
   }
 
   /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,

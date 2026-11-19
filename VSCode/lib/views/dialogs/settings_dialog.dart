@@ -466,7 +466,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(loc.t('string55', fallback: 'Language:')),
+                              Expanded(
+                                child: Text(
+                                  loc.t('string55', fallback: 'Language:'),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               DropdownButton<String>(
                                 value: loc.currentLanguage,
                                 isDense: true,

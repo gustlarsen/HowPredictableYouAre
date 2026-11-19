@@ -11,6 +11,7 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
+import 'package:how_predictable/views/screens/game_screen.dart';
 
 class FakeAdMobClient implements AdMobClient {
   bool shouldSucceedInit;
@@ -335,7 +336,7 @@ void main() {
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
             value: controller,
-            child: const HowPredictableApp(),
+            child: const HowPredictableApp(home: GameScreen()),
           ),
         );
         await tester.pump();
@@ -635,8 +636,8 @@ void main() {
         );
         await tester.pump();
 
-        // Open ShopDialog
-        await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+        // Open ShopDialog via Sacred Temple (Altar of Offerings) on WorldMapScreen
+        await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
         await tester.pumpAndSettle();
 
         // Pinned Rewarded Ad card & button are immediately visible without scrolling

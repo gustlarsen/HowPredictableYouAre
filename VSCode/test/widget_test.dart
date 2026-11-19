@@ -29,9 +29,10 @@ import 'package:how_predictable/views/screens/game_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('App smoke test loads GameScreen and displays top-left Backpack icon in AppBar', (WidgetTester tester) async {
+  testWidgets('App smoke test launches onto WorldMapScreen with bottom-left HUD and enters GameScreen via Metal Wizard\'s Lair', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
+      'animationsEnabled': false,
     });
     final storage = StorageService();
     await storage.init();
@@ -51,8 +52,20 @@ void main() {
         child: const HowPredictableApp(),
       ),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('world_map_screen')), findsOneWidget);
+    expect(find.byKey(const ValueKey('world_map_bottom_left_hud')), findsOneWidget);
+    expect(find.byKey(const ValueKey('week_counter_badge')), findsOneWidget);
+    expect(find.text('Week 1 / 40'), findsOneWidget);
+    expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
+
+    // Enter 100-round battle by tapping Metal Wizard's Lair
+    await tester.tap(find.byKey(const ValueKey('landmark_metal_wizard_lair')));
+    await tester.pumpAndSettle();
 
     expect(find.text('How Predictable You Are'), findsNothing);
+    expect(find.byKey(const ValueKey('game_retreat_button')), findsOneWidget);
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(
       find.descendant(
@@ -85,7 +98,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
   });
 
-  testWidgets('100-round alert dialog only offers TRY AGAIN option and resets game', (WidgetTester tester) async {
+  testWidgets('100-round alert dialog offers Return to Map option, advances week, and resets battle', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'userScore': 50,
       'pcScore': 50,
@@ -105,22 +118,28 @@ void main() {
           localization: localization,
           audio: audio,
         ),
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
     await tester.pumpAndSettle();
 
-    expect(find.text('TRY AGAIN'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('battle_return_to_map_button')),
+      findsOneWidget,
+    );
+    expect(find.text('Return to Map'), findsOneWidget);
+    expect(find.text('TRY AGAIN'), findsNothing);
     expect(find.text('CONTINUE'), findsNothing);
 
-    await tester.tap(find.text('TRY AGAIN'));
+    await tester.tap(find.byKey(const ValueKey('battle_return_to_map_button')));
     await tester.pumpAndSettle();
 
     final controller = tester.element(find.byKey(const ValueKey('hand_button_rock'))).read<GameController>();
     expect(controller.totalRounds, 0);
     expect(controller.userScore, 0);
     expect(controller.pcScore, 0);
+    expect(controller.currentWeek, 2);
   });
 
   testWidgets('VersusArena animates 500ms forward, then simultaneous 500ms return and 500ms 360 rotation', (WidgetTester tester) async {
@@ -446,7 +465,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -549,7 +568,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -597,7 +616,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -741,7 +760,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -939,7 +958,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1036,7 +1055,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1219,7 +1238,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1334,7 +1353,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1426,7 +1445,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1529,7 +1548,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: firstController,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1552,7 +1571,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: reopenedController,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -1609,7 +1628,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -1692,7 +1711,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
 
@@ -2103,7 +2122,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
     await tester.pump();
@@ -2418,7 +2437,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -3047,7 +3066,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(),
+        child: const HowPredictableApp(home: GameScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -3189,7 +3208,7 @@ void main() {
       await tester.pumpWidget(
         ChangeNotifierProvider.value(
           value: controller,
-          child: const HowPredictableApp(),
+          child: const HowPredictableApp(home: GameScreen()),
         ),
       );
       await tester.pumpAndSettle();
@@ -3302,7 +3321,7 @@ void main() {
       await tester.pumpWidget(
         ChangeNotifierProvider.value(
           value: controller,
-          child: const HowPredictableApp(),
+          child: const HowPredictableApp(home: GameScreen()),
         ),
       );
       await tester.pump();
@@ -3409,7 +3428,7 @@ void main() {
       await tester.pumpWidget(
         ChangeNotifierProvider.value(
           value: controllerAt99,
-          child: const HowPredictableApp(),
+          child: const HowPredictableApp(home: GameScreen()),
         ),
       );
       await tester.pumpAndSettle();
@@ -3427,7 +3446,11 @@ void main() {
         findsOneWidget,
       );
       // 100-round completion dialog fires with fair decisive win rate (60 / 80 = 75.0%)
-      expect(find.text('TRY AGAIN'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('battle_return_to_map_button')),
+        findsOneWidget,
+      );
+      expect(find.text('Return to Map'), findsOneWidget);
       expect(find.textContaining('75.0%'), findsWidgets);
     },
   );

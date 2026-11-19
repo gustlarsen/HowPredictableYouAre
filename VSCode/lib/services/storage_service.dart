@@ -153,6 +153,16 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
+  // Campaign Week Calendar (starts at Week 1)
+  static const String currentWeekKey = 'current_week';
+  int get currentWeek {
+    final val = _prefs.getInt(currentWeekKey) ?? 1;
+    return val < 1 ? 1 : val;
+  }
+
+  Future<void> setCurrentWeek(int val) =>
+      _prefs.setInt(currentWeekKey, val < 1 ? 1 : val);
+
   // Settings
   bool get darkMode => _prefs.getBool('darkMode') ?? true;
   Future<void> setDarkMode(bool val) => _prefs.setBool('darkMode', val);
@@ -439,6 +449,7 @@ class StorageService {
       setTotal(0),
       setUserHp(100),
       setPcHp(100),
+      setCurrentWeek(1),
       setUnlockedReset(false),
       setUnlockedPredictability(false),
       setUnlockedRandom(false),
