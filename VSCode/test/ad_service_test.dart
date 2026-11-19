@@ -411,8 +411,10 @@ void main() {
           findsNothing,
         );
 
-        // Open ShopDialog -> rewarded ad card is also hidden when Remove Ads is active
-        await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+        // Open ShopDialog via Backpack -> rewarded ad card is also hidden when Remove Ads is active
+        await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
         await tester.pumpAndSettle();
 
         expect(

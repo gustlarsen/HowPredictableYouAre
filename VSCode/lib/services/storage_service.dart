@@ -184,6 +184,13 @@ class StorageService {
   String get language => _prefs.getString('language') ?? 'en';
   Future<void> setLanguage(String val) => _prefs.setString('language', val);
 
+  // Battle Teleport confirmation preference (true = show confirmation dialog)
+  static const String confirmBattleTeleportKey = 'confirm_battle_teleport';
+  bool get confirmBattleTeleport =>
+      _prefs.getBool(confirmBattleTeleportKey) ?? true;
+  Future<void> setConfirmBattleTeleport(bool val) =>
+      _prefs.setBool(confirmBattleTeleportKey, val);
+
   // Unlocks (Purchased in shop)
   bool get unlockedReset => _prefs.getBool('unlockedReset') ?? false;
   Future<void> setUnlockedReset(bool val) =>
@@ -431,6 +438,7 @@ class StorageService {
       setMusicEnabled(true),
       setVibrationEnabled(true),
       setAnimationsEnabled(true),
+      setConfirmBattleTeleport(true),
     ]);
   }
 
@@ -441,6 +449,7 @@ class StorageService {
   Future<void> clearGameplayProgress({bool includeSettings = false}) {
     return Future.wait([
       if (includeSettings) resetSettingsToDefault(),
+      setConfirmBattleTeleport(true),
       setAllOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       clearLegacyDiamonds(),
       setHasClaimedQaBonus(false),

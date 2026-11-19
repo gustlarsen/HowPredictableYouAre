@@ -23,6 +23,7 @@ import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
+import 'package:how_predictable/views/widgets/rpg_teleport_portal_icon.dart';
 import 'package:how_predictable/views/widgets/adaptive_rewarded_ad_button.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 
@@ -621,7 +622,9 @@ void main() {
     );
 
     // Open Shop dialog
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     // Scroll down in Shop list to Crystal Ball
@@ -765,7 +768,9 @@ void main() {
     );
 
     // Open Shop dialog
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     // Attempt to unlock the first item (Predictability Score, cost: 15 Fire + 15 Water + 15 Wood) with only 10 of each
@@ -963,7 +968,9 @@ void main() {
     );
 
     // Open ShopDialog and unlock Reset Button
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     final resetUnlockBtn = find.byKey(
@@ -1003,8 +1010,13 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('settings_story_memories_button')), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('settings_story_memories_button')));
+    final storyMemoriesBtn = find.byKey(
+      const ValueKey('settings_story_memories_button'),
+    );
+    expect(storyMemoriesBtn, findsOneWidget);
+    await tester.ensureVisible(storyMemoriesBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(storyMemoriesBtn);
     await tester.pumpAndSettle();
 
     // Prologue and Reset Button chapters are unlocked (2 / 9), while Predictability Score is still locked
@@ -1244,7 +1256,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open ShopDialog
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     // Verify Predictability Score is at #1 position (above Reset Button and New Hands) and costs 15 Fire + 15 Water + 15 Wood
@@ -1452,7 +1466,9 @@ void main() {
     // 1. At the beginning of the game (no hand chosen yet):
     // Toggling New Hands in ShopDialog does NOT ask to reset the game
     expect(controller.hasGameStarted, isFalse);
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     await tester.drag(find.byType(ListView), const Offset(0, -150));
@@ -1480,7 +1496,9 @@ void main() {
     expect(controller.hasGameStarted, isTrue);
 
     // 2. Open ShopDialog and press New Hands to enable it while game is in progress
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     await tester.drag(find.byType(ListView), const Offset(0, -150));
@@ -1727,7 +1745,9 @@ void main() {
     expect(controller.hasGameStarted, isTrue);
 
     // Open ShopDialog and scroll to New Skin
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     final shopScrollable = find.descendant(
@@ -1779,7 +1799,9 @@ void main() {
     expect(find.byIcon(HandMove.scissors.elementalIcon), findsNothing);
 
     // Reopen ShopDialog and toggle New Skin OFF -> reverts to Elemental Theme without resetting match
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('New Skin'),
@@ -2625,10 +2647,18 @@ void main() {
     final initialIconSize = tester.getSize(backpackIconFinder);
     expect(initialIconSize, equals(const Size(28.0, 28.0)));
 
+    final teleportFinder = find.byKey(const ValueKey('teleport_portal_button'));
+    final teleportIconFinder = find.byType(RpgTeleportPortalIcon);
+    expect(teleportFinder, findsOneWidget);
+    expect(teleportIconFinder, findsOneWidget);
+    expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(28.0, 28.0)));
+    expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
+
     // Gift Box starts locked and hidden from the AppBar
     expect(find.text('🎁'), findsNothing);
 
-    // Activate ALL top bar icons: Rewarded Ad, Gift, Reset, Cart, Settings
+    // Activate ALL top bar icons: Rewarded Ad, Gift, Reset, Teleport, Settings
     controller.showReset = true;
     controller.unlockedReset = true;
     controller.giftBoxUnlocked = true;
@@ -2637,15 +2667,17 @@ void main() {
     controller.notifyListeners();
     await tester.pumpAndSettle();
 
-    // Verify all 5 action buttons / items are active
+    // Verify all action buttons / items are active and Shopping Cart is absent
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
     expect(find.text('🎁'), findsOneWidget);
     expect(find.byIcon(Icons.restart_alt), findsOneWidget);
-    expect(find.byIcon(Icons.shopping_cart_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
+    expect(teleportFinder, findsOneWidget);
+    expect(teleportIconFinder, findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
 
-    // The Backpack button maintains strict fixed size outside any Flexible wrapper
+    // Both Backpack and Teleport Portal buttons maintain strict fixed size outside any Flexible wrapper
     final crowdedSize = tester.getSize(backpackFinder);
     expect(crowdedSize, equals(const Size(36.0, 36.0)));
     expect(crowdedSize, equals(initialSize));
@@ -2653,6 +2685,9 @@ void main() {
     final crowdedIconSize = tester.getSize(backpackIconFinder);
     expect(crowdedIconSize, equals(const Size(28.0, 28.0)));
     expect(crowdedIconSize, equals(initialIconSize));
+
+    expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(28.0, 28.0)));
   });
 
   testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {
@@ -3078,7 +3113,9 @@ void main() {
     expect(find.text('🎁'), findsNothing);
 
     // 2. Open Shop and scroll to Gift Box
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -3144,7 +3181,9 @@ void main() {
     expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
 
     // 6. Toggle Gift Box OFF in Shop -> stops background timer cleanly
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined));
+    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Gift Box'),

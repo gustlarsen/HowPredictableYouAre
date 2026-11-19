@@ -239,6 +239,7 @@ class CloudSaveData {
   final bool musicEnabled;
   final bool vibrationEnabled;
   final bool animationsEnabled;
+  final bool confirmBattleTeleport;
 
   final int updatedAtMillis;
 
@@ -301,6 +302,7 @@ class CloudSaveData {
     this.musicEnabled = true,
     this.vibrationEnabled = true,
     this.animationsEnabled = true,
+    this.confirmBattleTeleport = true,
     this.updatedAtMillis = 0,
   }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
@@ -455,6 +457,7 @@ class CloudSaveData {
       musicEnabled: musicEnabled,
       vibrationEnabled: vibrationEnabled,
       animationsEnabled: animationsEnabled,
+      confirmBattleTeleport: confirmBattleTeleport,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -519,6 +522,7 @@ class CloudSaveData {
       musicEnabled: storage.musicEnabled,
       vibrationEnabled: storage.vibrationEnabled,
       animationsEnabled: storage.animationsEnabled,
+      confirmBattleTeleport: storage.confirmBattleTeleport,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -546,6 +550,7 @@ class CloudSaveData {
     await storage.setMusicEnabled(musicEnabled);
     await storage.setVibrationEnabled(vibrationEnabled);
     await storage.setAnimationsEnabled(animationsEnabled);
+    await storage.setConfirmBattleTeleport(confirmBattleTeleport);
 
     await storage.setUnlockedReset(unlockedReset);
     await storage.setUnlockedPredictability(unlockedPredictability);
@@ -677,6 +682,7 @@ class CloudSaveData {
       'musicEnabled': musicEnabled,
       'vibrationEnabled': vibrationEnabled,
       'animationsEnabled': animationsEnabled,
+      'confirmBattleTeleport': confirmBattleTeleport,
       'updatedAtMillis': updatedAtMillis,
     };
   }
@@ -799,6 +805,7 @@ class CloudSaveData {
       musicEnabled: map['musicEnabled'] as bool? ?? true,
       vibrationEnabled: map['vibrationEnabled'] as bool? ?? true,
       animationsEnabled: map['animationsEnabled'] as bool? ?? true,
+      confirmBattleTeleport: map['confirmBattleTeleport'] as bool? ?? true,
       updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ?? 0,
     );
   }

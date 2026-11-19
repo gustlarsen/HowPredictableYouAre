@@ -560,6 +560,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           value: controller.animationsEnabled,
                           onChanged: controller.toggleAnimations,
                         ),
+                        const SizedBox(height: 10),
+
+                        // Confirm Battle Teleport toggle
+                        SwitchListTile(
+                          key: const ValueKey('settings_confirm_teleport_tile'),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            loc.t(
+                              'settings_confirm_teleport',
+                              fallback: 'Confirm Battle Teleport',
+                            ),
+                          ),
+                          value: controller.confirmBattleTeleport,
+                          onChanged: controller.setConfirmBattleTeleport,
+                        ),
 
                         Divider(
                           height: 16,

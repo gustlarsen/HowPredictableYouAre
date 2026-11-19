@@ -16,9 +16,10 @@ import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
 import '../widgets/rpg_backpack_icon.dart';
+import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
 import '../dialogs/inventory_dialog.dart';
-import '../dialogs/shop_dialog.dart';
+import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
 
@@ -157,6 +158,24 @@ class _GameScreenState extends State<GameScreen>
       ).whenComplete(() {
         _isInventoryDialogOpen = false;
       });
+    }
+  }
+
+  Future<void> _handleTeleportTap(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    controller.audio.playTapVibrate();
+    if (controller.confirmBattleTeleport) {
+      final confirmed = await TeleportConfirmDialog.show(
+        context,
+        controller: controller,
+      );
+      if (!confirmed || !context.mounted) return;
+    }
+    controller.teleportToWorldMap();
+    if (context.mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -647,15 +666,30 @@ class _GameScreenState extends State<GameScreen>
               tooltip: loc.t('string53', fallback: 'RESET'),
               onPressed: () => _confirmReset(context, controller, loc),
             ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            tooltip: 'Shop',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => ShopDialog(controller: controller),
-              );
-            },
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton(
+              key: const ValueKey('teleport_portal_button'),
+              padding: EdgeInsets.zero,
+              iconSize: 28,
+              constraints: const BoxConstraints(
+                minWidth: 36,
+                maxWidth: 36,
+                minHeight: 36,
+                maxHeight: 36,
+              ),
+              tooltip: loc.t(
+                'teleport_tooltip',
+                fallback: 'Teleport to World Map (+1 Week)',
+              ),
+              onPressed: () => _handleTeleportTap(context, controller),
+              icon: const SizedBox(
+                width: 28,
+                height: 28,
+                child: RpgTeleportPortalIcon(size: 28),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),

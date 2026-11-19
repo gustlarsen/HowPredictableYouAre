@@ -194,6 +194,9 @@ class GameController extends ChangeNotifier {
   bool musicEnabled = true;
   bool vibrationEnabled = true;
   bool animationsEnabled = true;
+  bool confirmBattleTeleport = true;
+
+  bool get skipTeleportConfirm => !confirmBattleTeleport;
 
   // Unlocks
   bool unlockedReset = false;
@@ -469,6 +472,7 @@ class GameController extends ChangeNotifier {
     musicEnabled = storage.musicEnabled;
     vibrationEnabled = storage.vibrationEnabled;
     animationsEnabled = storage.animationsEnabled;
+    confirmBattleTeleport = storage.confirmBattleTeleport;
     localization.setLanguage(storage.language);
 
     unlockedReset = storage.unlockedReset;
@@ -726,6 +730,13 @@ class GameController extends ChangeNotifier {
     currentWeek += 1;
     storage.setCurrentWeek(currentWeek);
     resetGame();
+  }
+
+  /// Teleports the cleric back to the World Map, preserving all collected
+  /// Elemental Orbs, resetting the active battle (100 Mana / 100 HP / 0 rounds),
+  /// advancing +1 Week via [completeBattleWeek], and syncing local/cloud saves.
+  void teleportToWorldMap() {
+    completeBattleWeek();
   }
 
   /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,
@@ -1519,6 +1530,13 @@ class GameController extends ChangeNotifier {
   void toggleAnimations(bool val) {
     animationsEnabled = val;
     storage.setAnimationsEnabled(val);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  void setConfirmBattleTeleport(bool val) {
+    confirmBattleTeleport = val;
+    storage.setConfirmBattleTeleport(val);
     _triggerCloudSave();
     notifyListeners();
   }
