@@ -496,6 +496,216 @@ class StorageService {
     return _prefs.remove('markov_matrix_$size');
   }
 
+  // Royal Treasury Piggy Bank Orbs (capped at 50 per element)
+  static const String _treasuryFireKey = 'treasury_orbs_fire';
+  static const String _treasuryWaterKey = 'treasury_orbs_water';
+  static const String _treasuryWoodKey = 'treasury_orbs_wood';
+  static const String _treasuryEarthKey = 'treasury_orbs_earth';
+  static const String _treasuryMetalKey = 'treasury_orbs_metal';
+
+  int get treasuryFireOrbs => _prefs.getInt(_treasuryFireKey) ?? 0;
+  Future<void> setTreasuryFireOrbs(int val) =>
+      _prefs.setInt(_treasuryFireKey, val);
+
+  int get treasuryWaterOrbs => _prefs.getInt(_treasuryWaterKey) ?? 0;
+  Future<void> setTreasuryWaterOrbs(int val) =>
+      _prefs.setInt(_treasuryWaterKey, val);
+
+  int get treasuryWoodOrbs => _prefs.getInt(_treasuryWoodKey) ?? 0;
+  Future<void> setTreasuryWoodOrbs(int val) =>
+      _prefs.setInt(_treasuryWoodKey, val);
+
+  int get treasuryEarthOrbs => _prefs.getInt(_treasuryEarthKey) ?? 0;
+  Future<void> setTreasuryEarthOrbs(int val) =>
+      _prefs.setInt(_treasuryEarthKey, val);
+
+  int get treasuryMetalOrbs => _prefs.getInt(_treasuryMetalKey) ?? 0;
+  Future<void> setTreasuryMetalOrbs(int val) =>
+      _prefs.setInt(_treasuryMetalKey, val);
+
+  Future<void> setAllTreasuryOrbs({
+    required int fire,
+    required int water,
+    required int wood,
+    required int earth,
+    required int metal,
+  }) {
+    return Future.wait([
+      setTreasuryFireOrbs(fire),
+      setTreasuryWaterOrbs(water),
+      setTreasuryWoodOrbs(wood),
+      setTreasuryEarthOrbs(earth),
+      setTreasuryMetalOrbs(metal),
+    ]);
+  }
+
+  // Spoils of War Orbs (orbs lost on Turn 0 Reset or Campaign Defeat)
+  static const String _spoilsFireKey = 'spoils_orbs_fire';
+  static const String _spoilsWaterKey = 'spoils_orbs_water';
+  static const String _spoilsWoodKey = 'spoils_orbs_wood';
+  static const String _spoilsEarthKey = 'spoils_orbs_earth';
+  static const String _spoilsMetalKey = 'spoils_orbs_metal';
+
+  int get spoilsFireOrbs => _prefs.getInt(_spoilsFireKey) ?? 0;
+  Future<void> setSpoilsFireOrbs(int val) => _prefs.setInt(_spoilsFireKey, val);
+
+  int get spoilsWaterOrbs => _prefs.getInt(_spoilsWaterKey) ?? 0;
+  Future<void> setSpoilsWaterOrbs(int val) =>
+      _prefs.setInt(_spoilsWaterKey, val);
+
+  int get spoilsWoodOrbs => _prefs.getInt(_spoilsWoodKey) ?? 0;
+  Future<void> setSpoilsWoodOrbs(int val) => _prefs.setInt(_spoilsWoodKey, val);
+
+  int get spoilsEarthOrbs => _prefs.getInt(_spoilsEarthKey) ?? 0;
+  Future<void> setSpoilsEarthOrbs(int val) =>
+      _prefs.setInt(_spoilsEarthKey, val);
+
+  int get spoilsMetalOrbs => _prefs.getInt(_spoilsMetalKey) ?? 0;
+  Future<void> setSpoilsMetalOrbs(int val) =>
+      _prefs.setInt(_spoilsMetalKey, val);
+
+  Future<void> setAllSpoilsOrbs({
+    required int fire,
+    required int water,
+    required int wood,
+    required int earth,
+    required int metal,
+  }) {
+    return Future.wait([
+      setSpoilsFireOrbs(fire),
+      setSpoilsWaterOrbs(water),
+      setSpoilsWoodOrbs(wood),
+      setSpoilsEarthOrbs(earth),
+      setSpoilsMetalOrbs(metal),
+    ]);
+  }
+
+  // Relic Chamber Stored Upgrades (snapshot of lost run's orb-bought upgrades)
+  static const String _relicChamberUpgradesKey = 'relic_chamber_upgrades';
+
+  List<String> get relicChamberUpgrades {
+    final list = _prefs.getStringList(_relicChamberUpgradesKey);
+    if (list == null) return const [];
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> setRelicChamberUpgrades(List<String> upgrades) {
+    final cleaned =
+        upgrades
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return _prefs.setStringList(_relicChamberUpgradesKey, cleaned);
+  }
+
+  // Royal Library: Narrative Endings & Markov Bestiary
+  static const String _unlockedEndingsKey = 'unlocked_endings';
+  static const String _encounteredBestiaryKey = 'encountered_bestiary';
+
+  List<String> get unlockedEndings {
+    final list = _prefs.getStringList(_unlockedEndingsKey);
+    if (list == null) return const [];
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> setUnlockedEndings(List<String> endings) {
+    final cleaned =
+        endings
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return _prefs.setStringList(_unlockedEndingsKey, cleaned);
+  }
+
+  List<String> get encounteredBestiary {
+    final list = _prefs.getStringList(_encounteredBestiaryKey);
+    if (list == null) return const [];
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> setEncounteredBestiary(List<String> creatures) {
+    final cleaned =
+        creatures
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return _prefs.setStringList(_encounteredBestiaryKey, cleaned);
+  }
+
+  // Royal Decrees State
+  static const String _activeDecreeIdsKey = 'royal_decrees_active_ids';
+  static const String _completedCycleDecreeIdsKey =
+      'royal_decrees_completed_cycle_ids';
+  static const String _totalDecreesCompletedKey =
+      'royal_decrees_total_completed';
+  static const String _decreeNoRepeatWinsKey = 'decree_no_repeat_win_count';
+  static const String _decreeWinStreakKey = 'decree_win_streak';
+  static const String _decreeDefeatedElementsKey = 'decree_defeated_elements';
+
+  List<String>? get activeDecreeIds {
+    final list = _prefs.getStringList(_activeDecreeIdsKey);
+    if (list == null || list.isEmpty) return null;
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> setActiveDecreeIds(List<String> ids) =>
+      _prefs.setStringList(_activeDecreeIdsKey, ids);
+
+  List<String> get completedCycleDecreeIds {
+    final list = _prefs.getStringList(_completedCycleDecreeIdsKey);
+    if (list == null) return const [];
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> setCompletedCycleDecreeIds(List<String> ids) =>
+      _prefs.setStringList(_completedCycleDecreeIdsKey, ids.toSet().toList());
+
+  int get totalDecreesCompleted =>
+      _prefs.getInt(_totalDecreesCompletedKey) ?? 0;
+  Future<void> setTotalDecreesCompleted(int val) =>
+      _prefs.setInt(_totalDecreesCompletedKey, val);
+
+  int get decreeNoRepeatWinCount => _prefs.getInt(_decreeNoRepeatWinsKey) ?? 0;
+  Future<void> setDecreeNoRepeatWinCount(int val) =>
+      _prefs.setInt(_decreeNoRepeatWinsKey, val);
+
+  int get decreeWinStreak => _prefs.getInt(_decreeWinStreakKey) ?? 0;
+  Future<void> setDecreeWinStreak(int val) =>
+      _prefs.setInt(_decreeWinStreakKey, val);
+
+  List<String> get decreeDefeatedElements =>
+      _prefs.getStringList(_decreeDefeatedElementsKey) ?? const [];
+  Future<void> setDecreeDefeatedElements(List<String> elements) =>
+      _prefs.setStringList(_decreeDefeatedElementsKey, elements.toSet().toList());
+
+  Future<void> clearBattleDecreeProgress() {
+    return Future.wait([
+      setDecreeNoRepeatWinCount(0),
+      setDecreeWinStreak(0),
+      setDecreeDefeatedElements(const []),
+      setCompletedCycleDecreeIds(const []),
+    ]);
+  }
+
+  Future<void> clearAllCastleData() {
+    return Future.wait([
+      setAllTreasuryOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
+      setAllSpoilsOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
+      setRelicChamberUpgrades(const []),
+      setUnlockedEndings(const []),
+      setEncounteredBestiary(const []),
+      _prefs.remove(_activeDecreeIdsKey),
+      setTotalDecreesCompleted(0),
+      clearBattleDecreeProgress(),
+    ]);
+  }
+
   Future<void> clearGameStats() {
     return Future.wait([
       setUserScore(0),
@@ -528,9 +738,16 @@ class StorageService {
   /// active toggles, story chapter flags, last moves, and Markov matrices).
   /// When [includeSettings] is true (e.g., on multi-account switch), also resets
   /// UI settings back to defaults so settings are isolated per account.
-  Future<void> clearGameplayProgress({bool includeSettings = false}) {
+  /// When [includeCastleMeta] is true (e.g., full progress reset or account switch),
+  /// also clears Castle Treasury, Relic Chamber, Spoils of War, Endings, Bestiary,
+  /// and Royal Decrees.
+  Future<void> clearGameplayProgress({
+    bool includeSettings = false,
+    bool includeCastleMeta = false,
+  }) {
     return Future.wait([
       if (includeSettings) resetSettingsToDefault(),
+      if (includeCastleMeta) clearAllCastleData(),
       setConfirmBattleTeleport(true),
       setAllOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       clearTurn0Orbs(),

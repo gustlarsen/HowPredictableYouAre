@@ -546,11 +546,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(ObservatoryDialog), findsNothing);
 
-        // 2. Royal Castle -> King's Throne Room Dialog with Week 1, 10, 40 milestones
+        // 2. Royal Castle -> 5-Wing RoyalCastleDialog with King's Throne Room & Week 1, 10, 40 milestones
         await tester.tap(find.byKey(const ValueKey('landmark_royal_castle')));
         await tester.pumpAndSettle();
 
-        expect(find.byType(ThroneRoomDialog), findsOneWidget);
+        expect(find.byType(RoyalCastleDialog), findsOneWidget);
         expect(find.text("King's Throne Room"), findsOneWidget);
         expect(find.text('Week 10 / 40'), findsWidgets);
         expect(
@@ -561,9 +561,9 @@ void main() {
         expect(find.text("Week 10 — Archmage's Warning"), findsOneWidget);
         expect(find.text('Week 40 — The Final Deadline'), findsOneWidget);
 
-        await tester.tap(find.byKey(const ValueKey('throne_room_close_button')));
+        await tester.tap(find.byKey(const ValueKey('royal_castle_close_button')));
         await tester.pumpAndSettle();
-        expect(find.byType(ThroneRoomDialog), findsNothing);
+        expect(find.byType(RoyalCastleDialog), findsNothing);
 
         // 3. Sacred Temple -> Altar of Offerings (ShopDialog + Rewarded Ad prayer +50 Orbs)
         await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));

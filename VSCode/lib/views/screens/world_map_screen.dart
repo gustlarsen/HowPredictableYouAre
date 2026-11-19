@@ -12,7 +12,7 @@ import '../dialogs/observatory_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/story_dialog.dart';
-import '../dialogs/throne_room_dialog.dart';
+import '../dialogs/royal_castle_dialog.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import 'game_screen.dart';
 
@@ -243,7 +243,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     controller.audio.playTapVibrate();
     showDialog(
       context: context,
-      builder: (_) => ThroneRoomDialog(controller: controller),
+      builder: (_) => RoyalCastleDialog(controller: controller),
     );
   }
 
@@ -370,6 +370,8 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             accentColor: Colors.amber,
                             phaseOffset: 0.50,
                             animationsEnabled: controller.animationsEnabled,
+                            showNotificationBadge:
+                                controller.hasRoyalCastleNotification,
                             onTap: () => _openThroneRoom(context, controller),
                           ),
 
@@ -448,6 +450,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     required Color accentColor,
     required double phaseOffset,
     required bool animationsEnabled,
+    bool showNotificationBadge = false,
     required VoidCallback onTap,
   }) {
     const double hitboxWidth = 148.0;
@@ -469,6 +472,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         pulseAnimation: _pulseController,
         phaseOffset: phaseOffset,
         animationsEnabled: animationsEnabled,
+        showNotificationBadge: showNotificationBadge,
         onTap: onTap,
       ),
     );
@@ -641,6 +645,7 @@ class _LandmarkPinBadge extends StatelessWidget {
   final Animation<double> pulseAnimation;
   final double phaseOffset;
   final bool animationsEnabled;
+  final bool showNotificationBadge;
   final VoidCallback onTap;
 
   const _LandmarkPinBadge({
@@ -652,6 +657,7 @@ class _LandmarkPinBadge extends StatelessWidget {
     required this.pulseAnimation,
     required this.phaseOffset,
     required this.animationsEnabled,
+    this.showNotificationBadge = false,
     required this.onTap,
   });
 
@@ -682,29 +688,72 @@ class _LandmarkPinBadge extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Pulsing RPG Emblem Marker
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF14161D).withValues(alpha: 0.88),
-                      border: Border.all(
-                        color: accentColor,
-                        width: 1.8,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accentColor.withValues(alpha: glowAlpha),
-                          blurRadius: 10 + wave * 6,
-                          spreadRadius: 1.5,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF14161D).withValues(alpha: 0.88),
+                          border: Border.all(
+                            color: accentColor,
+                            width: 1.8,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: glowAlpha),
+                              blurRadius: 10 + wave * 6,
+                              spreadRadius: 1.5,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 20,
-                      color: accentColor,
-                    ),
+                        child: Icon(
+                          icon,
+                          size: 20,
+                          color: accentColor,
+                        ),
+                      ),
+                      if (showNotificationBadge)
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            key: const ValueKey('royal_castle_notification_badge'),
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFFFD54F),
+                              border: Border.all(
+                                color: const Color(0xFF14161D),
+                                width: 1.4,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.amber.withValues(
+                                    alpha: 0.45 + wave * 0.45,
+                                  ),
+                                  blurRadius: 6 + wave * 4,
+                                  spreadRadius: 1.0,
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '!',
+                                style: TextStyle(
+                                  color: Color(0xFF231F1A),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 10.5,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
 

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
+import '../models/royal_castle.dart';
 import '../models/story_chapter.dart';
 import '../services/markov_engine.dart';
 import '../services/storage_service.dart';
@@ -26,6 +27,8 @@ class GameController extends ChangeNotifier {
   static const int maxMana = 100;
   static const int maxCampaignWeeks = 40;
   static const int damagePerLoss = 1;
+  static const int maxTreasuryPerElement = 50;
+  static const int maxTreasuryTotal = 250;
 
   // Shop Upgrade Elemental Orb Costs
   static const ElementalCost costPredictability = ElementalCost(
@@ -306,6 +309,31 @@ class GameController extends ChangeNotifier {
   bool hasSeenStorySuggestion = false;
   bool hasSeenStoryCrystalBall = false;
   StoryChapter? pendingStoryChapter;
+
+  // Royal Castle Hub State
+  int treasuryFireOrbs = 0;
+  int treasuryWaterOrbs = 0;
+  int treasuryWoodOrbs = 0;
+  int treasuryEarthOrbs = 0;
+  int treasuryMetalOrbs = 0;
+
+  int spoilsFireOrbs = 0;
+  int spoilsWaterOrbs = 0;
+  int spoilsWoodOrbs = 0;
+  int spoilsEarthOrbs = 0;
+  int spoilsMetalOrbs = 0;
+
+  List<String> relicChamberStoredUpgrades = [];
+  Set<String> unlockedEndings = {};
+  Set<String> encounteredBestiary = {};
+
+  List<String> activeDecreeIds =
+      List<String>.from(RoyalDecreeType.defaultActiveIds);
+  Set<String> completedCycleDecreeIds = {};
+  int totalDecreesCompleted = 0;
+  int decreeNoRepeatWinCount = 0;
+  int decreeWinStreak = 0;
+  Set<String> decreeDefeatedElements = {};
 
   GameController({
     required this.storage,
@@ -670,6 +698,32 @@ class GameController extends ChangeNotifier {
     lastUserMove = currentUserMove;
 
     _computeNextHints();
+
+    treasuryFireOrbs = storage.treasuryFireOrbs;
+    treasuryWaterOrbs = storage.treasuryWaterOrbs;
+    treasuryWoodOrbs = storage.treasuryWoodOrbs;
+    treasuryEarthOrbs = storage.treasuryEarthOrbs;
+    treasuryMetalOrbs = storage.treasuryMetalOrbs;
+
+    spoilsFireOrbs = storage.spoilsFireOrbs;
+    spoilsWaterOrbs = storage.spoilsWaterOrbs;
+    spoilsWoodOrbs = storage.spoilsWoodOrbs;
+    spoilsEarthOrbs = storage.spoilsEarthOrbs;
+    spoilsMetalOrbs = storage.spoilsMetalOrbs;
+
+    relicChamberStoredUpgrades = List<String>.from(storage.relicChamberUpgrades);
+    unlockedEndings = Set<String>.from(storage.unlockedEndings);
+    encounteredBestiary = Set<String>.from(storage.encounteredBestiary);
+
+    final storedDecrees = storage.activeDecreeIds;
+    activeDecreeIds = (storedDecrees != null && storedDecrees.length == 3)
+        ? List<String>.from(storedDecrees)
+        : List<String>.from(RoyalDecreeType.defaultActiveIds);
+    completedCycleDecreeIds = Set<String>.from(storage.completedCycleDecreeIds);
+    totalDecreesCompleted = storage.totalDecreesCompleted;
+    decreeNoRepeatWinCount = storage.decreeNoRepeatWinCount;
+    decreeWinStreak = storage.decreeWinStreak;
+    decreeDefeatedElements = Set<String>.from(storage.decreeDefeatedElements);
   }
 
   MarkovEngine get engine => _engine;
@@ -700,6 +754,665 @@ class GameController extends ChangeNotifier {
     return EvaluationTier.fromPercent(pcPredictPercent, totalRounds);
   }
 
+  // --- Royal Castle Hub Getters & Helpers ---
+
+  int treasuryOrbsFor(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return treasuryFireOrbs;
+      case HandMove.paper:
+        return treasuryWaterOrbs;
+      case HandMove.scissors:
+        return treasuryWoodOrbs;
+      case HandMove.lizard:
+        return treasuryEarthOrbs;
+      case HandMove.spock:
+        return treasuryMetalOrbs;
+    }
+  }
+
+  int get totalTreasuryOrbs =>
+      treasuryFireOrbs +
+      treasuryWaterOrbs +
+      treasuryWoodOrbs +
+      treasuryEarthOrbs +
+      treasuryMetalOrbs;
+
+  bool get isAnyTreasuryElementFull =>
+      treasuryFireOrbs >= maxTreasuryPerElement ||
+      treasuryWaterOrbs >= maxTreasuryPerElement ||
+      treasuryWoodOrbs >= maxTreasuryPerElement ||
+      treasuryEarthOrbs >= maxTreasuryPerElement ||
+      treasuryMetalOrbs >= maxTreasuryPerElement;
+
+  bool get isTreasuryCompletelyFull =>
+      treasuryFireOrbs >= maxTreasuryPerElement &&
+      treasuryWaterOrbs >= maxTreasuryPerElement &&
+      treasuryWoodOrbs >= maxTreasuryPerElement &&
+      treasuryEarthOrbs >= maxTreasuryPerElement &&
+      treasuryMetalOrbs >= maxTreasuryPerElement;
+
+  int spoilsOrbsFor(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return spoilsFireOrbs;
+      case HandMove.paper:
+        return spoilsWaterOrbs;
+      case HandMove.scissors:
+        return spoilsWoodOrbs;
+      case HandMove.lizard:
+        return spoilsEarthOrbs;
+      case HandMove.spock:
+        return spoilsMetalOrbs;
+    }
+  }
+
+  int get totalSpoilsOfWarOrbs =>
+      spoilsFireOrbs +
+      spoilsWaterOrbs +
+      spoilsWoodOrbs +
+      spoilsEarthOrbs +
+      spoilsMetalOrbs;
+
+  bool get hasSpoilsOfWarOrbs => totalSpoilsOfWarOrbs > 0;
+
+  Map<HandMove, int> get spoilsOfWarOrbs => {
+    HandMove.rock: spoilsFireOrbs,
+    HandMove.paper: spoilsWaterOrbs,
+    HandMove.scissors: spoilsWoodOrbs,
+    HandMove.lizard: spoilsEarthOrbs,
+    HandMove.spock: spoilsMetalOrbs,
+  };
+
+  bool isUpgradeArtifactUnlocked(ShopUpgradeArtifact artifact) {
+    switch (artifact) {
+      case ShopUpgradeArtifact.predictability:
+        return unlockedPredictability;
+      case ShopUpgradeArtifact.reset:
+        return unlockedReset;
+      case ShopUpgradeArtifact.newHands:
+        return unlockedNewHands;
+      case ShopUpgradeArtifact.random:
+        return unlockedRandom;
+      case ShopUpgradeArtifact.algorithm:
+        return unlockedAlgorithm;
+      case ShopUpgradeArtifact.yourPrediction:
+        return unlockedYourPrediction;
+      case ShopUpgradeArtifact.nextMove:
+        return unlockedNextMove;
+      case ShopUpgradeArtifact.giftBox:
+        return giftBoxUnlocked;
+      case ShopUpgradeArtifact.suggestion:
+        return unlockedSuggestion;
+      case ShopUpgradeArtifact.newSkin:
+        return unlockedNewSkin;
+      case ShopUpgradeArtifact.removeAds:
+        return unlockedAds;
+      case ShopUpgradeArtifact.crystalBall:
+        return unlockedCrystalBall;
+      case ShopUpgradeArtifact.crystalBallPlus:
+        return unlockedCrystalBallPlus;
+    }
+  }
+
+  String? _productIdForArtifact(ShopUpgradeArtifact artifact) {
+    switch (artifact) {
+      case ShopUpgradeArtifact.predictability:
+        return BillingService.productPredictabilityScore;
+      case ShopUpgradeArtifact.reset:
+        return BillingService.productResetButton;
+      case ShopUpgradeArtifact.newHands:
+        return BillingService.productNewHands;
+      case ShopUpgradeArtifact.random:
+        return BillingService.productRandomButton;
+      case ShopUpgradeArtifact.algorithm:
+        return BillingService.productShowAlgorithm;
+      case ShopUpgradeArtifact.yourPrediction:
+        return BillingService.productYourPrediction;
+      case ShopUpgradeArtifact.nextMove:
+        return BillingService.productPcNextMove;
+      case ShopUpgradeArtifact.suggestion:
+        return BillingService.productSuggestion;
+      case ShopUpgradeArtifact.removeAds:
+        return BillingService.productRemoveAds;
+      case ShopUpgradeArtifact.crystalBall:
+        return BillingService.productCrystalBall;
+      case ShopUpgradeArtifact.giftBox:
+      case ShopUpgradeArtifact.newSkin:
+      case ShopUpgradeArtifact.crystalBallPlus:
+        return null;
+    }
+  }
+
+  List<ShopUpgradeArtifact> get availableRelicChamberArtifacts {
+    final result = <ShopUpgradeArtifact>[];
+    for (final id in relicChamberStoredUpgrades) {
+      final artifact = ShopUpgradeArtifact.fromId(id);
+      if (artifact != null && !isUpgradeArtifactUnlocked(artifact)) {
+        result.add(artifact);
+      }
+    }
+    return result;
+  }
+
+  bool get hasAvailableRelicChamberUpgrades =>
+      availableRelicChamberArtifacts.isNotEmpty;
+
+  bool get hasRoyalCastleNotification =>
+      isAnyTreasuryElementFull ||
+      hasAvailableRelicChamberUpgrades ||
+      hasSpoilsOfWarOrbs;
+
+  bool isEndingUnlocked(NarrativeEnding ending) =>
+      unlockedEndings.contains(ending.id);
+
+  int get unlockedEndingsCount => NarrativeEnding.values
+      .where((e) => unlockedEndings.contains(e.id))
+      .length;
+
+  bool isBestiaryEncountered(BestiaryCreature creature) =>
+      encounteredBestiary.contains(creature.id);
+
+  List<RoyalDecreeType> get activeRoyalDecrees {
+    final list = <RoyalDecreeType>[];
+    for (final id in activeDecreeIds) {
+      final decree = RoyalDecreeType.fromId(id);
+      if (decree != null) list.add(decree);
+    }
+    if (list.isEmpty) {
+      return const [
+        RoyalDecreeType.noRepeatWin10,
+        RoyalDecreeType.defeat15,
+        RoyalDecreeType.predictAbove70,
+      ];
+    }
+    return list;
+  }
+
+  bool isDecreeCompletedInCycle(RoyalDecreeType decree) =>
+      completedCycleDecreeIds.contains(decree.id);
+
+  int decreeProgressFor(RoyalDecreeType decree) {
+    if (isDecreeCompletedInCycle(decree)) return decree.target;
+    switch (decree) {
+      case RoyalDecreeType.noRepeatWin10:
+        return decreeNoRepeatWinCount.clamp(0, decree.target);
+      case RoyalDecreeType.defeat15:
+        return userScore.clamp(0, decree.target);
+      case RoyalDecreeType.predictAbove70:
+        return totalRounds.clamp(0, decree.target);
+      case RoyalDecreeType.winStreak5:
+        return decreeWinStreak.clamp(0, decree.target);
+      case RoyalDecreeType.endurance50:
+        return totalRounds.clamp(0, decree.target);
+      case RoyalDecreeType.diverseWins3:
+        return decreeDefeatedElements.length.clamp(0, decree.target);
+    }
+  }
+
+  void _persistTreasuryOrbsToStorage() {
+    storage.setAllTreasuryOrbs(
+      fire: treasuryFireOrbs,
+      water: treasuryWaterOrbs,
+      wood: treasuryWoodOrbs,
+      earth: treasuryEarthOrbs,
+      metal: treasuryMetalOrbs,
+    );
+  }
+
+  void _persistSpoilsOrbsToStorage() {
+    storage.setAllSpoilsOrbs(
+      fire: spoilsFireOrbs,
+      water: spoilsWaterOrbs,
+      wood: spoilsWoodOrbs,
+      earth: spoilsEarthOrbs,
+      metal: spoilsMetalOrbs,
+    );
+  }
+
+  void _depositTreasuryOrbForMove(HandMove move, int delta) {
+    if (delta <= 0) return;
+    switch (move) {
+      case HandMove.rock:
+        treasuryFireOrbs = math.min(
+          maxTreasuryPerElement,
+          treasuryFireOrbs + delta,
+        );
+        storage.setTreasuryFireOrbs(treasuryFireOrbs);
+        break;
+      case HandMove.paper:
+        treasuryWaterOrbs = math.min(
+          maxTreasuryPerElement,
+          treasuryWaterOrbs + delta,
+        );
+        storage.setTreasuryWaterOrbs(treasuryWaterOrbs);
+        break;
+      case HandMove.scissors:
+        treasuryWoodOrbs = math.min(
+          maxTreasuryPerElement,
+          treasuryWoodOrbs + delta,
+        );
+        storage.setTreasuryWoodOrbs(treasuryWoodOrbs);
+        break;
+      case HandMove.lizard:
+        treasuryEarthOrbs = math.min(
+          maxTreasuryPerElement,
+          treasuryEarthOrbs + delta,
+        );
+        storage.setTreasuryEarthOrbs(treasuryEarthOrbs);
+        break;
+      case HandMove.spock:
+        treasuryMetalOrbs = math.min(
+          maxTreasuryPerElement,
+          treasuryMetalOrbs + delta,
+        );
+        storage.setTreasuryMetalOrbs(treasuryMetalOrbs);
+        break;
+    }
+  }
+
+  void _depositTreasuryAllElements(int amountPerElement) {
+    if (amountPerElement <= 0) return;
+    treasuryFireOrbs = math.min(
+      maxTreasuryPerElement,
+      treasuryFireOrbs + amountPerElement,
+    );
+    treasuryWaterOrbs = math.min(
+      maxTreasuryPerElement,
+      treasuryWaterOrbs + amountPerElement,
+    );
+    treasuryWoodOrbs = math.min(
+      maxTreasuryPerElement,
+      treasuryWoodOrbs + amountPerElement,
+    );
+    treasuryEarthOrbs = math.min(
+      maxTreasuryPerElement,
+      treasuryEarthOrbs + amountPerElement,
+    );
+    treasuryMetalOrbs = math.min(
+      maxTreasuryPerElement,
+      treasuryMetalOrbs + amountPerElement,
+    );
+    _persistTreasuryOrbsToStorage();
+  }
+
+  void _markBestiaryEncountered(BestiaryCreature creature) {
+    if (encounteredBestiary.add(creature.id)) {
+      storage.setEncounteredBestiary(encounteredBestiary.toList());
+    }
+  }
+
+  void _markEndingUnlocked(NarrativeEnding ending) {
+    if (unlockedEndings.add(ending.id)) {
+      storage.setUnlockedEndings(unlockedEndings.toList());
+    }
+  }
+
+  void _evaluateRoyalDecrees() {
+    bool anyCompleted = false;
+    for (final decree in activeRoyalDecrees) {
+      if (completedCycleDecreeIds.contains(decree.id)) continue;
+      final bool isComplete;
+      switch (decree) {
+        case RoyalDecreeType.noRepeatWin10:
+          isComplete = decreeNoRepeatWinCount >= decree.target;
+          break;
+        case RoyalDecreeType.defeat15:
+          isComplete = userScore >= decree.target;
+          break;
+        case RoyalDecreeType.predictAbove70:
+          isComplete = totalRounds >= 100 && percentPredict > 70.0;
+          break;
+        case RoyalDecreeType.winStreak5:
+          isComplete = decreeWinStreak >= decree.target;
+          break;
+        case RoyalDecreeType.endurance50:
+          isComplete = totalRounds >= decree.target;
+          break;
+        case RoyalDecreeType.diverseWins3:
+          isComplete = decreeDefeatedElements.length >= decree.target;
+          break;
+      }
+      if (isComplete) {
+        completedCycleDecreeIds.add(decree.id);
+        totalDecreesCompleted += 1;
+        _depositTreasuryAllElements(decree.rewardPerElement);
+        anyCompleted = true;
+      }
+    }
+    if (anyCompleted) {
+      storage.setCompletedCycleDecreeIds(completedCycleDecreeIds.toList());
+      storage.setTotalDecreesCompleted(totalDecreesCompleted);
+    }
+  }
+
+  void _refreshCompletedDecreesAndResetBattleTrackers() {
+    if (completedCycleDecreeIds.isNotEmpty) {
+      for (int i = 0; i < activeDecreeIds.length; i++) {
+        if (completedCycleDecreeIds.contains(activeDecreeIds[i])) {
+          activeDecreeIds[i] = _nextDecreeIdForSlot(activeDecreeIds[i]);
+        }
+      }
+      completedCycleDecreeIds.clear();
+      storage.setActiveDecreeIds(activeDecreeIds);
+    }
+    decreeNoRepeatWinCount = 0;
+    decreeWinStreak = 0;
+    decreeDefeatedElements.clear();
+    storage.clearBattleDecreeProgress();
+  }
+
+  String _nextDecreeIdForSlot(String currentId) {
+    final pool = RoyalDecreeType.values.map((d) => d.id).toList();
+    final startIdx = pool.indexOf(currentId);
+    for (int offset = 1; offset <= pool.length; offset++) {
+      final candidate = pool[(startIdx + offset) % pool.length];
+      if (!activeDecreeIds.contains(candidate)) {
+        return candidate;
+      }
+    }
+    return currentId;
+  }
+
+  /// Rotates or refreshes a completed Royal Decree in the Throne Room.
+  void rotateCompletedDecree(RoyalDecreeType decree) {
+    if (!completedCycleDecreeIds.contains(decree.id)) return;
+    final idx = activeDecreeIds.indexOf(decree.id);
+    if (idx != -1) {
+      activeDecreeIds[idx] = _nextDecreeIdForSlot(decree.id);
+      storage.setActiveDecreeIds(activeDecreeIds);
+    }
+    completedCycleDecreeIds.remove(decree.id);
+    storage.setCompletedCycleDecreeIds(completedCycleDecreeIds.toList());
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  bool _transferTreasuryToBackpack() {
+    if (totalTreasuryOrbs <= 0) return false;
+    fireOrbs += treasuryFireOrbs;
+    waterOrbs += treasuryWaterOrbs;
+    woodOrbs += treasuryWoodOrbs;
+    earthOrbs += treasuryEarthOrbs;
+    metalOrbs += treasuryMetalOrbs;
+
+    turn0FireOrbs += treasuryFireOrbs;
+    turn0WaterOrbs += treasuryWaterOrbs;
+    turn0WoodOrbs += treasuryWoodOrbs;
+    turn0EarthOrbs += treasuryEarthOrbs;
+    turn0MetalOrbs += treasuryMetalOrbs;
+
+    treasuryFireOrbs = 0;
+    treasuryWaterOrbs = 0;
+    treasuryWoodOrbs = 0;
+    treasuryEarthOrbs = 0;
+    treasuryMetalOrbs = 0;
+
+    _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
+    _persistTreasuryOrbsToStorage();
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Directly claims all accumulated Royal Treasury orbs for Remove Ads users.
+  bool claimTreasuryDirect() {
+    if (!isRemoveAdsActive || totalTreasuryOrbs <= 0) return false;
+    return _transferTreasuryToBackpack();
+  }
+
+  /// Shows a rewarded video ad and transfers all accumulated Royal Treasury orbs
+  /// into the player's backpack inside `onUserEarnedReward`, resetting Treasury to 0.
+  Future<bool> watchAdToClaimTreasury({VoidCallback? onClaimed}) async {
+    if (totalTreasuryOrbs <= 0) return false;
+    if (isRemoveAdsActive) {
+      final ok = claimTreasuryDirect();
+      if (ok) onClaimed?.call();
+      return ok;
+    }
+    if (!adService.isRewardedAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        _transferTreasuryToBackpack();
+        onClaimed?.call();
+      },
+    );
+    return shown && earned;
+  }
+
+  /// Royal Alchemy: transmutes 3 Elemental Orbs of [source] into 1 Elemental Orb
+  /// of [target].
+  bool transmuteOrbs(HandMove source, HandMove target) {
+    if (source == target || orbsFor(source) < 3) {
+      audio.playVibrate();
+      return false;
+    }
+    final sourceTurn0WasEnough = turn0OrbsFor(source) >= 3;
+    _incrementOrbForMove(source, -3);
+    _incrementOrbForMove(target, 1);
+
+    if (sourceTurn0WasEnough) {
+      _adjustTurn0OrbForMove(source, -3);
+      _adjustTurn0OrbForMove(target, 1);
+    } else {
+      _clampTurn0OrbToBalance(source);
+    }
+
+    _persistTurn0OrbsToStorage();
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  void _adjustTurn0OrbForMove(HandMove move, int delta) {
+    switch (move) {
+      case HandMove.rock:
+        turn0FireOrbs = math.max(0, turn0FireOrbs + delta);
+        break;
+      case HandMove.paper:
+        turn0WaterOrbs = math.max(0, turn0WaterOrbs + delta);
+        break;
+      case HandMove.scissors:
+        turn0WoodOrbs = math.max(0, turn0WoodOrbs + delta);
+        break;
+      case HandMove.lizard:
+        turn0EarthOrbs = math.max(0, turn0EarthOrbs + delta);
+        break;
+      case HandMove.spock:
+        turn0MetalOrbs = math.max(0, turn0MetalOrbs + delta);
+        break;
+    }
+  }
+
+  void _clampTurn0OrbToBalance(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        turn0FireOrbs = math.min(turn0FireOrbs, fireOrbs);
+        break;
+      case HandMove.paper:
+        turn0WaterOrbs = math.min(turn0WaterOrbs, waterOrbs);
+        break;
+      case HandMove.scissors:
+        turn0WoodOrbs = math.min(turn0WoodOrbs, woodOrbs);
+        break;
+      case HandMove.lizard:
+        turn0EarthOrbs = math.min(turn0EarthOrbs, earthOrbs);
+        break;
+      case HandMove.spock:
+        turn0MetalOrbs = math.min(turn0MetalOrbs, metalOrbs);
+        break;
+    }
+  }
+
+  void _unlockArtifactWithoutCost(ShopUpgradeArtifact artifact) {
+    switch (artifact) {
+      case ShopUpgradeArtifact.predictability:
+        unlockedPredictability = true;
+        storage.setUnlockedPredictability(true);
+        break;
+      case ShopUpgradeArtifact.reset:
+        unlockedReset = true;
+        storage.setUnlockedReset(true);
+        break;
+      case ShopUpgradeArtifact.newHands:
+        unlockedNewHands = true;
+        storage.setUnlockedNewHands(true);
+        break;
+      case ShopUpgradeArtifact.random:
+        unlockedRandom = true;
+        storage.setUnlockedRandom(true);
+        break;
+      case ShopUpgradeArtifact.algorithm:
+        unlockedAlgorithm = true;
+        storage.setUnlockedAlgorithm(true);
+        break;
+      case ShopUpgradeArtifact.yourPrediction:
+        unlockedYourPrediction = true;
+        storage.setUnlockedYourPrediction(true);
+        break;
+      case ShopUpgradeArtifact.nextMove:
+        unlockedNextMove = true;
+        storage.setUnlockedNextMove(true);
+        break;
+      case ShopUpgradeArtifact.giftBox:
+        giftBoxUnlocked = true;
+        storage.setGiftBoxUnlocked(true);
+        break;
+      case ShopUpgradeArtifact.suggestion:
+        unlockedSuggestion = true;
+        storage.setUnlockedSuggestion(true);
+        break;
+      case ShopUpgradeArtifact.newSkin:
+        unlockedNewSkin = true;
+        storage.setUnlockedNewSkin(true);
+        break;
+      case ShopUpgradeArtifact.removeAds:
+        unlockedAds = true;
+        removeAdsEnabled = true;
+        storage.setUnlockedAds(true);
+        storage.setRemoveAdsEnabled(true);
+        adService.setAdsRemoved(true);
+        break;
+      case ShopUpgradeArtifact.crystalBall:
+        unlockedCrystalBall = true;
+        storage.setUnlockedCrystalBall(true);
+        break;
+      case ShopUpgradeArtifact.crystalBallPlus:
+        unlockedCrystalBall = true;
+        unlockedCrystalBallPlus = true;
+        storage.setUnlockedCrystalBall(true);
+        storage.setUnlockedCrystalBallPlus(true);
+        break;
+    }
+  }
+
+  bool _restoreStoredRelics() {
+    final toRestore = availableRelicChamberArtifacts;
+    if (toRestore.isEmpty) {
+      relicChamberStoredUpgrades = [];
+      storage.setRelicChamberUpgrades(const []);
+      notifyListeners();
+      return false;
+    }
+    for (final artifact in toRestore) {
+      _unlockArtifactWithoutCost(artifact);
+    }
+    relicChamberStoredUpgrades = [];
+    storage.setRelicChamberUpgrades(const []);
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Directly restores stored Relic Chamber artifacts for Remove Ads users.
+  bool restoreRelicsDirect() {
+    if (!isRemoveAdsActive || !hasAvailableRelicChamberUpgrades) return false;
+    return _restoreStoredRelics();
+  }
+
+  /// Shows a rewarded video ad and restores all Relic Chamber artifacts,
+  /// immediately clearing `relicChamberStoredUpgrades` so they cannot be claimed twice.
+  Future<bool> watchAdToRestoreRelics({VoidCallback? onRestored}) async {
+    if (!hasAvailableRelicChamberUpgrades) return false;
+    if (isRemoveAdsActive) {
+      final ok = restoreRelicsDirect();
+      if (ok) onRestored?.call();
+      return ok;
+    }
+    if (!adService.isRewardedAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        _restoreStoredRelics();
+        onRestored?.call();
+      },
+    );
+    return shown && earned;
+  }
+
+  bool _reclaimStoredSpoils() {
+    if (totalSpoilsOfWarOrbs <= 0) return false;
+    fireOrbs += spoilsFireOrbs;
+    waterOrbs += spoilsWaterOrbs;
+    woodOrbs += spoilsWoodOrbs;
+    earthOrbs += spoilsEarthOrbs;
+    metalOrbs += spoilsMetalOrbs;
+
+    turn0FireOrbs += spoilsFireOrbs;
+    turn0WaterOrbs += spoilsWaterOrbs;
+    turn0WoodOrbs += spoilsWoodOrbs;
+    turn0EarthOrbs += spoilsEarthOrbs;
+    turn0MetalOrbs += spoilsMetalOrbs;
+
+    spoilsFireOrbs = 0;
+    spoilsWaterOrbs = 0;
+    spoilsWoodOrbs = 0;
+    spoilsEarthOrbs = 0;
+    spoilsMetalOrbs = 0;
+
+    _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
+    _persistSpoilsOrbsToStorage();
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Directly reclaims all Spoils of War orbs for Remove Ads users.
+  bool reclaimSpoilsDirect() {
+    if (!isRemoveAdsActive || !hasSpoilsOfWarOrbs) return false;
+    return _reclaimStoredSpoils();
+  }
+
+  /// Shows a rewarded video ad and reclaims all Spoils of War orbs back into
+  /// the backpack (updating Turn 0 baseline and resetting Spoils to 0).
+  Future<bool> watchAdToReclaimSpoils({VoidCallback? onReclaimed}) async {
+    if (!hasSpoilsOfWarOrbs) return false;
+    if (isRemoveAdsActive) {
+      final ok = reclaimSpoilsDirect();
+      if (ok) onReclaimed?.call();
+      return ok;
+    }
+    if (!adService.isRewardedAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        _reclaimStoredSpoils();
+        onReclaimed?.call();
+      },
+    );
+    return shown && earned;
+  }
+
   void playTurn(HandMove userChoice) {
     if (userHp <= 0) {
       isDeathAlertPending = true;
@@ -715,17 +1428,34 @@ class GameController extends ChangeNotifier {
       return;
     }
     turnCount++;
+    final previousMove = lastUserMove;
+    final hadPrediction = _engine.hasPrediction(previousMove);
     currentUserMove = userChoice;
+
+    if (!hadPrediction) {
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
+    } else {
+      _markBestiaryEncountered(BestiaryCreature.guardianRobot);
+    }
+    if (currentWeek >= 10) {
+      _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    }
 
     // AI uses the move already pre-computed before the user chose their hand
     currentComputerMove = crystalBallMove ??
-        (!_engine.hasPrediction(lastUserMove)
+        (!hadPrediction
             ? _engine.getRandomMove()
-            : _engine.computeSmartChoice(lastUserMove));
+            : _engine.computeSmartChoice(previousMove));
 
     // Determine round outcome
     if (currentUserMove == currentComputerMove) {
       lastWinner = RoundWinner.draw;
+      decreeWinStreak = 0;
+      if (previousMove != null && userChoice == previousMove) {
+        decreeNoRepeatWinCount = 0;
+      }
+      storage.setDecreeWinStreak(decreeWinStreak);
+      storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
       audio.playDraw();
     } else if (currentUserMove!.beats(
       currentComputerMove!,
@@ -735,11 +1465,26 @@ class GameController extends ChangeNotifier {
       userScore += 1;
       // Grant +1 Elemental Orb of the defeated AI/PC element
       _incrementOrbForMove(currentComputerMove!, 1);
+      // Mirror +1 Elemental Orb into Royal Treasury Piggy Bank (capped at 50/element)
+      _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
       orbCollectionEventId += 1;
       computerHp = math.max(0, computerHp - damagePerLoss);
       storage.setUserScore(userScore);
       storage.setPcHp(computerHp);
+
+      // Update Royal Decree trackers
+      if (previousMove != null && userChoice == previousMove) {
+        decreeNoRepeatWinCount = 0;
+      } else {
+        decreeNoRepeatWinCount += 1;
+      }
+      decreeWinStreak += 1;
+      decreeDefeatedElements.add(currentComputerMove!.orbKey);
+      storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
+      storage.setDecreeWinStreak(decreeWinStreak);
+      storage.setDecreeDefeatedElements(decreeDefeatedElements.toList());
+
       audio.playWin();
     } else {
       lastWinner = RoundWinner.computer;
@@ -747,6 +1492,12 @@ class GameController extends ChangeNotifier {
       userHp = math.max(0, userHp - damagePerLoss);
       storage.setPcScore(pcScore);
       storage.setUserHp(userHp);
+      decreeWinStreak = 0;
+      if (previousMove != null && userChoice == previousMove) {
+        decreeNoRepeatWinCount = 0;
+      }
+      storage.setDecreeWinStreak(decreeWinStreak);
+      storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
       audio.playDefeat();
     }
 
@@ -760,15 +1511,24 @@ class GameController extends ChangeNotifier {
     storage.setLastUserMove(currentUserMove);
     storage.setLastComputerMove(currentComputerMove);
 
-    if (lastWinner == RoundWinner.user) {
-      _triggerCloudSave();
-    }
+    _evaluateRoyalDecrees();
 
     if (userHp <= 0) {
       isDeathAlertPending = true;
       is100RoundsAlertPending = false;
     } else if (totalRounds >= 100) {
       is100RoundsAlertPending = true;
+      if (percentPredict == 100) {
+        _markEndingUnlocked(NarrativeEnding.perfectPredictor);
+      } else if (percentPredict > 50) {
+        _markEndingUnlocked(NarrativeEnding.triumphantStrategist);
+      } else {
+        _markEndingUnlocked(NarrativeEnding.outpredicted);
+      }
+    }
+
+    if (lastWinner == RoundWinner.user || totalRounds >= 100) {
+      _triggerCloudSave();
     }
 
     _computeNextHints();
@@ -822,10 +1582,25 @@ class GameController extends ChangeNotifier {
 
   /// Rewinds the active battle back to Turn 0: restores HP (`100`), Mana (`100`),
   /// scores (`0`), clears the Markov matrix and last-played hands, reverts
-  /// Elemental Orbs back to the Turn 0 Orb Snapshot (removing battle-win and
-  /// periodic Gift Box orbs while preserving Rewarded Ad `+50` orbs), and
-  /// syncs with [StorageService] and [PlayGamesService].
+  /// Elemental Orbs back to the Turn 0 Orb Snapshot (recording the lost
+  /// battle/gift orbs into Spoils of War while preserving Rewarded Ad `+50` orbs),
+  /// and syncs with [StorageService] and [PlayGamesService].
   void resetGame() {
+    final lostFire = lostOrbsFor(HandMove.rock);
+    final lostWater = lostOrbsFor(HandMove.paper);
+    final lostWood = lostOrbsFor(HandMove.scissors);
+    final lostEarth = lostOrbsFor(HandMove.lizard);
+    final lostMetal = lostOrbsFor(HandMove.spock);
+
+    if (lostFire + lostWater + lostWood + lostEarth + lostMetal > 0) {
+      spoilsFireOrbs += lostFire;
+      spoilsWaterOrbs += lostWater;
+      spoilsWoodOrbs += lostWood;
+      spoilsEarthOrbs += lostEarth;
+      spoilsMetalOrbs += lostMetal;
+      _persistSpoilsOrbsToStorage();
+    }
+
     fireOrbs = turn0FireOrbs;
     waterOrbs = turn0WaterOrbs;
     woodOrbs = turn0WoodOrbs;
@@ -833,6 +1608,7 @@ class GameController extends ChangeNotifier {
     metalOrbs = turn0MetalOrbs;
     _persistOrbsToStorage();
     _persistTurn0OrbsToStorage();
+    _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     _triggerCloudSave();
     notifyListeners();
@@ -842,6 +1618,7 @@ class GameController extends ChangeNotifier {
   /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
   /// and recording the Turn 0 Orb Snapshot for the new battle.
   void startNewBattle() {
+    _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
@@ -855,6 +1632,7 @@ class GameController extends ChangeNotifier {
   void completeBattleWeek() {
     currentWeek += 1;
     storage.setCurrentWeek(currentWeek);
+    _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
@@ -896,11 +1674,13 @@ class GameController extends ChangeNotifier {
 
   /// Centralized permadeath hard reset used by both unrevived death (HP == 0)
   /// and Week > 40 Kingdom Fall defeat:
-  /// 1. Resets campaign week to 0 (Week 0 / 40).
-  /// 2. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
-  /// 3. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
+  /// 1. Snapshots lost orbs into Spoils of War and lost orb-bought upgrades
+  ///    into Relic Chamber, and records the Kingdom Fall narrative ending.
+  /// 2. Resets campaign week to 0 (Week 0 / 40).
+  /// 3. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
+  /// 4. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
   ///    IAP purchases persisted in [StorageService] or verified by [BillingService].
-  /// 4. Resets HP/Mana to 100, clears the Markov matrix, persists locally, and
+  /// 5. Resets HP/Mana to 100, clears the Markov matrix, persists locally, and
   ///    overwrites Cloud Save so old cloud data cannot revert the Week 0 reset.
   Future<void> applyPermadeathReset() async {
     _giftTimer?.cancel();
@@ -916,7 +1696,47 @@ class GameController extends ChangeNotifier {
     final preservedHasSeenIntro =
         hasSeenStoryIntro || storage.hasSeenStoryIntro;
 
-    await storage.clearGameplayProgress(includeSettings: false);
+    // 1. Snapshot lost orbs into Spoils of War
+    final updatedSpoilsFire = spoilsFireOrbs + fireOrbs;
+    final updatedSpoilsWater = spoilsWaterOrbs + waterOrbs;
+    final updatedSpoilsWood = spoilsWoodOrbs + woodOrbs;
+    final updatedSpoilsEarth = spoilsEarthOrbs + earthOrbs;
+    final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
+
+    // 2. Snapshot lost orb-bought upgrades into Relic Chamber (excluding paid IAPs)
+    final lostUpgrades = <String>[];
+    for (final artifact in ShopUpgradeArtifact.values) {
+      if (!isUpgradeArtifactUnlocked(artifact)) continue;
+      final productId = _productIdForArtifact(artifact);
+      if (productId != null && verifiedPaidIds.contains(productId)) {
+        continue;
+      }
+      lostUpgrades.add(artifact.id);
+    }
+    final nextRelicUpgrades = lostUpgrades.isNotEmpty
+        ? lostUpgrades
+        : List<String>.from(relicChamberStoredUpgrades);
+
+    // 3. Record Kingdom Fall ending
+    final nextEndings = <String>{
+      ...unlockedEndings,
+      NarrativeEnding.kingdomFall.id,
+    }.toList();
+
+    await storage.clearGameplayProgress(
+      includeSettings: false,
+      includeCastleMeta: false,
+    );
+    await storage.clearBattleDecreeProgress();
+    await storage.setAllSpoilsOrbs(
+      fire: updatedSpoilsFire,
+      water: updatedSpoilsWater,
+      wood: updatedSpoilsWood,
+      earth: updatedSpoilsEarth,
+      metal: updatedSpoilsMetal,
+    );
+    await storage.setRelicChamberUpgrades(nextRelicUpgrades);
+    await storage.setUnlockedEndings(nextEndings);
     await storage.setTurn0Orbs(
       fire: 0,
       water: 0,
@@ -953,15 +1773,19 @@ class GameController extends ChangeNotifier {
   }
 
   /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,
-  /// scores, Markov matrices, and unlocked story chapters) while preserving
-  /// the player's UI settings, and syncs the fresh state to the cloud if signed in.
+  /// scores, Markov matrices, unlocked story chapters, and Castle meta data)
+  /// while preserving the player's UI settings, and syncs the fresh state to the
+  /// cloud if signed in.
   Future<void> resetAllProgress() async {
     _giftTimer?.cancel();
     _giftTimer = null;
     _giftCooldownUntil = null;
     _remainingGiftCooldown = Duration.zero;
     isGiftAvailable = true;
-    await storage.clearGameplayProgress(includeSettings: false);
+    await storage.clearGameplayProgress(
+      includeSettings: false,
+      includeCastleMeta: true,
+    );
     turnCount = 0;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;

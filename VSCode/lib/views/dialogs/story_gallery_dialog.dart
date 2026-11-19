@@ -30,12 +30,6 @@ class StoryGalleryDialog extends StatelessWidget {
       'story_gallery_subtitle',
       fallback: 'Re-read unlocked comic chapters & lore',
     );
-    final lockedTitle = loc.t('story_locked_title', fallback: 'Locked Chapter');
-    final lockedHint = loc.t(
-      'story_locked_hint',
-      fallback: 'Unlock this item in the Shop to reveal its story!',
-    );
-    final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
 
     return Dialog(
       backgroundColor: palette.isDark ? null : palette.dialogSurface,
@@ -119,54 +113,7 @@ class StoryGalleryDialog extends StatelessWidget {
 
               // Chapters List
               Expanded(
-                child: ListView.separated(
-                  itemCount: chapters.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final chapter = chapters[index];
-                    final isUnlocked =
-                        controller.isStoryChapterUnlocked(chapter);
-                    final chapterTitle = loc.t(
-                      chapter.titleKey,
-                      fallback: chapter.fallbackTitle,
-                    );
-                    final itemName = loc.t(
-                      chapter.itemNameKey,
-                      fallback: chapter.fallbackItemName,
-                    );
-
-                    return _StoryChapterCard(
-                      key: ValueKey(
-                        isUnlocked
-                            ? 'story_gallery_item_${chapter.id}'
-                            : 'story_gallery_locked_${chapter.id}',
-                      ),
-                      chapter: chapter,
-                      chapterNumber: index + 1,
-                      isUnlocked: isUnlocked,
-                      chapterTitle: isUnlocked ? chapterTitle : lockedTitle,
-                      subtitle: isUnlocked ? itemName : '$itemName • $lockedHint',
-                      replayLabel: replayLabel,
-                      onTap: () {
-                        controller.audio.playTapVibrate();
-                        if (isUnlocked) {
-                          StoryDialog.show(
-                            context,
-                            chapter: chapter,
-                            controller: controller,
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('$itemName: $lockedHint'),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  },
-                ),
+                child: StoryMemoriesSection(controller: controller),
               ),
 
               const SizedBox(height: 12),
@@ -190,7 +137,82 @@ class StoryGalleryDialog extends StatelessWidget {
   }
 }
 
-class _StoryChapterCard extends StatelessWidget {
+/// Reusable Story Memories comic chapter gallery list used by both
+/// [StoryGalleryDialog] and the Royal Castle Hub's Library wing.
+class StoryMemoriesSection extends StatelessWidget {
+  final GameController controller;
+  final bool shrinkWrap;
+
+  const StoryMemoriesSection({
+    super.key,
+    required this.controller,
+    this.shrinkWrap = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = controller.localization;
+    final chapters = StoryChapter.values;
+    final lockedTitle = loc.t('story_locked_title', fallback: 'Locked Chapter');
+    final lockedHint = loc.t(
+      'story_locked_hint',
+      fallback: 'Unlock this item in the Shop to reveal its story!',
+    );
+    final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
+
+    return ListView.separated(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      itemCount: chapters.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final chapter = chapters[index];
+        final isUnlocked = controller.isStoryChapterUnlocked(chapter);
+        final chapterTitle = loc.t(
+          chapter.titleKey,
+          fallback: chapter.fallbackTitle,
+        );
+        final itemName = loc.t(
+          chapter.itemNameKey,
+          fallback: chapter.fallbackItemName,
+        );
+
+        return StoryChapterCard(
+          key: ValueKey(
+            isUnlocked
+                ? 'story_gallery_item_${chapter.id}'
+                : 'story_gallery_locked_${chapter.id}',
+          ),
+          chapter: chapter,
+          chapterNumber: index + 1,
+          isUnlocked: isUnlocked,
+          chapterTitle: isUnlocked ? chapterTitle : lockedTitle,
+          subtitle: isUnlocked ? itemName : '$itemName • $lockedHint',
+          replayLabel: replayLabel,
+          onTap: () {
+            controller.audio.playTapVibrate();
+            if (isUnlocked) {
+              StoryDialog.show(
+                context,
+                chapter: chapter,
+                controller: controller,
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$itemName: $lockedHint'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+}
+
+class StoryChapterCard extends StatelessWidget {
   final StoryChapter chapter;
   final int chapterNumber;
   final bool isUnlocked;
@@ -199,7 +221,7 @@ class _StoryChapterCard extends StatelessWidget {
   final String replayLabel;
   final VoidCallback onTap;
 
-  const _StoryChapterCard({
+  const StoryChapterCard({
     super.key,
     required this.chapter,
     required this.chapterNumber,

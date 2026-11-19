@@ -248,6 +248,24 @@ class CloudSaveData {
 
   final List<String> purchasedIapProductIds;
 
+  // Royal Castle Hub State
+  final int treasuryFireOrbs;
+  final int treasuryWaterOrbs;
+  final int treasuryWoodOrbs;
+  final int treasuryEarthOrbs;
+  final int treasuryMetalOrbs;
+  final int spoilsFireOrbs;
+  final int spoilsWaterOrbs;
+  final int spoilsWoodOrbs;
+  final int spoilsEarthOrbs;
+  final int spoilsMetalOrbs;
+  final List<String> relicChamberUpgrades;
+  final List<String> unlockedEndings;
+  final List<String> encounteredBestiary;
+  final List<String>? activeDecreeIds;
+  final List<String> completedCycleDecreeIds;
+  final int totalDecreesCompleted;
+
   final int updatedAtMillis;
 
   const CloudSaveData({
@@ -316,12 +334,42 @@ class CloudSaveData {
     this.animationsEnabled = true,
     this.confirmBattleTeleport = true,
     this.purchasedIapProductIds = const [],
+    this.treasuryFireOrbs = 0,
+    this.treasuryWaterOrbs = 0,
+    this.treasuryWoodOrbs = 0,
+    this.treasuryEarthOrbs = 0,
+    this.treasuryMetalOrbs = 0,
+    this.spoilsFireOrbs = 0,
+    this.spoilsWaterOrbs = 0,
+    this.spoilsWoodOrbs = 0,
+    this.spoilsEarthOrbs = 0,
+    this.spoilsMetalOrbs = 0,
+    this.relicChamberUpgrades = const [],
+    this.unlockedEndings = const [],
+    this.encounteredBestiary = const [],
+    this.activeDecreeIds,
+    this.completedCycleDecreeIds = const [],
+    this.totalDecreesCompleted = 0,
     this.updatedAtMillis = 0,
   }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
       fireOrbs + waterOrbs + woodOrbs + earthOrbs + metalOrbs;
+
+  int get totalTreasuryOrbs =>
+      treasuryFireOrbs +
+      treasuryWaterOrbs +
+      treasuryWoodOrbs +
+      treasuryEarthOrbs +
+      treasuryMetalOrbs;
+
+  int get totalSpoilsOrbs =>
+      spoilsFireOrbs +
+      spoilsWaterOrbs +
+      spoilsWoodOrbs +
+      spoilsEarthOrbs +
+      spoilsMetalOrbs;
 
   /// Number of shop items unlocked in this save snapshot.
   int get unlockedCount {
@@ -392,7 +440,13 @@ class CloudSaveData {
         (currentWeek > local.currentWeek ||
             total > local.total ||
             userScore > local.userScore ||
-            markovTransitionsCount > local.markovTransitionsCount)) {
+            markovTransitionsCount > local.markovTransitionsCount ||
+            totalTreasuryOrbs > local.totalTreasuryOrbs ||
+            totalSpoilsOrbs > local.totalSpoilsOrbs ||
+            relicChamberUpgrades.length > local.relicChamberUpgrades.length ||
+            unlockedEndings.length > local.unlockedEndings.length ||
+            encounteredBestiary.length > local.encounteredBestiary.length ||
+            totalDecreesCompleted > local.totalDecreesCompleted)) {
       return true;
     }
     return false;
@@ -480,6 +534,29 @@ class CloudSaveData {
         {...purchasedIapProductIds, ...local.purchasedIapProductIds}.toList()
           ..sort()
       ),
+      treasuryFireOrbs: treasuryFireOrbs,
+      treasuryWaterOrbs: treasuryWaterOrbs,
+      treasuryWoodOrbs: treasuryWoodOrbs,
+      treasuryEarthOrbs: treasuryEarthOrbs,
+      treasuryMetalOrbs: treasuryMetalOrbs,
+      spoilsFireOrbs: spoilsFireOrbs,
+      spoilsWaterOrbs: spoilsWaterOrbs,
+      spoilsWoodOrbs: spoilsWoodOrbs,
+      spoilsEarthOrbs: spoilsEarthOrbs,
+      spoilsMetalOrbs: spoilsMetalOrbs,
+      relicChamberUpgrades: relicChamberUpgrades,
+      unlockedEndings: (
+        {...unlockedEndings, ...local.unlockedEndings}.toList()..sort()
+      ),
+      encounteredBestiary: (
+        {...encounteredBestiary, ...local.encounteredBestiary}.toList()..sort()
+      ),
+      activeDecreeIds: activeDecreeIds ?? local.activeDecreeIds,
+      completedCycleDecreeIds: completedCycleDecreeIds,
+      totalDecreesCompleted:
+          totalDecreesCompleted > local.totalDecreesCompleted
+              ? totalDecreesCompleted
+              : local.totalDecreesCompleted,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -556,6 +633,22 @@ class CloudSaveData {
       animationsEnabled: storage.animationsEnabled,
       confirmBattleTeleport: storage.confirmBattleTeleport,
       purchasedIapProductIds: storage.purchasedIapProductIds.toList()..sort(),
+      treasuryFireOrbs: storage.treasuryFireOrbs,
+      treasuryWaterOrbs: storage.treasuryWaterOrbs,
+      treasuryWoodOrbs: storage.treasuryWoodOrbs,
+      treasuryEarthOrbs: storage.treasuryEarthOrbs,
+      treasuryMetalOrbs: storage.treasuryMetalOrbs,
+      spoilsFireOrbs: storage.spoilsFireOrbs,
+      spoilsWaterOrbs: storage.spoilsWaterOrbs,
+      spoilsWoodOrbs: storage.spoilsWoodOrbs,
+      spoilsEarthOrbs: storage.spoilsEarthOrbs,
+      spoilsMetalOrbs: storage.spoilsMetalOrbs,
+      relicChamberUpgrades: storage.relicChamberUpgrades,
+      unlockedEndings: storage.unlockedEndings,
+      encounteredBestiary: storage.encounteredBestiary,
+      activeDecreeIds: storage.activeDecreeIds,
+      completedCycleDecreeIds: storage.completedCycleDecreeIds,
+      totalDecreesCompleted: storage.totalDecreesCompleted,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -589,6 +682,29 @@ class CloudSaveData {
         ...purchasedIapProductIds,
       });
     }
+
+    await storage.setAllTreasuryOrbs(
+      fire: treasuryFireOrbs,
+      water: treasuryWaterOrbs,
+      wood: treasuryWoodOrbs,
+      earth: treasuryEarthOrbs,
+      metal: treasuryMetalOrbs,
+    );
+    await storage.setAllSpoilsOrbs(
+      fire: spoilsFireOrbs,
+      water: spoilsWaterOrbs,
+      wood: spoilsWoodOrbs,
+      earth: spoilsEarthOrbs,
+      metal: spoilsMetalOrbs,
+    );
+    await storage.setRelicChamberUpgrades(relicChamberUpgrades);
+    await storage.setUnlockedEndings(unlockedEndings);
+    await storage.setEncounteredBestiary(encounteredBestiary);
+    if (activeDecreeIds != null && activeDecreeIds!.isNotEmpty) {
+      await storage.setActiveDecreeIds(activeDecreeIds!);
+    }
+    await storage.setCompletedCycleDecreeIds(completedCycleDecreeIds);
+    await storage.setTotalDecreesCompleted(totalDecreesCompleted);
 
     await storage.setLanguage(language);
     await storage.setDarkMode(darkMode);
@@ -687,6 +803,26 @@ class CloudSaveData {
           'earth': turn0EarthOrbs ?? earthOrbs,
           'metal': turn0MetalOrbs ?? metalOrbs,
         },
+      'treasuryOrbs': {
+        'fire': treasuryFireOrbs,
+        'water': treasuryWaterOrbs,
+        'wood': treasuryWoodOrbs,
+        'earth': treasuryEarthOrbs,
+        'metal': treasuryMetalOrbs,
+      },
+      'spoilsOfWarOrbs': {
+        'fire': spoilsFireOrbs,
+        'water': spoilsWaterOrbs,
+        'wood': spoilsWoodOrbs,
+        'earth': spoilsEarthOrbs,
+        'metal': spoilsMetalOrbs,
+      },
+      'relicChamberUpgrades': relicChamberUpgrades,
+      'unlockedEndings': unlockedEndings,
+      'encounteredBestiary': encounteredBestiary,
+      if (activeDecreeIds != null) 'activeDecreeIds': activeDecreeIds,
+      'completedCycleDecreeIds': completedCycleDecreeIds,
+      'totalDecreesCompleted': totalDecreesCompleted,
       'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
@@ -761,6 +897,15 @@ class CloudSaveData {
     }
   }
 
+  static List<String> _parseStringList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
   factory CloudSaveData.fromJson(Map<String, dynamic> map) {
     final orbsMap = map['orbs'] is Map ? map['orbs'] as Map : null;
     int fire =
@@ -801,6 +946,10 @@ class CloudSaveData {
 
     final turn0OrbsMap =
         map['turn0Orbs'] is Map ? map['turn0Orbs'] as Map : null;
+    final treasuryMap =
+        map['treasuryOrbs'] is Map ? map['treasuryOrbs'] as Map : null;
+    final spoilsMap =
+        map['spoilsOfWarOrbs'] is Map ? map['spoilsOfWarOrbs'] as Map : null;
 
     return CloudSaveData(
       fireOrbs: fire,
@@ -813,6 +962,25 @@ class CloudSaveData {
       turn0WoodOrbs: (turn0OrbsMap?['wood'] as num?)?.toInt(),
       turn0EarthOrbs: (turn0OrbsMap?['earth'] as num?)?.toInt(),
       turn0MetalOrbs: (turn0OrbsMap?['metal'] as num?)?.toInt(),
+      treasuryFireOrbs: (treasuryMap?['fire'] as num?)?.toInt() ?? 0,
+      treasuryWaterOrbs: (treasuryMap?['water'] as num?)?.toInt() ?? 0,
+      treasuryWoodOrbs: (treasuryMap?['wood'] as num?)?.toInt() ?? 0,
+      treasuryEarthOrbs: (treasuryMap?['earth'] as num?)?.toInt() ?? 0,
+      treasuryMetalOrbs: (treasuryMap?['metal'] as num?)?.toInt() ?? 0,
+      spoilsFireOrbs: (spoilsMap?['fire'] as num?)?.toInt() ?? 0,
+      spoilsWaterOrbs: (spoilsMap?['water'] as num?)?.toInt() ?? 0,
+      spoilsWoodOrbs: (spoilsMap?['wood'] as num?)?.toInt() ?? 0,
+      spoilsEarthOrbs: (spoilsMap?['earth'] as num?)?.toInt() ?? 0,
+      spoilsMetalOrbs: (spoilsMap?['metal'] as num?)?.toInt() ?? 0,
+      relicChamberUpgrades: _parseStringList(map['relicChamberUpgrades']),
+      unlockedEndings: _parseStringList(map['unlockedEndings']),
+      encounteredBestiary: _parseStringList(map['encounteredBestiary']),
+      activeDecreeIds: map['activeDecreeIds'] is List
+          ? _parseStringList(map['activeDecreeIds'])
+          : null,
+      completedCycleDecreeIds: _parseStringList(map['completedCycleDecreeIds']),
+      totalDecreesCompleted:
+          (map['totalDecreesCompleted'] as num?)?.toInt() ?? 0,
       hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
@@ -1275,7 +1443,10 @@ class PlayGamesService extends ChangeNotifier {
       notifyListeners();
 
       if (playerChanged) {
-        await storage.clearGameplayProgress(includeSettings: true);
+        await storage.clearGameplayProgress(
+          includeSettings: true,
+          includeCastleMeta: true,
+        );
         onCloudDataRestored?.call();
         await loadAndResolveCloudSave(isAccountSwitch: true);
       } else {
@@ -1324,7 +1495,10 @@ class PlayGamesService extends ChangeNotifier {
             if (fetchedName != null && fetchedName.trim().isNotEmpty) {
               _playerName = fetchedName.trim();
             }
-            await storage.clearGameplayProgress(includeSettings: true);
+            await storage.clearGameplayProgress(
+          includeSettings: true,
+          includeCastleMeta: true,
+        );
             onCloudDataRestored?.call();
           }
         }
