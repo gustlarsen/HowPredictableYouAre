@@ -176,6 +176,11 @@ class CloudSaveData {
   final int woodOrbs;
   final int earthOrbs;
   final int metalOrbs;
+  final int? turn0FireOrbs;
+  final int? turn0WaterOrbs;
+  final int? turn0WoodOrbs;
+  final int? turn0EarthOrbs;
+  final int? turn0MetalOrbs;
   final bool hasClaimedQaBonus;
   final int userScore;
   final int pcScore;
@@ -249,6 +254,11 @@ class CloudSaveData {
     this.woodOrbs = 0,
     this.earthOrbs = 0,
     this.metalOrbs = 0,
+    this.turn0FireOrbs,
+    this.turn0WaterOrbs,
+    this.turn0WoodOrbs,
+    this.turn0EarthOrbs,
+    this.turn0MetalOrbs,
     this.hasClaimedQaBonus = false,
     this.userScore = 0,
     this.pcScore = 0,
@@ -394,6 +404,11 @@ class CloudSaveData {
       woodOrbs: woodOrbs,
       earthOrbs: earthOrbs,
       metalOrbs: metalOrbs,
+      turn0FireOrbs: turn0FireOrbs ?? fireOrbs,
+      turn0WaterOrbs: turn0WaterOrbs ?? waterOrbs,
+      turn0WoodOrbs: turn0WoodOrbs ?? woodOrbs,
+      turn0EarthOrbs: turn0EarthOrbs ?? earthOrbs,
+      turn0MetalOrbs: turn0MetalOrbs ?? metalOrbs,
       hasClaimedQaBonus: hasClaimedQaBonus || local.hasClaimedQaBonus,
       userScore: userScore,
       pcScore: pcScore,
@@ -469,6 +484,16 @@ class CloudSaveData {
       woodOrbs: storage.woodOrbs,
       earthOrbs: storage.earthOrbs,
       metalOrbs: storage.metalOrbs,
+      turn0FireOrbs:
+          storage.hasTurn0OrbSnapshot ? storage.turn0FireOrbs : storage.fireOrbs,
+      turn0WaterOrbs:
+          storage.hasTurn0OrbSnapshot ? storage.turn0WaterOrbs : storage.waterOrbs,
+      turn0WoodOrbs:
+          storage.hasTurn0OrbSnapshot ? storage.turn0WoodOrbs : storage.woodOrbs,
+      turn0EarthOrbs:
+          storage.hasTurn0OrbSnapshot ? storage.turn0EarthOrbs : storage.earthOrbs,
+      turn0MetalOrbs:
+          storage.hasTurn0OrbSnapshot ? storage.turn0MetalOrbs : storage.metalOrbs,
       hasClaimedQaBonus: storage.hasClaimedQaBonus,
       userScore: storage.userScore,
       pcScore: storage.pcScore,
@@ -534,6 +559,13 @@ class CloudSaveData {
       wood: woodOrbs,
       earth: earthOrbs,
       metal: metalOrbs,
+    );
+    await storage.setTurn0Orbs(
+      fire: turn0FireOrbs ?? fireOrbs,
+      water: turn0WaterOrbs ?? waterOrbs,
+      wood: turn0WoodOrbs ?? woodOrbs,
+      earth: turn0EarthOrbs ?? earthOrbs,
+      metal: turn0MetalOrbs ?? metalOrbs,
     );
     await storage.clearLegacyDiamonds();
     await storage.setHasClaimedQaBonus(hasClaimedQaBonus);
@@ -629,6 +661,18 @@ class CloudSaveData {
       'woodOrbs': woodOrbs,
       'earthOrbs': earthOrbs,
       'metalOrbs': metalOrbs,
+      if (turn0FireOrbs != null ||
+          turn0WaterOrbs != null ||
+          turn0WoodOrbs != null ||
+          turn0EarthOrbs != null ||
+          turn0MetalOrbs != null)
+        'turn0Orbs': {
+          'fire': turn0FireOrbs ?? fireOrbs,
+          'water': turn0WaterOrbs ?? waterOrbs,
+          'wood': turn0WoodOrbs ?? woodOrbs,
+          'earth': turn0EarthOrbs ?? earthOrbs,
+          'metal': turn0MetalOrbs ?? metalOrbs,
+        },
       'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
@@ -740,12 +784,20 @@ class CloudSaveData {
       metal = legacyDiamonds;
     }
 
+    final turn0OrbsMap =
+        map['turn0Orbs'] is Map ? map['turn0Orbs'] as Map : null;
+
     return CloudSaveData(
       fireOrbs: fire,
       waterOrbs: water,
       woodOrbs: wood,
       earthOrbs: earth,
       metalOrbs: metal,
+      turn0FireOrbs: (turn0OrbsMap?['fire'] as num?)?.toInt(),
+      turn0WaterOrbs: (turn0OrbsMap?['water'] as num?)?.toInt(),
+      turn0WoodOrbs: (turn0OrbsMap?['wood'] as num?)?.toInt(),
+      turn0EarthOrbs: (turn0OrbsMap?['earth'] as num?)?.toInt(),
+      turn0MetalOrbs: (turn0OrbsMap?['metal'] as num?)?.toInt(),
       hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
@@ -1345,12 +1397,25 @@ class PlayGamesService extends ChangeNotifier {
       return false;
     }
 
+    final baseTurn0Fire = storage.turn0FireOrbs;
+    final baseTurn0Water = storage.turn0WaterOrbs;
+    final baseTurn0Wood = storage.turn0WoodOrbs;
+    final baseTurn0Earth = storage.turn0EarthOrbs;
+    final baseTurn0Metal = storage.turn0MetalOrbs;
+
     await storage.setAllOrbs(
       fire: storage.fireOrbs + qaBonusOrbs,
       water: storage.waterOrbs + qaBonusOrbs,
       wood: storage.woodOrbs + qaBonusOrbs,
       earth: storage.earthOrbs + qaBonusOrbs,
       metal: storage.metalOrbs + qaBonusOrbs,
+    );
+    await storage.setTurn0Orbs(
+      fire: baseTurn0Fire + qaBonusOrbs,
+      water: baseTurn0Water + qaBonusOrbs,
+      wood: baseTurn0Wood + qaBonusOrbs,
+      earth: baseTurn0Earth + qaBonusOrbs,
+      metal: baseTurn0Metal + qaBonusOrbs,
     );
     await storage.setHasClaimedQaBonus(true);
     onCloudDataRestored?.call();

@@ -101,6 +101,7 @@ class _GameScreenState extends State<GameScreen>
       _controller = nextController;
       _lastHandledOrbCollectionEventId = nextController.orbCollectionEventId;
       _lastHandledTurnCount = nextController.turnCount;
+      nextController.captureTurn0SnapshotOnBattleEntry();
     }
   }
 
@@ -1158,42 +1159,280 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  String _elementShortName(HandMove move, LocalizationService loc) {
+    final raw = move.displayLabel(elemental: true, localization: loc).trim();
+    if (raw.isEmpty) return move.elementalLabel;
+    if (raw.length == 1) return raw.toUpperCase();
+    return raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+  }
+
+  Widget _buildLostOrbBadge(
+    HandMove move,
+    int lostCount,
+    AppPalette palette,
+    LocalizationService localization,
+  ) {
+    final primary = move.elementalPrimaryColor;
+    final secondary = move.elementalSecondaryColor;
+    final fgColor = palette.elementalText(move);
+    final label = '-$lostCount ${_elementShortName(move, localization)}';
+
+    return Container(
+      key: ValueKey('reset_lost_orb_${move.orbKey}'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: palette.elementalCardBackground(move),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: palette.elementalCardBorder(move),
+          width: 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                center: const Alignment(-0.25, -0.25),
+                colors: [
+                  Color.lerp(primary, Colors.white, 0.55)!,
+                  primary,
+                  secondary,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primary.withValues(alpha: palette.isDark ? 0.55 : 0.3),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                move.elementalIcon,
+                size: 13,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: fgColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmReset(
     BuildContext context,
     GameController controller,
     LocalizationService localization,
   ) async {
+    final lostEntries = <MapEntry<HandMove, int>>[
+      for (final move in HandMove.values)
+        if (controller.lostOrbsFor(move) > 0)
+          MapEntry(move, controller.lostOrbsFor(move)),
+    ];
+
     final shouldReset = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(localization.t('string53', fallback: 'RESET')),
-        content: const Text(
-          'This will clear your scores and prediction history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
+      builder: (dialogContext) {
+        final palette = AppPalette.of(dialogContext);
+        return AlertDialog(
+          key: const ValueKey('reset_confirm_dialog'),
+          backgroundColor: palette.isDark
+              ? const Color(0xFF14161D)
+              : palette.dialogSurface,
+          surfaceTintColor: palette.isDark ? null : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: palette.isDark
+                  ? Colors.redAccent.withValues(alpha: 0.45)
+                  : palette.dangerText.withValues(alpha: 0.38),
+              width: 1.2,
             ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(localization.t('string53', fallback: 'RESET')),
           ),
-        ],
-      ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                color: palette.dangerText,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  localization.t(
+                    'reset_rewind_title',
+                    fallback: 'Rewind to Turn 0?',
+                  ),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  localization.t(
+                    'reset_rewind_message',
+                    fallback:
+                        'Resetting will rewind time back to Turn 0, restoring Mana to 100, HP to 100, scores to 0, and clearing the Markov matrix.',
+                  ),
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.4,
+                    color: palette.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (lostEntries.isNotEmpty)
+                  Container(
+                    key: const ValueKey('reset_orbs_lost_card'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: palette.isDark
+                          ? const Color(0xFF23171B)
+                          : const Color(0xFFFDF0EE),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: palette.dangerText.withValues(
+                          alpha: palette.isDark ? 0.45 : 0.35,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localization.t(
+                            'reset_orbs_lost_header',
+                            fallback: 'Elemental Orbs that will be lost:',
+                          ),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                            color: palette.dangerText,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final entry in lostEntries)
+                              _buildLostOrbBadge(
+                                entry.key,
+                                entry.value,
+                                palette,
+                                localization,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    key: const ValueKey('reset_no_orbs_lost_note'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.isDark
+                          ? const Color(0xFF16241D)
+                          : const Color(0xFFEAF3E8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: palette.successText.withValues(
+                          alpha: palette.isDark ? 0.38 : 0.42,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 18,
+                          color: palette.successText,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            localization.t(
+                              'reset_no_orbs_lost',
+                              fallback: 'No Elemental Orbs will be lost.',
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                              color: palette.successText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('reset_cancel_button'),
+              style: TextButton.styleFrom(
+                foregroundColor: palette.secondaryText,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                localization.t('reset_cancel', fallback: 'Cancel'),
+              ),
+            ),
+            ElevatedButton(
+              key: const ValueKey('reset_confirm_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(localization.t('string53', fallback: 'RESET')),
+            ),
+          ],
+        );
+      },
     );
 
     if (shouldReset == true) {
       controller.resetGame();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Game and prediction matrix have been reset!'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(
+              localization.t(
+                'reset_rewind_done',
+                fallback: 'Time rewound to Turn 0!',
+              ),
+            ),
+            duration: const Duration(seconds: 2),
           ),
         );
       }

@@ -100,6 +100,61 @@ class StorageService {
     ]);
   }
 
+  // Turn 0 Battle Baseline Orb Snapshot
+  static const String _turn0FireKey = 'turn0_orbs_fire';
+  static const String _turn0WaterKey = 'turn0_orbs_water';
+  static const String _turn0WoodKey = 'turn0_orbs_wood';
+  static const String _turn0EarthKey = 'turn0_orbs_earth';
+  static const String _turn0MetalKey = 'turn0_orbs_metal';
+
+  bool get hasTurn0OrbSnapshot =>
+      _prefs.containsKey(_turn0FireKey) &&
+      _prefs.containsKey(_turn0WaterKey) &&
+      _prefs.containsKey(_turn0WoodKey) &&
+      _prefs.containsKey(_turn0EarthKey) &&
+      _prefs.containsKey(_turn0MetalKey);
+
+  int get turn0FireOrbs => _prefs.getInt(_turn0FireKey) ?? fireOrbs;
+  Future<void> setTurn0FireOrbs(int val) => _prefs.setInt(_turn0FireKey, val);
+
+  int get turn0WaterOrbs => _prefs.getInt(_turn0WaterKey) ?? waterOrbs;
+  Future<void> setTurn0WaterOrbs(int val) => _prefs.setInt(_turn0WaterKey, val);
+
+  int get turn0WoodOrbs => _prefs.getInt(_turn0WoodKey) ?? woodOrbs;
+  Future<void> setTurn0WoodOrbs(int val) => _prefs.setInt(_turn0WoodKey, val);
+
+  int get turn0EarthOrbs => _prefs.getInt(_turn0EarthKey) ?? earthOrbs;
+  Future<void> setTurn0EarthOrbs(int val) => _prefs.setInt(_turn0EarthKey, val);
+
+  int get turn0MetalOrbs => _prefs.getInt(_turn0MetalKey) ?? metalOrbs;
+  Future<void> setTurn0MetalOrbs(int val) => _prefs.setInt(_turn0MetalKey, val);
+
+  Future<void> setTurn0Orbs({
+    required int fire,
+    required int water,
+    required int wood,
+    required int earth,
+    required int metal,
+  }) {
+    return Future.wait([
+      setTurn0FireOrbs(fire),
+      setTurn0WaterOrbs(water),
+      setTurn0WoodOrbs(wood),
+      setTurn0EarthOrbs(earth),
+      setTurn0MetalOrbs(metal),
+    ]);
+  }
+
+  Future<void> clearTurn0Orbs() {
+    return Future.wait([
+      _prefs.remove(_turn0FireKey),
+      _prefs.remove(_turn0WaterKey),
+      _prefs.remove(_turn0WoodKey),
+      _prefs.remove(_turn0EarthKey),
+      _prefs.remove(_turn0MetalKey),
+    ]);
+  }
+
   // Legacy diamond key accessor (used only for one-time legacy save migration)
   int get legacyDiamonds => _prefs.getInt('diamonds') ?? 0;
   Future<void> clearLegacyDiamonds() => _prefs.setInt('diamonds', 0);
@@ -451,6 +506,7 @@ class StorageService {
       if (includeSettings) resetSettingsToDefault(),
       setConfirmBattleTeleport(true),
       setAllOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
+      clearTurn0Orbs(),
       clearLegacyDiamonds(),
       setHasClaimedQaBonus(false),
       setUserScore(0),

@@ -3317,14 +3317,20 @@ void main() {
         equals(initialMoveCardRect.bottom),
       );
 
-      // Trigger AppBar Reset -> Mana Pool resets back to 100 and deck matches initial bounds
+      // Trigger AppBar Reset -> shows -1 Wood loss, Mana Pool resets back to 100 and woodOrbs reverts to 0
+      expect(controller.woodOrbs, 1);
       await tester.tap(find.byIcon(Icons.restart_alt));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('reset_confirm_dialog')), findsOneWidget);
+      expect(find.text('-1 Wood'), findsOneWidget);
       await tester.tap(find.widgetWithText(ElevatedButton, 'RESET'));
       await tester.pumpAndSettle();
 
       expect(controller.remainingMana, 100);
       expect(controller.totalRounds, 0);
+      expect(controller.woodOrbs, 0);
+      expect(controller.userHp, 100);
+      expect(controller.computerHp, 100);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),
         findsOneWidget,

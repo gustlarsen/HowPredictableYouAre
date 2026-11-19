@@ -145,6 +145,15 @@ class GameController extends ChangeNotifier {
   int earthOrbs = 0;
   int metalOrbs = 0;
 
+  // Turn 0 Baseline Orb Snapshot (protected across battle rewind;
+  // battle-win and periodic Gift Box orbs are reverted on Reset,
+  // while Rewarded Video Ad +50 orbs are added here so they are preserved).
+  int turn0FireOrbs = 0;
+  int turn0WaterOrbs = 0;
+  int turn0WoodOrbs = 0;
+  int turn0EarthOrbs = 0;
+  int turn0MetalOrbs = 0;
+
   int get totalOrbs =>
       fireOrbs + waterOrbs + woodOrbs + earthOrbs + metalOrbs;
 
@@ -170,6 +179,33 @@ class GameController extends ChangeNotifier {
         return metalOrbs;
     }
   }
+
+  int turn0OrbsFor(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return turn0FireOrbs;
+      case HandMove.paper:
+        return turn0WaterOrbs;
+      case HandMove.scissors:
+        return turn0WoodOrbs;
+      case HandMove.lizard:
+        return turn0EarthOrbs;
+      case HandMove.spock:
+        return turn0MetalOrbs;
+    }
+  }
+
+  /// Reversible [move] orbs gained during this battle that will be lost on Reset.
+  int lostOrbsFor(HandMove move) =>
+      math.max(0, orbsFor(move) - turn0OrbsFor(move));
+
+  /// Per-element breakdown of reversible orbs that will be lost on Reset.
+  Map<HandMove, int> get lostOrbsOnReset => {
+    for (final move in HandMove.values) move: lostOrbsFor(move),
+  };
+
+  int get totalLostOrbsOnReset =>
+      HandMove.values.fold(0, (sum, move) => sum + lostOrbsFor(move));
 
   // Flying Orb VFX tracking for round wins
   HandMove? lastCollectedOrbMove;
@@ -371,6 +407,7 @@ class GameController extends ChangeNotifier {
   void _handleQaBonusGranted() {
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
     _syncOrbsFromStorage();
+    _syncTurn0OrbsFromStorage();
     pendingQaBonusSnackBar = PlayGamesService.qaBonusSnackBarMessage;
     notifyListeners();
   }
@@ -383,6 +420,14 @@ class GameController extends ChangeNotifier {
     metalOrbs = storage.metalOrbs;
   }
 
+  void _syncTurn0OrbsFromStorage() {
+    turn0FireOrbs = storage.turn0FireOrbs;
+    turn0WaterOrbs = storage.turn0WaterOrbs;
+    turn0WoodOrbs = storage.turn0WoodOrbs;
+    turn0EarthOrbs = storage.turn0EarthOrbs;
+    turn0MetalOrbs = storage.turn0MetalOrbs;
+  }
+
   void _persistOrbsToStorage() {
     storage.setAllOrbs(
       fire: fireOrbs,
@@ -391,6 +436,35 @@ class GameController extends ChangeNotifier {
       earth: earthOrbs,
       metal: metalOrbs,
     );
+  }
+
+  void _persistTurn0OrbsToStorage() {
+    storage.setTurn0Orbs(
+      fire: turn0FireOrbs,
+      water: turn0WaterOrbs,
+      wood: turn0WoodOrbs,
+      earth: turn0EarthOrbs,
+      metal: turn0MetalOrbs,
+    );
+  }
+
+  /// Records the player's current Elemental Orb balances as the Turn 0
+  /// baseline snapshot and persists them to [StorageService].
+  void recordTurn0OrbSnapshot() {
+    turn0FireOrbs = fireOrbs;
+    turn0WaterOrbs = waterOrbs;
+    turn0WoodOrbs = woodOrbs;
+    turn0EarthOrbs = earthOrbs;
+    turn0MetalOrbs = metalOrbs;
+    _persistTurn0OrbsToStorage();
+  }
+
+  /// Ensures a Turn 0 baseline snapshot exists when entering [GameScreen]
+  /// before Turn 1 is played.
+  void captureTurn0SnapshotOnBattleEntry() {
+    if (!hasGameStarted && totalRounds == 0 && !storage.hasTurn0OrbSnapshot) {
+      recordTurn0OrbSnapshot();
+    }
   }
 
   void _incrementOrbForMove(HandMove move, int delta) {
@@ -447,6 +521,11 @@ class GameController extends ChangeNotifier {
 
   void _loadState({bool restartAudio = true}) {
     _syncOrbsFromStorage();
+    if (storage.hasTurn0OrbSnapshot) {
+      _syncTurn0OrbsFromStorage();
+    } else {
+      recordTurn0OrbSnapshot();
+    }
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
@@ -695,7 +774,7 @@ class GameController extends ChangeNotifier {
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
-  void resetGame() {
+  void _resetBattleState() {
     userScore = 0;
     pcScore = 0;
     totalRounds = 0;
@@ -704,6 +783,7 @@ class GameController extends ChangeNotifier {
     currentComputerMove = null;
     lastUserMove = null;
     lastWinner = null;
+    lastCollectedOrbMove = null;
     userHp = maxHp;
     computerHp = maxHp;
     is100RoundsAlertPending = false;
@@ -713,23 +793,46 @@ class GameController extends ChangeNotifier {
     storage.setUserHp(maxHp);
     storage.setPcHp(maxHp);
     _computeNextHints();
+  }
+
+  /// Rewinds the active battle back to Turn 0: restores HP (`100`), Mana (`100`),
+  /// scores (`0`), clears the Markov matrix and last-played hands, reverts
+  /// Elemental Orbs back to the Turn 0 Orb Snapshot (removing battle-win and
+  /// periodic Gift Box orbs while preserving Rewarded Ad `+50` orbs), and
+  /// syncs with [StorageService] and [PlayGamesService].
+  void resetGame() {
+    fireOrbs = turn0FireOrbs;
+    waterOrbs = turn0WaterOrbs;
+    woodOrbs = turn0WoodOrbs;
+    earthOrbs = turn0EarthOrbs;
+    metalOrbs = turn0MetalOrbs;
+    _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
+    _resetBattleState();
     _triggerCloudSave();
     notifyListeners();
   }
 
   /// Starts a fresh 100-round battle (100 Mana) from the World Map while
-  /// preserving Elemental Orbs, shop unlocks, and campaign week progress.
+  /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
+  /// and recording the Turn 0 Orb Snapshot for the new battle.
   void startNewBattle() {
-    resetGame();
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
+    _triggerCloudSave();
+    notifyListeners();
   }
 
   /// Advances the campaign calendar by +1 Week upon completing a 100-round
-  /// battle, persists locally, resets the battle arena for the next encounter,
-  /// and syncs with Cloud Save if signed in.
+  /// battle, persists locally, resets the battle arena for the next encounter
+  /// while keeping collected Elemental Orbs, and syncs with Cloud Save.
   void completeBattleWeek() {
     currentWeek += 1;
     storage.setCurrentWeek(currentWeek);
-    resetGame();
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
+    _triggerCloudSave();
+    notifyListeners();
   }
 
   /// Teleports the cleric back to the World Map, preserving all collected
@@ -782,7 +885,13 @@ class GameController extends ChangeNotifier {
     woodOrbs -= cost.wood;
     earthOrbs -= cost.earth;
     metalOrbs -= cost.metal;
+    turn0FireOrbs = math.max(0, turn0FireOrbs - cost.fire);
+    turn0WaterOrbs = math.max(0, turn0WaterOrbs - cost.water);
+    turn0WoodOrbs = math.max(0, turn0WoodOrbs - cost.wood);
+    turn0EarthOrbs = math.max(0, turn0EarthOrbs - cost.earth);
+    turn0MetalOrbs = math.max(0, turn0MetalOrbs - cost.metal);
     _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
     onUnlock();
     _triggerCloudSave();
     notifyListeners();
@@ -1051,7 +1160,13 @@ class GameController extends ChangeNotifier {
     woodOrbs += rewardedAdOrbBonus;
     earthOrbs += rewardedAdOrbBonus;
     metalOrbs += rewardedAdOrbBonus;
+    turn0FireOrbs += rewardedAdOrbBonus;
+    turn0WaterOrbs += rewardedAdOrbBonus;
+    turn0WoodOrbs += rewardedAdOrbBonus;
+    turn0EarthOrbs += rewardedAdOrbBonus;
+    turn0MetalOrbs += rewardedAdOrbBonus;
     _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
     isRewardedAdOnCooldown = true;
     _rewardedAdCooldownUntil = DateTime.now().add(rewardedAdCooldownDuration);
     _rewardedAdCooldownTimer?.cancel();
@@ -1457,8 +1572,10 @@ class GameController extends ChangeNotifier {
       enableExtendedHands: val,
       enableElementalMode: isElementalMode,
     );
-    resetGame();
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
     _triggerCloudSave();
+    notifyListeners();
   }
 
   /// Toggles the "New Skin" item ON or OFF seamlessly over the
@@ -1555,7 +1672,13 @@ class GameController extends ChangeNotifier {
     woodOrbs += amount;
     earthOrbs += amount;
     metalOrbs += amount;
+    turn0FireOrbs += amount;
+    turn0WaterOrbs += amount;
+    turn0WoodOrbs += amount;
+    turn0EarthOrbs += amount;
+    turn0MetalOrbs += amount;
     _persistOrbsToStorage();
+    _persistTurn0OrbsToStorage();
     _triggerCloudSave();
     notifyListeners();
   }
@@ -1563,6 +1686,28 @@ class GameController extends ChangeNotifier {
   /// Grants [amount] of a specific element's orb.
   void addOrbForMove(HandMove move, int amount) {
     _incrementOrbForMove(move, amount);
+    switch (move) {
+      case HandMove.rock:
+        turn0FireOrbs += amount;
+        storage.setTurn0FireOrbs(turn0FireOrbs);
+        break;
+      case HandMove.paper:
+        turn0WaterOrbs += amount;
+        storage.setTurn0WaterOrbs(turn0WaterOrbs);
+        break;
+      case HandMove.scissors:
+        turn0WoodOrbs += amount;
+        storage.setTurn0WoodOrbs(turn0WoodOrbs);
+        break;
+      case HandMove.lizard:
+        turn0EarthOrbs += amount;
+        storage.setTurn0EarthOrbs(turn0EarthOrbs);
+        break;
+      case HandMove.spock:
+        turn0MetalOrbs += amount;
+        storage.setTurn0MetalOrbs(turn0MetalOrbs);
+        break;
+    }
     _triggerCloudSave();
     notifyListeners();
   }
