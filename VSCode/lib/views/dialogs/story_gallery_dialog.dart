@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
+import '../../theme/app_theme.dart';
 import 'story_dialog.dart';
 
 class StoryGalleryDialog extends StatelessWidget {
@@ -19,6 +20,7 @@ class StoryGalleryDialog extends StatelessWidget {
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final chapters = StoryChapter.values;
     final unlockedCount =
         chapters.where((c) => controller.isStoryChapterUnlocked(c)).length;
@@ -36,6 +38,8 @@ class StoryGalleryDialog extends StatelessWidget {
     final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
 
     return Dialog(
+      backgroundColor: palette.isDark ? null : palette.dialogSurface,
+      surfaceTintColor: palette.isDark ? null : Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480, maxHeight: 660),
@@ -50,9 +54,9 @@ class StoryGalleryDialog extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.auto_stories_outlined,
-                          color: Colors.amber,
+                          color: palette.amberIcon,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -63,12 +67,15 @@ class StoryGalleryDialog extends StatelessWidget {
                                 title,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: palette.primaryText,
                                 ),
                               ),
                               Text(
                                 subtitle,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: palette.isDark
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : palette.secondaryText,
                                   fontSize: 11,
                                 ),
                               ),
@@ -84,24 +91,31 @@ class StoryGalleryDialog extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.16),
+                      color: palette.isDark
+                          ? Colors.amber.withValues(alpha: 0.16)
+                          : palette.rewardedAdCardSurface,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.4),
+                        color: palette.isDark
+                            ? Colors.amber.withValues(alpha: 0.4)
+                            : palette.rewardedAdCardBorder,
                       ),
                     ),
                     child: Text(
                       '$unlockedCount / ${chapters.length}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        color: Colors.amber,
+                        color: palette.amberText,
                       ),
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 24),
+              Divider(
+                height: 24,
+                color: palette.isDark ? null : palette.divider,
+              ),
 
               // Chapters List
               Expanded(
@@ -159,6 +173,11 @@ class StoryGalleryDialog extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
+                  style: palette.isDark
+                      ? null
+                      : TextButton.styleFrom(
+                          foregroundColor: palette.amberText,
+                        ),
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(loc.t('string36', fallback: 'Close')),
                 ),
@@ -202,17 +221,26 @@ class _StoryChapterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: isUnlocked ? 0.45 : 0.22,
-        ),
+        color: palette.isDark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: isUnlocked ? 0.45 : 0.22,
+              )
+            : (isUnlocked
+                  ? palette.dialogCardSurface
+                  : palette.sandCardSurface.withValues(alpha: 0.72)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isUnlocked
-              ? Colors.amber.withValues(alpha: 0.45)
-              : theme.colorScheme.outline.withValues(alpha: 0.2),
+              ? palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.45 : 0.65,
+                )
+              : (palette.isDark
+                    ? theme.colorScheme.outline.withValues(alpha: 0.2)
+                    : palette.sandCardBorder),
           width: 1.2,
         ),
       ),
@@ -238,8 +266,12 @@ class _StoryChapterCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: isUnlocked
-                            ? Colors.amber.withValues(alpha: 0.2)
-                            : Colors.white10,
+                            ? (palette.isDark
+                                  ? Colors.amber.withValues(alpha: 0.2)
+                                  : palette.rewardedAdCardSurface)
+                            : (palette.isDark
+                                  ? Colors.white10
+                                  : palette.sandCardSurface),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -247,7 +279,11 @@ class _StoryChapterCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isUnlocked ? Colors.amber : Colors.white54,
+                          color: isUnlocked
+                              ? palette.amberText
+                              : (palette.isDark
+                                    ? Colors.white54
+                                    : palette.secondaryText),
                         ),
                       ),
                     ),
@@ -255,7 +291,7 @@ class _StoryChapterCard extends StatelessWidget {
                     Icon(
                       isUnlocked ? chapter.icon : Icons.help_outline,
                       size: 15,
-                      color: isUnlocked ? Colors.amber : Colors.grey,
+                      color: isUnlocked ? palette.amberIcon : palette.mutedText,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -265,9 +301,9 @@ class _StoryChapterCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 13.5,
                           color: isUnlocked
-                              ? theme.colorScheme.onSurface
-                              : theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.55,
+                              ? palette.primaryText
+                              : palette.primaryText.withValues(
+                                  alpha: palette.isDark ? 0.55 : 0.65,
                                 ),
                         ),
                       ),
@@ -280,10 +316,14 @@ class _StoryChapterCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11.5,
                     color: isUnlocked
-                        ? Colors.amber.shade300
-                        : theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.65,
-                          ),
+                        ? (palette.isDark
+                              ? Colors.amber.shade300
+                              : palette.amberSubtitle)
+                        : (palette.isDark
+                              ? theme.colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.65,
+                                )
+                              : palette.secondaryText),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -354,24 +394,32 @@ class _StoryChapterCard extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.16),
+                          color: palette.isDark
+                              ? Colors.amber.withValues(alpha: 0.16)
+                              : palette.rewardedAdCardSurface,
                           borderRadius: BorderRadius.circular(10),
+                          border: palette.isDark
+                              ? null
+                              : Border.all(
+                                  color: palette.rewardedAdCardBorder
+                                      .withValues(alpha: 0.65),
+                                ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.menu_book_rounded,
                               size: 16,
-                              color: Colors.amber,
+                              color: palette.amberText,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               replayLabel,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.amber,
+                                color: palette.amberText,
                               ),
                             ),
                           ],
@@ -381,9 +429,9 @@ class _StoryChapterCard extends StatelessWidget {
                       Padding(
                         key: ValueKey('story_gallery_lock_icon_${chapter.id}'),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: const Icon(
+                        child: Icon(
                           Icons.lock_rounded,
-                          color: Colors.grey,
+                          color: palette.mutedText,
                           size: 20,
                         ),
                       ),

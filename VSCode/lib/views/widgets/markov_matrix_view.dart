@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/markov_engine.dart';
 import '../../services/localization_service.dart';
 import '../../models/move.dart';
+import '../../theme/app_theme.dart';
 
 class MarkovMatrixView extends StatelessWidget {
   final MarkovEngine engine;
@@ -17,8 +18,13 @@ class MarkovMatrixView extends StatelessWidget {
     this.localization,
   });
 
-  Widget _buildMoveHeader(HandMove move, {bool isHighlighted = false}) {
+  Widget _buildMoveHeader(
+    AppPalette palette,
+    HandMove move, {
+    bool isHighlighted = false,
+  }) {
     if (elementalMode) {
+      final elementColor = palette.elementalText(move);
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -28,7 +34,7 @@ class MarkovMatrixView extends StatelessWidget {
               Icon(
                 move.elementalIcon,
                 size: 18,
-                color: move.elementalPrimaryColor,
+                color: elementColor,
               ),
               Text(
                 move.displayLabel(elemental: true, localization: localization),
@@ -36,7 +42,7 @@ class MarkovMatrixView extends StatelessWidget {
                   fontSize: 8.5,
                   fontWeight:
                       isHighlighted ? FontWeight.bold : FontWeight.w600,
-                  color: move.elementalPrimaryColor,
+                  color: elementColor,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -63,11 +69,20 @@ class MarkovMatrixView extends StatelessWidget {
     final moves = engine.activeMoves;
     final matrix = engine.matrix;
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
 
     return Card(
-      color: theme.colorScheme.surface.withValues(alpha: 0.9),
+      color: palette.isDark
+          ? theme.colorScheme.surface.withValues(alpha: 0.9)
+          : palette.deckSurface,
+      surfaceTintColor: palette.isDark ? null : Colors.transparent,
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: palette.isDark
+            ? BorderSide.none
+            : BorderSide(color: palette.sandCardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
@@ -79,6 +94,7 @@ class MarkovMatrixView extends StatelessWidget {
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
+                color: palette.primaryText,
               ),
             ),
             const SizedBox(height: 10),
@@ -89,7 +105,7 @@ class MarkovMatrixView extends StatelessWidget {
                 TableRow(
                   children: [
                     const SizedBox(width: 32),
-                    ...moves.map((m) => _buildMoveHeader(m)),
+                    ...moves.map((m) => _buildMoveHeader(palette, m)),
                   ],
                 ),
                 // Matrix rows
@@ -102,13 +118,16 @@ class MarkovMatrixView extends StatelessWidget {
                   return TableRow(
                     decoration: isCurrentLastMove
                         ? BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.15),
+                            color: palette.amberBorder.withValues(
+                              alpha: palette.isDark ? 0.15 : 0.18,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                           )
                         : null,
                     children: [
                       // Row header
                       _buildMoveHeader(
+                        palette,
                         rowMove,
                         isHighlighted: isCurrentLastMove,
                       ),
@@ -122,11 +141,22 @@ class MarkovMatrixView extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           decoration: BoxDecoration(
                             color: isMax
-                                ? Colors.amber.withValues(alpha: 0.3)
-                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                ? palette.amberBorder.withValues(
+                                    alpha: palette.isDark ? 0.3 : 0.24,
+                                  )
+                                : (palette.isDark
+                                      ? theme
+                                            .colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.4)
+                                      : palette.sandCardSurface),
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
-                              color: isMax ? Colors.amber : Colors.transparent,
+                              color: isMax
+                                  ? (palette.isDark
+                                        ? Colors.amber
+                                        : palette.amberIcon)
+                                  : Colors.transparent,
                               width: 1.5,
                             ),
                           ),
@@ -134,8 +164,12 @@ class MarkovMatrixView extends StatelessWidget {
                             child: Text(
                               '$val',
                               style: TextStyle(
-                                fontWeight: isMax ? FontWeight.bold : FontWeight.normal,
-                                color: isMax ? Colors.amber : theme.colorScheme.onSurface,
+                                fontWeight: isMax
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isMax
+                                    ? palette.amberText
+                                    : palette.primaryText,
                                 fontSize: 13,
                               ),
                             ),

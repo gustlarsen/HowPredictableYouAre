@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/ad_service.dart';
+import '../../theme/app_theme.dart';
 
 /// An adaptive pill-styled Rewarded Ad button for the top AppBar and navigation bars.
 ///
@@ -8,7 +9,8 @@ import '../../services/ad_service.dart';
 ///   readable pill label ("Watch Ad +50 Orbs" or custom [label]) at normal font size.
 /// - When horizontal space is tight (< [compactBreakpoint]): automatically switches
 ///   to a compact pill featuring a clear video icon ([Icons.ondemand_video_rounded])
-///   paired with "+50", preserving the dark/amber pill styling and full AdMob disclosure tooltip.
+///   paired with "+50", preserving the dark/amber or light parchment/bronze pill
+///   styling and full AdMob disclosure tooltip.
 class AdaptiveRewardedAdButton extends StatelessWidget {
   final VoidCallback onTap;
   final String tooltip;
@@ -27,6 +29,7 @@ class AdaptiveRewardedAdButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final effectiveWidth = maxWidth ?? constraints.maxWidth;
@@ -45,44 +48,50 @@ class AdaptiveRewardedAdButton extends StatelessWidget {
                 vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF151821).withValues(alpha: 0.90),
+                color: palette.isDark
+                    ? const Color(0xFF151821).withValues(alpha: 0.90)
+                    : palette.dialogSurface.withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.amber.withValues(alpha: 0.55),
+                  color: palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.55 : 0.85,
+                  ),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.amber.withValues(alpha: 0.15),
+                    color: palette.amberBorder.withValues(
+                      alpha: palette.isDark ? 0.15 : 0.22,
+                    ),
                     blurRadius: 4,
                   ),
                 ],
               ),
               child: isCompact
-                  ? const Row(
+                  ? Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.ondemand_video_rounded,
                           size: 16,
-                          color: Colors.amber,
+                          color: palette.amberText,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           '+50',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
-                            color: Colors.amber,
+                            color: palette.amberText,
                           ),
                         ),
                       ],
                     )
                   : Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 10.5,
-                        color: Colors.amber,
+                        color: palette.amberText,
                       ),
                     ),
             ),

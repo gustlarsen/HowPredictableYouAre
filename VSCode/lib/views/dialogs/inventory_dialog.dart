@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../services/play_games_service.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import 'shop_dialog.dart';
 
@@ -100,6 +101,7 @@ class _InventoryDialogState extends State<InventoryDialog>
       builder: (context, _) {
         final loc = controller.localization;
         final theme = Theme.of(context);
+        final palette = AppPalette.of(context);
         final isNewHandsActive = controller.showNewHands;
         final ownedOrbs = {
           for (final move in HandMove.values)
@@ -125,15 +127,19 @@ class _InventoryDialogState extends State<InventoryDialog>
                   child: Container(
                     key: const ValueKey('inventory_dialog_card'),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF14161D),
+                      color: palette.dialogSurface,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.45),
+                        color: palette.amberBorder.withValues(
+                          alpha: palette.isDark ? 0.45 : 0.55,
+                        ),
                         width: 1.4,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.55),
+                          color: Colors.black.withValues(
+                            alpha: palette.isDark ? 0.55 : 0.22,
+                          ),
                           blurRadius: 24,
                           offset: const Offset(0, 12),
                         ),
@@ -168,7 +174,7 @@ class _InventoryDialogState extends State<InventoryDialog>
                                       style: theme.textTheme.titleMedium
                                           ?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: palette.primaryText,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -180,9 +186,10 @@ class _InventoryDialogState extends State<InventoryDialog>
                                       ),
                                       style: TextStyle(
                                         fontSize: 11.5,
-                                        color: Colors.amber.withValues(
-                                          alpha: 0.85,
-                                        ),
+                                        fontWeight: palette.isDark
+                                            ? FontWeight.normal
+                                            : FontWeight.w600,
+                                        color: palette.amberSubtitle,
                                       ),
                                     ),
                                   ],
@@ -193,7 +200,7 @@ class _InventoryDialogState extends State<InventoryDialog>
                           const SizedBox(height: 12),
                           Divider(
                             height: 1,
-                            color: Colors.amber.withValues(alpha: 0.22),
+                            color: palette.divider,
                           ),
                           const SizedBox(height: 12),
 
@@ -248,7 +255,7 @@ class _InventoryDialogState extends State<InventoryDialog>
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber,
-                            foregroundColor: Colors.black87,
+                            foregroundColor: const Color(0xFF231F1A),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
@@ -279,9 +286,11 @@ class _InventoryDialogState extends State<InventoryDialog>
                         key: const ValueKey('inventory_close_button'),
                         onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.amber,
+                          foregroundColor: palette.amberText,
                           side: BorderSide(
-                            color: Colors.amber.withValues(alpha: 0.55),
+                            color: palette.amberBorder.withValues(
+                              alpha: palette.isDark ? 0.55 : 0.70,
+                            ),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -373,25 +382,29 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     final primaryColor = move.elementalPrimaryColor;
     final secondaryColor = move.elementalSecondaryColor;
+    final textElementColor = palette.elementalText(move);
 
     return Container(
       key: ValueKey('inventory_orb_row_${move.orbKey}'),
       margin: const EdgeInsets.symmetric(vertical: 4.5),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C202B).withValues(
-          alpha: isCombatLocked ? 0.65 : 0.92,
-        ),
+        color: palette.elementalCardBackground(move, locked: isCombatLocked),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: primaryColor.withValues(alpha: isCombatLocked ? 0.28 : 0.52),
+          color: palette.elementalCardBorder(move, locked: isCombatLocked),
           width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withValues(alpha: isCombatLocked ? 0.06 : 0.14),
+            color: textElementColor.withValues(
+              alpha: palette.isDark
+                  ? (isCombatLocked ? 0.06 : 0.14)
+                  : (isCombatLocked ? 0.04 : 0.10),
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -421,7 +434,9 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.45),
+                  color: primaryColor.withValues(
+                    alpha: palette.isDark ? 0.45 : 0.30,
+                  ),
                   blurRadius: 8,
                   spreadRadius: 0.8,
                 ),
@@ -458,7 +473,7 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: primaryColor,
+                          color: textElementColor,
                         ),
                       ),
                     ),
@@ -468,7 +483,9 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: palette.isDark
+                            ? Colors.white.withValues(alpha: 0.6)
+                            : palette.secondaryText,
                       ),
                     ),
                   ],
@@ -482,8 +499,12 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
                           : Icons.check_circle_outline_rounded,
                       size: 12,
                       color: isCombatLocked
-                          ? Colors.amber.withValues(alpha: 0.75)
-                          : Colors.greenAccent.withValues(alpha: 0.8),
+                          ? (palette.isDark
+                                ? Colors.amber.withValues(alpha: 0.75)
+                                : palette.amberText)
+                          : (palette.isDark
+                                ? Colors.greenAccent.withValues(alpha: 0.8)
+                                : palette.successText),
                     ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -493,9 +514,16 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
+                          fontWeight: palette.isDark
+                              ? FontWeight.normal
+                              : FontWeight.w500,
                           color: isCombatLocked
-                              ? Colors.amber.withValues(alpha: 0.78)
-                              : Colors.white.withValues(alpha: 0.65),
+                              ? (palette.isDark
+                                    ? Colors.amber.withValues(alpha: 0.78)
+                                    : palette.amberText)
+                              : (palette.isDark
+                                    ? Colors.white.withValues(alpha: 0.65)
+                                    : palette.secondaryText),
                         ),
                       ),
                     ),
@@ -510,10 +538,12 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: primaryColor.withValues(alpha: 0.14),
+              color: textElementColor.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: primaryColor.withValues(alpha: 0.4),
+                color: textElementColor.withValues(
+                  alpha: palette.isDark ? 0.4 : 0.5,
+                ),
               ),
             ),
             child: Text(
@@ -522,7 +552,9 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.95),
+                color: palette.isDark
+                    ? Colors.white.withValues(alpha: 0.95)
+                    : palette.primaryText,
               ),
             ),
           ),

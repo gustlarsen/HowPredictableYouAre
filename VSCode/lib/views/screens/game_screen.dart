@@ -10,6 +10,7 @@ import '../../services/ad_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
@@ -217,70 +218,93 @@ class _GameScreenState extends State<GameScreen>
               emoji = '🙁';
             }
 
-            return PopScope(
-              canPop: false,
-              child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              title: Row(
-                children: [
-                  Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 32),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      alertTitle,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            return Builder(
+              builder: (dialogCtx) {
+                final palette = AppPalette.of(dialogCtx);
+                return PopScope(
+                  canPop: false,
+                  child: AlertDialog(
+                    backgroundColor:
+                        palette.isDark ? null : palette.dialogSurface,
+                    surfaceTintColor:
+                        palette.isDark ? null : Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    alertSubtitle,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                    title: Row(
+                      children: [
+                        Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 32),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            alertTitle,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: palette.primaryText,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${loc.t('string2', fallback: 'You are:')} '
-                    '${loc.t(tier.key, fallback: tier.fallbackDescription)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Colors.amber,
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          alertSubtitle,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: palette.primaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '${loc.t('string2', fallback: 'You are:')} '
+                          '${loc.t(tier.key, fallback: tier.fallbackDescription)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: palette.amberText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'AI Predictability Score: ${pct.toStringAsFixed(1)}%\n'
+                          'Your Wins: ${controller.userScore} | PC Wins: ${controller.pcScore}',
+                          style: TextStyle(
+                            height: 1.4,
+                            color: palette.secondaryText,
+                          ),
+                        ),
+                      ],
                     ),
+                    actions: [
+                      ElevatedButton(
+                        style: palette.isDark
+                            ? null
+                            : ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber,
+                                foregroundColor: const Color(0xFF231F1A),
+                              ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          controller.resetGame();
+                        },
+                        child: Text(
+                          loc.t('string76', fallback: 'TRY AGAIN'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'AI Predictability Score: ${pct.toStringAsFixed(1)}%\n'
-                    'Your Wins: ${controller.userScore} | PC Wins: ${controller.pcScore}',
-                    style: const TextStyle(height: 1.4),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    controller.resetGame();
-                  },
-                  child: Text(
-                    loc.t('string76', fallback: 'TRY AGAIN'),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          );
+                );
+              },
+            );
           },
         );
       });
@@ -425,6 +449,8 @@ class _GameScreenState extends State<GameScreen>
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         centerTitle: false,
         automaticallyImplyLeading: false,
@@ -712,112 +738,141 @@ class _GameScreenState extends State<GameScreen>
                         16,
                         controller.shouldShowBannerAd ? 10 : 8,
                       ),
-                      child: Container(
-                        key: const ValueKey('move_selection_card'),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.amber.withValues(alpha: 0.25),
-                            width: 1.0,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              blurRadius: 12,
-                              spreadRadius: 1,
-                              offset: const Offset(0, -4),
-                            ),
-                          ],
-                        ),
-                        child: Card(
-                          margin: EdgeInsets.zero,
-                          elevation: 0,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.94),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                              horizontal: 10,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Hand move buttons (single row for 3 classic or all 5 hands)
-                                Row(
-                                  key: const ValueKey('hand_buttons_row'),
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    for (final move in [
-                                      HandMove.rock,
-                                      HandMove.paper,
-                                      HandMove.scissors,
-                                      if (controller.showNewHands) ...[
-                                        HandMove.lizard,
-                                        HandMove.spock,
-                                      ],
-                                    ])
-                                      _HandActionButton(
-                                        key: ValueKey(
-                                          'hand_button_${move.name}',
-                                        ),
-                                        move: move,
-                                        compact: controller.showNewHands,
-                                        elementalMode:
-                                            controller.isElementalMode,
-                                        isSelected:
-                                            controller.currentUserMove == move,
-                                        localization: loc,
-                                        animationsEnabled:
-                                            controller.animationsEnabled,
-                                        onPressed: () =>
-                                            controller.playTurn(move),
-                                      ),
-                                  ],
+                      child: Builder(
+                        builder: (context) {
+                          final palette = AppPalette.of(context);
+                          return Container(
+                            key: const ValueKey('move_selection_card'),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: palette.amberBorder.withValues(
+                                  alpha: palette.isDark ? 0.25 : 0.45,
                                 ),
-
-                                // Optional Random move button (if unlocked & enabled)
-                                if (controller.showRandom) ...[
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: OutlinedButton.icon(
-                                      key: const ValueKey('random_move_button'),
-                                      onPressed: controller.playRandom,
-                                      icon: const Icon(
-                                        Icons.casino_outlined,
-                                        size: 18,
-                                      ),
-                                      label: Text(
-                                        loc.t(
-                                          'string16',
-                                          fallback: 'RANDOM MOVE',
-                                        ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        visualDensity: VisualDensity.compact,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                      ),
-                                    ),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: palette.isDark ? 0.45 : 0.22,
                                   ),
-                                ],
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, -4),
+                                ),
                               ],
                             ),
-                          ),
-                        ),
+                            child: Card(
+                              margin: EdgeInsets.zero,
+                              elevation: 0,
+                              color: palette.isDark
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.surface.withValues(alpha: 0.94)
+                                  : palette.deckSurface,
+                              surfaceTintColor:
+                                  palette.isDark ? null : Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                  horizontal: 10,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Hand move buttons (single row for 3 classic or all 5 hands)
+                                    Row(
+                                      key: const ValueKey('hand_buttons_row'),
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        for (final move in [
+                                          HandMove.rock,
+                                          HandMove.paper,
+                                          HandMove.scissors,
+                                          if (controller.showNewHands) ...[
+                                            HandMove.lizard,
+                                            HandMove.spock,
+                                          ],
+                                        ])
+                                          _HandActionButton(
+                                            key: ValueKey(
+                                              'hand_button_${move.name}',
+                                            ),
+                                            move: move,
+                                            compact: controller.showNewHands,
+                                            elementalMode:
+                                                controller.isElementalMode,
+                                            isSelected:
+                                                controller.currentUserMove ==
+                                                move,
+                                            localization: loc,
+                                            animationsEnabled:
+                                                controller.animationsEnabled,
+                                            onPressed: () =>
+                                                controller.playTurn(move),
+                                          ),
+                                      ],
+                                    ),
+
+                                    // Optional Random move button (if unlocked & enabled)
+                                    if (controller.showRandom) ...[
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          key: const ValueKey(
+                                            'random_move_button',
+                                          ),
+                                          onPressed: controller.playRandom,
+                                          icon: const Icon(
+                                            Icons.casino_outlined,
+                                            size: 18,
+                                          ),
+                                          label: Text(
+                                            loc.t(
+                                              'string16',
+                                              fallback: 'RANDOM MOVE',
+                                            ),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: palette.isDark
+                                                ? null
+                                                : palette.amberText,
+                                            backgroundColor: palette.isDark
+                                                ? null
+                                                : palette.dialogCardSurface,
+                                            side: palette.isDark
+                                                ? null
+                                                : BorderSide(
+                                                    color: palette.amberBorder
+                                                        .withValues(alpha: 0.65),
+                                                  ),
+                                            visualDensity: VisualDensity.compact,
+                                            tapTargetSize:
+                                                MaterialTapTargetSize
+                                                    .shrinkWrap,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                              horizontal: 12,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -1106,12 +1161,14 @@ class _HandActionButtonState extends State<_HandActionButton>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final hasAsset = widget.move.leftAsset.isNotEmpty;
     final compact = widget.compact;
     final elemental = widget.elementalMode;
     final isSelected = widget.isSelected;
     final primaryColor = widget.move.elementalPrimaryColor;
     final secondaryColor = widget.move.elementalSecondaryColor;
+    final elementLabelColor = palette.elementalText(widget.move);
 
     final horizontalPadding = compact ? 6.0 : 14.0;
     final verticalPadding = compact ? 8.0 : 10.0;
@@ -1162,7 +1219,9 @@ class _HandActionButtonState extends State<_HandActionButton>
             ],
           )
         : BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+            color: palette.isDark
+                ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                : palette.amberBorder.withValues(alpha: 0.14),
             shape: BoxShape.circle,
           );
 
@@ -1176,21 +1235,32 @@ class _HandActionButtonState extends State<_HandActionButton>
         ),
         decoration: BoxDecoration(
           color: elemental
-              ? const Color(0xFF10131C).withValues(alpha: 0.85)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
+              ? (palette.isDark
+                    ? const Color(0xFF10131C).withValues(alpha: 0.85)
+                    : palette.elementalCardBackground(widget.move))
+              : (palette.isDark
+                    ? theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.5,
+                      )
+                    : palette.sandCardSurface),
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: elemental
-                ? primaryColor.withValues(alpha: isSelected ? 0.7 : 0.35)
-                : theme.colorScheme.outline.withValues(alpha: 0.2),
+                ? (palette.isDark
+                      ? primaryColor.withValues(alpha: isSelected ? 0.7 : 0.35)
+                      : elementLabelColor.withValues(
+                          alpha: isSelected ? 0.85 : 0.48,
+                        ))
+                : (palette.isDark
+                      ? theme.colorScheme.outline.withValues(alpha: 0.2)
+                      : palette.sandCardBorder),
             width: elemental && isSelected ? 1.5 : 1.0,
           ),
           boxShadow: elemental && isSelected
               ? [
                   BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.25),
+                    color: (palette.isDark ? primaryColor : elementLabelColor)
+                        .withValues(alpha: palette.isDark ? 0.25 : 0.18),
                     blurRadius: 8,
                     spreadRadius: 1,
                   ),
@@ -1240,7 +1310,9 @@ class _HandActionButtonState extends State<_HandActionButton>
                 fontWeight: FontWeight.bold,
                 fontSize: labelFontSize,
                 letterSpacing: letterSpacing,
-                color: elemental ? primaryColor : null,
+                color: elemental
+                    ? elementLabelColor
+                    : (palette.isDark ? null : palette.primaryText),
               ),
             ),
           ],

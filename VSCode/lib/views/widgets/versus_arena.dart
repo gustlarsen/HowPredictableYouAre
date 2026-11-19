@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../models/move.dart';
 import '../../services/localization_service.dart';
+import '../../theme/app_theme.dart';
 import 'mana_pool_orb.dart';
 import 'rpg_hp_bar.dart';
 
@@ -270,21 +271,22 @@ class _VersusArenaState extends State<VersusArena>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final winner = widget.winner;
 
     Color outcomeColor;
     switch (winner) {
       case RoundWinner.user:
-        outcomeColor = Colors.green;
+        outcomeColor = palette.isDark ? Colors.green : palette.successText;
         break;
       case RoundWinner.computer:
-        outcomeColor = Colors.redAccent;
+        outcomeColor = palette.dangerText;
         break;
       case RoundWinner.draw:
-        outcomeColor = Colors.amber;
+        outcomeColor = palette.amberText;
         break;
       case null:
-        outcomeColor = Colors.grey;
+        outcomeColor = palette.isDark ? Colors.grey : palette.mutedText;
         break;
     }
 
@@ -303,8 +305,8 @@ class _VersusArenaState extends State<VersusArena>
             ) ??
             '';
         battleDescColor = widget.elementalMode
-            ? widget.userMove!.elementalPrimaryColor
-            : Colors.greenAccent;
+            ? palette.elementalText(widget.userMove!)
+            : palette.successText;
       } else if (pcWins) {
         battleDescription = widget.computerMove!.battleDescriptionAgainst(
               widget.userMove!,
@@ -313,8 +315,8 @@ class _VersusArenaState extends State<VersusArena>
             ) ??
             '';
         battleDescColor = widget.elementalMode
-            ? widget.computerMove!.elementalPrimaryColor
-            : Colors.redAccent;
+            ? palette.elementalText(widget.computerMove!)
+            : palette.dangerText;
       } else if (isDraw) {
         final drawKey = widget.elementalMode
             ? 'battle_draw_elemental'
@@ -326,7 +328,7 @@ class _VersusArenaState extends State<VersusArena>
           drawKey,
           fallback: drawFallback,
         );
-        battleDescColor = Colors.amber;
+        battleDescColor = palette.amberText;
       } else {
         final idleKey = widget.elementalMode
             ? 'battle_idle_elemental'
@@ -338,7 +340,8 @@ class _VersusArenaState extends State<VersusArena>
           idleKey,
           fallback: idleFallback,
         );
-        battleDescColor = Colors.grey.shade400;
+        battleDescColor =
+            palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
       }
     } else if (isDraw) {
       final drawKey = widget.elementalMode
@@ -351,7 +354,7 @@ class _VersusArenaState extends State<VersusArena>
         drawKey,
         fallback: drawFallback,
       );
-      battleDescColor = Colors.amber;
+      battleDescColor = palette.amberText;
     } else {
       final idleKey = widget.elementalMode
           ? 'battle_idle_elemental'
@@ -363,7 +366,8 @@ class _VersusArenaState extends State<VersusArena>
         idleKey,
         fallback: idleFallback,
       );
-      battleDescColor = Colors.grey.shade400;
+      battleDescColor =
+          palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
     }
 
     if (battleDescription.isEmpty) {
@@ -377,18 +381,21 @@ class _VersusArenaState extends State<VersusArena>
         idleKey,
         fallback: idleFallback,
       );
-      battleDescColor = Colors.grey.shade400;
+      battleDescColor =
+          palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.85),
+        color: palette.isDark
+            ? theme.colorScheme.surface.withValues(alpha: 0.85)
+            : palette.arenaSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: winner != null
-              ? outcomeColor.withValues(alpha: 0.7)
-              : theme.dividerColor,
+              ? outcomeColor.withValues(alpha: palette.isDark ? 0.7 : 0.8)
+              : (palette.isDark ? theme.dividerColor : palette.sandCardBorder),
           width: 2,
         ),
         boxShadow: [
@@ -1678,6 +1685,7 @@ class _MoveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     final assetPath = isLeft ? move?.leftAsset : move?.rightAsset;
     final hasAsset = assetPath != null && assetPath.isNotEmpty;
 
@@ -1740,27 +1748,38 @@ class _MoveCard extends StatelessWidget {
           )
         : BoxDecoration(
             color: isWinner
-                ? Colors.green.withValues(alpha: 0.25)
-                : Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+                ? (palette.isDark
+                      ? Colors.green.withValues(alpha: 0.25)
+                      : palette.successText.withValues(alpha: 0.14))
+                : (palette.isDark
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.85,
+                        )
+                      : palette.sandCardSurface),
             shape: BoxShape.circle,
             border: Border.all(
               color: isWinner
-                  ? Colors.green
+                  ? (palette.isDark ? Colors.green : palette.successText)
                   : (flashOpacity > 0.0
                       ? Color.lerp(
                           Colors.white,
                           Colors.redAccent,
                           0.65,
                         )!.withValues(alpha: 0.85)
-                      : Colors.white24),
+                      : (palette.isDark
+                            ? Colors.white24
+                            : palette.sandCardBorder)),
               width: isWinner ? 3 : (flashOpacity > 0.0 ? 2.5 : 1.5),
             ),
             boxShadow: isWinner
                 ? [
                     BoxShadow(
-                      color: Colors.green.withValues(alpha: 0.4),
+                      color: (palette.isDark
+                              ? Colors.green
+                              : palette.successText)
+                          .withValues(alpha: 0.35),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
@@ -1789,9 +1808,12 @@ class _MoveCard extends StatelessWidget {
           decoration: circleDecoration,
           child: Center(
             child: move == null
-                ? const Text(
+                ? Text(
                     '?',
-                    style: TextStyle(fontSize: 34, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 34,
+                      color: palette.isDark ? Colors.grey : palette.mutedText,
+                    ),
                   )
                 : elementalMode
                 ? Icon(
@@ -1901,7 +1923,11 @@ class _MoveCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: palette.isDark ? FontWeight.normal : FontWeight.w600,
+              color: palette.isDark ? Colors.grey : palette.mutedText,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1934,8 +1960,8 @@ class _MoveCard extends StatelessWidget {
               fontSize: 13,
               letterSpacing: 0.5,
               color: (elementalMode && move != null)
-                  ? move!.elementalPrimaryColor
-                  : null,
+                  ? palette.elementalText(move!)
+                  : (palette.isDark ? null : palette.primaryText),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

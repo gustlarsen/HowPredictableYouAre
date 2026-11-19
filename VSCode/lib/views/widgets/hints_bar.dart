@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
+import '../../theme/app_theme.dart';
 
 class HintsBar extends StatelessWidget {
   final GameController controller;
@@ -36,6 +37,7 @@ class HintsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = controller.localization;
+    final palette = AppPalette.of(context);
     final elemental = controller.isElementalMode;
 
     final topChips = <Widget>[
@@ -46,7 +48,7 @@ class HintsBar extends StatelessWidget {
           value: _formatMoves(controller.predictedUserMoves),
           moves: _visibleMoves(controller.predictedUserMoves),
           elementalMode: elemental,
-          color: Colors.blueAccent,
+          color: palette.blueAccent,
         ),
       if (controller.showNextMove)
         _HintChip(
@@ -55,7 +57,7 @@ class HintsBar extends StatelessWidget {
           value: _formatMoves(controller.pcNextMoves),
           moves: _visibleMoves(controller.pcNextMoves),
           elementalMode: elemental,
-          color: Colors.orangeAccent,
+          color: palette.orangeAccent,
         ),
     ];
 
@@ -67,7 +69,7 @@ class HintsBar extends StatelessWidget {
           value: _formatMoves(controller.suggestedMoves),
           moves: _visibleMoves(controller.suggestedMoves),
           elementalMode: elemental,
-          color: Colors.greenAccent,
+          color: palette.successText,
         ),
       if (controller.showCrystalBall &&
           controller.showCrystalBallPlus &&
@@ -78,7 +80,7 @@ class HintsBar extends StatelessWidget {
           value: controller.crystalBallPlusMove!.emoji,
           moves: [controller.crystalBallPlusMove!],
           elementalMode: elemental,
-          color: Colors.purpleAccent,
+          color: palette.purpleAccent,
         )
       else if (controller.showCrystalBall &&
           controller.crystalBallMove != null)
@@ -88,7 +90,7 @@ class HintsBar extends StatelessWidget {
           value: controller.crystalBallMove!.emoji,
           moves: [controller.crystalBallMove!],
           elementalMode: elemental,
-          color: Colors.purpleAccent,
+          color: palette.purpleAccent,
         ),
     ];
 
@@ -133,15 +135,25 @@ class _HintChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final backgroundColor = palette.isDark
+        ? color.withValues(alpha: 0.12)
+        : Color.alphaBlend(
+            color.withValues(alpha: 0.12),
+            const Color(0xFFFAF6EE),
+          ).withValues(alpha: 0.94);
+
     return SizedBox(
       height: pillHeight,
       child: Container(
         height: pillHeight,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          border: Border.all(
+            color: color.withValues(alpha: palette.isDark ? 0.4 : 0.6),
+          ),
         ),
         child: Center(
           child: FittedBox(
@@ -164,10 +176,13 @@ class _HintChip extends StatelessWidget {
                   Text(
                     label,
                     maxLines: 1,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       height: 1.0,
-                      color: Colors.grey,
+                      fontWeight:
+                          palette.isDark ? FontWeight.normal : FontWeight.w600,
+                      color:
+                          palette.isDark ? Colors.grey : palette.secondaryText,
                     ),
                   ),
                   const SizedBox(width: 3),
@@ -185,7 +200,7 @@ class _HintChip extends StatelessWidget {
                               child: Icon(
                                 moves[i].elementalIcon,
                                 size: 15,
-                                color: moves[i].elementalPrimaryColor,
+                                color: palette.elementalText(moves[i]),
                               ),
                             ),
                           ),

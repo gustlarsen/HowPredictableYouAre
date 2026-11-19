@@ -5,6 +5,7 @@ import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
+import '../../theme/app_theme.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
@@ -182,46 +183,62 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final loc = controller.localization;
     final shouldRestart = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const ValueKey('update_install_dialog'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.system_update_rounded,
-              color: Colors.amber,
-              size: 22,
+      builder: (dialogContext) {
+        final palette = AppPalette.of(dialogContext);
+        return AlertDialog(
+          key: const ValueKey('update_install_dialog'),
+          backgroundColor: palette.isDark ? null : palette.dialogSurface,
+          surfaceTintColor: palette.isDark ? null : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.system_update_rounded,
+                color: palette.amberIcon,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.t('update_ready_title', fallback: 'Update Ready'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            UpdateService.updateReadyMessage,
+            style: TextStyle(color: palette.primaryText),
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('update_install_later_button'),
+              style: palette.isDark
+                  ? null
+                  : TextButton.styleFrom(foregroundColor: palette.secondaryText),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(loc.t('update_later', fallback: 'Later')),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                loc.t('update_ready_title', fallback: 'Update Ready'),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+            ElevatedButton(
+              key: const ValueKey('update_install_restart_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                foregroundColor: const Color(0xFF231F1A),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                UpdateService.restartActionLabel,
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
-        ),
-        content: const Text(UpdateService.updateReadyMessage),
-        actions: [
-          TextButton(
-            key: const ValueKey('update_install_later_button'),
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(loc.t('update_later', fallback: 'Later')),
-          ),
-          ElevatedButton(
-            key: const ValueKey('update_install_restart_button'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black87,
-            ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text(
-              UpdateService.restartActionLabel,
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
     if (shouldRestart == true) {
       await controller.completeFlexibleUpdate();
@@ -274,42 +291,54 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final loc = controller.localization;
     final shouldReset = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          loc.t(
-            'reset_all_progress_title',
-            fallback: 'Reset All Progress?',
+      builder: (dialogContext) {
+        final palette = AppPalette.of(dialogContext);
+        return AlertDialog(
+          backgroundColor: palette.isDark ? null : palette.dialogSurface,
+          surfaceTintColor: palette.isDark ? null : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-        content: Text(
-          loc.t(
-            'reset_all_progress_message',
-            fallback:
-                'This will permanently delete all your diamonds, shop upgrades, scores, and prediction history so you can start fresh. This action cannot be undone.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            key: const ValueKey('cancel_reset_progress_button'),
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(
-              loc.t('reset_all_progress_cancel', fallback: 'Cancel'),
+          title: Text(
+            loc.t(
+              'reset_all_progress_title',
+              fallback: 'Reset All Progress?',
             ),
+            style: TextStyle(color: palette.primaryText),
           ),
-          ElevatedButton(
-            key: const ValueKey('confirm_reset_progress_button'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
+          content: Text(
+            loc.t(
+              'reset_all_progress_message',
+              fallback:
+                  'This will permanently delete all your diamonds, shop upgrades, scores, and prediction history so you can start fresh. This action cannot be undone.',
             ),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              loc.t('reset_all_progress', fallback: 'Reset All Progress'),
-            ),
+            style: TextStyle(color: palette.primaryText),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              key: const ValueKey('cancel_reset_progress_button'),
+              style: palette.isDark
+                  ? null
+                  : TextButton.styleFrom(foregroundColor: palette.secondaryText),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                loc.t('reset_all_progress_cancel', fallback: 'Cancel'),
+              ),
+            ),
+            ElevatedButton(
+              key: const ValueKey('confirm_reset_progress_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.dangerText,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                loc.t('reset_all_progress', fallback: 'Reset All Progress'),
+              ),
+            ),
+          ],
+        );
+      },
     );
 
     if (shouldReset == true && context.mounted) {
@@ -342,6 +371,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
 
     final Map<String, String> languageNames = {
       'en': 'English 🇬🇧',
@@ -351,9 +381,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
     };
 
     const compactDensity = VisualDensity(horizontal: 0, vertical: -2);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = palette.isDark;
 
     return Dialog(
+      backgroundColor: isDark ? null : palette.dialogSurface,
+      surfaceTintColor: isDark ? null : Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
@@ -365,17 +397,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.settings_outlined, color: Colors.blueAccent),
+                  Icon(Icons.settings_outlined, color: palette.blueAccent),
                   const SizedBox(width: 8),
                   Text(
                     'Settings',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: palette.primaryText,
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 14),
+              Divider(height: 14, color: isDark ? null : palette.divider),
 
               Flexible(
                 child: SingleChildScrollView(
@@ -384,29 +417,31 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     data: SwitchThemeData(
                       thumbColor: WidgetStateProperty.resolveWith((states) {
                         if (states.contains(WidgetState.selected)) {
-                          return Colors.amber;
+                          return palette.amberIcon;
                         }
                         return isDark
                             ? const Color(0xFFD5D9E2)
-                            : Colors.grey.shade700;
+                            : palette.secondaryText;
                       }),
                       trackColor: WidgetStateProperty.resolveWith((states) {
                         if (states.contains(WidgetState.selected)) {
-                          return Colors.amber.withValues(alpha: 0.35);
+                          return palette.amberBorder.withValues(
+                            alpha: isDark ? 0.35 : 0.28,
+                          );
                         }
                         return isDark
                             ? Colors.white.withValues(alpha: 0.14)
-                            : Colors.black.withValues(alpha: 0.10);
+                            : Colors.black.withValues(alpha: 0.08);
                       }),
                       trackOutlineColor: WidgetStateProperty.resolveWith((
                         states,
                       ) {
                         if (states.contains(WidgetState.selected)) {
-                          return Colors.amber.withValues(alpha: 0.80);
+                          return palette.amberBorder.withValues(alpha: 0.80);
                         }
                         return isDark
                             ? Colors.white.withValues(alpha: 0.55)
-                            : Colors.black.withValues(alpha: 0.42);
+                            : palette.mutedText.withValues(alpha: 0.45);
                       }),
                     ),
                     child: Column(
@@ -420,7 +455,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           onCopyPlayerId: () => _handleCopyPlayerId(context),
                         ),
 
-                        const Divider(height: 16),
+                        Divider(
+                          height: 16,
+                          color: isDark ? null : palette.divider,
+                        ),
 
                         // Language selector
                         Padding(
@@ -517,7 +555,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           onChanged: controller.toggleAnimations,
                         ),
 
-                        const Divider(height: 16),
+                        Divider(
+                          height: 16,
+                          color: palette.isDark ? null : palette.divider,
+                        ),
 
                       // Story Memories / Lore Gallery button
                       SizedBox(
@@ -525,9 +566,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         child: OutlinedButton.icon(
                           key: const ValueKey('settings_story_memories_button'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.amber,
+                            foregroundColor: palette.amberText,
+                            backgroundColor: palette.isDark
+                                ? null
+                                : palette.dialogCardSurface,
                             side: BorderSide(
-                              color: Colors.amber.withValues(alpha: 0.55),
+                              color: palette.amberBorder.withValues(
+                                alpha: palette.isDark ? 0.55 : 0.72,
+                              ),
                             ),
                             padding: const EdgeInsets.symmetric(
                               vertical: 9,
@@ -566,9 +612,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         child: OutlinedButton.icon(
                           key: const ValueKey('settings_help_button'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blueAccent,
+                            foregroundColor: palette.blueAccent,
+                            backgroundColor: palette.isDark
+                                ? null
+                                : palette.dialogCardSurface,
                             side: BorderSide(
-                              color: Colors.blueAccent.withValues(alpha: 0.55),
+                              color: palette.blueAccent.withValues(
+                                alpha: palette.isDark ? 0.55 : 0.65,
+                              ),
                             ),
                             padding: const EdgeInsets.symmetric(
                               vertical: 9,
@@ -618,11 +669,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                   'settings_privacy_options_button',
                                 ),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor:
-                                      theme.colorScheme.onSurfaceVariant,
+                                  foregroundColor: palette.isDark
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : palette.secondaryText,
                                   side: BorderSide(
-                                    color: theme.colorScheme.outline
-                                        .withValues(alpha: 0.45),
+                                    color: palette.isDark
+                                        ? theme.colorScheme.outline
+                                            .withValues(alpha: 0.45)
+                                        : palette.sandCardBorder,
                                   ),
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 9,
@@ -661,9 +715,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         child: OutlinedButton.icon(
                           key: const ValueKey('settings_reset_progress_button'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.redAccent,
+                            foregroundColor: palette.dangerText,
+                            backgroundColor: palette.isDark
+                                ? null
+                                : palette.dialogCardSurface,
                             side: BorderSide(
-                              color: Colors.redAccent.withValues(alpha: 0.55),
+                              color: palette.dangerText.withValues(
+                                alpha: palette.isDark ? 0.55 : 0.65,
+                              ),
                             ),
                             padding: const EdgeInsets.symmetric(
                               vertical: 9,
@@ -712,8 +771,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         final isDownloaded =
                             controller.updateService.isUpdateDownloaded;
                         final accentColor = isBusy
-                            ? Colors.amber.withValues(alpha: 0.55)
-                            : Colors.amber;
+                            ? palette.amberText.withValues(alpha: 0.55)
+                            : palette.amberText;
                         return Tooltip(
                           message: loc.t(
                             'check_for_updates',
@@ -726,8 +785,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                 'settings_version_check_button',
                               ),
                               borderRadius: BorderRadius.circular(10),
-                              splashColor: Colors.amber.withValues(alpha: 0.16),
-                              highlightColor: Colors.amber.withValues(
+                              splashColor: palette.amberBorder.withValues(
+                                alpha: 0.16,
+                              ),
+                              highlightColor: palette.amberBorder.withValues(
                                 alpha: 0.08,
                               ),
                               onTap: isBusy
@@ -743,13 +804,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                       ? Colors.amber.withValues(
                                           alpha: isBusy ? 0.04 : 0.08,
                                         )
-                                      : Colors.amber.withValues(
-                                          alpha: isBusy ? 0.06 : 0.12,
+                                      : palette.sandCardSurface.withValues(
+                                          alpha: isBusy ? 0.65 : 1.0,
                                         ),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: Colors.amber.withValues(
-                                      alpha: isBusy ? 0.22 : 0.35,
+                                    color: palette.amberBorder.withValues(
+                                      alpha: isBusy
+                                          ? 0.25
+                                          : (isDark ? 0.35 : 0.55),
                                     ),
                                   ),
                                 ),
@@ -794,14 +857,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w500,
                                           color: isBusy
-                                              ? theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant
-                                                    .withValues(alpha: 0.5)
-                                              : theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant
-                                                    .withValues(alpha: 0.85),
+                                              ? (isDark
+                                                    ? theme.colorScheme
+                                                          .onSurfaceVariant
+                                                          .withValues(
+                                                            alpha: 0.5,
+                                                          )
+                                                    : palette.mutedText
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ))
+                                              : (isDark
+                                                    ? theme.colorScheme
+                                                          .onSurfaceVariant
+                                                          .withValues(
+                                                            alpha: 0.85,
+                                                          )
+                                                    : palette.secondaryText),
                                         ),
                                       ),
                                     ),
@@ -818,10 +890,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   OutlinedButton(
                     key: const ValueKey('settings_ok_button'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.amber,
-                      backgroundColor: Colors.amber.withValues(alpha: 0.10),
+                      foregroundColor: palette.amberText,
+                      backgroundColor: palette.isDark
+                          ? Colors.amber.withValues(alpha: 0.10)
+                          : palette.rewardedAdCardSurface,
                       side: BorderSide(
-                        color: Colors.amber.withValues(alpha: 0.65),
+                        color: palette.amberBorder.withValues(
+                          alpha: palette.isDark ? 0.65 : 0.85,
+                        ),
                         width: 1.2,
                       ),
                       padding: const EdgeInsets.symmetric(
@@ -864,6 +940,7 @@ class _PlayerProfileSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final hasVerifiedPlayerId = PlayGamesService.isValidPlayerId(
       playGames.playerID,
     );
@@ -877,12 +954,18 @@ class _PlayerProfileSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        color: palette.isDark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)
+            : palette.sandCardSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isConnected
-              ? Colors.amber.withValues(alpha: 0.45)
-              : theme.colorScheme.outline.withValues(alpha: 0.25),
+              ? palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.45 : 0.72,
+                )
+              : (palette.isDark
+                    ? theme.colorScheme.outline.withValues(alpha: 0.25)
+                    : palette.sandCardBorder),
           width: 1.2,
         ),
       ),
@@ -899,7 +982,9 @@ class _PlayerProfileSection extends StatelessWidget {
                     Icon(
                       Icons.sports_esports_rounded,
                       size: 16,
-                      color: isConnected ? Colors.amber : Colors.grey,
+                      color: isConnected
+                          ? palette.amberIcon
+                          : (palette.isDark ? Colors.grey : palette.mutedText),
                     ),
                     const SizedBox(width: 6),
                     Flexible(
@@ -911,8 +996,8 @@ class _PlayerProfileSection extends StatelessWidget {
                           fontSize: 12.5,
                           fontWeight: FontWeight.bold,
                           color: isConnected
-                              ? Colors.amber
-                              : theme.colorScheme.onSurface,
+                              ? palette.amberText
+                              : palette.primaryText,
                         ),
                       ),
                     ),
@@ -937,7 +1022,7 @@ class _PlayerProfileSection extends StatelessWidget {
                 key: const ValueKey('play_games_sign_in_button'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber,
-                  foregroundColor: Colors.black87,
+                  foregroundColor: const Color(0xFF231F1A),
                   padding: const EdgeInsets.symmetric(
                     vertical: 9,
                     horizontal: 12,
@@ -953,7 +1038,7 @@ class _PlayerProfileSection extends StatelessWidget {
                         height: 15,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.black87,
+                          color: Color(0xFF231F1A),
                         ),
                       )
                     : const Icon(Icons.sports_esports_rounded, size: 17),
@@ -974,20 +1059,26 @@ class _PlayerProfileSection extends StatelessWidget {
               key: const ValueKey('play_games_profile_card'),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: palette.isDark
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : palette.dialogCardSurface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.amber.withValues(alpha: 0.2),
+                  color: palette.isDark
+                      ? Colors.amber.withValues(alpha: 0.2)
+                      : palette.sandCardBorder,
                 ),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 15,
-                    backgroundColor: Colors.amber.withValues(alpha: 0.2),
-                    child: const Icon(
+                    backgroundColor: palette.amberBorder.withValues(
+                      alpha: palette.isDark ? 0.2 : 0.18,
+                    ),
+                    child: Icon(
                       Icons.person_rounded,
-                      color: Colors.amber,
+                      color: palette.amberIcon,
                       size: 17,
                     ),
                   ),
@@ -999,9 +1090,10 @@ class _PlayerProfileSection extends StatelessWidget {
                         Text(
                           playGames.playerName ?? 'Play Games Player',
                           key: const ValueKey('play_games_player_name'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12.5,
+                            color: palette.primaryText,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1017,7 +1109,9 @@ class _PlayerProfileSection extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontFamily: 'monospace',
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: palette.isDark
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : palette.secondaryText,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1033,7 +1127,9 @@ class _PlayerProfileSection extends StatelessWidget {
                                 child: Icon(
                                   Icons.copy_rounded,
                                   size: 13,
-                                  color: Colors.amber.withValues(alpha: 0.85),
+                                  color: palette.amberText.withValues(
+                                    alpha: palette.isDark ? 0.85 : 0.95,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1067,6 +1163,7 @@ class _CloudSyncStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     final bool isConnecting = isAuthenticating && !isConnected;
     final bool isSyncing =
         isConnected && (isAuthenticating || status == CloudSyncStatus.syncing);
@@ -1079,19 +1176,19 @@ class _CloudSyncStatusBadge extends StatelessWidget {
     if (isConnecting) {
       icon = Icons.cloud_sync_outlined;
       label = 'Connecting...';
-      color = Colors.amber;
+      color = palette.amberText;
     } else if (isSyncing) {
       icon = Icons.cloud_sync_outlined;
       label = 'Syncing...';
-      color = Colors.amber;
+      color = palette.amberText;
     } else if (isConnected && status == CloudSyncStatus.synced) {
       icon = Icons.cloud_done_outlined;
       label = 'Synced';
-      color = Colors.greenAccent;
+      color = palette.successText;
     } else {
       icon = Icons.cloud_off_outlined;
       label = 'Offline';
-      color = Colors.grey;
+      color = palette.isDark ? Colors.grey : palette.mutedText;
     }
 
     return InkWell(
@@ -1101,9 +1198,11 @@ class _CloudSyncStatusBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
+          color: color.withValues(alpha: palette.isDark ? 0.14 : 0.10),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          border: Border.all(
+            color: color.withValues(alpha: palette.isDark ? 0.4 : 0.45),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

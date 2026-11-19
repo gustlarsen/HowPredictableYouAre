@@ -69,6 +69,11 @@ class HowPredictableApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.amber,
           brightness: Brightness.light,
+          surface: const Color(0xFFFAF6EE),
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFFFAF6EE),
+          surfaceTintColor: Colors.transparent,
         ),
         scaffoldBackgroundColor: const Color(0xFFF7F8FA),
       ),

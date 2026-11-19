@@ -3,6 +3,7 @@ import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
+import '../../theme/app_theme.dart';
 import 'story_dialog.dart';
 
 class ShopDialog extends StatefulWidget {
@@ -287,16 +288,19 @@ class _ShopDialogState extends State<ShopDialog> {
     );
   }
 
-  Widget _buildOrbSummaryBar() {
+  Widget _buildOrbSummaryBar(BuildContext context) {
+    final palette = AppPalette.of(context);
     return Container(
       key: const ValueKey('shop_orb_summary_bar'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF151821),
+        color: palette.summaryBarSurface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.32),
+          color: palette.amberBorder.withValues(
+            alpha: palette.isDark ? 0.32 : 0.45,
+          ),
         ),
       ),
       child: Wrap(
@@ -313,7 +317,7 @@ class _ShopDialogState extends State<ShopDialog> {
                 Icon(
                   move.elementalIcon,
                   size: 14,
-                  color: move.elementalPrimaryColor,
+                  color: palette.elementalText(move),
                 ),
                 const SizedBox(width: 3),
                 Text(
@@ -321,7 +325,9 @@ class _ShopDialogState extends State<ShopDialog> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
-                    color: move.elementalPrimaryColor,
+                    color: palette.isDark
+                        ? move.elementalPrimaryColor
+                        : palette.primaryText,
                   ),
                 ),
               ],
@@ -334,11 +340,14 @@ class _ShopDialogState extends State<ShopDialog> {
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
 
     final enabledStr = loc.t('string49', fallback: 'Enabled');
     final disabledStr = loc.t('string48', fallback: 'Disabled');
 
     return Dialog(
+      backgroundColor: palette.isDark ? null : palette.dialogSurface,
+      surfaceTintColor: palette.isDark ? null : Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
@@ -350,9 +359,9 @@ class _ShopDialogState extends State<ShopDialog> {
               // Dialog Header
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.shopping_cart_outlined,
-                    color: Colors.amber,
+                    color: palette.amberIcon,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -364,6 +373,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         maxLines: 1,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: palette.primaryText,
                         ),
                       ),
                     ),
@@ -372,7 +382,7 @@ class _ShopDialogState extends State<ShopDialog> {
               ),
               const SizedBox(height: 6),
               // Compact Horizontal Summary Bar of all 5 Elemental Orb Balances
-              _buildOrbSummaryBar(),
+              _buildOrbSummaryBar(context),
               // Pinned "Free Elemental Orbs" rewarded ad card directly below the balance box
               AnimatedSize(
                 duration: const Duration(milliseconds: 250),
@@ -391,7 +401,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         ),
                 ),
               ),
-              const Divider(height: 18),
+              Divider(height: 18, color: palette.isDark ? null : palette.divider),
 
               // Shop items list (ordered ascending by Elemental Orb cost)
               Expanded(
@@ -824,6 +834,11 @@ class _ShopDialogState extends State<ShopDialog> {
                   Flexible(
                     child: TextButton.icon(
                       key: const ValueKey('shop_restore_purchases_button'),
+                      style: palette.isDark
+                          ? null
+                          : TextButton.styleFrom(
+                              foregroundColor: palette.amberText,
+                            ),
                       onPressed: controller.billingService.isRestoring
                           ? null
                           : _handleRestorePurchases,
@@ -843,6 +858,11 @@ class _ShopDialogState extends State<ShopDialog> {
                   ),
                   TextButton(
                     key: const ValueKey('shop_close_button'),
+                    style: palette.isDark
+                        ? null
+                        : TextButton.styleFrom(
+                            foregroundColor: palette.amberText,
+                          ),
                     onPressed: () => Navigator.of(context).pop(),
                     child: Text(loc.t('string36', fallback: 'Close')),
                   ),
@@ -857,14 +877,17 @@ class _ShopDialogState extends State<ShopDialog> {
 
   Widget _buildRewardedAdCard(BuildContext context) {
     final loc = controller.localization;
+    final palette = AppPalette.of(context);
     return Card(
       key: const ValueKey('shop_rewarded_ad_card'),
       margin: EdgeInsets.zero,
-      color: Colors.amber.withValues(alpha: 0.12),
+      elevation: palette.isDark ? null : 0,
+      color: palette.rewardedAdCardSurface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
-          color: Colors.amber.withValues(alpha: 0.35),
+          color: palette.rewardedAdCardBorder,
+          width: palette.isDark ? 1.0 : 1.2,
         ),
       ),
       child: Padding(
@@ -886,9 +909,10 @@ class _ShopDialogState extends State<ShopDialog> {
                       fallback: 'Free Elemental Orbs',
                     ),
                     maxLines: 1,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
+                      color: palette.primaryText,
                     ),
                   ),
                 ),
@@ -903,9 +927,11 @@ class _ShopDialogState extends State<ShopDialog> {
                         ),
                   style: TextStyle(
                     fontSize: 11.5,
+                    fontWeight:
+                        palette.isDark ? FontWeight.normal : FontWeight.w500,
                     color: controller.isRewardedAdOnCooldown
-                        ? Colors.grey
-                        : Colors.amber,
+                        ? (palette.isDark ? Colors.grey : palette.mutedText)
+                        : (palette.isDark ? Colors.amber : palette.amberText),
                   ),
                 ),
               ],
@@ -945,7 +971,7 @@ class _ShopDialogState extends State<ShopDialog> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
-                foregroundColor: Colors.black87,
+                foregroundColor: const Color(0xFF231F1A),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 10,
@@ -1017,21 +1043,30 @@ class _ShopItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final hasRealMoneyPrice =
         localizedPrice != null && localizedPrice!.trim().isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: palette.isDark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+            : palette.shopTileSurface,
         borderRadius: BorderRadius.circular(12),
         border: isUnlocked && isActive
             ? Border.all(
-                color: Colors.green.withValues(alpha: 0.4),
+                color: palette.successIcon.withValues(
+                  alpha: palette.isDark ? 0.4 : 0.55,
+                ),
                 width: 1.2,
               )
-            : null,
+            : (palette.isDark
+                  ? null
+                  : Border.all(
+                      color: palette.sandCardBorder,
+                      width: 1.0,
+                    )),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1046,15 +1081,18 @@ class _ShopItemTile extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: isUnlocked
-                ? _buildUnlockedContent()
-                : _buildLockedContent(hasRealMoneyPrice),
+                ? _buildUnlockedContent(palette)
+                : _buildLockedContent(palette, hasRealMoneyPrice),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUnlockedContent() {
+  Widget _buildUnlockedContent(AppPalette palette) {
+    final activeColor = palette.successIcon;
+    final inactiveColor = palette.isDark ? Colors.grey : palette.mutedText;
+
     return Row(
       children: [
         Expanded(
@@ -1065,9 +1103,10 @@ class _ShopItemTile extends StatelessWidget {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
+                  color: palette.primaryText,
                 ),
               ),
               if (subtitle != null && subtitle!.isNotEmpty) ...[
@@ -1077,7 +1116,7 @@ class _ShopItemTile extends StatelessWidget {
                   softWrap: true,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.amber.withValues(alpha: 0.85),
+                    color: palette.amberSubtitle,
                   ),
                 ),
               ],
@@ -1088,7 +1127,7 @@ class _ShopItemTile extends StatelessWidget {
                   Icon(
                     isActive ? Icons.check_circle : Icons.cancel_outlined,
                     size: 13,
-                    color: isActive ? Colors.green : Colors.grey,
+                    color: isActive ? activeColor : inactiveColor,
                   ),
                   const SizedBox(width: 4),
                   Flexible(
@@ -1098,7 +1137,7 @@ class _ShopItemTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isActive ? Colors.green : Colors.grey,
+                        color: isActive ? activeColor : inactiveColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1112,13 +1151,13 @@ class _ShopItemTile extends StatelessWidget {
         Switch(
           value: isActive,
           onChanged: isToggleEnabled ? onToggle : null,
-          activeTrackColor: Colors.green,
+          activeTrackColor: activeColor,
         ),
       ],
     );
   }
 
-  Widget _buildLockedContent(bool hasRealMoneyPrice) {
+  Widget _buildLockedContent(AppPalette palette, bool hasRealMoneyPrice) {
     final entries = cost.nonZeroEntries;
 
     return Column(
@@ -1128,9 +1167,10 @@ class _ShopItemTile extends StatelessWidget {
           title,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 14,
+            color: palette.primaryText,
           ),
         ),
         if (subtitle != null && subtitle!.isNotEmpty) ...[
@@ -1140,7 +1180,7 @@ class _ShopItemTile extends StatelessWidget {
             softWrap: true,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.amber.withValues(alpha: 0.85),
+              color: palette.amberSubtitle,
             ),
           ),
         ],
@@ -1151,13 +1191,15 @@ class _ShopItemTile extends StatelessWidget {
           alignment: WrapAlignment.spaceBetween,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Text(
+            Text(
               'Unlock',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                fontWeight:
+                    palette.isDark ? FontWeight.normal : FontWeight.w600,
+                color: palette.isDark ? Colors.grey : palette.secondaryText,
               ),
             ),
             Wrap(
@@ -1172,6 +1214,12 @@ class _ShopItemTile extends StatelessWidget {
                   ),
                   onPressed: isPurchasePending ? null : onUnlock,
                   style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        palette.isDark ? null : palette.dialogSurface,
+                    elevation: palette.isDark ? null : 1,
+                    side: palette.isDark
+                        ? null
+                        : BorderSide(color: palette.sandCardBorder),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 5,
@@ -1192,14 +1240,14 @@ class _ShopItemTile extends StatelessWidget {
                             Icon(
                               entry.key.elementalIcon,
                               size: 12,
-                              color: entry.key.elementalPrimaryColor,
+                              color: palette.elementalText(entry.key),
                             ),
                             const SizedBox(width: 2),
                             Text(
                               '${entry.value}',
                               style: TextStyle(
                                 fontSize: 10.5,
-                                color: entry.key.elementalPrimaryColor,
+                                color: palette.elementalText(entry.key),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1217,6 +1265,17 @@ class _ShopItemTile extends StatelessWidget {
                         ? onRealMoneyUnlock
                         : null,
                     style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          palette.isDark ? null : palette.primaryText,
+                      disabledForegroundColor:
+                          palette.isDark ? null : palette.mutedText,
+                      backgroundColor:
+                          palette.isDark ? null : palette.dialogSurface,
+                      side: palette.isDark
+                          ? null
+                          : BorderSide(
+                              color: palette.amberBorder.withValues(alpha: 0.65),
+                            ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 5,

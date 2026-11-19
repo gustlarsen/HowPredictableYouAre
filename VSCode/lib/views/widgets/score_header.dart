@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../theme/app_theme.dart';
 
 class ScoreHeader extends StatelessWidget {
   final GameController controller;
@@ -10,18 +11,22 @@ class ScoreHeader extends StatelessWidget {
   static const Color amberGold = Color(0xFFFFB300);
   static const Color crimsonRed = Color(0xFFE74C3C);
 
+  static const Color lightEmeraldGreen = Color(0xFF1B6E36);
+  static const Color lightAmberBronze = Color(0xFF8A5A00);
+  static const Color lightCrimsonRed = Color(0xFFC62828);
+
   /// Returns a semantic color matching the RPG HP bar aesthetic:
-  /// - Emerald green (`0xFF2ECC71`) for high percentages (>= 60%)
-  /// - Amber/gold (`0xFFFFB300`) for moderate percentages (30%–59%)
-  /// - Crimson red (`0xFFE74C3C`) for low percentages (< 30%)
-  static Color gaugeColor(double percentPredict) {
+  /// - Emerald green (`0xFF2ECC71` in Dark Mode, `0xFF1B6E36` in Light Mode) for high percentages (>= 60%)
+  /// - Amber/gold (`0xFFFFB300` in Dark Mode, `0xFF8A5A00` in Light Mode) for moderate percentages (30%–59%)
+  /// - Crimson red (`0xFFE74C3C` in Dark Mode, `0xFFC62828` in Light Mode) for low percentages (< 30%)
+  static Color gaugeColor(double percentPredict, {bool isDark = true}) {
     final clamped = percentPredict.clamp(0.0, 100.0);
     if (clamped >= 60.0) {
-      return emeraldGreen;
+      return isDark ? emeraldGreen : lightEmeraldGreen;
     } else if (clamped >= 30.0) {
-      return amberGold;
+      return isDark ? amberGold : lightAmberBronze;
     } else {
-      return crimsonRed;
+      return isDark ? crimsonRed : lightCrimsonRed;
     }
   }
 
@@ -32,11 +37,20 @@ class ScoreHeader extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
     final loc = controller.localization;
+    final dividerColor = palette.isDark ? theme.dividerColor : palette.divider;
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: palette.isDark ? null : palette.dialogSurface.withValues(alpha: 0.95),
+      surfaceTintColor: palette.isDark ? null : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: palette.isDark
+            ? BorderSide.none
+            : BorderSide(color: palette.sandCardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
         child: Row(
@@ -45,25 +59,28 @@ class ScoreHeader extends StatelessWidget {
             _ScoreItem(
               label: loc.t('string6', fallback: 'You'),
               value: '${controller.userScore}',
-              color: Colors.green,
+              color: palette.isDark ? Colors.green : palette.successText,
             ),
-            Container(width: 1, height: 28, color: theme.dividerColor),
+            Container(width: 1, height: 28, color: dividerColor),
             _ScoreItem(
               label: loc.t('string7', fallback: 'PC'),
               value: '${controller.pcScore}',
-              color: Colors.redAccent,
+              color: palette.dangerText,
             ),
-            Container(width: 1, height: 28, color: theme.dividerColor),
+            Container(width: 1, height: 28, color: dividerColor),
             _ScoreItem(
               label: loc.t('string8', fallback: 'Total'),
               value: '${controller.totalRounds}',
-              color: Colors.grey,
+              color: palette.isDark ? Colors.grey : palette.secondaryText,
             ),
-            Container(width: 1, height: 28, color: theme.dividerColor),
+            Container(width: 1, height: 28, color: dividerColor),
             _ScoreItem(
               label: loc.t('string5', fallback: 'Gauge'),
               value: '${controller.percentPredict.toStringAsFixed(1)}%',
-              color: gaugeColor(controller.percentPredict),
+              color: gaugeColor(
+                controller.percentPredict,
+                isDark: palette.isDark,
+              ),
             ),
           ],
         ),
@@ -85,11 +102,16 @@ class _ScoreItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     return Column(
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: palette.isDark ? FontWeight.normal : FontWeight.w600,
+            color: palette.isDark ? Colors.grey : palette.mutedText,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
