@@ -191,12 +191,12 @@ void main() {
 
         // Verify readable dark status text
         final activeStatus = tester.widget<Text>(
-          find.text('Active in combat').first,
+          find.text('Active').first,
         );
         expect(activeStatus.style?.color, lightPalette.secondaryText);
 
         final lockedStatus = tester.widget<Text>(
-          find.text('Locked in combat (Enable New Hands)').first,
+          find.text('Locked (Enable New Hands)').first,
         );
         expect(lockedStatus.style?.color, lightPalette.amberText);
 

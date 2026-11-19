@@ -2214,12 +2214,35 @@ void main() {
       '8',
     );
 
-    // Earth and Metal show locked in combat while showNewHands is false
+    // Earth and Metal show simplified Locked status while showNewHands is false
     expect(
-      find.text('Locked in combat (Enable New Hands)'),
+      find.text('Locked (Enable New Hands)'),
       findsNWidgets(2),
     );
-    expect(find.text('Active in combat'), findsNWidgets(3));
+    expect(find.text('Active'), findsNWidgets(3));
+    expect(find.textContaining('in combat'), findsNothing);
+
+    // Clean orb names without parenthesized element codes & 3D spheres without combat icons
+    for (final move in HandMove.values) {
+      expect(
+        find.byKey(ValueKey('inventory_orb_sphere_${move.orbKey}')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(InventoryDialog),
+          matching: find.byIcon(move.elementalIcon),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(InventoryDialog),
+          matching: find.textContaining('(${move.elementalLabel})'),
+        ),
+        findsNothing,
+      );
+    }
 
     // 3. Tap "Open Shop / Altar" button in InventoryDialog -> jumps straight to ShopDialog
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
@@ -2884,6 +2907,110 @@ void main() {
       expect(tester.getSize(find.byType(RpgBackpackIcon)), equals(const Size(86.0, 86.0)));
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('InventoryDialog rows render 3D energy spheres without flat icons, clean titles, localized Active/Locked status across en/pt/es/de, and adapt to Dark and Light modes', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 47,
+      'orbs_water': 8,
+      'orbs_wood': 39,
+      'orbs_earth': 0,
+      'orbs_metal': 0,
+      'showNewHands': false,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    await tester.runAsync(() => localization.load());
+    final audio = AudioService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    // 1. Dark Mode verification + English strings
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          body: InventoryDialog(controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Clean titles without parenthesized element codes, 3D spheres without combat icons
+    expect(find.text('Fire Orb'), findsOneWidget);
+    expect(find.text('Water Orb'), findsOneWidget);
+    expect(find.text('Wood Orb'), findsOneWidget);
+    expect(find.text('Earth Orb'), findsOneWidget);
+    expect(find.text('Metal Orb'), findsOneWidget);
+    expect(find.textContaining('('), findsNWidgets(2)); // Only the 2 Locked hints use parentheses
+
+    for (final move in HandMove.values) {
+      final sphereFinder = find.byKey(ValueKey('inventory_orb_sphere_${move.orbKey}'));
+      expect(sphereFinder, findsOneWidget);
+      expect(tester.getSize(sphereFinder), equals(const Size(38.0, 38.0)));
+      expect(
+        find.descendant(
+          of: find.byType(InventoryDialog),
+          matching: find.byIcon(move.elementalIcon),
+        ),
+        findsNothing,
+      );
+    }
+
+    expect(find.text('Active'), findsNWidgets(3));
+    expect(find.text('Locked (Enable New Hands)'), findsNWidgets(2));
+    expect(find.textContaining('in combat'), findsNothing);
+
+    final darkCard = tester.widget<Container>(
+      find.byKey(const ValueKey('inventory_dialog_card')),
+    );
+    final darkCardDecor = darkCard.decoration! as BoxDecoration;
+    expect(darkCardDecor.color, equals(const Color(0xFF14161D)));
+
+    // 2. Light Mode verification + localized strings across pt, es, de
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.light(useMaterial3: true),
+        home: Scaffold(
+          body: InventoryDialog(controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final lightCard = tester.widget<Container>(
+      find.byKey(const ValueKey('inventory_dialog_card')),
+    );
+    final lightCardDecor = lightCard.decoration! as BoxDecoration;
+    expect(lightCardDecor.color, equals(const Color(0xFFFAF6EE)));
+    expect(
+      tester.widget<Text>(find.text("Cleric's Backpack")).style?.color,
+      equals(const Color(0xFF231F1A)),
+    );
+
+    const expectedByLang = <String, (String, String)>{
+      'pt': ('Ativo', 'Bloqueado (Ative Novas Mãos)'),
+      'es': ('Activo', 'Bloqueado (Activa Nuevas Manos)'),
+      'de': ('Aktiv', 'Gesperrt (Neue Hände aktivieren)'),
+    };
+
+    for (final entry in expectedByLang.entries) {
+      controller.setLanguage(entry.key);
+      await tester.pumpAndSettle();
+      final (expectedActive, expectedLocked) = entry.value;
+      expect(find.text(expectedActive), findsNWidgets(3));
+      expect(find.text(expectedLocked), findsNWidgets(2));
+      expect(find.textContaining('combate'), findsNothing);
+      expect(find.textContaining('Kampf'), findsNothing);
+    }
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Gift Box Shop unlock, toggle ON/OFF, AppBar visibility, cooldown pause/resume, and localization', (WidgetTester tester) async {
