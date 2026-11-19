@@ -65,6 +65,10 @@ class _GameScreenState extends State<GameScreen>
   bool _isIntroDialogScheduled = false;
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
+  bool _isDeathSequenceActive = false;
+  bool _isDeathDialogOpen = false;
+  bool _isKingdomFallDialogOpen = false;
+  Timer? _deathDialogTimer;
   GameController? _controller;
 
   final GlobalKey _rootStackKey = GlobalKey();
@@ -107,6 +111,8 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    _deathDialogTimer?.cancel();
+    _deathDialogTimer = null;
     _flyingOrbController.dispose();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
@@ -167,6 +173,7 @@ class _GameScreenState extends State<GameScreen>
     GameController controller,
   ) async {
     controller.audio.playTapVibrate();
+    if (controller.userHp <= 0 || _isDeathSequenceActive) return;
     if (controller.confirmBattleTeleport) {
       final confirmed = await TeleportConfirmDialog.show(
         context,
@@ -174,10 +181,7 @@ class _GameScreenState extends State<GameScreen>
       );
       if (!confirmed || !context.mounted) return;
     }
-    controller.teleportToWorldMap();
-    if (context.mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop(true);
-    }
+    _handleExitViaWeekProgression(context, controller);
   }
 
   @override
@@ -208,10 +212,399 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  void _handleExitViaWeekProgression(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (controller.willNextWeekExceedLimit) {
+      _triggerWeek40KingdomFall(context, controller);
+      return;
+    }
+    controller.completeBattleWeek();
+    if (context.mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  /// Modular handler for campaign week > 40 defeat events.
+  /// Structured as a standalone entry point so a full multi-panel comic
+  /// cutscene can be plugged in before executing [applyPermadeathReset].
+  Future<void> _triggerWeek40KingdomFall(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    if (_isKingdomFallDialogOpen || !mounted) return;
+    _isKingdomFallDialogOpen = true;
+    controller.audio.playDefeat();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        bool isResetting = false;
+        return StatefulBuilder(
+          builder: (innerCtx, setDialogState) {
+            final loc = controller.localization;
+            final palette = AppPalette.of(innerCtx);
+            return PopScope(
+              canPop: false,
+              child: AlertDialog(
+                key: const ValueKey('week40_kingdom_fall_dialog'),
+                backgroundColor: palette.isDark
+                    ? const Color(0xFF1A1014)
+                    : palette.dialogSurface,
+                surfaceTintColor:
+                    palette.isDark ? null : Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: Colors.redAccent.withValues(alpha: 0.65),
+                    width: 1.5,
+                  ),
+                ),
+                title: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: Text(
+                        loc.t(
+                          'kingdom_fall_badge',
+                          fallback: 'WEEK 40 EXPIRED',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.0,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('🏰🔥', style: TextStyle(fontSize: 34)),
+                    const SizedBox(height: 6),
+                    Text(
+                      loc.t(
+                        'kingdom_fall_title',
+                        fallback: 'The Kingdom Has Fallen',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 19,
+                        color: palette.isDark
+                            ? Colors.red.shade200
+                            : const Color(0xFF8E1B1B),
+                      ),
+                    ),
+                  ],
+                ),
+                content: Text(
+                  loc.t(
+                    'kingdom_fall_body',
+                    fallback:
+                        'Time has run out. The Metal Wizard has taken over all neighboring kingdoms and destroyed the Cleric\'s kingdom!',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: palette.secondaryText,
+                  ),
+                ),
+                actionsAlignment: MainAxisAlignment.center,
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      key: const ValueKey(
+                        'week40_kingdom_fall_confirm_button',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFB71C1C),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: isResetting
+                          ? null
+                          : () async {
+                              setDialogState(() => isResetting = true);
+                              await controller.applyPermadeathReset();
+                              _isKingdomFallDialogOpen = false;
+                              if (dialogCtx.mounted) {
+                                Navigator.of(dialogCtx).pop();
+                              }
+                              if (context.mounted &&
+                                  Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop(true);
+                              }
+                            },
+                      child: Text(
+                        loc.t(
+                          'kingdom_fall_confirm_btn',
+                          fallback: 'Return to Week 0',
+                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    _isKingdomFallDialogOpen = false;
+  }
+
+  void _checkDeathAlert(BuildContext context, GameController controller) {
+    if (!controller.isDeathAlertPending ||
+        _isDeathSequenceActive ||
+        _isDeathDialogOpen) {
+      return;
+    }
+    controller.isDeathAlertPending = false;
+    _isDeathSequenceActive = true;
+
+    if (!controller.animationsEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _isDeathDialogOpen) return;
+        _showYouDiedDialog(context, controller);
+      });
+      return;
+    }
+
+    _deathDialogTimer?.cancel();
+    _deathDialogTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted || _isDeathDialogOpen) return;
+      _showYouDiedDialog(context, controller);
+    });
+  }
+
+  Future<void> _showYouDiedDialog(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    if (_isDeathDialogOpen || !mounted) return;
+    _isDeathDialogOpen = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        bool isProcessing = false;
+        return StatefulBuilder(
+          builder: (innerCtx, setDialogState) {
+            return AnimatedBuilder(
+              animation: controller,
+              builder: (animCtx, _) {
+                final loc = controller.localization;
+                final palette = AppPalette.of(animCtx);
+                final canWatchReviveAd = controller.isReviveAdReady;
+
+                return PopScope(
+                  canPop: false,
+                  child: AlertDialog(
+                    key: const ValueKey('death_dialog'),
+                    backgroundColor: palette.isDark
+                        ? const Color(0xFF191116)
+                        : palette.dialogSurface,
+                    surfaceTintColor:
+                        palette.isDark ? null : Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: Colors.redAccent.withValues(alpha: 0.65),
+                        width: 1.5,
+                      ),
+                    ),
+                    title: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('💀', style: TextStyle(fontSize: 36)),
+                        const SizedBox(height: 6),
+                        Text(
+                          loc.t('death_dialog_title', fallback: 'You Died'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            color: palette.isDark
+                                ? Colors.red.shade200
+                                : const Color(0xFF8E1B1B),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          loc.t(
+                            'death_dialog_subtitle',
+                            fallback: 'The Cleric Has Fallen',
+                          ),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: palette.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                    content: Text(
+                      loc.t(
+                        'death_dialog_body',
+                        fallback:
+                            'Your HP reached 0. Watch a sacred vision to revive, keep all Elemental Orbs earned, and retreat to the map—or accept death and start over at Week 0.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                    actionsAlignment: MainAxisAlignment.center,
+                    actions: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (canWatchReviveAd) ...[
+                              ElevatedButton.icon(
+                                key: const ValueKey('death_revive_ad_button'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: palette.isDark
+                                      ? Colors.amber.shade700
+                                      : Colors.amber.shade600,
+                                  foregroundColor: const Color(0xFF1F180D),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: isProcessing
+                                    ? null
+                                    : () async {
+                                        setDialogState(
+                                            () => isProcessing = true);
+                                        final revived = await controller
+                                            .watchReviveRewardedAd();
+                                        if (!mounted) return;
+                                        if (revived) {
+                                          _isDeathDialogOpen = false;
+                                          _isDeathSequenceActive = false;
+                                          if (dialogCtx.mounted) {
+                                            Navigator.of(dialogCtx).pop();
+                                          }
+                                          if (context.mounted &&
+                                              Navigator.of(context).canPop()) {
+                                            Navigator.of(context).pop(false);
+                                          }
+                                        } else if (dialogCtx.mounted) {
+                                          setDialogState(
+                                              () => isProcessing = false);
+                                        }
+                                      },
+                                icon: const Icon(
+                                  Icons.play_circle_fill_rounded,
+                                  size: 20,
+                                ),
+                                label: Text(
+                                  loc.t(
+                                    'death_revive_ad_btn',
+                                    fallback:
+                                        'Watch Ad to Revive & Retreat to Map',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            OutlinedButton(
+                              key: const ValueKey('death_accept_button'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: BorderSide(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.6),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: isProcessing
+                                  ? null
+                                  : () async {
+                                      setDialogState(() => isProcessing = true);
+                                      await controller.applyPermadeathReset();
+                                      _isDeathDialogOpen = false;
+                                      _isDeathSequenceActive = false;
+                                      if (dialogCtx.mounted) {
+                                        Navigator.of(dialogCtx).pop();
+                                      }
+                                      if (context.mounted &&
+                                          Navigator.of(context).canPop()) {
+                                        Navigator.of(context).pop(true);
+                                      }
+                                    },
+                              child: Text(
+                                loc.t(
+                                  'death_accept_btn',
+                                  fallback: 'Accept Death',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+    _isDeathDialogOpen = false;
+  }
+
   void _check100RoundAlert(BuildContext context, GameController controller) {
-    if (controller.is100RoundsAlertPending) {
+    if (controller.is100RoundsAlertPending &&
+        controller.userHp > 0 &&
+        !_isDeathSequenceActive &&
+        !_isDeathDialogOpen) {
       controller.is100RoundsAlertPending = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || controller.userHp <= 0) return;
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -353,11 +746,7 @@ class _GameScreenState extends State<GameScreen>
                               ),
                         onPressed: () {
                           Navigator.of(ctx).pop();
-                          controller.completeBattleWeek();
-                          if (context.mounted &&
-                              Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop(true);
-                          }
+                          _handleExitViaWeekProgression(context, controller);
                         },
                         child: Text(
                           loc.t('map_return_to_map', fallback: 'Return to Map'),
@@ -502,52 +891,31 @@ class _GameScreenState extends State<GameScreen>
     final controller = context.watch<GameController>();
     final loc = controller.localization;
     final bgImage = _resolveBackgroundImage(controller);
+    final inputsLocked = controller.userHp <= 0 ||
+        controller.totalRounds >= 100 ||
+        _isDeathSequenceActive;
 
     _checkIntroStory(context, controller);
+    _checkDeathAlert(context, controller);
     _check100RoundAlert(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
     _checkFlyingOrbVfx(controller);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actionsIconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        centerTitle: false,
-        automaticallyImplyLeading: false,
-        leadingWidth: 80,
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(width: 4),
-            SizedBox(
-              width: 36,
-              height: 36,
-              child: IconButton(
-                key: const ValueKey('game_retreat_button'),
-                padding: EdgeInsets.zero,
-                iconSize: 22,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  maxWidth: 36,
-                  minHeight: 36,
-                  maxHeight: 36,
-                ),
-                tooltip: loc.t('map_return_to_map', fallback: 'Return to Map'),
-                onPressed: () {
-                  controller.audio.playTapVibrate();
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop(false);
-                  }
-                },
-                icon: const Icon(Icons.arrow_back_rounded),
-              ),
-            ),
-            const SizedBox(width: 4),
-            SizedBox(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
+          elevation: 0,
+          centerTitle: false,
+          automaticallyImplyLeading: false,
+          leadingWidth: 48,
+          leading: Center(
+            child: SizedBox(
               width: 36,
               height: 36,
               child: IconButton(
@@ -606,8 +974,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
             ),
-          ],
-        ),
+          ),
         titleSpacing: 4,
         title: (controller.isRewardedAdReady && !controller.isRemoveAdsActive)
             ? LayoutBuilder(
@@ -684,7 +1051,9 @@ class _GameScreenState extends State<GameScreen>
                 'teleport_tooltip',
                 fallback: 'Teleport to World Map (+1 Week)',
               ),
-              onPressed: () => _handleTeleportTap(context, controller),
+              onPressed: inputsLocked
+                  ? null
+                  : () => _handleTeleportTap(context, controller),
               icon: const SizedBox(
                 width: 28,
                 height: 28,
@@ -919,8 +1288,10 @@ class _GameScreenState extends State<GameScreen>
                                             localization: loc,
                                             animationsEnabled:
                                                 controller.animationsEnabled,
-                                            onPressed: () =>
-                                                controller.playTurn(move),
+                                            onPressed: inputsLocked
+                                                ? null
+                                                : () =>
+                                                    controller.playTurn(move),
                                           ),
                                       ],
                                     ),
@@ -934,7 +1305,9 @@ class _GameScreenState extends State<GameScreen>
                                           key: const ValueKey(
                                             'random_move_button',
                                           ),
-                                          onPressed: controller.playRandom,
+                                          onPressed: inputsLocked
+                                              ? null
+                                              : controller.playRandom,
                                           icon: const Icon(
                                             Icons.casino_outlined,
                                             size: 18,
@@ -1137,6 +1510,7 @@ class _GameScreenState extends State<GameScreen>
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1447,7 +1821,7 @@ class _HandActionButton extends StatefulWidget {
   final bool isSelected;
   final LocalizationService localization;
   final bool animationsEnabled;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _HandActionButton({
     super.key,
@@ -1489,8 +1863,10 @@ class _HandActionButtonState extends State<_HandActionButton>
   }
 
   void _handleTap() {
+    final onPressed = widget.onPressed;
+    if (onPressed == null) return;
     // Execute the game turn immediately with zero delay
-    widget.onPressed();
+    onPressed();
 
     // Trigger visual scale animation asynchronously only if animations are enabled
     if (widget.animationsEnabled) {
@@ -1571,7 +1947,7 @@ class _HandActionButtonState extends State<_HandActionButton>
           );
 
     Widget buttonContent = InkWell(
-      onTap: _handleTap,
+      onTap: widget.onPressed == null ? null : _handleTap,
       borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
         padding: EdgeInsets.symmetric(

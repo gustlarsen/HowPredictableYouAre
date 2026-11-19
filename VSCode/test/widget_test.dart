@@ -66,7 +66,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('How Predictable You Are'), findsNothing);
-    expect(find.byKey(const ValueKey('game_retreat_button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('game_retreat_button')), findsNothing);
+    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byKey(const ValueKey('teleport_portal_button')), findsOneWidget);
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(
       find.descendant(

@@ -246,6 +246,8 @@ class CloudSaveData {
   final bool animationsEnabled;
   final bool confirmBattleTeleport;
 
+  final List<String> purchasedIapProductIds;
+
   final int updatedAtMillis;
 
   const CloudSaveData({
@@ -313,6 +315,7 @@ class CloudSaveData {
     this.vibrationEnabled = true,
     this.animationsEnabled = true,
     this.confirmBattleTeleport = true,
+    this.purchasedIapProductIds = const [],
     this.updatedAtMillis = 0,
   }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
@@ -473,6 +476,10 @@ class CloudSaveData {
       vibrationEnabled: vibrationEnabled,
       animationsEnabled: animationsEnabled,
       confirmBattleTeleport: confirmBattleTeleport,
+      purchasedIapProductIds: (
+        {...purchasedIapProductIds, ...local.purchasedIapProductIds}.toList()
+          ..sort()
+      ),
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -548,6 +555,7 @@ class CloudSaveData {
       vibrationEnabled: storage.vibrationEnabled,
       animationsEnabled: storage.animationsEnabled,
       confirmBattleTeleport: storage.confirmBattleTeleport,
+      purchasedIapProductIds: storage.purchasedIapProductIds.toList()..sort(),
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -575,6 +583,12 @@ class CloudSaveData {
     await storage.setUserHp(userHp);
     await storage.setPcHp(pcHp);
     await storage.setCurrentWeek(currentWeek);
+    if (purchasedIapProductIds.isNotEmpty) {
+      await storage.setPurchasedIapProductIds({
+        ...storage.purchasedIapProductIds,
+        ...purchasedIapProductIds,
+      });
+    }
 
     await storage.setLanguage(language);
     await storage.setDarkMode(darkMode);
@@ -727,6 +741,7 @@ class CloudSaveData {
       'vibrationEnabled': vibrationEnabled,
       'animationsEnabled': animationsEnabled,
       'confirmBattleTeleport': confirmBattleTeleport,
+      'purchasedIapProductIds': purchasedIapProductIds,
       'updatedAtMillis': updatedAtMillis,
     };
   }
@@ -804,8 +819,8 @@ class CloudSaveData {
       total: (map['total'] as num?)?.toInt() ?? 0,
       userHp: (map['userHp'] as num?)?.toInt() ?? 100,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
-      currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 1
-          ? 1
+      currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 0
+          ? 0
           : ((map['currentWeek'] as num?)?.toInt() ?? 1),
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
@@ -858,6 +873,13 @@ class CloudSaveData {
       vibrationEnabled: map['vibrationEnabled'] as bool? ?? true,
       animationsEnabled: map['animationsEnabled'] as bool? ?? true,
       confirmBattleTeleport: map['confirmBattleTeleport'] as bool? ?? true,
+      purchasedIapProductIds: (map['purchasedIapProductIds'] is List)
+          ? (map['purchasedIapProductIds'] as List)
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toSet()
+              .toList()
+          : const [],
       updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ?? 0,
     );
   }

@@ -273,6 +273,7 @@ class GameController extends ChangeNotifier {
   bool giftBoxEnabled = false;
 
   bool is100RoundsAlertPending = false;
+  bool isDeathAlertPending = false;
   bool isGiftAvailable = true;
   Timer? _giftTimer;
   DateTime? _giftCooldownUntil;
@@ -389,6 +390,18 @@ class GameController extends ChangeNotifier {
   /// True when the optional Rewarded Video ad (+50 Orbs) is preloaded and not on cooldown.
   bool get isRewardedAdReady =>
       adService.isRewardedAdReady && !isRewardedAdOnCooldown;
+
+  /// True when a Rewarded Video ad is preloaded and ready for death revival
+  /// (unaffected by the +50 Orbs anti-spam cooldown).
+  bool get isReviveAdReady => adService.isRewardedAdReady;
+
+  /// True when advancing +1 Week from the current campaign week exceeds [maxCampaignWeeks] (40).
+  bool get willNextWeekExceedLimit => currentWeek + 1 > maxCampaignWeeks;
+
+  /// True when [productId] has been verified as a real-money Google Play IAP.
+  bool isRealMoneyIapProduct(String productId) =>
+      storage.purchasedIapProductIds.contains(productId) ||
+      billingService.isVerifiedPurchased(productId);
 
   /// Remaining cooldown duration after watching a rewarded ad, or [Duration.zero].
   Duration get rewardedAdCooldownRemaining {
@@ -541,7 +554,8 @@ class GameController extends ChangeNotifier {
     } else {
       computerHp = math.max(0, maxHp - userScore * damagePerLoss);
     }
-    is100RoundsAlertPending = totalRounds >= 100;
+    isDeathAlertPending = userHp <= 0;
+    is100RoundsAlertPending = !isDeathAlertPending && totalRounds >= 100;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
     }
@@ -687,6 +701,13 @@ class GameController extends ChangeNotifier {
   }
 
   void playTurn(HandMove userChoice) {
+    if (userHp <= 0) {
+      isDeathAlertPending = true;
+      is100RoundsAlertPending = false;
+      audio.playVibrate();
+      notifyListeners();
+      return;
+    }
     if (totalRounds >= 100) {
       is100RoundsAlertPending = true;
       audio.playVibrate();
@@ -743,7 +764,10 @@ class GameController extends ChangeNotifier {
       _triggerCloudSave();
     }
 
-    if (totalRounds >= 100) {
+    if (userHp <= 0) {
+      isDeathAlertPending = true;
+      is100RoundsAlertPending = false;
+    } else if (totalRounds >= 100) {
       is100RoundsAlertPending = true;
     }
 
@@ -787,6 +811,7 @@ class GameController extends ChangeNotifier {
     userHp = maxHp;
     computerHp = maxHp;
     is100RoundsAlertPending = false;
+    isDeathAlertPending = false;
     _engine.reset();
 
     storage.clearGameStats();
@@ -823,9 +848,10 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Advances the campaign calendar by +1 Week upon completing a 100-round
-  /// battle, persists locally, resets the battle arena for the next encounter
-  /// while keeping collected Elemental Orbs, and syncs with Cloud Save.
+  /// Advances the campaign calendar by +1 Week upon exiting a battle via
+  /// 100 rounds completed or Teleport, persists locally, resets the battle
+  /// arena for the next encounter while keeping collected Elemental Orbs,
+  /// and syncs with Cloud Save if signed in.
   void completeBattleWeek() {
     currentWeek += 1;
     storage.setCurrentWeek(currentWeek);
@@ -842,6 +868,90 @@ class GameController extends ChangeNotifier {
     completeBattleWeek();
   }
 
+  /// Revives the Cleric after watching a rewarded video ad upon death:
+  /// restores HP and battle Mana to 100, keeps all Elemental Orbs collected,
+  /// preserves unlocks and current campaign week, persists & syncs to Cloud Save.
+  void reviveAndRetreatToMap() {
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  /// Displays the preloaded rewarded video ad when the player chooses to revive
+  /// after reaching 0 HP. Restores HP/Mana and keeps earned orbs exclusively
+  /// inside `onUserEarnedReward`, invoking [onRevived] upon completion.
+  Future<bool> watchReviveRewardedAd({VoidCallback? onRevived}) async {
+    if (!isReviveAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        reviveAndRetreatToMap();
+        onRevived?.call();
+      },
+    );
+    return shown && earned;
+  }
+
+  /// Centralized permadeath hard reset used by both unrevived death (HP == 0)
+  /// and Week > 40 Kingdom Fall defeat:
+  /// 1. Resets campaign week to 0 (Week 0 / 40).
+  /// 2. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
+  /// 3. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
+  ///    IAP purchases persisted in [StorageService] or verified by [BillingService].
+  /// 4. Resets HP/Mana to 100, clears the Markov matrix, persists locally, and
+  ///    overwrites Cloud Save so old cloud data cannot revert the Week 0 reset.
+  Future<void> applyPermadeathReset() async {
+    _giftTimer?.cancel();
+    _giftTimer = null;
+    _giftCooldownUntil = null;
+    _remainingGiftCooldown = Duration.zero;
+    isGiftAvailable = true;
+
+    final verifiedPaidIds = <String>{
+      ...storage.purchasedIapProductIds,
+      ...billingService.verifiedPurchasedProductIds,
+    };
+    final preservedHasSeenIntro =
+        hasSeenStoryIntro || storage.hasSeenStoryIntro;
+
+    await storage.clearGameplayProgress(includeSettings: false);
+    await storage.setTurn0Orbs(
+      fire: 0,
+      water: 0,
+      wood: 0,
+      earth: 0,
+      metal: 0,
+    );
+    await storage.setPurchasedIapProductIds(verifiedPaidIds);
+    await storage.setCurrentWeek(0);
+    if (preservedHasSeenIntro) {
+      await storage.setHasSeenStoryIntro(true);
+    }
+
+    turnCount = 0;
+    lastCollectedOrbMove = null;
+    is100RoundsAlertPending = false;
+    isDeathAlertPending = false;
+
+    _loadState(restartAudio: false);
+
+    for (final productId in verifiedPaidIds) {
+      unlockByProductId(
+        productId,
+        recordAsIap: false,
+        triggerStory: false,
+        triggerCloudSave: false,
+      );
+    }
+
+    notifyListeners();
+    if (playGames.isSignedIn) {
+      await playGames.saveCloudData();
+    }
+  }
+
   /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,
   /// scores, Markov matrices, and unlocked story chapters) while preserving
   /// the player's UI settings, and syncs the fresh state to the cloud if signed in.
@@ -854,6 +964,7 @@ class GameController extends ChangeNotifier {
     await storage.clearGameplayProgress(includeSettings: false);
     turnCount = 0;
     is100RoundsAlertPending = false;
+    isDeathAlertPending = false;
     _loadState(restartAudio: false);
     notifyListeners();
     if (playGames.isSignedIn) {
@@ -1230,7 +1341,12 @@ class GameController extends ChangeNotifier {
   /// Google Play purchase ([PurchaseStatus.purchased]) or restore
   /// ([PurchaseStatus.restored]), persisting to [SharedPreferences] and
   /// triggering a [PlayGamesService] cloud save if signed in.
-  bool unlockByProductId(String productId) {
+  bool unlockByProductId(
+    String productId, {
+    bool recordAsIap = true,
+    bool triggerStory = true,
+    bool triggerCloudSave = true,
+  }) {
     switch (productId) {
       case BillingService.productResetButton:
         if (!unlockedReset) {
@@ -1239,7 +1355,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedReset = true;
         storage.setUnlockedReset(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
+        }
         break;
       case BillingService.productPredictabilityScore:
         if (!unlockedPredictability) {
@@ -1248,7 +1366,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedPredictability = true;
         storage.setUnlockedPredictability(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
+        }
         break;
       case BillingService.productRandomButton:
         if (!unlockedRandom) {
@@ -1257,7 +1377,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedRandom = true;
         storage.setUnlockedRandom(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
+        }
         break;
       case BillingService.productShowAlgorithm:
         if (!unlockedAlgorithm) {
@@ -1266,7 +1388,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedAlgorithm = true;
         storage.setUnlockedAlgorithm(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
+        }
         break;
       case BillingService.productNewHands:
         if (!unlockedNewHands) {
@@ -1283,7 +1407,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedYourPrediction = true;
         storage.setUnlockedYourPrediction(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
+        }
         break;
       case BillingService.productPcNextMove:
         if (!unlockedNextMove) {
@@ -1292,7 +1418,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedNextMove = true;
         storage.setUnlockedNextMove(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
+        }
         break;
       case BillingService.productSuggestion:
         if (!unlockedSuggestion) {
@@ -1301,7 +1429,9 @@ class GameController extends ChangeNotifier {
         }
         unlockedSuggestion = true;
         storage.setUnlockedSuggestion(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
+        }
         break;
       case BillingService.productRemoveAds:
         unlockedAds = true;
@@ -1317,13 +1447,20 @@ class GameController extends ChangeNotifier {
         }
         unlockedCrystalBall = true;
         storage.setUnlockedCrystalBall(true);
-        _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
+        if (triggerStory) {
+          _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
+        }
         break;
       default:
         return false;
     }
 
-    _triggerCloudSave();
+    if (recordAsIap) {
+      unawaited(storage.addPurchasedIapProductId(productId));
+    }
+    if (triggerCloudSave) {
+      _triggerCloudSave();
+    }
     notifyListeners();
     return true;
   }

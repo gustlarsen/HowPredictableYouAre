@@ -208,15 +208,42 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
-  // Campaign Week Calendar (starts at Week 1)
+  // Campaign Week Calendar (starts at Week 1; Permadeath resets to Week 0)
   static const String currentWeekKey = 'current_week';
   int get currentWeek {
     final val = _prefs.getInt(currentWeekKey) ?? 1;
-    return val < 1 ? 1 : val;
+    return val < 0 ? 0 : val;
   }
 
   Future<void> setCurrentWeek(int val) =>
-      _prefs.setInt(currentWeekKey, val < 1 ? 1 : val);
+      _prefs.setInt(currentWeekKey, val < 0 ? 0 : val);
+
+  // Persisted Real-Money Google Play IAP Product IDs (survives Permadeath Reset)
+  static const String purchasedIapProductIdsKey = 'iap_purchased_product_ids';
+
+  Set<String> get purchasedIapProductIds {
+    final list = _prefs.getStringList(purchasedIapProductIdsKey);
+    if (list == null) return <String>{};
+    return list.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+  }
+
+  Future<void> addPurchasedIapProductId(String productId) {
+    final clean = productId.trim();
+    if (clean.isEmpty) return Future.value();
+    final updated = {...purchasedIapProductIds, clean};
+    return setPurchasedIapProductIds(updated);
+  }
+
+  Future<void> setPurchasedIapProductIds(Set<String> productIds) {
+    final sorted =
+        productIds
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return _prefs.setStringList(purchasedIapProductIdsKey, sorted);
+  }
 
   // Settings
   bool get darkMode => _prefs.getBool('darkMode') ?? true;

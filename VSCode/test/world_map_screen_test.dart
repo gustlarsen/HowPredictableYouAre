@@ -355,7 +355,7 @@ void main() {
     );
 
     testWidgets(
-      'Tapping Metal Wizard\'s Lair opens fresh 100-round battle, Retreat returns early without advancing week, and completing 100 rounds returns to WorldMapScreen and increments week + cloud save',
+      'Tapping Metal Wizard\'s Lair opens fresh 100-round battle, Teleport exits advancing +1 week, and completing 100 rounds returns to WorldMapScreen and increments week + cloud save',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -410,21 +410,26 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(GameScreen), findsOneWidget);
+        expect(find.byKey(const ValueKey('game_retreat_button')), findsNothing);
+        expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
         expect(controller.totalRounds, 0);
         expect(controller.remainingMana, 100);
 
-        // Play 1 round then tap Retreat button in AppBar -> returns to map, week stays 1
+        // Play 1 round then tap Teleport button in AppBar -> returns to map, week advances 1 -> 2
         await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
         await tester.pumpAndSettle();
         expect(controller.totalRounds, 1);
 
-        await tester.tap(find.byKey(const ValueKey('game_retreat_button')));
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(find.byType(GameScreen), findsNothing);
-        expect(controller.currentWeek, 1);
-        expect(find.text('Week 1 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 2);
+        expect(storage.currentWeek, 2);
+        expect(find.text('Week 2 / 40'), findsOneWidget);
 
         // 2. Re-enter Metal Wizard's Lair -> fresh 100-round battle again
         await tester.tap(
@@ -434,9 +439,9 @@ void main() {
         expect(controller.totalRounds, 0);
         expect(controller.remainingMana, 100);
 
-        // Complete all 100 rounds
+        // Complete all 100 rounds without dropping to 0 HP
         for (var i = 0; i < 100; i++) {
-          controller.playTurn(HandMove.rock);
+          controller.playTurn(controller.crystalBallMove ?? HandMove.rock);
         }
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
@@ -452,20 +457,20 @@ void main() {
         );
         expect(returnBtn, findsOneWidget);
 
-        // Tap Return to Map -> pops back to WorldMapScreen and increments Week 1 -> 2
+        // Tap Return to Map -> pops back to WorldMapScreen and increments Week 2 -> 3
         await tester.tap(returnBtn);
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(find.byType(GameScreen), findsNothing);
-        expect(controller.currentWeek, 2);
-        expect(storage.currentWeek, 2);
-        expect(find.text('Week 2 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 3);
+        expect(storage.currentWeek, 3);
+        expect(find.text('Week 3 / 40'), findsOneWidget);
 
         // Persisted in CloudSaveData
         expect(fakePlayGamesClient.saveCount, greaterThanOrEqualTo(1));
         final cloud = CloudSaveData.tryParse(fakePlayGamesClient.savedPayload)!;
-        expect(cloud.currentWeek, 2);
+        expect(cloud.currentWeek, 3);
       },
     );
 

@@ -132,6 +132,7 @@ class BillingService extends ChangeNotifier {
   bool _isRestoring = false;
   final Map<String, ProductDetails> _productsById = {};
   final Set<String> _pendingProductIds = {};
+  final Set<String> _verifiedPurchasedProductIds = {};
   final List<void Function(BillingPurchaseEvent)> _eventListeners = [];
 
   /// Invoked immediately whenever a purchase has status [PurchaseStatus.purchased]
@@ -153,6 +154,12 @@ class BillingService extends ChangeNotifier {
       Map.unmodifiable(_productsById);
 
   Set<String> get pendingProductIds => Set.unmodifiable(_pendingProductIds);
+
+  Set<String> get verifiedPurchasedProductIds =>
+      Set.unmodifiable(_verifiedPurchasedProductIds);
+
+  bool isVerifiedPurchased(String productId) =>
+      _verifiedPurchasedProductIds.contains(productId);
 
   bool isPurchasePending(String productId) =>
       _pendingProductIds.contains(productId);
@@ -373,6 +380,7 @@ class BillingService extends ChangeNotifier {
         case PurchaseStatus.restored:
           _pendingProductIds.remove(productId);
           _isRestoring = false;
+          _verifiedPurchasedProductIds.add(productId);
 
           // Immediately grant entitlement in GameController (persisting to
           // SharedPreferences and triggering PlayGamesService cloud save).
