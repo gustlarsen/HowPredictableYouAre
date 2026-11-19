@@ -410,6 +410,11 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
         await tester.pumpAndSettle();
 
+        final shopScrollable = find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
+        );
+
         // Verify side-by-side Elemental Orb and Real Money buttons for Reset Button
         final orbBtn = find.byKey(
           const ValueKey('diamond_unlock_unlock_reset_button'),
@@ -417,6 +422,12 @@ void main() {
         final realMoneyBtn = find.byKey(
           const ValueKey('real_money_unlock_unlock_reset_button'),
         );
+        await tester.scrollUntilVisible(
+          orbBtn,
+          140,
+          scrollable: shopScrollable,
+        );
+        await tester.pumpAndSettle();
         expect(orbBtn, findsOneWidget);
         expect(realMoneyBtn, findsOneWidget);
         expect(
@@ -439,6 +450,12 @@ void main() {
         final predRealMoneyBtn = find.byKey(
           const ValueKey('real_money_unlock_unlock_predictability_score'),
         );
+        await tester.scrollUntilVisible(
+          predRealMoneyBtn,
+          -140,
+          scrollable: shopScrollable,
+        );
+        await tester.pumpAndSettle();
         await tester.tap(predRealMoneyBtn);
         await tester.pump();
 

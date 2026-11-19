@@ -776,8 +776,21 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
-    // Attempt to unlock the first item (Predictability Score, cost: 15 Fire + 15 Water + 15 Wood) with only 10 of each
-    await tester.tap(find.text('Unlock').first);
+    // Attempt to unlock Predictability Score (cost: 15 Fire + 15 Water + 15 Wood) with only 10 of each
+    final predUnlockBtn = find.byKey(
+      const ValueKey('diamond_unlock_unlock_predictability_score'),
+    );
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      predUnlockBtn,
+      120,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(predUnlockBtn);
     await tester.pump();
 
     expect(find.text('Not enough Elemental Orbs'), findsOneWidget);
@@ -979,7 +992,15 @@ void main() {
     final resetUnlockBtn = find.byKey(
       const ValueKey('diamond_unlock_unlock_reset_button'),
     );
-    await tester.ensureVisible(resetUnlockBtn);
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      resetUnlockBtn,
+      140,
+      scrollable: shopScrollable,
+    );
     await tester.pumpAndSettle();
     await tester.tap(resetUnlockBtn);
     await tester.pumpAndSettle();
@@ -1264,21 +1285,37 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
-    // Verify Predictability Score is at #1 position (above Reset Button and New Hands) and costs 15 Fire + 15 Water + 15 Wood
-    final predTitle = find.text('Predictability Score');
-    final resetTitle = find.text('Reset Button');
-    final newHandsTitle = find.text('New Hands');
-    expect(predTitle, findsOneWidget);
-    expect(resetTitle, findsOneWidget);
-
-    final predY = tester.getTopLeft(predTitle).dy;
-    final initialResetY = tester.getTopLeft(resetTitle).dy;
-    expect(predY, lessThan(initialResetY));
-
     final shopScrollable = find.descendant(
       of: find.byType(ShopDialog),
       matching: find.byType(Scrollable),
     );
+
+    // Verify Predictability Score is ahead of Reset Button and New Hands and costs 15 Fire + 15 Water + 15 Wood
+    final predTitle = find.text('Predictability Score');
+    final resetTitle = find.text('Reset Button');
+    final newHandsTitle = find.text('New Hands');
+    final scrollState = tester.state<ScrollableState>(shopScrollable);
+
+    await tester.scrollUntilVisible(
+      predTitle,
+      100,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(predTitle, findsOneWidget);
+    final predY = scrollState.position.pixels + tester.getTopLeft(predTitle).dy;
+
+    await tester.scrollUntilVisible(
+      resetTitle,
+      100,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(resetTitle, findsOneWidget);
+    final initialResetY =
+        scrollState.position.pixels + tester.getTopLeft(resetTitle).dy;
+    expect(predY, lessThan(initialResetY));
+
     await tester.scrollUntilVisible(
       newHandsTitle,
       120,
@@ -1286,20 +1323,20 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(newHandsTitle, findsOneWidget);
-    if (resetTitle.evaluate().isNotEmpty) {
-      expect(
-        tester.getTopLeft(resetTitle).dy,
-        lessThan(tester.getTopLeft(newHandsTitle).dy),
-      );
-    }
+    final newHandsY =
+        scrollState.position.pixels + tester.getTopLeft(newHandsTitle).dy;
+    expect(initialResetY, lessThan(newHandsY));
 
-    // Scroll back to top so Predictability Score card is fully visible
-    tester.state<ScrollableState>(shopScrollable).position.jumpTo(0);
-    await tester.pumpAndSettle();
-
+    // Scroll back up so Predictability Score card is fully visible
     final predUnlockBtn = find.byKey(
       const ValueKey('diamond_unlock_unlock_predictability_score'),
     );
+    await tester.scrollUntilVisible(
+      predUnlockBtn,
+      -120,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
     expect(predUnlockBtn, findsOneWidget);
     expect(
       find.descendant(of: predUnlockBtn, matching: find.text('15')),
@@ -1474,7 +1511,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.scrollUntilVisible(
+      find.text('New Hands (Lizard & Spock)'),
+      140,
+      scrollable: find.descendant(
+        of: find.byType(ShopDialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('New Hands (Lizard & Spock)'));
     await tester.pumpAndSettle();
@@ -1504,7 +1548,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -150));
+    await tester.scrollUntilVisible(
+      find.text('New Hands (Lizard & Spock)'),
+      140,
+      scrollable: find.descendant(
+        of: find.byType(ShopDialog),
+        matching: find.byType(Scrollable),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('New Hands (Lizard & Spock)'));
     await tester.pumpAndSettle();
@@ -1923,7 +1974,21 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. "Predictability" in "Predictability Score" must never split mid-word on narrow mobile screens
+    final listViewFinder = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(ListView),
+    );
+    final shopScrollable = find.descendant(
+      of: find.byType(ShopDialog),
+      matching: find.byType(Scrollable),
+    );
     final predTitleFinder = find.text('Predictability Score');
+    await tester.scrollUntilVisible(
+      predTitleFinder,
+      120,
+      scrollable: shopScrollable,
+    );
+    await tester.pumpAndSettle();
     expect(predTitleFinder, findsOneWidget);
     final predParagraph =
         tester.renderObject<RenderParagraph>(predTitleFinder);
@@ -1938,13 +2003,12 @@ void main() {
         predictabilityWordBoxes.map((b) => b.top.round()).toSet();
     expect(predictabilityLineTops.length, 1);
 
+    tester.state<ScrollableState>(shopScrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+
     // 2. Pinned Rewarded Ad card is immediately visible below the balance bar and above the ListView without scrolling
     final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
     final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
-    final listViewFinder = find.descendant(
-      of: find.byType(ShopDialog),
-      matching: find.byType(ListView),
-    );
     expect(balanceBarFinder, findsOneWidget);
     expect(adCardFinder, findsOneWidget);
     expect(listViewFinder, findsOneWidget);
@@ -3332,7 +3396,7 @@ void main() {
       expect(controller.remainingMana, 100);
       expect(controller.totalRounds, 0);
       expect(controller.woodOrbs, 0);
-      expect(controller.userHp, 100);
+      expect(controller.userHp, 60);
       expect(controller.computerHp, 100);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),
@@ -3378,7 +3442,7 @@ void main() {
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
       final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
 
-      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, HP stays 100/100, Gauge = 0.0%
+      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, Player HP stays 60, Gauge = 0.0%
       controller.crystalBallMove = HandMove.rock;
       await tester.tap(rockBtnFinder);
       await tester.pump();
@@ -3387,7 +3451,7 @@ void main() {
       expect(controller.lastWinner, RoundWinner.draw);
       expect(controller.remainingMana, 99);
       expect(controller.totalRounds, 1);
-      expect(controller.userHp, 100);
+      expect(controller.userHp, 60);
       expect(controller.computerHp, 100);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('99')),
@@ -3418,7 +3482,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1100));
       expect(controller.remainingMana, 98);
       expect(controller.totalRounds, 2);
-      expect(controller.userHp, 100);
+      expect(controller.userHp, 60);
       expect(controller.computerHp, 99);
       expect(
         find.descendant(of: find.byType(ScoreHeader), matching: find.text('100.0%')),
@@ -3433,7 +3497,7 @@ void main() {
 
       expect(controller.remainingMana, 97);
       expect(controller.totalRounds, 3);
-      expect(controller.userHp, 100);
+      expect(controller.userHp, 60);
       expect(controller.computerHp, 99);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('97')),

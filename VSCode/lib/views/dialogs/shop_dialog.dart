@@ -415,11 +415,115 @@ class _ShopDialogState extends State<ShopDialog> {
               ),
               Divider(height: 18, color: palette.isDark ? null : palette.divider),
 
-              // Shop items list (ordered ascending by Elemental Orb cost)
+              // Shop items list (infinite Cleric stat upgrades first, then unlocks)
               Expanded(
                 child: ListView(
                   cacheExtent: 1000,
                   children: [
+                    _InfiniteStatUpgradeTile(
+                      cardKey: const ValueKey('shop_upgrade_max_hp_card'),
+                      buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
+                      icon: Icons.favorite_rounded,
+                      iconColor: palette.dangerText,
+                      title: loc.t(
+                        'upgrade_max_hp_title',
+                        fallback: '+1 Max HP',
+                      ),
+                      subtitle: loc.t(
+                        'upgrade_max_hp_desc',
+                        fallback:
+                            "Permanently raises your Cleric's maximum HP by +1 for this campaign.",
+                      ),
+                      statusText:
+                          'Lv. ${controller.hpUpgradeLevel} • ${controller.playerMaxHp} → ${controller.playerMaxHp + 1} HP',
+                      actionLabel: loc.t(
+                        'stat_upgrade_action_label',
+                        fallback: 'Upgrade',
+                      ),
+                      cost: controller.nextMaxHpUpgradeCost,
+                      onPurchase: () {
+                        final ok = controller.upgradeMaxHp();
+                        if (ok) {
+                          controller.audio.playWinVibrate();
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${loc.t('upgrade_max_hp_title', fallback: '+1 Max HP')}: ${controller.playerMaxHp} HP (Lv. ${controller.hpUpgradeLevel})',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        } else {
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  loc.t(
+                                    'string79',
+                                    fallback: 'Not enough Elemental Orbs',
+                                  ),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        }
+                      },
+                    ),
+                    _InfiniteStatUpgradeTile(
+                      cardKey: const ValueKey('shop_upgrade_max_mana_card'),
+                      buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
+                      icon: Icons.water_drop_rounded,
+                      iconColor: const Color(0xFF00B0FF),
+                      title: loc.t(
+                        'upgrade_max_mana_title',
+                        fallback: '+1 Max Mana Pool',
+                      ),
+                      subtitle: loc.t(
+                        'upgrade_max_mana_desc',
+                        fallback:
+                            "Permanently expands your Cleric's maximum Mana Pool by +1 turn per battle.",
+                      ),
+                      statusText:
+                          'Lv. ${controller.manaUpgradeLevel} • ${controller.playerMaxMana} → ${controller.playerMaxMana + 1} ${loc.t('mana_label', fallback: 'Mana')}',
+                      actionLabel: loc.t(
+                        'stat_upgrade_action_label',
+                        fallback: 'Upgrade',
+                      ),
+                      cost: controller.nextMaxManaUpgradeCost,
+                      onPurchase: () {
+                        final ok = controller.upgradeMaxMana();
+                        if (ok) {
+                          controller.audio.playWinVibrate();
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool')}: ${controller.playerMaxMana} ${loc.t('mana_label', fallback: 'Mana')} (Lv. ${controller.manaUpgradeLevel})',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        } else {
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  loc.t(
+                                    'string79',
+                                    fallback: 'Not enough Elemental Orbs',
+                                  ),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        }
+                      },
+                    ),
                     _buildShopItem(
                       context: context,
                       title: loc.t(
@@ -1320,3 +1424,198 @@ class _ShopItemTile extends StatelessWidget {
     );
   }
 }
+
+class _InfiniteStatUpgradeTile extends StatelessWidget {
+  final Key cardKey;
+  final Key buttonKey;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String statusText;
+  final String actionLabel;
+  final ElementalCost cost;
+  final VoidCallback onPurchase;
+
+  const _InfiniteStatUpgradeTile({
+    required this.cardKey,
+    required this.buttonKey,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.statusText,
+    required this.actionLabel,
+    required this.cost,
+    required this.onPurchase,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
+    final entries = cost.nonZeroEntries;
+
+    return Container(
+      key: cardKey,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.isDark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+            : palette.shopTileSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: palette.isDark
+              ? palette.amberBorder.withValues(alpha: 0.32)
+              : palette.sandCardBorder,
+          width: 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onPurchase,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 16, color: iconColor),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: palette.primaryText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.rewardedAdCardSurface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: palette.amberText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    softWrap: true,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: palette.amberSubtitle,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      actionLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: palette.isDark
+                            ? FontWeight.normal
+                            : FontWeight.w600,
+                        color: palette.isDark
+                            ? Colors.grey
+                            : palette.secondaryText,
+                      ),
+                    ),
+                    ElevatedButton(
+                      key: buttonKey,
+                      onPressed: onPurchase,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            palette.isDark ? null : palette.dialogSurface,
+                        elevation: palette.isDark ? null : 1,
+                        side: palette.isDark
+                            ? null
+                            : BorderSide(color: palette.sandCardBorder),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        minimumSize: const Size(52, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 2,
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final entry in entries)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  entry.key.elementalIcon,
+                                  size: 12,
+                                  color: palette.elementalText(entry.key),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${entry.value}',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: palette.elementalText(entry.key),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

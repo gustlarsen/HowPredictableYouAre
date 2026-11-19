@@ -11,6 +11,7 @@ class RpgHpBar extends StatefulWidget {
   final double height;
   final double flashOpacity;
   final double shakeOffset;
+  final bool animationsEnabled;
 
   const RpgHpBar({
     super.key,
@@ -20,6 +21,7 @@ class RpgHpBar extends StatefulWidget {
     this.height = 15.0,
     this.flashOpacity = 0.0,
     this.shakeOffset = 0.0,
+    this.animationsEnabled = true,
   });
 
   @override
@@ -42,20 +44,28 @@ class _RpgHpBarState extends State<RpgHpBar>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    if (_isCritical(widget.hp)) {
+    if (_isCritical(widget.hp, widget.maxHp) && widget.animationsEnabled) {
       _pulseController.repeat(reverse: true);
     }
   }
 
-  bool _isCritical(int hp) => hp < 30;
+  bool _isCritical(int hp, int maxHp) {
+    if (maxHp <= 0) return true;
+    return (hp.clamp(0, maxHp) * 100) < (maxHp * 30);
+  }
 
   @override
   void didUpdateWidget(covariant RpgHpBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final wasCritical = _isCritical(oldWidget.hp);
-    final isCrit = _isCritical(widget.hp);
+    final wasCritical = _isCritical(oldWidget.hp, oldWidget.maxHp);
+    final isCrit = _isCritical(widget.hp, widget.maxHp);
 
-    if (isCrit && !wasCritical) {
+    if (!widget.animationsEnabled) {
+      if (_pulseController.isAnimating || _pulseController.value != 0.0) {
+        _pulseController.stop();
+        _pulseController.reset();
+      }
+    } else if (isCrit && (!wasCritical || !oldWidget.animationsEnabled)) {
       if (!_pulseController.isAnimating) {
         _pulseController.repeat(reverse: true);
       }
@@ -74,30 +84,21 @@ class _RpgHpBarState extends State<RpgHpBar>
   }
 
   Color _resolveHpColor(double ratio) {
-    if (ratio >= 0.5) {
-      // Transition from golden amber (0.5) to lush emerald green (1.0)
-      final t = ((ratio - 0.5) * 2.0).clamp(0.0, 1.0);
-      return Color.lerp(
-        const Color(0xFFFFB300), // Amber
-        const Color(0xFF2ECC71), // Emerald green
-        t,
-      )!;
+    if (ratio >= 0.60) {
+      return const Color(0xFF2ECC71); // Emerald green (>= 60%)
+    } else if (ratio >= 0.30) {
+      return const Color(0xFFFFB300); // Amber (30%–59%)
     } else {
-      // Transition from crimson red (0.0) to golden amber (0.5)
-      final t = (ratio * 2.0).clamp(0.0, 1.0);
-      return Color.lerp(
-        const Color(0xFFE74C3C), // Crimson red
-        const Color(0xFFFFB300), // Amber
-        t,
-      )!;
+      return const Color(0xFFE74C3C); // Crimson red (< 30%)
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final clampedHp = widget.hp.clamp(0, widget.maxHp);
-    final hpRatio = clampedHp / widget.maxHp.toDouble();
-    final isCritical = _isCritical(widget.hp);
+    final safeMaxHp = widget.maxHp <= 0 ? 1 : widget.maxHp;
+    final clampedHp = widget.hp.clamp(0, safeMaxHp);
+    final hpRatio = widget.maxHp <= 0 ? 0.0 : clampedHp / widget.maxHp.toDouble();
+    final isCritical = _isCritical(widget.hp, widget.maxHp);
 
     final shake = widget.shakeOffset;
     final paddingLeft = shake > 0 ? shake : 0.0;
@@ -108,7 +109,9 @@ class _RpgHpBarState extends State<RpgHpBar>
       child: AnimatedBuilder(
         animation: _pulseAnim,
         builder: (context, _) {
-          final pulse = isCritical ? _pulseAnim.value : 0.0;
+          final pulse = isCritical
+              ? (widget.animationsEnabled ? _pulseAnim.value : 0.5)
+              : 0.0;
 
           return Container(
             width: widget.width,

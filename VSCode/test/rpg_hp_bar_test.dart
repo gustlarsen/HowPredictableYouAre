@@ -112,6 +112,7 @@ void main() {
                 animationsEnabled: false,
                 roundId: 1,
                 userHp: 100,
+                playerMaxHp: 100,
                 computerHp: 95,
               ),
             ),

@@ -464,7 +464,10 @@ void main() {
           expect(dialog.backgroundColor, expectedPalette.dialogSurface);
 
           // Wing 1: Throne Room + Milestones + Royal Decrees
-          await tester.tap(find.byKey(const ValueKey('castle_tab_throne')));
+          final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
+          await tester.ensureVisible(throneTab);
+          await tester.pumpAndSettle();
+          await tester.tap(throneTab);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_throne_room')),
@@ -474,7 +477,10 @@ void main() {
           expect(find.text('Unbroken Variety'), findsOneWidget);
 
           // Wing 2: Library (Endings X/4 + Bestiary + Story Memories)
-          await tester.tap(find.byKey(const ValueKey('castle_tab_library')));
+          final libTab = find.byKey(const ValueKey('castle_tab_library'));
+          await tester.ensureVisible(libTab);
+          await tester.pumpAndSettle();
+          await tester.tap(libTab);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_library')),
@@ -485,7 +491,10 @@ void main() {
           expect(find.text('Story Memories'), findsOneWidget);
 
           // Wing 3: Treasury (Piggy Bank + 3-to-1 Alchemy)
-          await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
+          final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
+          await tester.ensureVisible(treasuryTab);
+          await tester.pumpAndSettle();
+          await tester.tap(treasuryTab);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_treasury')),
@@ -502,7 +511,10 @@ void main() {
           );
 
           // Wing 4: Relic Chamber
-          await tester.tap(find.byKey(const ValueKey('castle_tab_relics')));
+          final relicsTab = find.byKey(const ValueKey('castle_tab_relics'));
+          await tester.ensureVisible(relicsTab);
+          await tester.pumpAndSettle();
+          await tester.tap(relicsTab);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_relic_chamber')),
@@ -514,7 +526,10 @@ void main() {
           );
 
           // Wing 5: Spoils of War
-          await tester.tap(find.byKey(const ValueKey('castle_tab_spoils')));
+          final spoilsTab = find.byKey(const ValueKey('castle_tab_spoils'));
+          await tester.ensureVisible(spoilsTab);
+          await tester.pumpAndSettle();
+          await tester.tap(spoilsTab);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_spoils_of_war')),
@@ -527,7 +542,10 @@ void main() {
         }
 
         // Now test interactive Alchemy + Claiming inside UI
-        await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
+        final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
+        await tester.ensureVisible(treasuryTab);
+        await tester.pumpAndSettle();
+        await tester.tap(treasuryTab);
         await tester.pumpAndSettle();
 
         // Transmute 3 Fire -> 1 Water
@@ -590,7 +608,10 @@ void main() {
         // Open Royal Castle, switch to Treasury, claim directly, close
         await tester.tap(find.byKey(const ValueKey('landmark_royal_castle')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
+        final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
+        await tester.ensureVisible(treasuryTab);
+        await tester.pumpAndSettle();
+        await tester.tap(treasuryTab);
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('treasury_claim_direct_button')),

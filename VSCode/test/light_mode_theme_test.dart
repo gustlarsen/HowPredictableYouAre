@@ -280,12 +280,22 @@ void main() {
         );
         expect(adSubtitle.style?.color, lightPalette.amberText);
 
-        // Upgrade description subtitles use warm bronze (#7A4E00)
-        final predDesc = tester.widget<Text>(
-          find.text(
-            'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
-          ),
+        final scrollable = find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
         );
+
+        // Upgrade description subtitles use warm bronze (#7A4E00)
+        final predDescFinder = find.text(
+          'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
+        );
+        await tester.scrollUntilVisible(
+          predDescFinder,
+          120,
+          scrollable: scrollable,
+        );
+        await tester.pumpAndSettle();
+        final predDesc = tester.widget<Text>(predDescFinder);
         expect(predDesc.style?.color, lightPalette.amberSubtitle);
 
         // "Unlock" labels use dark charcoal (#4A4238)
@@ -297,10 +307,6 @@ void main() {
           const ValueKey(
             'diamond_unlock_${BillingService.productShowAlgorithm}',
           ),
-        );
-        final scrollable = find.descendant(
-          of: find.byType(Dialog),
-          matching: find.byType(Scrollable),
         );
         await tester.scrollUntilVisible(
           algoBtn,

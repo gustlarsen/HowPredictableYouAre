@@ -892,7 +892,7 @@ class _GameScreenState extends State<GameScreen>
     final loc = controller.localization;
     final bgImage = _resolveBackgroundImage(controller);
     final inputsLocked = controller.userHp <= 0 ||
-        controller.totalRounds >= 100 ||
+        controller.totalRounds >= controller.playerMaxMana ||
         _isDeathSequenceActive;
 
     _checkIntroStory(context, controller);
@@ -1174,8 +1174,11 @@ class _GameScreenState extends State<GameScreen>
                                       controller.animationsEnabled,
                                   roundId: controller.turnCount,
                                   userHp: controller.userHp,
+                                  playerMaxHp: controller.playerMaxHp,
                                   computerHp: controller.computerHp,
+                                  computerMaxHp: GameController.pcMaxHp,
                                   remainingMana: controller.remainingMana,
+                                  maxMana: controller.playerMaxMana,
                                   elementalMode: controller.isElementalMode,
                                   pcSlotKey: _pcSlotKey,
                                   clashCenterKey: _clashCenterKey,
@@ -1667,11 +1670,14 @@ class _GameScreenState extends State<GameScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  localization.t(
-                    'reset_rewind_message',
-                    fallback:
-                        'Resetting will rewind time back to Turn 0, restoring Mana to 100, HP to 100, scores to 0, and clearing the Markov matrix.',
-                  ),
+                  localization
+                      .t(
+                        'reset_rewind_message',
+                        fallback:
+                            'Resetting will rewind time back to Turn 0, restoring Mana to {mana}, HP to {hp}, scores to 0, and clearing the Markov matrix.',
+                      )
+                      .replaceAll('{mana}', '${controller.playerMaxMana}')
+                      .replaceAll('{hp}', '${controller.playerMaxHp}'),
                   style: TextStyle(
                     fontSize: 13.5,
                     height: 1.4,

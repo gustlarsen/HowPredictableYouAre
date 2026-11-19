@@ -199,14 +199,52 @@ class StorageService {
   int get total => _prefs.getInt('total') ?? 0;
   Future<void> setTotal(int val) => _prefs.setInt('total', val);
 
-  // RPG Hand HP (0 - 100)
-  int get userHp => _prefs.getInt('userHp') ?? 100;
+  // RPG Hand HP (Player base 60 + upgrades; PC 100)
+  int get userHp => _prefs.getInt('userHp') ?? 60;
   int? get userHpRaw => _prefs.getInt('userHp');
   Future<void> setUserHp(int val) => _prefs.setInt('userHp', val);
 
   int get pcHp => _prefs.getInt('pcHp') ?? 100;
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
+
+  // Cleric Infinite Stat Upgrades & Hall of Heroes Vault
+  static const String _hpUpgradeLevelKey = 'hp_upgrade_level';
+  static const String _manaUpgradeLevelKey = 'mana_upgrade_level';
+  static const String _hallOfHeroesHpBonusKey = 'hall_of_heroes_hp_bonus';
+  static const String _hallOfHeroesManaBonusKey = 'hall_of_heroes_mana_bonus';
+
+  int get hpUpgradeLevel {
+    final val = _prefs.getInt(_hpUpgradeLevelKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setHpUpgradeLevel(int val) =>
+      _prefs.setInt(_hpUpgradeLevelKey, val < 0 ? 0 : val);
+
+  int get manaUpgradeLevel {
+    final val = _prefs.getInt(_manaUpgradeLevelKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setManaUpgradeLevel(int val) =>
+      _prefs.setInt(_manaUpgradeLevelKey, val < 0 ? 0 : val);
+
+  int get hallOfHeroesHpBonus {
+    final val = _prefs.getInt(_hallOfHeroesHpBonusKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setHallOfHeroesHpBonus(int val) =>
+      _prefs.setInt(_hallOfHeroesHpBonusKey, val < 0 ? 0 : val);
+
+  int get hallOfHeroesManaBonus {
+    final val = _prefs.getInt(_hallOfHeroesManaBonusKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setHallOfHeroesManaBonus(int val) =>
+      _prefs.setInt(_hallOfHeroesManaBonusKey, val < 0 ? 0 : val);
 
   // Campaign Week Calendar (starts at Week 1; Permadeath resets to Week 0)
   static const String currentWeekKey = 'current_week';
@@ -698,6 +736,8 @@ class StorageService {
       setAllTreasuryOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setAllSpoilsOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setRelicChamberUpgrades(const []),
+      setHallOfHeroesHpBonus(0),
+      setHallOfHeroesManaBonus(0),
       setUnlockedEndings(const []),
       setEncounteredBestiary(const []),
       _prefs.remove(_activeDecreeIdsKey),
@@ -706,13 +746,13 @@ class StorageService {
     ]);
   }
 
-  Future<void> clearGameStats() {
+  Future<void> clearGameStats({int userMaxHp = 60, int pcMaxHp = 100}) {
     return Future.wait([
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
-      setUserHp(100),
-      setPcHp(100),
+      setUserHp(userMaxHp),
+      setPcHp(pcMaxHp),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),
@@ -739,8 +779,8 @@ class StorageService {
   /// When [includeSettings] is true (e.g., on multi-account switch), also resets
   /// UI settings back to defaults so settings are isolated per account.
   /// When [includeCastleMeta] is true (e.g., full progress reset or account switch),
-  /// also clears Castle Treasury, Relic Chamber, Spoils of War, Endings, Bestiary,
-  /// and Royal Decrees.
+  /// also clears Castle Treasury, Relic Chamber, Spoils of War, Hall of Heroes,
+  /// Endings, Bestiary, and Royal Decrees.
   Future<void> clearGameplayProgress({
     bool includeSettings = false,
     bool includeCastleMeta = false,
@@ -756,8 +796,10 @@ class StorageService {
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
-      setUserHp(100),
+      setUserHp(60),
       setPcHp(100),
+      setHpUpgradeLevel(0),
+      setManaUpgradeLevel(0),
       setCurrentWeek(1),
       setUnlockedReset(false),
       setUnlockedPredictability(false),

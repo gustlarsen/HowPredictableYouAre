@@ -38,8 +38,11 @@ class VersusArena extends StatefulWidget {
   final bool animationsEnabled;
   final int roundId;
   final int userHp;
+  final int playerMaxHp;
   final int computerHp;
+  final int computerMaxHp;
   final int remainingMana;
+  final int maxMana;
   final bool elementalMode;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
@@ -53,9 +56,12 @@ class VersusArena extends StatefulWidget {
     required this.localization,
     required this.animationsEnabled,
     required this.roundId,
-    this.userHp = 100,
+    this.userHp = 60,
+    this.playerMaxHp = 60,
     this.computerHp = 100,
+    this.computerMaxHp = 100,
     this.remainingMana = 100,
+    this.maxMana = 100,
     this.elementalMode = false,
     this.onImpactHaptic,
     this.pcSlotKey,
@@ -149,10 +155,10 @@ class _VersusArenaState extends State<VersusArena>
     if (widget.roundId > 0 && widget.animationsEnabled) {
       if (widget.winner == RoundWinner.user) {
         _pendingPcHp = widget.computerHp;
-        displayedPcHp = math.min(100, widget.computerHp + 1);
+        displayedPcHp = math.min(widget.computerMaxHp, widget.computerHp + 1);
       } else if (widget.winner == RoundWinner.computer) {
         _pendingPlayerHp = widget.userHp;
-        displayedPlayerHp = math.min(100, widget.userHp + 1);
+        displayedPlayerHp = math.min(widget.playerMaxHp, widget.userHp + 1);
       }
       _startRoundAnimations();
     }
@@ -269,9 +275,10 @@ class _VersusArenaState extends State<VersusArena>
     super.didUpdateWidget(oldWidget);
 
     final bool isMatchReset = widget.roundId == 0 ||
-        (widget.userHp == 100 &&
-            widget.computerHp == 100 &&
-            (oldWidget.userHp < 100 || oldWidget.computerHp < 100));
+        (widget.userHp == widget.playerMaxHp &&
+            widget.computerHp == widget.computerMaxHp &&
+            (oldWidget.userHp < oldWidget.playerMaxHp ||
+                oldWidget.computerHp < oldWidget.computerMaxHp));
 
     if (isMatchReset) {
       _stopRoundAnimations();
@@ -573,6 +580,7 @@ class _VersusArenaState extends State<VersusArena>
                       ManaPoolOrb(
                         key: const ValueKey('mana_pool_orb'),
                         remainingMana: widget.remainingMana,
+                        maxMana: widget.maxMana,
                         localization: widget.localization,
                         animationsEnabled: widget.animationsEnabled,
                       ),
@@ -649,7 +657,9 @@ class _VersusArenaState extends State<VersusArena>
                         localization: widget.localization,
                         pulseProgress: pulseProgress,
                         hp: displayedPlayerHp,
+                        maxHp: widget.playerMaxHp,
                         hpBarKey: const ValueKey('user_hp_bar'),
+                        animationsEnabled: widget.animationsEnabled,
                         isDamaged: isDamaged,
                         flashOpacity: _calculateFlash(isDamaged),
                         shakeOffset: _calculateShake(isDamaged),
@@ -724,7 +734,9 @@ class _VersusArenaState extends State<VersusArena>
                           localization: widget.localization,
                           pulseProgress: pulseProgress,
                           hp: displayedPcHp,
+                          maxHp: widget.computerMaxHp,
                           hpBarKey: const ValueKey('pc_hp_bar'),
+                          animationsEnabled: widget.animationsEnabled,
                           isDamaged: isDamaged,
                           flashOpacity: _calculateFlash(isDamaged),
                           shakeOffset: _calculateShake(isDamaged),
@@ -1788,7 +1800,9 @@ class _MoveCard extends StatelessWidget {
   final LocalizationService localization;
   final double pulseProgress;
   final int hp;
+  final int maxHp;
   final Key? hpBarKey;
+  final bool animationsEnabled;
   final bool isDamaged;
   final double flashOpacity;
   final double shakeOffset;
@@ -1805,7 +1819,9 @@ class _MoveCard extends StatelessWidget {
     required this.localization,
     this.pulseProgress = 0.0,
     required this.hp,
+    required this.maxHp,
     this.hpBarKey,
+    this.animationsEnabled = true,
     required this.isDamaged,
     required this.flashOpacity,
     required this.shakeOffset,
@@ -2026,8 +2042,10 @@ class _MoveCard extends StatelessWidget {
               RpgHpBar(
                 key: hpBarKey,
                 hp: hp,
+                maxHp: maxHp,
                 flashOpacity: flashOpacity,
                 shakeOffset: shakeOffset,
+                animationsEnabled: animationsEnabled,
               ),
               if (damageIndicatorProgress != null)
                 Positioned(

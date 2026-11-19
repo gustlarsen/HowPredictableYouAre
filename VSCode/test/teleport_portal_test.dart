@@ -124,7 +124,7 @@ void main() {
         expect(controller.totalRounds, 2);
         expect(controller.remainingMana, 98);
         expect(controller.fireOrbs, 1);
-        expect(controller.userHp, 99);
+        expect(controller.userHp, 59);
         expect(controller.computerHp, 99);
 
         // Tap Teleport -> opens TeleportConfirmDialog
@@ -171,7 +171,7 @@ void main() {
         expect(storage.fireOrbs, 1);
         expect(controller.totalRounds, 0);
         expect(controller.remainingMana, 100);
-        expect(controller.userHp, 100);
+        expect(controller.userHp, 60);
         expect(controller.computerHp, 100);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
@@ -272,7 +272,7 @@ void main() {
         expect(controller.waterOrbs, 1);
         expect(controller.woodOrbs, 1);
         expect(controller.remainingMana, 100);
-        expect(controller.userHp, 100);
+        expect(controller.userHp, 60);
 
         // 3. Re-enable confirmation via SettingsDialog toggle ("Confirm Battle Teleport")
         await tester.tap(

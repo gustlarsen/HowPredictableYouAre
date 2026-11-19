@@ -37,8 +37,6 @@ class ManaPoolOrb extends StatefulWidget {
 
 class _ManaPoolOrbState extends State<ManaPoolOrb>
     with TickerProviderStateMixin {
-  static const int lowManaThreshold = 20;
-
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
   late final AnimationController _drainIndicatorController;
@@ -64,7 +62,8 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
       duration: const Duration(milliseconds: 2600),
     );
 
-    if (_shouldPulse(widget.remainingMana) && widget.animationsEnabled) {
+    if (_shouldPulse(widget.remainingMana, widget.maxMana) &&
+        widget.animationsEnabled) {
       _pulseController.repeat(reverse: true);
     }
     if (_shouldWave(widget.remainingMana) && widget.animationsEnabled) {
@@ -72,19 +71,25 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
     }
   }
 
-  bool _isLowMana(int mana) => mana <= lowManaThreshold;
+  bool _isLowMana(int mana, int maxMana) {
+    if (maxMana <= 0) return true;
+    return mana.clamp(0, maxMana) * 100 <= maxMana * 20;
+  }
 
-  bool _shouldPulse(int mana) => mana > 0 && mana <= lowManaThreshold;
+  bool _shouldPulse(int mana, int maxMana) =>
+      mana > 0 && _isLowMana(mana, maxMana);
 
   bool _shouldWave(int mana) => mana > 0;
 
   @override
   void didUpdateWidget(covariant ManaPoolOrb oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldClamped = oldWidget.remainingMana.clamp(0, widget.maxMana);
-    final newClamped = widget.remainingMana.clamp(0, widget.maxMana);
-    final wasPulsing = _shouldPulse(oldClamped);
-    final shouldPulseNow = _shouldPulse(newClamped);
+    final oldSafeMax = oldWidget.maxMana <= 0 ? 0 : oldWidget.maxMana;
+    final newSafeMax = widget.maxMana <= 0 ? 0 : widget.maxMana;
+    final oldClamped = oldWidget.remainingMana.clamp(0, oldSafeMax);
+    final newClamped = widget.remainingMana.clamp(0, newSafeMax);
+    final wasPulsing = _shouldPulse(oldClamped, oldWidget.maxMana);
+    final shouldPulseNow = _shouldPulse(newClamped, widget.maxMana);
     final shouldWaveNow = _shouldWave(newClamped);
 
     if (!widget.animationsEnabled) {
@@ -124,10 +129,10 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
         }
       }
 
-      if (newClamped < oldClamped) {
+      if (newClamped < oldClamped && newSafeMax == oldSafeMax) {
         _lastDrainAmount = oldClamped - newClamped;
         _drainIndicatorController.forward(from: 0.0);
-      } else if (newClamped > oldClamped) {
+      } else if (newClamped > oldClamped || newSafeMax != oldSafeMax) {
         if (_drainIndicatorController.isAnimating ||
             _drainIndicatorController.value != 0.0) {
           _drainIndicatorController.stop();
@@ -147,11 +152,13 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
 
   @override
   Widget build(BuildContext context) {
-    final clampedMana = widget.remainingMana.clamp(0, widget.maxMana);
+    final safeMaxMana = widget.maxMana <= 0 ? 0 : widget.maxMana;
+    final clampedMana = widget.remainingMana.clamp(0, safeMaxMana);
     final manaRatio =
         widget.maxMana <= 0 ? 0.0 : (clampedMana / widget.maxMana.toDouble());
-    final isLowMana = _isLowMana(clampedMana);
-    final isPulsing = _shouldPulse(clampedMana) && widget.animationsEnabled;
+    final isLowMana = _isLowMana(clampedMana, widget.maxMana);
+    final isPulsing =
+        _shouldPulse(clampedMana, widget.maxMana) && widget.animationsEnabled;
     final manaLabel =
         widget.localization?.t('mana_label', fallback: 'MANA') ?? 'MANA';
     final innerGlassInset = widget.size * 0.085;

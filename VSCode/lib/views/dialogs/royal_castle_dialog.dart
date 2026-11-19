@@ -7,16 +7,17 @@ import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import 'story_gallery_dialog.dart';
 
-/// Identifies the 5 wings inside the [RoyalCastleDialog] hub.
+/// Identifies the 6 wings inside the [RoyalCastleDialog] hub.
 enum CastleWing {
   throneRoom,
   library,
   treasury,
   relicChamber,
   spoilsOfWar,
+  hallOfHeroes,
 }
 
-/// Comprehensive 5-wing Royal Castle Hub dialog accessed from the Royal Castle
+/// Comprehensive 6-wing Royal Castle Hub dialog accessed from the Royal Castle
 /// landmark on [WorldMapScreen].
 class RoyalCastleDialog extends StatefulWidget {
   final GameController controller;
@@ -71,6 +72,11 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         return loc.t(
           'castle_wing_spoils_subtitle',
           fallback: 'Reclaim Lost Elemental Orbs',
+        );
+      case CastleWing.hallOfHeroes:
+        return loc.t(
+          'castle_wing_heroes_subtitle',
+          fallback: "Restore Fallen Hero's Stat Blessings",
         );
     }
   }
@@ -266,26 +272,37 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         label: loc.t('castle_tab_spoils', fallback: 'Spoils of War'),
         hasDot: controller.hasSpoilsOfWarOrbs,
       ),
+      (
+        wing: CastleWing.hallOfHeroes,
+        key: const ValueKey('castle_tab_hall_of_heroes'),
+        icon: Icons.workspace_premium_rounded,
+        label: loc.t('castle_tab_hall_of_heroes', fallback: 'Hall of Heroes'),
+        hasDot: controller.hasHallOfHeroesBlessings,
+      ),
     ];
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final tab in tabs)
-          _WingNavPill(
-            key: tab.key,
-            icon: tab.icon,
-            label: tab.label,
-            selected: _selectedWing == tab.wing,
-            showDot: tab.hasDot,
-            palette: palette,
-            onTap: () {
-              controller.audio.playTapVibrate();
-              setState(() => _selectedWing = tab.wing);
-            },
-          ),
-      ],
+    return SingleChildScrollView(
+      key: const ValueKey('castle_wing_tab_strip'),
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < tabs.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            _WingNavPill(
+              key: tabs[i].key,
+              icon: tabs[i].icon,
+              label: tabs[i].label,
+              selected: _selectedWing == tabs[i].wing,
+              showDot: tabs[i].hasDot,
+              palette: palette,
+              onTap: () {
+                controller.audio.playTapVibrate();
+                setState(() => _selectedWing = tabs[i].wing);
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -305,6 +322,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         return _buildRelicChamberWing(context, palette, loc);
       case CastleWing.spoilsOfWar:
         return _buildSpoilsOfWarWing(context, palette, loc);
+      case CastleWing.hallOfHeroes:
+        return _buildHallOfHeroesWing(context, palette, loc);
     }
   }
 
@@ -1491,6 +1510,272 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 'castle_spoils_ad_disclosure',
                 fallback:
                     'Rewarded Video Ad: watch an ad to recover lost orbs into your backpack.',
+              ),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10.5, color: palette.mutedText),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // WING 6: HALL OF HEROES (RESTORE FALLEN CLERIC'S HP & MANA STAT BLESSINGS)
+  // ---------------------------------------------------------------------------
+  Widget _buildHallOfHeroesWing(
+    BuildContext context,
+    AppPalette palette,
+    LocalizationService loc,
+  ) {
+    final hpBonus = controller.hallOfHeroesHpBonus;
+    final manaBonus = controller.hallOfHeroesManaBonus;
+    final hasBlessings = controller.hasHallOfHeroesBlessings;
+    final isRemoveAds = controller.isRemoveAdsActive;
+    final canRestoreAd = hasBlessings && controller.adService.isRewardedAdReady;
+
+    return Column(
+      key: const ValueKey('castle_wing_hall_of_heroes'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: palette.rewardedAdCardSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.rewardedAdCardBorder),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.workspace_premium_rounded,
+                color: palette.amberIcon,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  loc.t(
+                    'castle_heroes_desc',
+                    fallback:
+                        'Stat blessings forged by a fallen Cleric (+Max HP & +Max Mana) are enshrined here. Restore them once into your current campaign.',
+                  ),
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        if (!hasBlessings)
+          Container(
+            key: const ValueKey('hall_of_heroes_empty_state'),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: palette.dialogCardSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: palette.sandCardBorder),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.shield_outlined,
+                  size: 32,
+                  color: palette.mutedText,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  loc.t(
+                    'castle_heroes_empty',
+                    fallback: 'No fallen hero blessings awaiting restoration.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: palette.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.dialogCardSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: palette.amberBorder.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (hpBonus > 0)
+                  Row(
+                    key: const ValueKey('hall_of_heroes_hp_bonus_row'),
+                    children: [
+                      Icon(
+                        Icons.favorite_rounded,
+                        size: 18,
+                        color: palette.dangerText,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.t(
+                            'castle_heroes_hp_blessing',
+                            fallback: 'Fallen Hero Max HP Blessing',
+                          ),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: palette.primaryText,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '+$hpBonus Max HP',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: palette.dangerText,
+                        ),
+                      ),
+                    ],
+                  ),
+                if (hpBonus > 0 && manaBonus > 0) const SizedBox(height: 10),
+                if (manaBonus > 0)
+                  Row(
+                    key: const ValueKey('hall_of_heroes_mana_bonus_row'),
+                    children: [
+                      const Icon(
+                        Icons.water_drop_rounded,
+                        size: 18,
+                        color: Color(0xFF00B0FF),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.t(
+                            'castle_heroes_mana_blessing',
+                            fallback: 'Fallen Hero Max Mana Blessing',
+                          ),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: palette.primaryText,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '+$manaBonus Max ${loc.t('mana_label', fallback: 'Mana')}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: Color(0xFF00B0FF),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (isRemoveAds)
+            ElevatedButton.icon(
+              key: const ValueKey('hall_of_heroes_restore_direct_button'),
+              onPressed: () {
+                final ok = controller.restoreHallOfHeroesDirect();
+                if (ok && context.mounted) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          loc.t(
+                            'castle_heroes_restored_msg',
+                            fallback:
+                                'Fallen hero blessings restored to your Cleric!',
+                          ),
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                foregroundColor: const Color(0xFF231F1A),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.workspace_premium_rounded, size: 18),
+              label: Text(
+                loc.t(
+                  'castle_heroes_restore_direct',
+                  fallback: 'Restore Blessings',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            )
+          else ...[
+            ElevatedButton.icon(
+              key: const ValueKey('hall_of_heroes_restore_ad_button'),
+              onPressed: canRestoreAd
+                  ? () {
+                      controller.watchAdToRestoreHallOfHeroes(
+                        onRestored: () {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  loc.t(
+                                    'castle_heroes_restored_msg',
+                                    fallback:
+                                        'Fallen hero blessings restored to your Cleric!',
+                                  ),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        },
+                      );
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                foregroundColor: const Color(0xFF231F1A),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
+              label: Text(
+                loc.t(
+                  'castle_heroes_restore_ad',
+                  fallback: 'Watch Ad to Restore',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              loc.t(
+                'castle_heroes_ad_disclosure',
+                fallback:
+                    'Rewarded Video Ad: watch an ad to restore your fallen hero\'s Max HP and Max Mana blessings once.',
               ),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10.5, color: palette.mutedText),

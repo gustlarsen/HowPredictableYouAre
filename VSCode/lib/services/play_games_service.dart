@@ -260,6 +260,10 @@ class CloudSaveData {
   final int spoilsEarthOrbs;
   final int spoilsMetalOrbs;
   final List<String> relicChamberUpgrades;
+  final int hpUpgradeLevel;
+  final int manaUpgradeLevel;
+  final int hallOfHeroesHpBonus;
+  final int hallOfHeroesManaBonus;
   final List<String> unlockedEndings;
   final List<String> encounteredBestiary;
   final List<String>? activeDecreeIds;
@@ -283,7 +287,7 @@ class CloudSaveData {
     this.userScore = 0,
     this.pcScore = 0,
     this.total = 0,
-    this.userHp = 100,
+    this.userHp = 60,
     this.pcHp = 100,
     this.currentWeek = 1,
     this.unlockedReset = false,
@@ -345,6 +349,10 @@ class CloudSaveData {
     this.spoilsEarthOrbs = 0,
     this.spoilsMetalOrbs = 0,
     this.relicChamberUpgrades = const [],
+    this.hpUpgradeLevel = 0,
+    this.manaUpgradeLevel = 0,
+    this.hallOfHeroesHpBonus = 0,
+    this.hallOfHeroesManaBonus = 0,
     this.unlockedEndings = const [],
     this.encounteredBestiary = const [],
     this.activeDecreeIds,
@@ -390,9 +398,21 @@ class CloudSaveData {
     return count;
   }
 
-  /// Total Elemental Orb value of all unlocked shop items in this snapshot.
+  /// Total Elemental Orb value of all infinite stat upgrades in this snapshot.
+  int get statUpgradeOrbValue {
+    int sum = 0;
+    for (int i = 0; i < hpUpgradeLevel; i++) {
+      sum += 3 * (2 + (i ~/ 2));
+    }
+    for (int i = 0; i < manaUpgradeLevel; i++) {
+      sum += 3 * (3 + (i ~/ 2));
+    }
+    return sum;
+  }
+
+  /// Total Elemental Orb value of all unlocked shop items and stat upgrades in this snapshot.
   int get unlockedShopValue {
-    int value = 0;
+    int value = statUpgradeOrbValue;
     if (unlockedPredictability) value += 45;
     if (unlockedReset) value += 90;
     if (unlockedNewHands) value += 120;
@@ -444,6 +464,10 @@ class CloudSaveData {
             totalTreasuryOrbs > local.totalTreasuryOrbs ||
             totalSpoilsOrbs > local.totalSpoilsOrbs ||
             relicChamberUpgrades.length > local.relicChamberUpgrades.length ||
+            hpUpgradeLevel > local.hpUpgradeLevel ||
+            manaUpgradeLevel > local.manaUpgradeLevel ||
+            hallOfHeroesHpBonus > local.hallOfHeroesHpBonus ||
+            hallOfHeroesManaBonus > local.hallOfHeroesManaBonus ||
             unlockedEndings.length > local.unlockedEndings.length ||
             encounteredBestiary.length > local.encounteredBestiary.length ||
             totalDecreesCompleted > local.totalDecreesCompleted)) {
@@ -545,6 +569,10 @@ class CloudSaveData {
       spoilsEarthOrbs: spoilsEarthOrbs,
       spoilsMetalOrbs: spoilsMetalOrbs,
       relicChamberUpgrades: relicChamberUpgrades,
+      hpUpgradeLevel: hpUpgradeLevel,
+      manaUpgradeLevel: manaUpgradeLevel,
+      hallOfHeroesHpBonus: hallOfHeroesHpBonus,
+      hallOfHeroesManaBonus: hallOfHeroesManaBonus,
       unlockedEndings: (
         {...unlockedEndings, ...local.unlockedEndings}.toList()..sort()
       ),
@@ -644,6 +672,10 @@ class CloudSaveData {
       spoilsEarthOrbs: storage.spoilsEarthOrbs,
       spoilsMetalOrbs: storage.spoilsMetalOrbs,
       relicChamberUpgrades: storage.relicChamberUpgrades,
+      hpUpgradeLevel: storage.hpUpgradeLevel,
+      manaUpgradeLevel: storage.manaUpgradeLevel,
+      hallOfHeroesHpBonus: storage.hallOfHeroesHpBonus,
+      hallOfHeroesManaBonus: storage.hallOfHeroesManaBonus,
       unlockedEndings: storage.unlockedEndings,
       encounteredBestiary: storage.encounteredBestiary,
       activeDecreeIds: storage.activeDecreeIds,
@@ -698,6 +730,10 @@ class CloudSaveData {
       metal: spoilsMetalOrbs,
     );
     await storage.setRelicChamberUpgrades(relicChamberUpgrades);
+    await storage.setHpUpgradeLevel(hpUpgradeLevel);
+    await storage.setManaUpgradeLevel(manaUpgradeLevel);
+    await storage.setHallOfHeroesHpBonus(hallOfHeroesHpBonus);
+    await storage.setHallOfHeroesManaBonus(hallOfHeroesManaBonus);
     await storage.setUnlockedEndings(unlockedEndings);
     await storage.setEncounteredBestiary(encounteredBestiary);
     if (activeDecreeIds != null && activeDecreeIds!.isNotEmpty) {
@@ -818,6 +854,10 @@ class CloudSaveData {
         'metal': spoilsMetalOrbs,
       },
       'relicChamberUpgrades': relicChamberUpgrades,
+      'hpUpgradeLevel': hpUpgradeLevel,
+      'manaUpgradeLevel': manaUpgradeLevel,
+      'hallOfHeroesHpBonus': hallOfHeroesHpBonus,
+      'hallOfHeroesManaBonus': hallOfHeroesManaBonus,
       'unlockedEndings': unlockedEndings,
       'encounteredBestiary': encounteredBestiary,
       if (activeDecreeIds != null) 'activeDecreeIds': activeDecreeIds,
@@ -973,6 +1013,11 @@ class CloudSaveData {
       spoilsEarthOrbs: (spoilsMap?['earth'] as num?)?.toInt() ?? 0,
       spoilsMetalOrbs: (spoilsMap?['metal'] as num?)?.toInt() ?? 0,
       relicChamberUpgrades: _parseStringList(map['relicChamberUpgrades']),
+      hpUpgradeLevel: (map['hpUpgradeLevel'] as num?)?.toInt() ?? 0,
+      manaUpgradeLevel: (map['manaUpgradeLevel'] as num?)?.toInt() ?? 0,
+      hallOfHeroesHpBonus: (map['hallOfHeroesHpBonus'] as num?)?.toInt() ?? 0,
+      hallOfHeroesManaBonus:
+          (map['hallOfHeroesManaBonus'] as num?)?.toInt() ?? 0,
       unlockedEndings: _parseStringList(map['unlockedEndings']),
       encounteredBestiary: _parseStringList(map['encounteredBestiary']),
       activeDecreeIds: map['activeDecreeIds'] is List
@@ -985,7 +1030,7 @@ class CloudSaveData {
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
       total: (map['total'] as num?)?.toInt() ?? 0,
-      userHp: (map['userHp'] as num?)?.toInt() ?? 100,
+      userHp: (map['userHp'] as num?)?.toInt() ?? 60,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
       currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 0
           ? 0

@@ -23,12 +23,25 @@ class GameController extends ChangeNotifier {
   static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
   static const String rewardedAdSnackBarMessage =
       '+50 Elemental Orbs earned!';
-  static const int maxHp = 100;
-  static const int maxMana = 100;
+  static const int baseMaxHp = 60;
+  static const int baseMaxMana = 100;
+  static const int maxHp = baseMaxHp;
+  static const int maxMana = baseMaxMana;
+  static const int pcMaxHp = 100;
   static const int maxCampaignWeeks = 40;
   static const int damagePerLoss = 1;
   static const int maxTreasuryPerElement = 50;
   static const int maxTreasuryTotal = 250;
+
+  static ElementalCost maxHpUpgradeCostForLevel(int level) {
+    final perOrb = 2 + (level ~/ 2);
+    return ElementalCost(fire: perOrb, water: perOrb, wood: perOrb);
+  }
+
+  static ElementalCost maxManaUpgradeCostForLevel(int level) {
+    final perOrb = 3 + (level ~/ 2);
+    return ElementalCost(fire: perOrb, water: perOrb, wood: perOrb);
+  }
 
   // Shop Upgrade Elemental Orb Costs
   static const ElementalCost costPredictability = ElementalCost(
@@ -222,10 +235,18 @@ class GameController extends ChangeNotifier {
   int get playerScore => userScore;
   int pcScore = 0;
   int totalRounds = 0;
-  int get remainingMana => (maxMana - totalRounds).clamp(0, maxMana);
+  int hpUpgradeLevel = 0;
+  int manaUpgradeLevel = 0;
+  int get playerMaxHp => baseMaxHp + hpUpgradeLevel;
+  int get playerMaxMana => baseMaxMana + manaUpgradeLevel;
+  ElementalCost get nextMaxHpUpgradeCost =>
+      maxHpUpgradeCostForLevel(hpUpgradeLevel);
+  ElementalCost get nextMaxManaUpgradeCost =>
+      maxManaUpgradeCostForLevel(manaUpgradeLevel);
+  int get remainingMana => (playerMaxMana - totalRounds).clamp(0, playerMaxMana);
   int turnCount = 0;
-  int userHp = maxHp;
-  int computerHp = maxHp;
+  int userHp = baseMaxHp;
+  int computerHp = pcMaxHp;
   int currentWeek = 1;
 
   bool darkMode = true;
@@ -324,6 +345,8 @@ class GameController extends ChangeNotifier {
   int spoilsMetalOrbs = 0;
 
   List<String> relicChamberStoredUpgrades = [];
+  int hallOfHeroesHpBonus = 0;
+  int hallOfHeroesManaBonus = 0;
   Set<String> unlockedEndings = {};
   Set<String> encounteredBestiary = {};
 
@@ -568,22 +591,25 @@ class GameController extends ChangeNotifier {
       recordTurn0OrbSnapshot();
     }
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
+    hpUpgradeLevel = storage.hpUpgradeLevel;
+    manaUpgradeLevel = storage.manaUpgradeLevel;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
     currentWeek = storage.currentWeek;
     if (storage.userHpRaw != null) {
-      userHp = storage.userHp;
+      userHp = storage.userHp.clamp(0, playerMaxHp);
     } else {
-      userHp = math.max(0, maxHp - pcScore * damagePerLoss);
+      userHp = math.max(0, playerMaxHp - pcScore * damagePerLoss);
     }
     if (storage.pcHpRaw != null) {
-      computerHp = storage.pcHp;
+      computerHp = storage.pcHp.clamp(0, pcMaxHp);
     } else {
-      computerHp = math.max(0, maxHp - userScore * damagePerLoss);
+      computerHp = math.max(0, pcMaxHp - userScore * damagePerLoss);
     }
     isDeathAlertPending = userHp <= 0;
-    is100RoundsAlertPending = !isDeathAlertPending && totalRounds >= 100;
+    is100RoundsAlertPending =
+        !isDeathAlertPending && totalRounds >= playerMaxMana;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
     }
@@ -712,6 +738,8 @@ class GameController extends ChangeNotifier {
     spoilsMetalOrbs = storage.spoilsMetalOrbs;
 
     relicChamberStoredUpgrades = List<String>.from(storage.relicChamberUpgrades);
+    hallOfHeroesHpBonus = storage.hallOfHeroesHpBonus;
+    hallOfHeroesManaBonus = storage.hallOfHeroesManaBonus;
     unlockedEndings = Set<String>.from(storage.unlockedEndings);
     encounteredBestiary = Set<String>.from(storage.encounteredBestiary);
 
@@ -898,10 +926,14 @@ class GameController extends ChangeNotifier {
   bool get hasAvailableRelicChamberUpgrades =>
       availableRelicChamberArtifacts.isNotEmpty;
 
+  bool get hasHallOfHeroesBlessings =>
+      hallOfHeroesHpBonus > 0 || hallOfHeroesManaBonus > 0;
+
   bool get hasRoyalCastleNotification =>
       isAnyTreasuryElementFull ||
       hasAvailableRelicChamberUpgrades ||
-      hasSpoilsOfWarOrbs;
+      hasSpoilsOfWarOrbs ||
+      hasHallOfHeroesBlessings;
 
   bool isEndingUnlocked(NarrativeEnding ending) =>
       unlockedEndings.contains(ending.id);
@@ -1413,6 +1445,54 @@ class GameController extends ChangeNotifier {
     return shown && earned;
   }
 
+  bool _restoreHallOfHeroesBlessings() {
+    if (!hasHallOfHeroesBlessings) return false;
+    hpUpgradeLevel += hallOfHeroesHpBonus;
+    manaUpgradeLevel += hallOfHeroesManaBonus;
+    hallOfHeroesHpBonus = 0;
+    hallOfHeroesManaBonus = 0;
+    if (!hasGameStarted) {
+      userHp = playerMaxHp;
+      storage.setUserHp(userHp);
+    }
+    storage.setHpUpgradeLevel(hpUpgradeLevel);
+    storage.setManaUpgradeLevel(manaUpgradeLevel);
+    storage.setHallOfHeroesHpBonus(0);
+    storage.setHallOfHeroesManaBonus(0);
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Directly restores fallen hero stat blessings for Remove Ads users.
+  bool restoreHallOfHeroesDirect() {
+    if (!isRemoveAdsActive || !hasHallOfHeroesBlessings) return false;
+    return _restoreHallOfHeroesBlessings();
+  }
+
+  /// Shows a rewarded video ad and restores the Hall of Heroes HP & Mana
+  /// blessings to the current Cleric, immediately clearing the Hall of Heroes
+  /// vault to 0 so blessings cannot be duplicated across defeat loops.
+  Future<bool> watchAdToRestoreHallOfHeroes({VoidCallback? onRestored}) async {
+    if (!hasHallOfHeroesBlessings) return false;
+    if (isRemoveAdsActive) {
+      final ok = restoreHallOfHeroesDirect();
+      if (ok) onRestored?.call();
+      return ok;
+    }
+    if (!adService.isRewardedAdReady) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        _restoreHallOfHeroesBlessings();
+        onRestored?.call();
+      },
+    );
+    return shown && earned;
+  }
+
   void playTurn(HandMove userChoice) {
     if (userHp <= 0) {
       isDeathAlertPending = true;
@@ -1421,7 +1501,7 @@ class GameController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (totalRounds >= 100) {
+    if (totalRounds >= playerMaxMana) {
       is100RoundsAlertPending = true;
       audio.playVibrate();
       notifyListeners();
@@ -1469,7 +1549,7 @@ class GameController extends ChangeNotifier {
       _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
       orbCollectionEventId += 1;
-      computerHp = math.max(0, computerHp - damagePerLoss);
+      computerHp = (computerHp - damagePerLoss).clamp(0, pcMaxHp);
       storage.setUserScore(userScore);
       storage.setPcHp(computerHp);
 
@@ -1489,7 +1569,7 @@ class GameController extends ChangeNotifier {
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
-      userHp = math.max(0, userHp - damagePerLoss);
+      userHp = (userHp - damagePerLoss).clamp(0, playerMaxHp);
       storage.setPcScore(pcScore);
       storage.setUserHp(userHp);
       decreeWinStreak = 0;
@@ -1516,7 +1596,7 @@ class GameController extends ChangeNotifier {
     if (userHp <= 0) {
       isDeathAlertPending = true;
       is100RoundsAlertPending = false;
-    } else if (totalRounds >= 100) {
+    } else if (totalRounds >= playerMaxMana) {
       is100RoundsAlertPending = true;
       if (percentPredict == 100) {
         _markEndingUnlocked(NarrativeEnding.perfectPredictor);
@@ -1527,7 +1607,7 @@ class GameController extends ChangeNotifier {
       }
     }
 
-    if (lastWinner == RoundWinner.user || totalRounds >= 100) {
+    if (lastWinner == RoundWinner.user || totalRounds >= playerMaxMana) {
       _triggerCloudSave();
     }
 
@@ -1568,19 +1648,19 @@ class GameController extends ChangeNotifier {
     lastUserMove = null;
     lastWinner = null;
     lastCollectedOrbMove = null;
-    userHp = maxHp;
-    computerHp = maxHp;
+    userHp = playerMaxHp;
+    computerHp = pcMaxHp;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
     _engine.reset();
 
-    storage.clearGameStats();
-    storage.setUserHp(maxHp);
-    storage.setPcHp(maxHp);
+    storage.clearGameStats(userMaxHp: playerMaxHp, pcMaxHp: pcMaxHp);
+    storage.setUserHp(playerMaxHp);
+    storage.setPcHp(pcMaxHp);
     _computeNextHints();
   }
 
-  /// Rewinds the active battle back to Turn 0: restores HP (`100`), Mana (`100`),
+  /// Rewinds the active battle back to Turn 0: restores HP (`playerMaxHp`), Mana (`playerMaxMana`),
   /// scores (`0`), clears the Markov matrix and last-played hands, reverts
   /// Elemental Orbs back to the Turn 0 Orb Snapshot (recording the lost
   /// battle/gift orbs into Spoils of War while preserving Rewarded Ad `+50` orbs),
@@ -1614,7 +1694,7 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts a fresh 100-round battle (100 Mana) from the World Map while
+  /// Starts a fresh battle ([playerMaxMana] Mana, [playerMaxHp] HP) from the World Map while
   /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
   /// and recording the Turn 0 Orb Snapshot for the new battle.
   void startNewBattle() {
@@ -1626,7 +1706,7 @@ class GameController extends ChangeNotifier {
   }
 
   /// Advances the campaign calendar by +1 Week upon exiting a battle via
-  /// 100 rounds completed or Teleport, persists locally, resets the battle
+  /// battle completion or Teleport, persists locally, resets the battle
   /// arena for the next encounter while keeping collected Elemental Orbs,
   /// and syncs with Cloud Save if signed in.
   void completeBattleWeek() {
@@ -1640,14 +1720,14 @@ class GameController extends ChangeNotifier {
   }
 
   /// Teleports the cleric back to the World Map, preserving all collected
-  /// Elemental Orbs, resetting the active battle (100 Mana / 100 HP / 0 rounds),
+  /// Elemental Orbs, resetting the active battle ([playerMaxMana] Mana / [playerMaxHp] HP / 0 rounds),
   /// advancing +1 Week via [completeBattleWeek], and syncing local/cloud saves.
   void teleportToWorldMap() {
     completeBattleWeek();
   }
 
   /// Revives the Cleric after watching a rewarded video ad upon death:
-  /// restores HP and battle Mana to 100, keeps all Elemental Orbs collected,
+  /// restores HP and battle Mana to [playerMaxHp] / [playerMaxMana], keeps all Elemental Orbs collected,
   /// preserves unlocks and current campaign week, persists & syncs to Cloud Save.
   void reviveAndRetreatToMap() {
     _resetBattleState();
@@ -1674,14 +1754,16 @@ class GameController extends ChangeNotifier {
 
   /// Centralized permadeath hard reset used by both unrevived death (HP == 0)
   /// and Week > 40 Kingdom Fall defeat:
-  /// 1. Snapshots lost orbs into Spoils of War and lost orb-bought upgrades
-  ///    into Relic Chamber, and records the Kingdom Fall narrative ending.
+  /// 1. Snapshots lost orbs into Spoils of War, lost orb-bought upgrades into
+  ///    Relic Chamber, accumulated HP/Mana stat levels into Hall of Heroes, and
+  ///    records the Kingdom Fall narrative ending.
   /// 2. Resets campaign week to 0 (Week 0 / 40).
   /// 3. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
   /// 4. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
   ///    IAP purchases persisted in [StorageService] or verified by [BillingService].
-  /// 5. Resets HP/Mana to 100, clears the Markov matrix, persists locally, and
-  ///    overwrites Cloud Save so old cloud data cannot revert the Week 0 reset.
+  /// 5. Resets HP/Mana to base (60 HP / 100 Mana), clears the Markov matrix,
+  ///    persists locally, and overwrites Cloud Save so old cloud data cannot revert
+  ///    the Week 0 reset.
   Future<void> applyPermadeathReset() async {
     _giftTimer?.cancel();
     _giftTimer = null;
@@ -1717,6 +1799,14 @@ class GameController extends ChangeNotifier {
         ? lostUpgrades
         : List<String>.from(relicChamberStoredUpgrades);
 
+    // 2b. Snapshot fallen Cleric's accumulated +Max HP & +Max Mana levels into Hall of Heroes
+    final nextHallHpBonus = hpUpgradeLevel > 0
+        ? hallOfHeroesHpBonus + hpUpgradeLevel
+        : hallOfHeroesHpBonus;
+    final nextHallManaBonus = manaUpgradeLevel > 0
+        ? hallOfHeroesManaBonus + manaUpgradeLevel
+        : hallOfHeroesManaBonus;
+
     // 3. Record Kingdom Fall ending
     final nextEndings = <String>{
       ...unlockedEndings,
@@ -1736,6 +1826,8 @@ class GameController extends ChangeNotifier {
       metal: updatedSpoilsMetal,
     );
     await storage.setRelicChamberUpgrades(nextRelicUpgrades);
+    await storage.setHallOfHeroesHpBonus(nextHallHpBonus);
+    await storage.setHallOfHeroesManaBonus(nextHallManaBonus);
     await storage.setUnlockedEndings(nextEndings);
     await storage.setTurn0Orbs(
       fire: 0,
@@ -1939,6 +2031,34 @@ class GameController extends ChangeNotifier {
     } else {
       pendingStoryChapter = null;
     }
+  }
+
+  /// Infinitely upgrades the Cleric's Max HP by +1 using only Fire, Water, and
+  /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat.
+  bool upgradeMaxHp() {
+    return purchaseWithOrbs(
+      cost: nextMaxHpUpgradeCost,
+      onUnlock: () {
+        hpUpgradeLevel += 1;
+        storage.setHpUpgradeLevel(hpUpgradeLevel);
+        if (!hasGameStarted) {
+          userHp = playerMaxHp;
+          storage.setUserHp(userHp);
+        }
+      },
+    );
+  }
+
+  /// Infinitely upgrades the Cleric's Max Mana Pool by +1 using only Fire, Water,
+  /// and Wood orbs (`3 + manaUpgradeLevel ~/ 2` each).
+  bool upgradeMaxMana() {
+    return purchaseWithOrbs(
+      cost: nextMaxManaUpgradeCost,
+      onUnlock: () {
+        manaUpgradeLevel += 1;
+        storage.setManaUpgradeLevel(manaUpgradeLevel);
+      },
+    );
   }
 
   bool unlockReset() {
