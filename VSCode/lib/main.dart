@@ -37,7 +37,6 @@ void main() async {
     billingService: billingService,
     updateService: updateService,
   );
-  unawaited(playGames.initialize());
   unawaited(adService.initialize(adsRemoved: controller.unlockedAds));
   unawaited(billingService.initialize());
 
@@ -47,6 +46,10 @@ void main() async {
       child: const HowPredictableApp(),
     ),
   );
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(playGames.initialize());
+  });
 }
 
 class HowPredictableApp extends StatelessWidget {

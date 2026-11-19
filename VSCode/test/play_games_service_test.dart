@@ -1875,6 +1875,7 @@ void main() {
           storage: storage,
           client: slowClient,
           retryBaseDelay: const Duration(seconds: 30),
+          profileRetryDelay: Duration.zero,
           maxAutoRetries: 1,
         );
         final controller = GameController(
@@ -1926,6 +1927,227 @@ void main() {
         expect(find.text('Português 🇧🇷'), findsOneWidget);
         expect(storage.language, 'pt');
         expect(controller.fireOrbs, 250);
+      },
+    );
+
+    test(
+      'PlayGamesService.signIn retries profile fetch when Play Games SDK is still initializing on the first getPlayerID attempt',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final retryClient = _DelayedProfilePlayGamesClient(
+          nullIdAttemptsBeforeReady: 2,
+          mockPlayerName: 'DelayedProfilePlayer',
+          mockPlayerId: 'player_ready_after_retry',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: retryClient,
+          profileRetryDelay: const Duration(milliseconds: 10),
+          maxProfileFetchAttempts: 3,
+        );
+        addTearDown(playGames.dispose);
+
+        final ok = await playGames.signIn(silent: true);
+
+        expect(ok, isTrue);
+        // 2 failed attempts + 1 successful attempt in signIn + 1 verification in loadAndResolveCloudSave
+        expect(retryClient.getPlayerIdCalls, 4);
+        expect(playGames.isSignedIn, isTrue);
+        expect(playGames.playerID, 'player_ready_after_retry');
+        expect(playGames.playerName, 'DelayedProfilePlayer');
+        expect(playGames.syncStatus, CloudSyncStatus.synced);
+        expect(playGames.lastErrorCode, isNull);
+      },
+    );
+
+    test(
+      'PlayGamesService distinguishes SDK PlatformException errors from network/offline errors in signInDiagnosticMessage',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final errorClient = _ThrowingPlayGamesClient(
+          errorToThrow: PlatformException(
+            code: 'failed_to_authenticate',
+            message: '10: DEVELOPER_ERROR',
+          ),
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: errorClient,
+          maxAutoRetries: 0,
+        );
+        addTearDown(playGames.dispose);
+
+        final ok = await playGames.signIn(silent: false);
+
+        expect(ok, isFalse);
+        expect(playGames.isSignedIn, isFalse);
+        expect(playGames.lastErrorCode, 'failed_to_authenticate');
+        expect(playGames.lastErrorMessage, '10: DEVELOPER_ERROR');
+        expect(
+          playGames.signInDiagnosticMessage,
+          'Google Play Games sign-in failed [failed_to_authenticate]: 10: DEVELOPER_ERROR',
+        );
+        expect(
+          playGames.signInDiagnosticMessage.contains('Offline mode'),
+          isFalse,
+        );
+
+        // Now verify a genuine network error formats with an offline/network diagnostic
+        errorClient.errorToThrow = PlatformException(
+          code: 'network_error',
+          message: '7: NETWORK_ERROR',
+        );
+        final okNet = await playGames.signIn(silent: false);
+        expect(okNet, isFalse);
+        expect(playGames.lastErrorCode, 'network_error');
+        expect(
+          playGames.signInDiagnosticMessage,
+          'Could not connect to Google Play Games (Offline: 7: NETWORK_ERROR)',
+        );
+      },
+    );
+
+    test(
+      'Manual signIn(silent: false) queued while silent startup signIn is in flight triggers a fresh sign-in attempt if silent fails',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final firstGate = Completer<String?>();
+        final queuedClient = _QueuedSignInPlayGamesClient(
+          firstAttemptGate: firstGate,
+          secondAttemptPlayerName: 'ManualRetryHero',
+          secondAttemptPlayerId: 'player_manual_retry_42',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: queuedClient,
+          profileRetryDelay: Duration.zero,
+          maxAutoRetries: 0,
+        );
+        addTearDown(playGames.dispose);
+
+        // Start silent sign-in on startup (in flight)
+        final silentFuture = playGames.initialize();
+        expect(playGames.isAuthenticating, isTrue);
+
+        // User taps manual sign-in while silent sign-in is still in flight
+        final manualFuture = playGames.signIn(silent: false);
+
+        // Complete the first (silent) attempt as failed (null)
+        firstGate.complete(null);
+
+        final manualResult = await manualFuture;
+        await silentFuture;
+
+        expect(manualResult, isTrue);
+        expect(queuedClient.signInCalls, 2);
+        expect(playGames.isSignedIn, isTrue);
+        expect(playGames.playerID, 'player_manual_retry_42');
+        expect(playGames.playerName, 'ManualRetryHero');
+      },
+    );
+
+    testWidgets(
+      'SettingsDialog shows exact PlatformException diagnostic in SnackBar and allows tapping Offline badge or Sign in button to retry',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'musicEnabled': false,
+          'animationsEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await localization.load();
+
+        final client = _ThrowingPlayGamesClient(
+          errorToThrow: PlatformException(
+            code: 'failed_to_authenticate',
+            message: 'SIGN_IN_REQUIRED',
+          ),
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: client,
+          profileRetryDelay: Duration.zero,
+          maxAutoRetries: 0,
+        );
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          playGames: playGames,
+        );
+        addTearDown(() {
+          controller.dispose();
+          playGames.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pump();
+
+        // Open SettingsDialog
+        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Offline'), findsOneWidget);
+        final signInButtonFinder = find.byKey(
+          const ValueKey('play_games_sign_in_button'),
+        );
+        expect(signInButtonFinder, findsOneWidget);
+
+        // Tap "Sign in with Google Play" button -> fails with PlatformException
+        await tester.tap(signInButtonFinder);
+        await tester.pump();
+        await tester.pump();
+
+        // Diagnostic message must show the exact PlatformException code & message, NOT "Offline mode"
+        expect(
+          find.text(
+            'Google Play Games sign-in failed [failed_to_authenticate]: SIGN_IN_REQUIRED',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Could not connect to Google Play Games (Offline mode)'),
+          findsNothing,
+        );
+
+        // Now allow the next sign-in attempt to succeed when tapping the "Offline" status badge
+        client.errorToThrow = null;
+        client.mockPlayerName = 'BadgeTapPlayer';
+        client.mockPlayerId = 'player_badge_tap_888';
+
+        final syncBadgeFinder = find.byKey(
+          const ValueKey('play_games_sync_status'),
+        );
+        await tester.tap(syncBadgeFinder);
+        await tester.pumpAndSettle();
+
+        expect(playGames.isSignedIn, isTrue);
+        expect(find.text('Synced'), findsOneWidget);
+        expect(find.text('BadgeTapPlayer'), findsOneWidget);
+        expect(find.text('ID: player_badge_tap_888'), findsOneWidget);
       },
     );
   });
@@ -1993,3 +2215,104 @@ class _CompleterPlayGamesClient implements PlayGamesClient {
   @override
   Future<String?> loadGame({required String name}) async => null;
 }
+
+class _DelayedProfilePlayGamesClient implements PlayGamesClient {
+  final int nullIdAttemptsBeforeReady;
+  final String mockPlayerName;
+  final String mockPlayerId;
+  int getPlayerIdCalls = 0;
+
+  _DelayedProfilePlayGamesClient({
+    required this.nullIdAttemptsBeforeReady,
+    required this.mockPlayerName,
+    required this.mockPlayerId,
+  });
+
+  @override
+  Future<String?> signIn() async => 'success';
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async {
+    getPlayerIdCalls++;
+    if (getPlayerIdCalls <= nullIdAttemptsBeforeReady) {
+      return null;
+    }
+    return mockPlayerId;
+  }
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
+}
+
+class _ThrowingPlayGamesClient implements PlayGamesClient {
+  Object? errorToThrow;
+  String mockPlayerName = 'RecoveredPlayer';
+  String mockPlayerId = 'player_recovered_1';
+
+  _ThrowingPlayGamesClient({this.errorToThrow});
+
+  @override
+  Future<String?> signIn() async {
+    final err = errorToThrow;
+    if (err != null) {
+      throw err;
+    }
+    return 'success';
+  }
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => mockPlayerId;
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
+}
+
+class _QueuedSignInPlayGamesClient implements PlayGamesClient {
+  final Completer<String?> firstAttemptGate;
+  final String secondAttemptPlayerName;
+  final String secondAttemptPlayerId;
+  int signInCalls = 0;
+
+  _QueuedSignInPlayGamesClient({
+    required this.firstAttemptGate,
+    required this.secondAttemptPlayerName,
+    required this.secondAttemptPlayerId,
+  });
+
+  @override
+  Future<String?> signIn() {
+    signInCalls++;
+    if (signInCalls == 1) {
+      return firstAttemptGate.future;
+    }
+    return Future<String?>.value('success');
+  }
+
+  @override
+  Future<String?> getPlayerName() async => secondAttemptPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => secondAttemptPlayerId;
+
+  @override
+  Future<String?> saveGame({required String data, required String name}) async =>
+      'success';
+
+  @override
+  Future<String?> loadGame({required String name}) async => null;
+}
+

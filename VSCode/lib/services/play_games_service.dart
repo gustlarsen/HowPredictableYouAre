@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:games_services/games_services.dart';
 import '../models/move.dart';
@@ -17,12 +18,16 @@ class PlayGamesAuthResult {
   final bool success;
   final String? playerName;
   final String? playerID;
+  final String? errorCode;
+  final String? errorMessage;
   final String? message;
 
   const PlayGamesAuthResult({
     required this.success,
     this.playerName,
     this.playerID,
+    this.errorCode,
+    this.errorMessage,
     this.message,
   });
 }
@@ -40,35 +45,110 @@ abstract class PlayGamesClient {
 
 /// Default production implementation of [PlayGamesClient] backed by
 /// the `games_services` plugin.
+///
+/// Important: `games_services` caches `PlayerData` on Dart's broadcast
+/// `GamesServices.player` stream only while there is an active listener on the
+/// `games_services.player` EventChannel. Keeping a persistent listener warmed up
+/// before `GamesServices.signIn()` ensures the player event emitted during
+/// native sign-in is captured immediately and never lost.
 class DefaultPlayGamesClient implements PlayGamesClient {
+  static const Duration defaultSignInTimeout = Duration(seconds: 15);
   static const Duration defaultProfileTimeout = Duration(seconds: 8);
   static const Duration defaultCloudTimeout = Duration(seconds: 12);
 
+  static StreamSubscription<PlayerData?>? _playerSubscription;
+  static PlayerData? _cachedPlayer;
+
   const DefaultPlayGamesClient();
 
-  @override
-  Future<String?> signIn() => GamesServices.signIn();
-
-  @override
-  Future<String?> getPlayerName() async {
+  static void _ensurePlayerStreamSubscribed() {
+    if (_playerSubscription != null) return;
     try {
-      return await GamesServices.getPlayerName().timeout(
-        defaultProfileTimeout,
+      _playerSubscription = GamesServices.player.listen(
+        (player) {
+          if (player != null) {
+            _cachedPlayer = player;
+          }
+        },
+        onError: (Object error) {
+          debugPrint('[PlayGamesService] player stream error: $error');
+        },
       );
+    } catch (e) {
+      debugPrint('[PlayGamesService] failed to subscribe player stream: $e');
+    }
+  }
+
+  static Future<PlayerData?> _waitForPlayerData(Duration timeout) async {
+    _ensurePlayerStreamSubscribed();
+    final cached = _cachedPlayer;
+    if (cached != null &&
+        StorageService.isValidPlayerId(cached.playerID)) {
+      return cached;
+    }
+    try {
+      final player = await GamesServices.player
+          .firstWhere(
+            (data) =>
+                data != null &&
+                StorageService.isValidPlayerId(data.playerID),
+          )
+          .timeout(timeout);
+      if (player != null) {
+        _cachedPlayer = player;
+      }
+      return player;
     } catch (_) {
-      return null;
+      return _cachedPlayer;
     }
   }
 
   @override
-  Future<String?> getPlayerID() async {
+  Future<String?> signIn() async {
+    _ensurePlayerStreamSubscribed();
+    return await GamesServices.signIn().timeout(defaultSignInTimeout);
+  }
+
+  @override
+  Future<String?> getPlayerName() async {
+    _ensurePlayerStreamSubscribed();
+    final cachedName = _cachedPlayer?.displayName;
+    if (cachedName != null && cachedName.trim().isNotEmpty) {
+      return cachedName.trim();
+    }
     try {
-      return await GamesServices.getPlayerID().timeout(
+      final name = await GamesServices.getPlayerName().timeout(
         defaultProfileTimeout,
       );
-    } catch (_) {
-      return null;
+      if (name != null && name.trim().isNotEmpty) {
+        return name.trim();
+      }
+    } catch (e) {
+      debugPrint('[PlayGamesService] getPlayerName fallback: $e');
     }
+    final player = await _waitForPlayerData(const Duration(seconds: 3));
+    return player?.displayName;
+  }
+
+  @override
+  Future<String?> getPlayerID() async {
+    _ensurePlayerStreamSubscribed();
+    final cachedId = _cachedPlayer?.playerID;
+    if (StorageService.isValidPlayerId(cachedId)) {
+      return cachedId!.trim();
+    }
+    try {
+      final id = await GamesServices.getPlayerID().timeout(
+        defaultProfileTimeout,
+      );
+      if (StorageService.isValidPlayerId(id)) {
+        return id!.trim();
+      }
+    } catch (e) {
+      debugPrint('[PlayGamesService] getPlayerID fallback: $e');
+    }
+    final player = await _waitForPlayerData(const Duration(seconds: 3));
+    return player?.playerID;
   }
 
   @override
@@ -77,7 +157,8 @@ class DefaultPlayGamesClient implements PlayGamesClient {
       return await GamesServices.saveGame(data: data, name: name).timeout(
         defaultCloudTimeout,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[PlayGamesService] saveGame error: $e');
       return null;
     }
   }
@@ -768,13 +849,19 @@ class PlayGamesService extends ChangeNotifier {
   final PlayGamesClient _client;
   final Duration _silentAuthTimeout;
   final Duration _retryBaseDelay;
+  final Duration _profileRetryDelay;
   final int _maxAutoRetries;
+  final int _maxProfileFetchAttempts;
 
   bool _isSignedIn = false;
   bool _isAuthenticating = false;
+  bool _pendingManualSignIn = false;
+  Completer<bool>? _activeSignInCompleter;
   String? _playerName;
   String? _playerID;
   String? _lastPlayerID;
+  String? _lastErrorCode;
+  String? _lastErrorMessage;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
   Timer? _retryTimer;
   int _retryAttempt = 0;
@@ -784,15 +871,19 @@ class PlayGamesService extends ChangeNotifier {
   PlayGamesService({
     required this.storage,
     PlayGamesClient? client,
-    Duration silentAuthTimeout = const Duration(seconds: 10),
-    Duration retryBaseDelay = const Duration(seconds: 4),
-    int maxAutoRetries = 2,
+    Duration silentAuthTimeout = const Duration(seconds: 15),
+    Duration retryBaseDelay = const Duration(seconds: 3),
+    Duration profileRetryDelay = const Duration(milliseconds: 350),
+    int maxAutoRetries = 3,
+    int maxProfileFetchAttempts = 3,
     this.onCloudDataRestored,
     this.onQaBonusGranted,
   }) : _client = client ?? const DefaultPlayGamesClient(),
        _silentAuthTimeout = silentAuthTimeout,
        _retryBaseDelay = retryBaseDelay,
-       _maxAutoRetries = maxAutoRetries;
+       _profileRetryDelay = profileRetryDelay,
+       _maxAutoRetries = maxAutoRetries,
+       _maxProfileFetchAttempts = maxProfileFetchAttempts;
 
   bool get isSignedIn => _isSignedIn && isValidPlayerId(_playerID);
   bool get isAuthenticating => _isAuthenticating;
@@ -801,6 +892,56 @@ class PlayGamesService extends ChangeNotifier {
   String? get playerID => isValidPlayerId(_playerID) ? _playerID : null;
   String? get lastPlayerID =>
       isValidPlayerId(_lastPlayerID) ? _lastPlayerID : storage.lastPlayerId;
+  String? get lastErrorCode => _lastErrorCode;
+  String? get lastErrorMessage => _lastErrorMessage;
+
+  /// Human-readable diagnostic message for the most recent sign-in failure.
+  /// Distinguishes genuine network/timeout issues from Google Play Games SDK
+  /// or `PlatformException` authentication errors.
+  String get signInDiagnosticMessage => formatSignInFailureMessage(
+    errorCode: _lastErrorCode,
+    errorMessage: _lastErrorMessage,
+  );
+
+  /// Formats a clear diagnostic message from a sign-in failure [errorCode] and
+  /// [errorMessage], avoiding mislabeling SDK/auth errors as "Offline mode".
+  static String formatSignInFailureMessage({
+    String? errorCode,
+    String? errorMessage,
+  }) {
+    final code = errorCode?.trim() ?? '';
+    final msg = errorMessage?.trim() ?? '';
+    final combinedLower = '$code $msg'.toLowerCase();
+
+    final isNetworkOrOffline =
+        code == 'network_error' ||
+        code == 'sign_in_timeout' ||
+        combinedLower.contains('network_error') ||
+        combinedLower.contains('no internet') ||
+        combinedLower.contains('offline') ||
+        combinedLower.contains('socketexception') ||
+        combinedLower.contains('unable to resolve host') ||
+        combinedLower.contains('7:');
+
+    if (isNetworkOrOffline) {
+      if (msg.isNotEmpty) {
+        return 'Could not connect to Google Play Games (Offline: $msg)';
+      }
+      return 'Could not connect to Google Play Games (Check internet connection)';
+    }
+
+    if (code.isNotEmpty && msg.isNotEmpty) {
+      return 'Google Play Games sign-in failed [$code]: $msg';
+    }
+    if (code.isNotEmpty) {
+      return 'Google Play Games sign-in failed [$code]';
+    }
+    if (msg.isNotEmpty) {
+      return 'Google Play Games sign-in failed: $msg';
+    }
+    return 'Could not connect to Google Play Games (Offline mode)';
+  }
+
   CloudSyncStatus get syncStatus =>
       isSignedIn ? _syncStatus : CloudSyncStatus.offline;
 
@@ -854,50 +995,171 @@ class PlayGamesService extends ChangeNotifier {
     });
   }
 
+  void _recordSignInError(Object error, [StackTrace? stackTrace]) {
+    const fallbackCode = 'sign_in_error';
+    if (error is PlatformException) {
+      _lastErrorCode = error.code.trim().isNotEmpty
+          ? error.code.trim()
+          : fallbackCode;
+      final detailsStr = error.details?.toString().trim() ?? '';
+      final msgStr = error.message?.trim() ?? '';
+      _lastErrorMessage = [
+        if (msgStr.isNotEmpty) msgStr,
+        if (detailsStr.isNotEmpty && detailsStr != msgStr) detailsStr,
+      ].join(' - ');
+    } else if (error is TimeoutException) {
+      _lastErrorCode = 'sign_in_timeout';
+      _lastErrorMessage = error.message?.trim().isNotEmpty == true
+          ? error.message!.trim()
+          : 'Timed out waiting for Google Play Games';
+    } else {
+      _lastErrorCode = fallbackCode;
+      _lastErrorMessage = error.toString().trim();
+    }
+    debugPrint(
+      '[PlayGamesService] Sign-in failed (code=$_lastErrorCode): '
+      '$_lastErrorMessage',
+    );
+    if (stackTrace != null) {
+      debugPrint('[PlayGamesService] StackTrace: $stackTrace');
+    }
+  }
+
   /// Signs in with Google Play Games Services (`GamesServices.signIn()`).
   /// When [silent] is true, errors or slow timeouts fall back gracefully to
   /// offline mode without overwriting local user settings or triggering a false
   /// multi-account reset, and schedule bounded retries.
+  /// When [silent] is false (manual user tap), if a silent sign-in is already
+  /// in progress, awaits it and immediately triggers a fresh sign-in attempt if
+  /// the silent attempt did not succeed.
   Future<bool> signIn({bool silent = false}) async {
-    if (_isAuthenticating) return isSignedIn;
+    if (_isAuthenticating) {
+      if (!silent) {
+        _pendingManualSignIn = true;
+      }
+      final active = _activeSignInCompleter;
+      if (active != null) {
+        final currentResult = await active.future;
+        if (currentResult || silent) {
+          _pendingManualSignIn = false;
+          return currentResult;
+        }
+        if (_pendingManualSignIn && !_isAuthenticating) {
+          _pendingManualSignIn = false;
+          return signIn(silent: false);
+        }
+      }
+      return isSignedIn;
+    }
 
     _retryTimer?.cancel();
     _retryTimer = null;
     if (!silent) {
       _retryAttempt = 0;
+      _pendingManualSignIn = false;
     }
 
+    final completer = Completer<bool>();
+    _activeSignInCompleter = completer;
     _isAuthenticating = true;
     notifyListeners();
 
+    Future<bool> finish(bool outcome) async {
+      if (identical(_activeSignInCompleter, completer)) {
+        _activeSignInCompleter = null;
+      }
+      if (!outcome && _pendingManualSignIn && !_isAuthenticating) {
+        _pendingManualSignIn = false;
+        final manualOutcome = await signIn(silent: false);
+        if (!completer.isCompleted) {
+          completer.complete(manualOutcome);
+        }
+        return manualOutcome;
+      }
+      _pendingManualSignIn = false;
+      if (!completer.isCompleted) {
+        completer.complete(outcome);
+      }
+      return outcome;
+    }
+
     try {
+      const sentinelTimeout = '__PLAY_GAMES_SIGN_IN_TIMEOUT__';
       final signInFuture = _client.signIn();
       final result = silent
-          ? await signInFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
+          ? await signInFuture.timeout(
+              _silentAuthTimeout,
+              onTimeout: () => sentinelTimeout,
+            )
           : await signInFuture;
-      if (result == null) {
+      if (result == sentinelTimeout) {
+        _recordSignInError(
+          TimeoutException('Google Play Games sign-in timed out'),
+        );
         _setDisconnectedState();
         if (silent) {
           _scheduleRetryIfNeeded();
         }
-        return false;
+        return await finish(false);
+      }
+      if (result == null) {
+        _lastErrorCode = 'sign_in_canceled_or_unavailable';
+        _lastErrorMessage =
+            'Google Play Games signIn() returned null (not authenticated)';
+        debugPrint(
+          '[PlayGamesService] Sign-in returned null: $_lastErrorMessage',
+        );
+        _setDisconnectedState();
+        if (silent) {
+          _scheduleRetryIfNeeded();
+        }
+        return await finish(false);
       }
 
-      final nameFuture = _client.getPlayerName();
-      final idFuture = _client.getPlayerID();
-      final fetchedName = silent
-          ? await nameFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
-          : await nameFuture;
-      final fetchedId = silent
-          ? await idFuture.timeout(_silentAuthTimeout, onTimeout: () => null)
-          : await idFuture;
+      String? fetchedName;
+      String? fetchedId;
+      final attempts = _maxProfileFetchAttempts < 1
+          ? 1
+          : _maxProfileFetchAttempts;
+
+      for (int attempt = 0; attempt < attempts; attempt++) {
+        final nameFuture = _client.getPlayerName();
+        final idFuture = _client.getPlayerID();
+        fetchedName = silent
+            ? await nameFuture.timeout(
+                _silentAuthTimeout,
+                onTimeout: () => null,
+              )
+            : await nameFuture;
+        fetchedId = silent
+            ? await idFuture.timeout(
+                _silentAuthTimeout,
+                onTimeout: () => null,
+              )
+            : await idFuture;
+
+        if (isValidPlayerId(fetchedId)) {
+          break;
+        }
+        if (attempt + 1 < attempts && _profileRetryDelay > Duration.zero) {
+          await Future<void>.delayed(_profileRetryDelay);
+        }
+      }
 
       if (!isValidPlayerId(fetchedId)) {
+        _lastErrorCode = 'invalid_player_id';
+        _lastErrorMessage = fetchedId == null || fetchedId.trim().isEmpty
+            ? 'Player ID unavailable while Play Games profile is initializing'
+            : 'Rejected placeholder Player ID "${fetchedId.trim()}"';
+        debugPrint(
+          '[PlayGamesService] Rejecting unverified playerID: '
+          '$_lastErrorMessage',
+        );
         _setDisconnectedState();
         if (silent) {
           _scheduleRetryIfNeeded();
         }
-        return false;
+        return await finish(false);
       }
 
       final resolvedId = fetchedId!.trim();
@@ -910,6 +1172,8 @@ class PlayGamesService extends ChangeNotifier {
           previousPlayerId != null && previousPlayerId != resolvedId;
 
       _retryAttempt = 0;
+      _lastErrorCode = null;
+      _lastErrorMessage = null;
       _isSignedIn = true;
       _playerName = resolvedName;
       _playerID = resolvedId;
@@ -925,13 +1189,14 @@ class PlayGamesService extends ChangeNotifier {
       } else {
         await loadAndResolveCloudSave();
       }
-      return true;
-    } catch (_) {
+      return await finish(true);
+    } catch (error, stackTrace) {
+      _recordSignInError(error, stackTrace);
       _setDisconnectedState();
       if (silent) {
         _scheduleRetryIfNeeded();
       }
-      return false;
+      return await finish(false);
     }
   }
 
@@ -1017,7 +1282,8 @@ class PlayGamesService extends ChangeNotifier {
       _syncStatus = isSignedIn ? CloudSyncStatus.synced : CloudSyncStatus.offline;
       notifyListeners();
       return restoredFromCloud;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[PlayGamesService] loadAndResolveCloudSave error: $error');
       if (isAccountSwitch) {
         onCloudDataRestored?.call();
       }
@@ -1033,7 +1299,8 @@ class PlayGamesService extends ChangeNotifier {
         _syncStatus = (isSignedIn && saveRes != null)
             ? CloudSyncStatus.synced
             : CloudSyncStatus.offline;
-      } catch (_) {
+      } catch (saveError) {
+        debugPrint('[PlayGamesService] fallback saveGame error: $saveError');
         _syncStatus = CloudSyncStatus.offline;
       }
       notifyListeners();
@@ -1106,7 +1373,8 @@ class PlayGamesService extends ChangeNotifier {
         notifyListeners();
         return false;
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[PlayGamesService] saveCloudData error: $error');
       _syncStatus = CloudSyncStatus.offline;
       notifyListeners();
       return false;

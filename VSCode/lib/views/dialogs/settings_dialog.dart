@@ -82,7 +82,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       context,
       ok
           ? 'Signed in as ${controller.playGames.playerName ?? "Player"}'
-          : 'Could not connect to Google Play Games (Offline mode)',
+          : controller.playGames.signInDiagnosticMessage,
     );
   }
 
@@ -924,7 +924,7 @@ class _PlayerProfileSection extends StatelessWidget {
                 status: playGames.syncStatus,
                 isConnected: isConnected,
                 isAuthenticating: playGames.isAuthenticating,
-                onTap: isConnected && !isBusy ? onManualSync : null,
+                onTap: isBusy ? null : (isConnected ? onManualSync : onSignIn),
               ),
             ],
           ),
