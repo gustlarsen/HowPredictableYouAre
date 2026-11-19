@@ -483,5 +483,311 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets(
+      'Elemental Orbs mode delays HP bar deduction until Phase 3 impact (550ms) and spawns -1 heart indicator that drifts up and fades out over 650ms without changing arena height',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        int impactHaptics = 0;
+
+        Future<void> pumpArena({
+          required int roundId,
+          required int userHp,
+          required int computerHp,
+          HandMove? userMove,
+          HandMove? computerMove,
+          RoundWinner? winner,
+        }) {
+          return tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 400,
+                  child: VersusArena(
+                    userMove: userMove,
+                    computerMove: computerMove,
+                    winner: winner,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: roundId,
+                    userHp: userHp,
+                    computerHp: computerHp,
+                    elementalMode: true,
+                    onImpactHaptic: () => impactHaptics++,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        int displayedUserHp() =>
+            tester.widget<RpgHpBar>(find.byKey(const ValueKey('user_hp_bar'))).hp;
+        int displayedPcHp() =>
+            tester.widget<RpgHpBar>(find.byKey(const ValueKey('pc_hp_bar'))).hp;
+
+        // Idle state: 100 vs 100
+        await pumpArena(roundId: 0, userHp: 100, computerHp: 100);
+        await tester.pump();
+        final initialHeight = tester.getSize(find.byType(VersusArena)).height;
+        expect(displayedUserHp(), 100);
+        expect(displayedPcHp(), 100);
+
+        // Trigger winning round: logical computerHp drops immediately to 99,
+        // but displayedPcHp must remain 100 during Launch (0-300ms) and Clash (300-550ms).
+        await pumpArena(
+          roundId: 1,
+          userHp: 100,
+          computerHp: 99,
+          userMove: HandMove.rock,
+          computerMove: HandMove.scissors,
+          winner: RoundWinner.user,
+        );
+        await tester.pump();
+        expect(displayedPcHp(), 100);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsNothing);
+        expect(impactHaptics, 0);
+
+        // Phase 1 Launch (150ms): HP still 100
+        await tester.pump(const Duration(milliseconds: 150));
+        expect(displayedPcHp(), 100);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsNothing);
+
+        // Phase 2 Mid-Arena Clash (425ms): HP still 100
+        await tester.pump(const Duration(milliseconds: 275));
+        expect(displayedPcHp(), 100);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsNothing);
+        expect(impactHaptics, 0);
+
+        // Just before impact (540ms): HP still 100
+        await tester.pump(const Duration(milliseconds: 115));
+        expect(displayedPcHp(), 100);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsNothing);
+
+        // Exact Phase 3 Impact (550ms): HP drops to 99, haptic fires, and -1 heart spawns above pc_hp_bar
+        await tester.pump(const Duration(milliseconds: 10));
+        expect(displayedPcHp(), 99);
+        expect(impactHaptics, 1);
+        final pcIndicatorFinder = find.byKey(const ValueKey('pc_damage_indicator'));
+        expect(pcIndicatorFinder, findsOneWidget);
+        expect(
+          find.descendant(of: pcIndicatorFinder, matching: find.text('-1')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: pcIndicatorFinder,
+            matching: find.byIcon(Icons.favorite_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.getSize(find.byType(VersusArena)).height, initialHeight);
+
+        final pcHpBarTop =
+            tester.getTopLeft(find.byKey(const ValueKey('pc_hp_bar'))).dy;
+        final indicatorRectAtImpact = tester.getRect(pcIndicatorFinder);
+        expect(indicatorRectAtImpact.bottom, lessThanOrEqualTo(pcHpBarTop));
+
+        // Midpoint of 650ms indicator drift/fade (+325ms -> 875ms total)
+        await tester.pump(const Duration(milliseconds: 325));
+        expect(pcIndicatorFinder, findsOneWidget);
+        final indicatorRectMid = tester.getRect(pcIndicatorFinder);
+        expect(indicatorRectMid.top, lessThan(indicatorRectAtImpact.top));
+        final midOpacity = tester
+            .widget<Opacity>(
+              find.ancestor(
+                of: pcIndicatorFinder,
+                matching: find.byType(Opacity),
+              ),
+            )
+            .opacity;
+        expect(midOpacity, lessThan(1.0));
+        expect(midOpacity, greaterThan(0.0));
+        expect(tester.getSize(find.byType(VersusArena)).height, initialHeight);
+
+        // After 650ms indicator completes (550 + 650 = 1200ms): indicator disappears cleanly
+        await tester.pump(const Duration(milliseconds: 330));
+        expect(pcIndicatorFinder, findsNothing);
+        expect(displayedPcHp(), 99);
+      },
+    );
+
+    testWidgets(
+      'Classic Hands mode delays HP deduction until strike peak (500ms) and spawns -1 heart indicator on damaged player',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+
+        Future<void> pumpArena({
+          required int roundId,
+          required int userHp,
+          required int computerHp,
+          HandMove? userMove,
+          HandMove? computerMove,
+          RoundWinner? winner,
+        }) {
+          return tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 400,
+                  child: VersusArena(
+                    userMove: userMove,
+                    computerMove: computerMove,
+                    winner: winner,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: roundId,
+                    userHp: userHp,
+                    computerHp: computerHp,
+                    elementalMode: false,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        int displayedUserHp() =>
+            tester.widget<RpgHpBar>(find.byKey(const ValueKey('user_hp_bar'))).hp;
+
+        await pumpArena(roundId: 0, userHp: 100, computerHp: 100);
+        await tester.pump();
+        expect(displayedUserHp(), 100);
+
+        // Trigger losing round for user (userHp becomes 99 logically)
+        await pumpArena(
+          roundId: 1,
+          userHp: 99,
+          computerHp: 100,
+          userMove: HandMove.scissors,
+          computerMove: HandMove.rock,
+          winner: RoundWinner.computer,
+        );
+        await tester.pump();
+
+        // At 0ms and 490ms (lunge approaching): displayed user HP is still 100
+        expect(displayedUserHp(), 100);
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 490));
+        expect(displayedUserHp(), 100);
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsNothing);
+
+        // At 500ms (lunge strike peak): displayed user HP drops to 99 and -1 heart spawns
+        await tester.pump(const Duration(milliseconds: 10));
+        expect(displayedUserHp(), 99);
+        final userIndicatorFinder =
+            find.byKey(const ValueKey('user_damage_indicator'));
+        expect(userIndicatorFinder, findsOneWidget);
+        expect(
+          find.descendant(of: userIndicatorFinder, matching: find.text('-1')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: userIndicatorFinder,
+            matching: find.byIcon(Icons.favorite_rounded),
+          ),
+          findsOneWidget,
+        );
+
+        // After 650ms indicator duration: indicator fades out cleanly
+        await tester.pump(const Duration(milliseconds: 660));
+        expect(userIndicatorFinder, findsNothing);
+        expect(displayedUserHp(), 99);
+      },
+    );
+
+    testWidgets(
+      'Rapid-tap flushes interrupted turn HP immediately and match reset restores 100 HP immediately',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+
+        Future<void> pumpArena({
+          required int roundId,
+          required int userHp,
+          required int computerHp,
+          HandMove? userMove,
+          HandMove? computerMove,
+          RoundWinner? winner,
+        }) {
+          return tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 400,
+                  child: VersusArena(
+                    userMove: userMove,
+                    computerMove: computerMove,
+                    winner: winner,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: roundId,
+                    userHp: userHp,
+                    computerHp: computerHp,
+                    elementalMode: true,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        int displayedUserHp() =>
+            tester.widget<RpgHpBar>(find.byKey(const ValueKey('user_hp_bar'))).hp;
+        int displayedPcHp() =>
+            tester.widget<RpgHpBar>(find.byKey(const ValueKey('pc_hp_bar'))).hp;
+
+        await pumpArena(roundId: 0, userHp: 100, computerHp: 100);
+        await tester.pump();
+
+        // Round 1: User wins (computerHp: 99). Advance only 200ms (before 550ms impact).
+        await pumpArena(
+          roundId: 1,
+          userHp: 100,
+          computerHp: 99,
+          userMove: HandMove.rock,
+          computerMove: HandMove.scissors,
+          winner: RoundWinner.user,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(displayedPcHp(), 100);
+        expect(displayedUserHp(), 100);
+
+        // Rapid-tap Round 2: User loses (userHp: 99, computerHp: 99).
+        // Interrupted Round 1's PC damage (100 -> 99) must flush immediately,
+        // while Round 2's User damage (100 -> 99) waits until Round 2's 550ms impact!
+        await pumpArena(
+          roundId: 2,
+          userHp: 99,
+          computerHp: 99,
+          userMove: HandMove.rock,
+          computerMove: HandMove.paper,
+          winner: RoundWinner.computer,
+        );
+        await tester.pump();
+        expect(displayedPcHp(), 99);
+        expect(displayedUserHp(), 100);
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsNothing);
+
+        // Advance to Round 2 impact (550ms) -> User HP drops to 99 and -1 heart spawns
+        await tester.pump(const Duration(milliseconds: 550));
+        expect(displayedPcHp(), 99);
+        expect(displayedUserHp(), 99);
+        expect(
+          find.byKey(const ValueKey('user_damage_indicator')),
+          findsOneWidget,
+        );
+
+        // Trigger match reset mid-indicator -> both HP bars immediately restore to 100 and indicator clears
+        await pumpArena(roundId: 0, userHp: 100, computerHp: 100);
+        await tester.pump();
+        expect(displayedUserHp(), 100);
+        expect(displayedPcHp(), 100);
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsNothing);
+        expect(find.byKey(const ValueKey('pc_damage_indicator')), findsNothing);
+      },
+    );
   });
 }

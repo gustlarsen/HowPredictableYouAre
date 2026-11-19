@@ -29,6 +29,7 @@ class VersusArena extends StatefulWidget {
   static const int vfxDurationMs = 750;
   static const int clashTimeMs = 300;
   static const int impactTimeMs = 550;
+  static const int damageIndicatorDurationMs = 650;
 
   final HandMove? userMove;
   final HandMove? computerMove;
@@ -69,10 +70,19 @@ class _VersusArenaState extends State<VersusArena>
     with TickerProviderStateMixin {
   late AnimationController _animController;
   late AnimationController _vfxController;
+  late AnimationController _damageIndicatorController;
   late Animation<double> _punchAnim;
   late Animation<double> _defeatRotationAnim;
   late Animation<double> _drawRotationAnim;
+  late Animation<double> _damageIndicatorAnim;
   bool _didTriggerImpactHaptic = false;
+  bool _didTriggerImpact = false;
+
+  late int displayedPlayerHp;
+  late int displayedPcHp;
+  int? _pendingPlayerHp;
+  int? _pendingPcHp;
+  bool? _activeDamageIsUser;
 
   @override
   void initState() {
@@ -80,11 +90,23 @@ class _VersusArenaState extends State<VersusArena>
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    );
+    )..addListener(_handleClassicTick);
     _vfxController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: VersusArena.vfxDurationMs),
     )..addListener(_handleVfxTick);
+    _damageIndicatorController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: VersusArena.damageIndicatorDurationMs,
+      ),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {
+            _activeDamageIsUser = null;
+          });
+        }
+      });
 
     // Winning hand takes 500ms (0.0 -> 0.5) to move over to the losing hand,
     // and 500ms (0.5 -> 1.0) to move back to its starting position.
@@ -116,13 +138,29 @@ class _VersusArenaState extends State<VersusArena>
       ),
     );
 
+    _damageIndicatorAnim = CurvedAnimation(
+      parent: _damageIndicatorController,
+      curve: Curves.easeOut,
+    );
+
+    displayedPlayerHp = widget.userHp;
+    displayedPcHp = widget.computerHp;
+
     if (widget.roundId > 0 && widget.animationsEnabled) {
+      if (widget.winner == RoundWinner.user) {
+        _pendingPcHp = widget.computerHp;
+        displayedPcHp = math.min(100, widget.computerHp + 1);
+      } else if (widget.winner == RoundWinner.computer) {
+        _pendingPlayerHp = widget.userHp;
+        displayedPlayerHp = math.min(100, widget.userHp + 1);
+      }
       _startRoundAnimations();
     }
   }
 
   void _startRoundAnimations() {
     _didTriggerImpactHaptic = false;
+    _didTriggerImpact = false;
     if (widget.elementalMode) {
       _vfxController.forward(from: 0.0);
     } else {
@@ -132,6 +170,7 @@ class _VersusArenaState extends State<VersusArena>
 
   void _stopRoundAnimations() {
     _didTriggerImpactHaptic = false;
+    _didTriggerImpact = false;
     if (_animController.isAnimating || _animController.value != 0.0) {
       _animController.stop();
       _animController.reset();
@@ -142,48 +181,154 @@ class _VersusArenaState extends State<VersusArena>
     }
   }
 
+  void _resetDamageIndicator() {
+    _activeDamageIsUser = null;
+    if (_damageIndicatorController.isAnimating ||
+        _damageIndicatorController.value != 0.0) {
+      _damageIndicatorController.stop();
+      _damageIndicatorController.reset();
+    }
+  }
+
+  void _flushPendingHp(VersusArena fallbackWidget) {
+    displayedPlayerHp = _pendingPlayerHp ?? fallbackWidget.userHp;
+    displayedPcHp = _pendingPcHp ?? fallbackWidget.computerHp;
+    _pendingPlayerHp = null;
+    _pendingPcHp = null;
+  }
+
+  void _commitImpact() {
+    if (!mounted) return;
+    setState(() {
+      if (_pendingPlayerHp != null) {
+        displayedPlayerHp = _pendingPlayerHp!;
+        _pendingPlayerHp = null;
+      }
+      if (_pendingPcHp != null) {
+        displayedPcHp = _pendingPcHp!;
+        _pendingPcHp = null;
+      }
+      if (widget.winner == RoundWinner.computer) {
+        _activeDamageIsUser = true;
+        _damageIndicatorController.forward(from: 0.0);
+      } else if (widget.winner == RoundWinner.user) {
+        _activeDamageIsUser = false;
+        _damageIndicatorController.forward(from: 0.0);
+      }
+    });
+  }
+
+  void _handleClassicTick() {
+    if (widget.elementalMode ||
+        !widget.animationsEnabled ||
+        _didTriggerImpact ||
+        widget.winner == null ||
+        widget.winner == RoundWinner.draw) {
+      return;
+    }
+    if (!_animController.isAnimating &&
+        _animController.status != AnimationStatus.completed) {
+      return;
+    }
+    if (_animController.value >= 0.5) {
+      _didTriggerImpact = true;
+      _commitImpact();
+    }
+  }
+
   void _handleVfxTick() {
     if (!widget.elementalMode ||
         !widget.animationsEnabled ||
-        !_vfxController.isAnimating ||
-        _didTriggerImpactHaptic ||
         widget.winner == null) {
       return;
     }
+    if (!_vfxController.isAnimating &&
+        _vfxController.status != AnimationStatus.completed) {
+      return;
+    }
     final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
-    final triggerThresholdMs = widget.winner == RoundWinner.draw
-        ? VersusArena.clashTimeMs.toDouble()
-        : VersusArena.impactTimeMs.toDouble();
-    if (elapsedMs >= triggerThresholdMs) {
-      _didTriggerImpactHaptic = true;
-      widget.onImpactHaptic?.call();
+    if (!_didTriggerImpactHaptic) {
+      final triggerThresholdMs = widget.winner == RoundWinner.draw
+          ? VersusArena.clashTimeMs.toDouble()
+          : VersusArena.impactTimeMs.toDouble();
+      if (elapsedMs >= triggerThresholdMs) {
+        _didTriggerImpactHaptic = true;
+        widget.onImpactHaptic?.call();
+      }
+    }
+    if (!_didTriggerImpact &&
+        widget.winner != RoundWinner.draw &&
+        elapsedMs >= VersusArena.impactTimeMs.toDouble()) {
+      _didTriggerImpact = true;
+      _commitImpact();
     }
   }
 
   @override
   void didUpdateWidget(covariant VersusArena oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    final bool isMatchReset = widget.roundId == 0 ||
+        (widget.userHp == 100 &&
+            widget.computerHp == 100 &&
+            (oldWidget.userHp < 100 || oldWidget.computerHp < 100));
+
+    if (isMatchReset) {
+      _stopRoundAnimations();
+      _resetDamageIndicator();
+      _pendingPlayerHp = null;
+      _pendingPcHp = null;
+      displayedPlayerHp = widget.userHp;
+      displayedPcHp = widget.computerHp;
+      return;
+    }
+
     if (!widget.animationsEnabled) {
       _stopRoundAnimations();
+      _resetDamageIndicator();
+      _pendingPlayerHp = null;
+      _pendingPcHp = null;
+      displayedPlayerHp = widget.userHp;
+      displayedPcHp = widget.computerHp;
       return;
     }
 
     if (widget.elementalMode != oldWidget.elementalMode) {
       _stopRoundAnimations();
+      _resetDamageIndicator();
+      _flushPendingHp(oldWidget);
     }
 
     if (widget.roundId != oldWidget.roundId) {
-      // Immediately cancel any active animation, return to initial state, and restart cleanly
+      // Flush any pending HP change from an interrupted turn before starting the next round
+      _flushPendingHp(oldWidget);
       _stopRoundAnimations();
       if (widget.roundId > 0) {
+        if (widget.userHp != displayedPlayerHp) {
+          _pendingPlayerHp = widget.userHp;
+        }
+        if (widget.computerHp != displayedPcHp) {
+          _pendingPcHp = widget.computerHp;
+        }
         _startRoundAnimations();
+      } else {
+        displayedPlayerHp = widget.userHp;
+        displayedPcHp = widget.computerHp;
       }
+    } else if (widget.userHp != oldWidget.userHp ||
+        widget.computerHp != oldWidget.computerHp) {
+      _pendingPlayerHp = null;
+      _pendingPcHp = null;
+      displayedPlayerHp = widget.userHp;
+      displayedPcHp = widget.computerHp;
     }
   }
 
   @override
   void dispose() {
+    _animController.removeListener(_handleClassicTick);
     _vfxController.removeListener(_handleVfxTick);
+    _damageIndicatorController.dispose();
     _vfxController.dispose();
     _animController.dispose();
     super.dispose();
@@ -243,29 +388,13 @@ class _VersusArenaState extends State<VersusArena>
     return 0.0;
   }
 
-  double? _calculateDamageProgress(bool isDamaged) {
-    if (!isDamaged || !widget.animationsEnabled) {
+  double? _calculateDamageProgress({required bool isUser}) {
+    if (!widget.animationsEnabled ||
+        _activeDamageIsUser != isUser ||
+        !_damageIndicatorController.isAnimating) {
       return null;
     }
-    if (!widget.elementalMode) {
-      if (!_animController.isAnimating) return null;
-      final t = _animController.value;
-      if (t >= 0.5 && t <= 1.0) {
-        return ((t - 0.5) / 0.5).clamp(0.0, 1.0);
-      }
-      return null;
-    }
-    if (!_vfxController.isAnimating || _vfxController.value >= 1.0) {
-      return null;
-    }
-    final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
-    if (elapsedMs >= VersusArena.impactTimeMs &&
-        elapsedMs < VersusArena.vfxDurationMs) {
-      return ((elapsedMs - VersusArena.impactTimeMs) /
-              (VersusArena.vfxDurationMs - VersusArena.impactTimeMs))
-          .clamp(0.0, 1.0);
-    }
-    return null;
+    return _damageIndicatorAnim.value.clamp(0.0, 1.0);
   }
 
   @override
@@ -497,6 +626,7 @@ class _VersusArenaState extends State<VersusArena>
                     animation: Listenable.merge([
                       _animController,
                       _vfxController,
+                      _damageIndicatorController,
                     ]),
                     builder: (context, _) {
                       final isDamaged = pcWins && widget.roundId > 0;
@@ -518,13 +648,13 @@ class _VersusArenaState extends State<VersusArena>
                         elementalMode: widget.elementalMode,
                         localization: widget.localization,
                         pulseProgress: pulseProgress,
-                        hp: widget.userHp,
+                        hp: displayedPlayerHp,
                         hpBarKey: const ValueKey('user_hp_bar'),
                         isDamaged: isDamaged,
                         flashOpacity: _calculateFlash(isDamaged),
                         shakeOffset: _calculateShake(isDamaged),
                         damageIndicatorProgress:
-                            _calculateDamageProgress(isDamaged),
+                            _calculateDamageProgress(isUser: true),
                         damageAmount: 1,
                         handBuilder: (context, handWidget) {
                           Widget animatedChild = handWidget;
@@ -569,6 +699,7 @@ class _VersusArenaState extends State<VersusArena>
                     animation: Listenable.merge([
                       _animController,
                       _vfxController,
+                      _damageIndicatorController,
                     ]),
                     builder: (context, _) {
                       final isDamaged = userWins && widget.roundId > 0;
@@ -592,13 +723,13 @@ class _VersusArenaState extends State<VersusArena>
                           elementalMode: widget.elementalMode,
                           localization: widget.localization,
                           pulseProgress: pulseProgress,
-                          hp: widget.computerHp,
+                          hp: displayedPcHp,
                           hpBarKey: const ValueKey('pc_hp_bar'),
                           isDamaged: isDamaged,
                           flashOpacity: _calculateFlash(isDamaged),
                           shakeOffset: _calculateShake(isDamaged),
                           damageIndicatorProgress:
-                              _calculateDamageProgress(isDamaged),
+                              _calculateDamageProgress(isUser: false),
                           damageAmount: 1,
                           handBuilder: (context, handWidget) {
                             Widget animatedChild = handWidget;
@@ -1862,55 +1993,6 @@ class _MoveCard extends StatelessWidget {
             ),
           ),
 
-        // Floating Damage Indicator (-1 in crisp red/gold text that fades upward)
-        if (damageIndicatorProgress != null)
-          Positioned(
-            top: 10.0 - (28.0 * Curves.easeOut.transform(damageIndicatorProgress!)),
-            child: Opacity(
-              opacity: (1.0 - damageIndicatorProgress!).clamp(0.0, 1.0),
-              child: Container(
-                key: isLeft
-                    ? const ValueKey('user_damage_indicator')
-                    : const ValueKey('pc_damage_indicator'),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B0505).withValues(alpha: 0.88),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.amber.withValues(
-                      alpha: 0.85 * (1.0 - damageIndicatorProgress!),
-                    ),
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.redAccent.withValues(
-                        alpha: 0.55 * (1.0 - damageIndicatorProgress!),
-                      ),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '-$damageAmount',
-                  style: const TextStyle(
-                    color: Color(0xFFFF4D4D),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                    shadows: [
-                      Shadow(color: Colors.amber, blurRadius: 4),
-                      Shadow(
-                        color: Colors.black,
-                        blurRadius: 2,
-                        offset: Offset(1, 1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
 
@@ -1937,11 +2019,72 @@ class _MoveCard extends StatelessWidget {
             child: handBuilder(context, handCircle),
           ),
           const SizedBox(height: 6),
-          RpgHpBar(
-            key: hpBarKey,
-            hp: hp,
-            flashOpacity: flashOpacity,
-            shakeOffset: shakeOffset,
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              RpgHpBar(
+                key: hpBarKey,
+                hp: hp,
+                flashOpacity: flashOpacity,
+                shakeOffset: shakeOffset,
+              ),
+              if (damageIndicatorProgress != null)
+                Positioned(
+                  bottom: 16.0 + (24.0 * damageIndicatorProgress!),
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: (1.0 - damageIndicatorProgress!).clamp(0.0, 1.0),
+                      child: Row(
+                        key: isLeft
+                            ? const ValueKey('user_damage_indicator')
+                            : const ValueKey('pc_damage_indicator'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '-$damageAmount',
+                            style: const TextStyle(
+                              color: Color(0xFFFF5A5F),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11.5,
+                              height: 1.0,
+                              letterSpacing: 0.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black87,
+                                  blurRadius: 3.0,
+                                  offset: Offset(0, 1),
+                                ),
+                                Shadow(
+                                  color: Colors.black54,
+                                  blurRadius: 6.0,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.favorite_rounded,
+                            size: 10.5,
+                            color: Color(0xFFFF5A5F),
+                            shadows: [
+                              Shadow(
+                                color: Colors.black87,
+                                blurRadius: 3.0,
+                                offset: Offset(0, 1),
+                              ),
+                              Shadow(
+                                color: Colors.black54,
+                                blurRadius: 6.0,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
