@@ -20,6 +20,7 @@ import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/adaptive_rewarded_ad_button.dart';
+import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
@@ -315,27 +316,34 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final earthCostIcon = tester.widget<Icon>(
+        final earthCostOrb = tester.widget<ElementalEnergySphere>(
           find.descendant(
             of: algoBtn,
-            matching: find.byIcon(HandMove.lizard.elementalIcon),
+            matching: find.byKey(const ValueKey('shop_cost_orb_earth')),
           ),
         );
-        expect(earthCostIcon.color, lightPalette.elementalText(HandMove.lizard));
-        expect(earthCostIcon.color, const Color(0xFF6E3D14));
+        expect(earthCostOrb.primaryColor, HandMove.lizard.elementalPrimaryColor);
+        expect(earthCostOrb.isDark, isFalse);
 
         final earthCostText = tester.widget<Text>(
           find.descendant(of: algoBtn, matching: find.text('50')).first,
         );
+        expect(earthCostText.style?.color, lightPalette.elementalText(HandMove.lizard));
         expect(earthCostText.style?.color, const Color(0xFF6E3D14));
 
-        final metalCostIcon = tester.widget<Icon>(
+        final metalCostOrb = tester.widget<ElementalEnergySphere>(
           find.descendant(
             of: algoBtn,
-            matching: find.byIcon(HandMove.spock.elementalIcon),
+            matching: find.byKey(const ValueKey('shop_cost_orb_metal')),
           ),
         );
-        expect(metalCostIcon.color, const Color(0xFF435660));
+        expect(metalCostOrb.primaryColor, HandMove.spock.elementalPrimaryColor);
+        expect(metalCostOrb.isDark, isFalse);
+
+        final metalCostText = tester.widget<Text>(
+          find.descendant(of: algoBtn, matching: find.text('50')).last,
+        );
+        expect(metalCostText.style?.color, const Color(0xFF435660));
       },
     );
 

@@ -4,6 +4,7 @@ import '../../models/move.dart';
 import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/elemental_energy_sphere.dart';
 import 'story_dialog.dart';
 
 class ShopDialog extends StatefulWidget {
@@ -319,12 +320,14 @@ class _ShopDialogState extends State<ShopDialog> {
               key: ValueKey('shop_header_orb_${move.orbKey}'),
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  move.elementalIcon,
-                  size: 14,
-                  color: palette.elementalText(move),
+                ElementalEnergySphere(
+                  key: ValueKey('shop_header_orb_sphere_${move.orbKey}'),
+                  size: 17,
+                  primaryColor: move.elementalPrimaryColor,
+                  secondaryColor: move.elementalSecondaryColor,
+                  isDark: palette.isDark,
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(width: 4),
                 Text(
                   '${controller.orbsFor(move)}',
                   style: TextStyle(
@@ -1055,11 +1058,12 @@ class _ShopDialogState extends State<ShopDialog> {
                           elemental: true,
                           localization: loc,
                         ),
-                        child: Icon(
-                          move.elementalIcon,
+                        child: ElementalEnergySphere(
                           key: ValueKey('shop_ad_orb_icon_${move.name}'),
-                          size: 15,
-                          color: palette.elementalText(move),
+                          size: 19,
+                          primaryColor: move.elementalPrimaryColor,
+                          secondaryColor: move.elementalSecondaryColor,
+                          isDark: palette.isDark,
                         ),
                       ),
                   ],
@@ -1357,33 +1361,9 @@ class _ShopItemTile extends StatelessWidget {
                     minimumSize: const Size(52, 30),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Wrap(
-                    spacing: 4,
-                    runSpacing: 2,
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      for (final entry in entries)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              entry.key.elementalIcon,
-                              size: 12,
-                              color: palette.elementalText(entry.key),
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${entry.value}',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: palette.elementalText(entry.key),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                  child: _ElementalCostPillRow(
+                    entries: entries,
+                    palette: palette,
                   ),
                 ),
                 if (productId != null)
@@ -1593,33 +1573,9 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
                         minimumSize: const Size(52, 30),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 2,
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          for (final entry in entries)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  entry.key.elementalIcon,
-                                  size: 12,
-                                  color: palette.elementalText(entry.key),
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${entry.value}',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: palette.elementalText(entry.key),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
+                      child: _ElementalCostPillRow(
+                        entries: entries,
+                        palette: palette,
                       ),
                     ),
                   ],
@@ -1632,4 +1588,52 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
     );
   }
 }
+
+class _ElementalCostPillRow extends StatelessWidget {
+  final List<MapEntry<HandMove, int>> entries;
+  final AppPalette palette;
+
+  const _ElementalCostPillRow({
+    required this.entries,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (int i = 0; i < entries.length; i++) ...[
+            if (i > 0) const SizedBox(width: 5),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElementalEnergySphere(
+                  key: ValueKey('shop_cost_orb_${entries[i].key.orbKey}'),
+                  size: 14,
+                  primaryColor: entries[i].key.elementalPrimaryColor,
+                  secondaryColor: entries[i].key.elementalSecondaryColor,
+                  isDark: palette.isDark,
+                ),
+                const SizedBox(width: 2.5),
+                Text(
+                  '${entries[i].value}',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: palette.elementalText(entries[i].key),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 
