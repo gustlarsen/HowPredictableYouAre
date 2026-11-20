@@ -1152,10 +1152,10 @@ class BattleVfxPainter extends CustomPainter {
         );
       case BattleVfxElement.earth:
         return const _ElementPalette(
-          core: Color(0xFFFFF3E0),
-          primary: Color(0xFFFFB300),
-          secondary: Color(0xFFD87A16),
-          accent: Color(0xFFFFE082),
+          core: Color(0xFFFFECD6),
+          primary: Color(0xFFC47A38),
+          secondary: Color(0xFF593214),
+          accent: Color(0xFFE29E5A),
         );
       case BattleVfxElement.metal:
         return const _ElementPalette(
@@ -1389,7 +1389,7 @@ class BattleVfxPainter extends CustomPainter {
         break;
 
       case BattleVfxElement.earth:
-        // Rotating jagged golden-amber meteor/rock polygon with magma core
+        // Rotating jagged bronze-brown meteor/rock polygon with luminous caramel core
         canvas.save();
         canvas.translate(pos.dx, pos.dy);
         canvas.rotate(phaseProgress * math.pi * 3 * direction);
@@ -1852,10 +1852,12 @@ class _MoveCard extends StatelessWidget {
     final hasAsset = assetPath != null && assetPath.isNotEmpty;
 
     final bool isElementalOrb = elementalMode && move != null;
+    final bool isEarth = move == HandMove.lizard;
     final Color primaryElementColor =
         move?.elementalPrimaryColor ?? Colors.amber;
     final Color secondaryElementColor =
         move?.elementalSecondaryColor ?? Colors.deepOrange;
+    const Color earthIconColor = Color(0xFFE29E5A);
 
     final double orbScale =
         (isElementalOrb && isWinner) ? (1.0 + 0.08 * pulseProgress) : 1.0;
@@ -1865,29 +1867,57 @@ class _MoveCard extends StatelessWidget {
         ? BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              center: const Alignment(-0.2, -0.2),
+              center: isEarth
+                  ? const Alignment(-0.24, -0.24)
+                  : const Alignment(-0.2, -0.2),
               radius: 0.88,
-              colors: [
-                const Color(0xFF0A0C12),
-                Color.lerp(
-                  const Color(0xFF0E121B),
-                  secondaryElementColor,
-                  isWinner ? 0.55 : 0.38,
-                )!,
-                primaryElementColor.withValues(alpha: isWinner ? 0.92 : 0.72),
-              ],
+              colors: isEarth
+                  ? [
+                      Color.lerp(
+                        const Color(0xFF3D220E),
+                        const Color(0xFFE29E5A),
+                        isWinner ? 0.28 : 0.16,
+                      )!,
+                      Color.lerp(
+                        const Color(0xFF3D220E),
+                        secondaryElementColor,
+                        isWinner ? 0.90 : 0.72,
+                      )!,
+                      primaryElementColor.withValues(
+                        alpha: isWinner ? 0.96 : 0.85,
+                      ),
+                    ]
+                  : [
+                      const Color(0xFF0A0C12),
+                      Color.lerp(
+                        const Color(0xFF0E121B),
+                        secondaryElementColor,
+                        isWinner ? 0.55 : 0.38,
+                      )!,
+                      primaryElementColor.withValues(
+                        alpha: isWinner ? 0.92 : 0.72,
+                      ),
+                    ],
               stops: const [0.0, 0.58, 1.0],
             ),
             border: Border.all(
               color: isWinner
-                  ? Color.lerp(primaryElementColor, Colors.white, 0.45)!
+                  ? (isEarth
+                        ? Color.lerp(
+                            primaryElementColor,
+                            const Color(0xFFE29E5A),
+                            0.55,
+                          )!
+                        : Color.lerp(primaryElementColor, Colors.white, 0.45)!)
                   : (flashOpacity > 0.0
                       ? Color.lerp(
                           Colors.white,
                           Colors.redAccent,
                           0.65,
                         )!.withValues(alpha: 0.85)
-                      : primaryElementColor.withValues(alpha: 0.75)),
+                      : primaryElementColor.withValues(
+                          alpha: isEarth ? 0.90 : 0.75,
+                        )),
               width: isWinner ? 3.0 : (flashOpacity > 0.0 ? 2.5 : 2.0),
             ),
             boxShadow: [
@@ -1895,9 +1925,11 @@ class _MoveCard extends StatelessWidget {
                 color: primaryElementColor.withValues(
                   alpha: isWinner
                       ? (0.55 + 0.25 * pulseProgress).clamp(0.0, 1.0)
-                      : 0.35,
+                      : (isEarth ? 0.42 : 0.35),
                 ),
-                blurRadius: isWinner ? (16.0 + 8.0 * pulseProgress) : 10.0,
+                blurRadius: isWinner
+                    ? (16.0 + 8.0 * pulseProgress)
+                    : (isEarth ? 12.0 : 10.0),
                 spreadRadius: isWinner ? (3.0 + 2.0 * pulseProgress) : 1.5,
               ),
               if (isWinner)
@@ -1981,10 +2013,10 @@ class _MoveCard extends StatelessWidget {
                 ? Icon(
                     move!.elementalIcon,
                     size: 42 * orbScale,
-                    color: primaryElementColor,
+                    color: isEarth ? earthIconColor : primaryElementColor,
                     shadows: [
                       Shadow(
-                        color: primaryElementColor.withValues(alpha: 0.8),
+                        color: primaryElementColor.withValues(alpha: 0.85),
                         blurRadius: 12,
                       ),
                       const Shadow(

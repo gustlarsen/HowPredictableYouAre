@@ -1469,7 +1469,9 @@ class _GameScreenState extends State<GameScreen>
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    Colors.white,
+                                    orbMove == HandMove.lizard
+                                        ? const Color(0xFFE29E5A)
+                                        : Colors.white,
                                     primary,
                                     secondary,
                                   ],
@@ -1886,9 +1888,12 @@ class _HandActionButtonState extends State<_HandActionButton>
     final compact = widget.compact;
     final elemental = widget.elementalMode;
     final isSelected = widget.isSelected;
+    final bool isEarth = widget.move == HandMove.lizard;
     final primaryColor = widget.move.elementalPrimaryColor;
     final secondaryColor = widget.move.elementalSecondaryColor;
     final elementLabelColor = palette.elementalText(widget.move);
+    final Color earthIconColor =
+        isSelected ? const Color(0xFFE29E5A) : const Color(0xFFD68C45);
 
     final horizontalPadding = compact ? 6.0 : 14.0;
     final verticalPadding = compact ? 8.0 : 10.0;
@@ -1911,28 +1916,46 @@ class _HandActionButtonState extends State<_HandActionButton>
         ? BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              center: const Alignment(-0.2, -0.2),
+              center: isEarth
+                  ? const Alignment(-0.24, -0.24)
+                  : const Alignment(-0.2, -0.2),
               radius: 0.88,
-              colors: [
-                const Color(0xFF0A0C12),
-                Color.lerp(
-                  const Color(0xFF0E121B),
-                  secondaryColor,
-                  isSelected ? 0.55 : 0.38,
-                )!,
-                primaryColor.withValues(alpha: isSelected ? 0.92 : 0.72),
-              ],
+              colors: isEarth
+                  ? [
+                      Color.lerp(
+                        const Color(0xFF3D220E),
+                        const Color(0xFFE29E5A),
+                        isSelected ? 0.28 : 0.16,
+                      )!,
+                      Color.lerp(
+                        const Color(0xFF3D220E),
+                        secondaryColor,
+                        isSelected ? 0.90 : 0.72,
+                      )!,
+                      primaryColor.withValues(alpha: isSelected ? 0.96 : 0.85),
+                    ]
+                  : [
+                      const Color(0xFF0A0C12),
+                      Color.lerp(
+                        const Color(0xFF0E121B),
+                        secondaryColor,
+                        isSelected ? 0.55 : 0.38,
+                      )!,
+                      primaryColor.withValues(alpha: isSelected ? 0.92 : 0.72),
+                    ],
               stops: const [0.0, 0.58, 1.0],
             ),
             border: Border.all(
               color: isSelected
-                  ? Color.lerp(primaryColor, Colors.white, 0.45)!
-                  : primaryColor.withValues(alpha: 0.75),
+                  ? (isEarth
+                        ? Color.lerp(primaryColor, const Color(0xFFE29E5A), 0.55)!
+                        : Color.lerp(primaryColor, Colors.white, 0.45)!)
+                  : primaryColor.withValues(alpha: isEarth ? 0.88 : 0.75),
               width: isSelected ? 2.2 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: primaryColor.withValues(alpha: isSelected ? 0.65 : 0.35),
+                color: primaryColor.withValues(alpha: isSelected ? 0.65 : 0.38),
                 blurRadius: isSelected ? 12 : 8,
                 spreadRadius: isSelected ? 2.0 : 1.0,
               ),
@@ -1967,7 +1990,7 @@ class _HandActionButtonState extends State<_HandActionButton>
           border: Border.all(
             color: elemental
                 ? (palette.isDark
-                      ? primaryColor.withValues(alpha: isSelected ? 0.7 : 0.35)
+                      ? primaryColor.withValues(alpha: isSelected ? 0.75 : 0.45)
                       : elementLabelColor.withValues(
                           alpha: isSelected ? 0.85 : 0.48,
                         ))
@@ -1999,7 +2022,7 @@ class _HandActionButtonState extends State<_HandActionButton>
                     ? Icon(
                         widget.move.elementalIcon,
                         size: iconSize,
-                        color: primaryColor,
+                        color: isEarth ? earthIconColor : primaryColor,
                         shadows: [
                           Shadow(
                             color: primaryColor.withValues(alpha: 0.75),

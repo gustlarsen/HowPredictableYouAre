@@ -331,7 +331,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                     color: palette.isDark
-                        ? move.elementalPrimaryColor
+                        ? palette.elementalText(move)
                         : palette.primaryText,
                   ),
                 ),

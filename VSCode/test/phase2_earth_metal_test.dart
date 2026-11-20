@@ -12,6 +12,8 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/markov_engine.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/theme/app_theme.dart';
+import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
@@ -405,6 +407,77 @@ void main() {
       controller.playTurn(HandMove.scissors);
       expect(controller.lastWinner, RoundWinner.user);
       expect(hpBeforeBonusHit - controller.computerHp, 4);
+    });
+
+    testWidgets('Earth uses bronze-brown palette in Dark Mode and deep roasted brown in Light Mode', (WidgetTester tester) async {
+      expect(HandMove.lizard.elementalPrimaryColor, const Color(0xFFC47A38));
+      expect(HandMove.lizard.elementalSecondaryColor, const Color(0xFF593214));
+
+      const darkPalette = AppPalette(isDark: true);
+      const lightPalette = AppPalette(isDark: false);
+      expect(darkPalette.elementalText(HandMove.lizard), const Color(0xFFD68C45));
+      expect(lightPalette.elementalText(HandMove.lizard), const Color(0xFF6E3D14));
+
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'darkMode': true,
+        'animationsEnabled': false,
+        'musicEnabled': false,
+        'soundEnabled': false,
+        'unlockedNewSkin': true,
+        'showNewSkin': false,
+        'unlockedNewHands': true,
+        'showNewHands': true,
+        'orbs_earth': 42,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final controller = GameController(
+        storage: storage,
+        localization: LocalizationService(),
+        audio: AudioService(),
+      );
+      addTearDown(controller.dispose);
+
+      // Verify InventoryDialog Earth Orb title uses tan-bronze #D68C45 in Dark Mode
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          home: Scaffold(body: InventoryDialog(controller: controller)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final earthOrbTitle = tester.widget<Text>(find.text('Earth Orb'));
+      expect(earthOrbTitle.style?.color, const Color(0xFFD68C45));
+
+      final earthRow = tester.widget<Container>(
+        find.byKey(const ValueKey('inventory_orb_row_earth')),
+      );
+      final earthBorder = (earthRow.decoration! as BoxDecoration).border! as Border;
+      expect(
+        earthBorder.top.color,
+        const Color(0xFFC47A38).withValues(alpha: 0.52),
+      );
+
+      // Verify VersusArena & GameScreen EARTH label uses tan-bronze #D68C45 in Dark Mode
+      controller.playTurn(HandMove.lizard);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          home: ChangeNotifierProvider.value(
+            value: controller,
+            child: const GameScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final earthLabels = tester.widgetList<Text>(find.text('EARTH')).toList();
+      expect(earthLabels.length, greaterThanOrEqualTo(2));
+      for (final label in earthLabels) {
+        expect(label.style?.color, const Color(0xFFD68C45));
+      }
     });
   });
 }

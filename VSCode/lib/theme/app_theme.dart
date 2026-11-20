@@ -95,7 +95,11 @@ class AppPalette {
 
   // Elemental Foreground & Card Tint Tokens (crisp contrast on light surfaces)
   Color elementalText(HandMove move) {
-    if (isDark) return move.elementalPrimaryColor;
+    if (isDark) {
+      return move == HandMove.lizard
+          ? const Color(0xFFD68C45)
+          : move.elementalPrimaryColor;
+    }
     switch (move) {
       case HandMove.rock:
         return const Color(0xFFC63B0E);
@@ -104,7 +108,7 @@ class AppPalette {
       case HandMove.scissors:
         return const Color(0xFF1B6E36);
       case HandMove.lizard:
-        return const Color(0xFF9A6700);
+        return const Color(0xFF6E3D14);
       case HandMove.spock:
         return const Color(0xFF435660);
     }
@@ -123,7 +127,7 @@ class AppPalette {
       case HandMove.scissors:
         base = const Color(0xFFE5F4EA);
       case HandMove.lizard:
-        base = const Color(0xFFF6EED9);
+        base = const Color(0xFFF2E3D4);
       case HandMove.spock:
         base = const Color(0xFFE9EEF2);
     }

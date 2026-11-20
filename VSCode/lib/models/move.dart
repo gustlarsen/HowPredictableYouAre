@@ -44,8 +44,8 @@ enum HandMove {
     '',
     '🦎',
     Symbols.landslide,
-    Color(0xFFFFB300),
-    Color(0xFFD87A16),
+    Color(0xFFC47A38),
+    Color(0xFF593214),
   ),
   spock(
     5,

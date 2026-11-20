@@ -322,12 +322,12 @@ void main() {
           ),
         );
         expect(earthCostIcon.color, lightPalette.elementalText(HandMove.lizard));
-        expect(earthCostIcon.color, const Color(0xFF9A6700));
+        expect(earthCostIcon.color, const Color(0xFF6E3D14));
 
         final earthCostText = tester.widget<Text>(
           find.descendant(of: algoBtn, matching: find.text('50')).first,
         );
-        expect(earthCostText.style?.color, const Color(0xFF9A6700));
+        expect(earthCostText.style?.color, const Color(0xFF6E3D14));
 
         final metalCostIcon = tester.widget<Icon>(
           find.descendant(
@@ -558,14 +558,14 @@ void main() {
           ),
         );
 
-        // Earth label uses high-contrast #9A6700 instead of #FFB300
+        // Earth label uses high-contrast #6E3D14 instead of yellow/amber
         final earthLabel = tester.widget<Text>(
           find.descendant(
             of: earthBtnFinder,
             matching: find.text('EARTH'),
           ),
         );
-        expect(earthLabel.style?.color, const Color(0xFF9A6700));
+        expect(earthLabel.style?.color, const Color(0xFF6E3D14));
         expect(tester.takeException(), isNull);
       },
     );
