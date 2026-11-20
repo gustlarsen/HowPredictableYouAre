@@ -6,6 +6,7 @@ import '../../models/story_chapter.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/elemental_energy_sphere.dart';
+import '../widgets/royal_castle_icon.dart';
 import 'story_gallery_dialog.dart';
 
 /// Identifies the 6 wings inside the [RoyalCastleDialog] hub.
@@ -131,7 +132,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
                           color: palette.amberBorder.withValues(
                             alpha: palette.isDark ? 0.18 : 0.14,
@@ -141,11 +142,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                             color: palette.amberBorder.withValues(alpha: 0.55),
                           ),
                         ),
-                        child: Icon(
-                          Icons.castle_rounded,
-                          color: palette.amberIcon,
-                          size: 22,
-                        ),
+                        child: const RoyalCastleIcon(size: 24),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -263,11 +260,22 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     AppPalette palette,
     LocalizationService loc,
   ) {
-    final tabs = [
+    final List<({
+      CastleWing wing,
+      ValueKey<String> key,
+      IconData? icon,
+      Widget Function(bool isSelected)? iconBuilder,
+      String label,
+      bool hasDot,
+    })> tabs = [
       (
         wing: CastleWing.throneRoom,
         key: const ValueKey('castle_tab_throne'),
-        icon: Icons.castle_rounded,
+        icon: null,
+        iconBuilder: (isSelected) => RoyalCastleIcon(
+          size: 17,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_throne_short', fallback: 'Throne'),
         hasDot: false,
       ),
@@ -275,6 +283,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.library,
         key: const ValueKey('castle_tab_library'),
         icon: Icons.menu_book_rounded,
+        iconBuilder: null,
         label: loc.t('castle_tab_library_short', fallback: 'Library'),
         hasDot: false,
       ),
@@ -282,6 +291,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.treasury,
         key: const ValueKey('castle_tab_treasury'),
         icon: Icons.inventory_2_rounded,
+        iconBuilder: null,
         label: loc.t('castle_tab_treasury_short', fallback: 'Treasury'),
         hasDot: controller.isAnyTreasuryElementFull,
       ),
@@ -289,6 +299,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.relicChamber,
         key: const ValueKey('castle_tab_relics'),
         icon: Icons.auto_awesome_rounded,
+        iconBuilder: null,
         label: loc.t('castle_tab_relics_short', fallback: 'Relics'),
         hasDot: controller.hasAvailableRelicChamberUpgrades,
       ),
@@ -296,6 +307,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.spoilsOfWar,
         key: const ValueKey('castle_tab_spoils'),
         icon: Icons.savings_rounded,
+        iconBuilder: null,
         label: loc.t('castle_tab_spoils_short', fallback: 'Spoils'),
         hasDot: controller.hasSpoilsOfWarOrbs,
       ),
@@ -303,6 +315,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.hallOfHeroes,
         key: const ValueKey('castle_tab_hall_of_heroes'),
         icon: Icons.workspace_premium_rounded,
+        iconBuilder: null,
         label: loc.t('castle_tab_heroes_short', fallback: 'Heroes'),
         hasDot: controller.hasHallOfHeroesBlessings,
       ),
@@ -317,6 +330,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             child: _CompactVerticalTabPill(
               key: tabs[i].key,
               icon: tabs[i].icon,
+              iconBuilder: tabs[i].iconBuilder,
               label: tabs[i].label,
               selected: _selectedWing == tabs[i].wing,
               showDot: tabs[i].hasDot,
@@ -1952,7 +1966,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 }
 
 class _CompactVerticalTabPill extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget Function(bool isSelected)? iconBuilder;
   final String label;
   final bool selected;
   final bool showDot;
@@ -1961,13 +1976,14 @@ class _CompactVerticalTabPill extends StatelessWidget {
 
   const _CompactVerticalTabPill({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconBuilder,
     required this.label,
     required this.selected,
     required this.showDot,
     required this.palette,
     required this.onTap,
-  });
+  }) : assert(icon != null || iconBuilder != null);
 
   @override
   Widget build(BuildContext context) {
@@ -2014,7 +2030,9 @@ class _CompactVerticalTabPill extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 17, color: fgColor),
+                  iconBuilder != null
+                      ? iconBuilder!(selected)
+                      : Icon(icon, size: 17, color: fgColor),
                   const SizedBox(height: 3),
                   SizedBox(
                     height: 13,

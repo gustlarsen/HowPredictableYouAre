@@ -13,6 +13,7 @@ import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/story_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
+import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import 'game_screen.dart';
 
@@ -362,7 +363,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             mapWidth: mapWidth,
                             mapHeight: mapHeight,
                             normalizedPos: WorldMapScreen.royalCastlePos,
-                            icon: Icons.castle_rounded,
+                            iconWidget: const RoyalCastleIcon(size: 24),
                             label: loc.t(
                               'map_landmark_royal_castle',
                               fallback: 'Royal Castle',
@@ -444,7 +445,8 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     required double mapWidth,
     required double mapHeight,
     required Offset normalizedPos,
-    required IconData icon,
+    IconData? icon,
+    Widget? iconWidget,
     required String label,
     String? subtitle,
     required Color accentColor,
@@ -453,6 +455,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     bool showNotificationBadge = false,
     required VoidCallback onTap,
   }) {
+    assert(icon != null || iconWidget != null);
     const double hitboxWidth = 148.0;
     const double hitboxHeight = 104.0;
     final left = normalizedPos.dx * mapWidth - hitboxWidth / 2;
@@ -466,6 +469,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
       child: _LandmarkPinBadge(
         key: key,
         icon: icon,
+        iconWidget: iconWidget,
         label: label,
         subtitle: subtitle,
         accentColor: accentColor,
@@ -630,7 +634,8 @@ class _WorldMapScreenState extends State<WorldMapScreen>
 }
 
 class _LandmarkPinBadge extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String label;
   final String? subtitle;
   final Color accentColor;
@@ -642,7 +647,8 @@ class _LandmarkPinBadge extends StatelessWidget {
 
   const _LandmarkPinBadge({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.label,
     this.subtitle,
     required this.accentColor,
@@ -651,7 +657,7 @@ class _LandmarkPinBadge extends StatelessWidget {
     required this.animationsEnabled,
     this.showNotificationBadge = false,
     required this.onTap,
-  });
+  }) : assert(icon != null || iconWidget != null);
 
   @override
   Widget build(BuildContext context) {
@@ -701,10 +707,13 @@ class _LandmarkPinBadge extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: Icon(
-                          icon,
-                          size: 20,
-                          color: accentColor,
+                        child: Center(
+                          child: iconWidget ??
+                              Icon(
+                                icon,
+                                size: 20,
+                                color: accentColor,
+                              ),
                         ),
                       ),
                       if (showNotificationBadge)

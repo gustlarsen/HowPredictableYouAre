@@ -17,6 +17,7 @@ import 'package:how_predictable/theme/app_theme.dart';
 import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
 import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
+import 'package:how_predictable/views/widgets/royal_castle_icon.dart';
 
 class _TestAdMobClient implements AdMobClient {
   bool rewardedAvailable;
@@ -682,6 +683,113 @@ void main() {
         expect(
           find.byKey(const ValueKey('royal_castle_notification_badge')),
           findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'RoyalCastleIcon renders stone-gray and high-contrast gold-background variants cleanly and replaces yellow castle icons across WorldMapScreen and RoyalCastleDialog',
+      (WidgetTester tester) async {
+        // 1. Standalone RoyalCastleIcon variants & sizes
+        for (final onGold in [false, true]) {
+          for (final iconSize in [17.0, 24.0, 48.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: Center(
+                    child: RoyalCastleIcon(
+                      size: iconSize,
+                      isOnGoldBackground: onGold,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final finder = find.byType(RoyalCastleIcon);
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(Size(iconSize, iconSize)));
+            expect(tester.takeException(), isNull);
+          }
+        }
+
+        // 2. WorldMapScreen Royal Castle pin + RoyalCastleDialog header & Throne tab
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(loadJsonStrings: true);
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final worldMapPin = find.byKey(const ValueKey('landmark_royal_castle'));
+        expect(worldMapPin, findsOneWidget);
+        expect(
+          find.descendant(
+            of: worldMapPin,
+            matching: find.byIcon(Icons.castle_rounded),
+          ),
+          findsNothing,
+        );
+        final mapCastleFinder = find.descendant(
+          of: worldMapPin,
+          matching: find.byType(RoyalCastleIcon),
+        );
+        expect(mapCastleFinder, findsOneWidget);
+        expect(
+          tester.widget<RoyalCastleIcon>(mapCastleFinder).isOnGoldBackground,
+          isFalse,
+        );
+
+        // Open RoyalCastleDialog -> Throne tab active by default
+        await tester.tap(worldMapPin);
+        await tester.pumpAndSettle();
+
+        final dialogFinder = find.byKey(const ValueKey('royal_castle_dialog'));
+        expect(dialogFinder, findsOneWidget);
+        expect(
+          find.descendant(
+            of: dialogFinder,
+            matching: find.byIcon(Icons.castle_rounded),
+          ),
+          findsNothing,
+        );
+
+        // Both header badge and Throne tab render RoyalCastleIcon
+        expect(
+          find.descendant(
+            of: dialogFinder,
+            matching: find.byType(RoyalCastleIcon),
+          ),
+          findsNWidgets(2),
+        );
+
+        final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
+        final throneIconFinder = find.descendant(
+          of: throneTab,
+          matching: find.byType(RoyalCastleIcon),
+        );
+        expect(throneIconFinder, findsOneWidget);
+        expect(
+          tester.widget<RoyalCastleIcon>(throneIconFinder).isOnGoldBackground,
+          isTrue,
+        );
+
+        // Switch to Library tab -> Throne tab switches to inactive stone-gray palette
+        await tester.tap(find.byKey(const ValueKey('castle_tab_library')));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<RoyalCastleIcon>(throneIconFinder).isOnGoldBackground,
+          isFalse,
         );
       },
     );
