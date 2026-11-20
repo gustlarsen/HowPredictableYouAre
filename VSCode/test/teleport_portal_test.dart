@@ -402,12 +402,12 @@ void main() {
         final parsed = CloudSaveData.tryParse(snapshot.toJsonString())!;
         expect(parsed.confirmBattleTeleport, isFalse);
 
-        // Starting a brand-new campaign resets confirmation preference back to true
+        // Starting a brand-new campaign resets confirmation preference back to true and week to 0
         await controller.resetAllProgress();
         expect(controller.confirmBattleTeleport, isTrue);
         expect(controller.skipTeleportConfirm, isFalse);
         expect(storage.confirmBattleTeleport, isTrue);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
 
         // Localization keys across en, pt, es, de
         const keys = [

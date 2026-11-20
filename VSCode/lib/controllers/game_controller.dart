@@ -1864,24 +1864,102 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  /// Wipes all gameplay progression (elemental orbs, shop unlocks, active toggles,
-  /// scores, Markov matrices, unlocked story chapters, and Castle meta data)
-  /// while preserving the player's UI settings, and syncs the fresh state to the
-  /// cloud if signed in.
+  /// Archives the active run's lost artifacts/power-ups into the Royal Castle's
+  /// Relic Chamber, active Elemental Orbs into Spoils of War, and HP/Mana stat
+  /// levels into the Hall of Heroes (with a double-reset guard so an already-empty
+  /// hero does not wipe previously archived recovery rewards), then resets the
+  /// campaign back to Week 0 / Turn 0 while preserving global account data
+  /// (unlocked story cutscenes, Library endings & bestiary, Hall of Heroes
+  /// records, Royal Treasury, verified real-money IAPs such as Remove Ads, and
+  /// UI settings) and syncing with Cloud Save.
   Future<void> resetAllProgress() async {
     _giftTimer?.cancel();
     _giftTimer = null;
     _giftCooldownUntil = null;
     _remainingGiftCooldown = Duration.zero;
     isGiftAvailable = true;
+
+    final verifiedPaidIds = <String>{
+      ...storage.purchasedIapProductIds,
+      ...billingService.verifiedPurchasedProductIds,
+    };
+
+    // 1. Archive active Elemental Orbs into Spoils of War (Double-Reset Guard)
+    final hasActiveOrbs = totalOrbs > 0;
+    final updatedSpoilsFire = spoilsFireOrbs + fireOrbs;
+    final updatedSpoilsWater = spoilsWaterOrbs + waterOrbs;
+    final updatedSpoilsWood = spoilsWoodOrbs + woodOrbs;
+    final updatedSpoilsEarth = spoilsEarthOrbs + earthOrbs;
+    final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
+
+    // 2. Archive owned shop artifacts & power-ups into Relic Chamber (excluding paid IAPs)
+    //    (Double-Reset Guard: only update if active run has owned artifacts)
+    final lostUpgrades = <String>[];
+    for (final artifact in ShopUpgradeArtifact.values) {
+      if (!isUpgradeArtifactUnlocked(artifact)) continue;
+      final productId = _productIdForArtifact(artifact);
+      if (productId != null && verifiedPaidIds.contains(productId)) {
+        continue;
+      }
+      lostUpgrades.add(artifact.id);
+    }
+    final nextRelicUpgrades = lostUpgrades.isNotEmpty
+        ? <String>{...relicChamberStoredUpgrades, ...lostUpgrades}.toList()
+        : List<String>.from(relicChamberStoredUpgrades);
+
+    // 3. Archive active HP/Mana stat upgrade levels into Hall of Heroes
+    final nextHallHpBonus = hpUpgradeLevel > 0
+        ? hallOfHeroesHpBonus + hpUpgradeLevel
+        : hallOfHeroesHpBonus;
+    final nextHallManaBonus = manaUpgradeLevel > 0
+        ? hallOfHeroesManaBonus + manaUpgradeLevel
+        : hallOfHeroesManaBonus;
+
+    // 4. Wipe active campaign & arena state while preserving global account data
     await storage.clearGameplayProgress(
       includeSettings: false,
-      includeCastleMeta: true,
+      includeCastleMeta: false,
+      preserveStoryFlags: true,
     );
+    await storage.clearBattleDecreeProgress();
+
+    if (hasActiveOrbs) {
+      await storage.setAllSpoilsOrbs(
+        fire: updatedSpoilsFire,
+        water: updatedSpoilsWater,
+        wood: updatedSpoilsWood,
+        earth: updatedSpoilsEarth,
+        metal: updatedSpoilsMetal,
+      );
+    }
+    if (lostUpgrades.isNotEmpty) {
+      await storage.setRelicChamberUpgrades(nextRelicUpgrades);
+    }
+    if (hpUpgradeLevel > 0) {
+      await storage.setHallOfHeroesHpBonus(nextHallHpBonus);
+    }
+    if (manaUpgradeLevel > 0) {
+      await storage.setHallOfHeroesManaBonus(nextHallManaBonus);
+    }
+    await storage.setPurchasedIapProductIds(verifiedPaidIds);
+    await storage.setCurrentWeek(0);
+
     turnCount = 0;
+    lastCollectedOrbMove = null;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
+
     _loadState(restartAudio: false);
+
+    for (final productId in verifiedPaidIds) {
+      unlockByProductId(
+        productId,
+        recordAsIap: false,
+        triggerStory: false,
+        triggerCloudSave: false,
+      );
+    }
+
     notifyListeners();
     if (playGames.isSignedIn) {
       await playGames.saveCloudData();

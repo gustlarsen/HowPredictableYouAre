@@ -499,30 +499,32 @@ void main() {
     expect(controller.pendingStoryChapter, isNull);
   });
 
-  test('resetAllProgress resets intro story flag and sets pendingStoryChapter to intro as if opened for first time', () async {
+  test('resetAllProgress preserves seen story flags, archives orbs to Spoils of War, and resets campaign to Week 0', () async {
     SharedPreferences.setMockInitialValues({
       'musicEnabled': false,
       'has_seen_story_intro': true,
+      'has_seen_story_reset': true,
       'orbs_fire': 500,
       'total': 10,
+      'current_week': 5,
     });
     await createController();
 
     expect(storage.hasSeenStoryIntro, isTrue);
     expect(controller.hasSeenStoryIntro, isTrue);
+    expect(controller.hasSeenStoryReset, isTrue);
     expect(controller.pendingStoryChapter, isNull);
 
     await controller.resetAllProgress();
 
-    expect(storage.hasSeenStoryIntro, isFalse);
-    expect(controller.hasSeenStoryIntro, isFalse);
-    expect(controller.pendingStoryChapter, StoryChapter.intro);
-
-    final consumed = controller.consumePendingStory(StoryChapter.intro);
-    expect(consumed, StoryChapter.intro);
-    expect(controller.hasSeenStoryIntro, isTrue);
     expect(storage.hasSeenStoryIntro, isTrue);
+    expect(controller.hasSeenStoryIntro, isTrue);
+    expect(controller.hasSeenStoryReset, isTrue);
     expect(controller.pendingStoryChapter, isNull);
+    expect(controller.currentWeek, 0);
+    expect(storage.currentWeek, 0);
+    expect(controller.fireOrbs, 0);
+    expect(controller.spoilsFireOrbs, 500);
   });
 
   test('All 8 shop story chapters trigger on first unlock, persist flags, and do not re-trigger on toggle', () async {

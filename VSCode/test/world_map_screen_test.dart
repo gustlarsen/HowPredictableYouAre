@@ -590,7 +590,7 @@ void main() {
     );
 
     test(
-      'CloudSaveData round-trips currentWeek and resetAllProgress resets week back to 1',
+      'CloudSaveData round-trips currentWeek and resetAllProgress resets week back to 0',
       () async {
         SharedPreferences.setMockInitialValues({
           'current_week': 12,
@@ -614,8 +614,8 @@ void main() {
         expect(parsed.currentWeek, 12);
 
         await controller.resetAllProgress();
-        expect(controller.currentWeek, 1);
-        expect(storage.currentWeek, 1);
+        expect(controller.currentWeek, 0);
+        expect(storage.currentWeek, 0);
       },
     );
   });

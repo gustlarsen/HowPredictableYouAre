@@ -883,11 +883,12 @@ void main() {
     expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
   });
 
-  testWidgets('Resetting all progress from SettingsDialog closes settings and plays the intro cutscene as if opened for the first time', (WidgetTester tester) async {
+  testWidgets('Resetting all progress from SettingsDialog closes settings, archives orbs to Spoils of War, resets to Week 0, and triggers Castle badge', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'orbs_fire': 500,
       'total': 15,
+      'current_week': 4,
       'animationsEnabled': false,
     });
     final storage = StorageService();
@@ -909,9 +910,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Intro cutscene should NOT be visible initially since has_seen_story_intro was true
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
     expect(controller.fireOrbs, 500);
+    expect(find.text('Week 4 / 40'), findsOneWidget);
 
     // Open SettingsDialog
     await tester.tap(find.byIcon(Icons.settings_outlined));
@@ -924,37 +924,35 @@ void main() {
     await tester.tap(resetBtn);
     await tester.pumpAndSettle();
 
-    // Confirmation dialog appears
+    // Confirmation dialog appears with updated Castle recovery explanation
     expect(find.text('Reset All Progress?'), findsOneWidget);
+    expect(find.textContaining('Week 0'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('Royal Castle'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(
       find.byKey(const ValueKey('confirm_reset_progress_button')),
     );
     await tester.pumpAndSettle();
 
-    // Settings dialog is dismissed, progress is reset, and Intro cutscene is opened
+    // Settings dialog is dismissed, hero returns to Week 0 on WorldMapScreen with archived Spoils
+    expect(find.byType(SettingsDialog), findsNothing);
     expect(controller.totalOrbs, 0);
     expect(controller.totalRounds, 0);
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
-    expect(find.text('Panel 1 / 4'), findsOneWidget);
-
-    // Navigate through the cutscene panels and finish
-    final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
-    await tester.tap(nextBtnFinder); // Panel 2
-    await tester.pumpAndSettle();
-    expect(find.text('Panel 2 / 4'), findsOneWidget);
-
-    await tester.tap(nextBtnFinder); // Panel 3
-    await tester.pumpAndSettle();
-    expect(find.text('Panel 3 / 4'), findsOneWidget);
-
-    await tester.tap(nextBtnFinder); // Panel 4
-    await tester.pumpAndSettle();
-    expect(find.text('Panel 4 / 4'), findsOneWidget);
-
-    await tester.tap(nextBtnFinder); // Finish
-    await tester.pumpAndSettle();
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+    expect(controller.currentWeek, 0);
+    expect(controller.spoilsFireOrbs, 500);
+    expect(controller.hasRoyalCastleNotification, isTrue);
     expect(storage.hasSeenStoryIntro, isTrue);
+    expect(find.text('Week 0 / 40'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('royal_castle_notification_badge')),
+      findsOneWidget,
+    );
+    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
   });
 
   testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {

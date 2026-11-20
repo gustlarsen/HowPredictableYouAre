@@ -310,7 +310,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             loc.t(
               'reset_all_progress_message',
               fallback:
-                  'This will permanently delete all your diamonds, shop upgrades, scores, and prediction history so you can start fresh. This action cannot be undone.',
+                  'Resetting starts a new cycle as if defeated: your hero will lose all current items and Elemental Orbs and return to Week 0 on the Main Map. Any acquired artifacts, power-ups, and orbs will be archived at the Royal Castle, where you can recover them by watching a rewarded video ad.',
             ),
             style: TextStyle(color: palette.primaryText),
           ),
@@ -342,16 +342,19 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
 
     if (shouldReset == true && context.mounted) {
+      final navigator = Navigator.of(context);
       final messenger = ScaffoldMessenger.of(context);
-      Navigator.of(context).pop();
-      await controller.resetAllProgress();
+      final gameController = controller;
+      navigator.popUntil((route) => route.isFirst);
+      await gameController.resetAllProgress();
       messenger.hideCurrentSnackBar();
-      if (controller.pendingStoryChapter == null) {
-        final qaBonusMsg = controller.consumePendingQaBonusSnackBar();
+      if (gameController.pendingStoryChapter == null) {
+        final qaBonusMsg = gameController.consumePendingQaBonusSnackBar();
         final message = qaBonusMsg ??
             loc.t(
               'reset_all_progress_done',
-              fallback: 'All progress has been reset!',
+              fallback:
+                  'Returned to Week 0! Visit the Royal Castle to recover lost items and orbs.',
             );
         messenger.showSnackBar(
           SnackBar(

@@ -738,7 +738,7 @@ void main() {
     );
 
     testWidgets(
-      'Reset All Progress button in SettingsDialog asks for confirmation and resets all local and cloud progress so the user can restart fresh',
+      'Reset All Progress button in SettingsDialog asks for confirmation, archives to Castle, resets to Week 0, and syncs to Cloud Save',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -747,6 +747,7 @@ void main() {
           'userScore': 20,
           'pcScore': 10,
           'total': 30,
+          'current_week': 6,
           'unlockedReset': true,
           'showReset': true,
           'unlockedAlgorithm': true,
@@ -819,7 +820,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // All progress is wiped locally and synced to cloud, while UI settings stay intact
+        // Active run is wiped to Week 0 / Turn 0, archived in Castle, and synced to cloud,
+        // while global account data (story memories, UI settings) stay intact
+        expect(controller.currentWeek, 0);
         expect(controller.totalOrbs, 0);
         expect(storage.totalOrbs, 0);
         expect(controller.userScore, 0);
@@ -830,29 +833,34 @@ void main() {
         expect(controller.unlockedAlgorithm, isFalse);
         expect(controller.showAlgorithm, isFalse);
         expect(controller.darkMode, isFalse);
+        expect(controller.hasSeenStoryIntro, isTrue);
+        expect(controller.spoilsFireOrbs, 800);
+        expect(controller.spoilsWaterOrbs, 800);
+        expect(
+          controller.relicChamberStoredUpgrades,
+          containsAll(['reset', 'algorithm']),
+        );
+        expect(controller.hasRoyalCastleNotification, isTrue);
+        expect(find.text('Week 0 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('royal_castle_notification_badge')),
+          findsOneWidget,
+        );
 
         final cloudAfterReset =
             CloudSaveData.tryParse(fakeClient.cloudPayload)!;
+        expect(cloudAfterReset.currentWeek, 0);
         expect(cloudAfterReset.totalOrbs, 0);
         expect(cloudAfterReset.unlockedCount, 0);
         expect(cloudAfterReset.total, 0);
         expect(cloudAfterReset.darkMode, isFalse);
-        expect(cloudAfterReset.hasSeenStoryIntro, isFalse);
-
-        // Intro comic cutscene opens automatically as if opened for the first time
-        expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
-        expect(find.text('Panel 1 / 4'), findsOneWidget);
-
-        final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
-        await tester.tap(nextBtnFinder); // Panel 2
-        await tester.pumpAndSettle();
-        await tester.tap(nextBtnFinder); // Panel 3
-        await tester.pumpAndSettle();
-        await tester.tap(nextBtnFinder); // Panel 4
-        await tester.pumpAndSettle();
-        await tester.tap(nextBtnFinder); // Finish cutscene
-        await tester.pumpAndSettle();
-        expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+        expect(cloudAfterReset.hasSeenStoryIntro, isTrue);
+        expect(cloudAfterReset.spoilsFireOrbs, 800);
+        expect(cloudAfterReset.spoilsWaterOrbs, 800);
+        expect(
+          cloudAfterReset.relicChamberUpgrades,
+          containsAll(['reset', 'algorithm']),
+        );
       },
     );
 
