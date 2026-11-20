@@ -162,29 +162,29 @@ void main() {
         expect(controller.userHp, 59);
         expect(controller.computerHp, 97);
 
-        // 2. Claim periodic Gift Box (+5 of each element) -> reversible
+        // 2. Claim periodic Gift Box (+5 Fire/Water/Wood in Phase 1) -> reversible
         controller.claimGift();
         expect(controller.fireOrbs, 17);
         expect(controller.waterOrbs, 10);
         expect(controller.woodOrbs, 6);
-        expect(controller.earthOrbs, 7);
-        expect(controller.metalOrbs, 6);
+        expect(controller.earthOrbs, 2);
+        expect(controller.metalOrbs, 1);
 
-        // 3. Watch Rewarded Video Ad (+50 of each element) -> PROTECTED
+        // 3. Watch Rewarded Video Ad (+50 Fire/Water/Wood in Phase 1) -> PROTECTED
         final adOk = await controller.watchRewardedAd();
         expect(adOk, isTrue);
         expect(controller.fireOrbs, 67);
         expect(controller.waterOrbs, 60);
         expect(controller.woodOrbs, 56);
-        expect(controller.earthOrbs, 57);
-        expect(controller.metalOrbs, 56);
+        expect(controller.earthOrbs, 2);
+        expect(controller.metalOrbs, 1);
 
-        // Turn 0 snapshot grew by +50 so Ad orbs are protected
+        // Turn 0 snapshot grew by +50 for Fire/Water/Wood so Ad orbs are protected
         expect(controller.turn0FireOrbs, 60);
         expect(controller.turn0WaterOrbs, 55);
         expect(controller.turn0WoodOrbs, 50);
-        expect(controller.turn0EarthOrbs, 52);
-        expect(controller.turn0MetalOrbs, 51);
+        expect(controller.turn0EarthOrbs, 2);
+        expect(controller.turn0MetalOrbs, 1);
 
         // 4. Simulate closing & reopening the app mid-battle
         controller.cancelPendingTimers();
@@ -206,8 +206,8 @@ void main() {
         expect(reopenedController.lostOrbsFor(HandMove.rock), 7);
         expect(reopenedController.lostOrbsFor(HandMove.paper), 5);
         expect(reopenedController.lostOrbsFor(HandMove.scissors), 6);
-        expect(reopenedController.lostOrbsFor(HandMove.lizard), 5);
-        expect(reopenedController.lostOrbsFor(HandMove.spock), 5);
+        expect(reopenedController.lostOrbsFor(HandMove.lizard), 0);
+        expect(reopenedController.lostOrbsFor(HandMove.spock), 0);
 
         // 5. Confirm Reset (Time Rewind back to Turn 0)
         final savesBeforeReset = fakePlayGamesClient.saveCount;
@@ -237,13 +237,13 @@ void main() {
         expect(reopenedController.fireOrbs, 60);
         expect(reopenedController.waterOrbs, 55);
         expect(reopenedController.woodOrbs, 50);
-        expect(reopenedController.earthOrbs, 52);
-        expect(reopenedController.metalOrbs, 51);
+        expect(reopenedController.earthOrbs, 2);
+        expect(reopenedController.metalOrbs, 1);
         expect(reopenedStorage.fireOrbs, 60);
         expect(reopenedStorage.waterOrbs, 55);
         expect(reopenedStorage.woodOrbs, 50);
-        expect(reopenedStorage.earthOrbs, 52);
-        expect(reopenedStorage.metalOrbs, 51);
+        expect(reopenedStorage.earthOrbs, 2);
+        expect(reopenedStorage.metalOrbs, 1);
         expect(reopenedController.totalLostOrbsOnReset, 0);
 
         // Cloud save synced with rewound orbs & reset battle stats
@@ -358,11 +358,11 @@ void main() {
         controller.playTurn(HandMove.rock);
         await tester.pump();
 
-        // Claim Gift Box (+5 each) via AppBar button
+        // Claim Gift Box (+5 each since Earth & Metal unlocked) via AppBar button
         await tester.tap(find.byKey(const ValueKey('gift_box_button')));
         await tester.pumpAndSettle();
 
-        // Watch Rewarded Video Ad (+50 each) via AppBar button
+        // Watch Rewarded Video Ad (+50 each since Earth & Metal unlocked) via AppBar button
         await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
         await tester.pumpAndSettle();
 
@@ -498,8 +498,8 @@ void main() {
         expect(controller.fireOrbs, 50);
         expect(controller.waterOrbs, 50);
         expect(controller.woodOrbs, 50);
-        expect(controller.earthOrbs, 50);
-        expect(controller.metalOrbs, 50);
+        expect(controller.earthOrbs, 0);
+        expect(controller.metalOrbs, 0);
 
         // Now win ONLY 1 Fire orb, switch to Dark Mode, and verify only Fire badge is shown
         controller.toggleDarkMode(true);

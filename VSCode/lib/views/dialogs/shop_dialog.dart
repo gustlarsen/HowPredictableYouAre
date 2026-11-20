@@ -742,11 +742,7 @@ class _ShopDialogState extends State<ShopDialog> {
                     _buildShopItem(
                       context: context,
                       title: loc.t('gift_box', fallback: 'Gift Box'),
-                      subtitle: loc.t(
-                        'gift_box_desc',
-                        fallback:
-                            'Unlocks a periodic 🎁 gift chest on the top bar granting +5 orbs of every element',
-                      ),
+                      subtitle: controller.giftBoxDescription,
                       cost: GameController.costGiftBox,
                       productId: null,
                       isUnlocked: controller.giftBoxUnlocked,
@@ -1036,11 +1032,7 @@ class _ShopDialogState extends State<ShopDialog> {
                 Text(
                   controller.isRewardedAdOnCooldown
                       ? 'Cooldown active (2m)'
-                      : loc.t(
-                          'rewarded_ad_desc',
-                          fallback:
-                              'Watch a video ad for +50 of each Elemental Orb',
-                        ),
+                      : controller.rewardedAdDescription,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight:
@@ -1049,6 +1041,28 @@ class _ShopDialogState extends State<ShopDialog> {
                         ? (palette.isDark ? Colors.grey : palette.mutedText)
                         : (palette.isDark ? Colors.amber : palette.amberText),
                   ),
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  key: const ValueKey('shop_rewarded_ad_element_icons'),
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final move in controller.bonusOrbMoves)
+                      Tooltip(
+                        message: move.displayLabel(
+                          elemental: true,
+                          localization: loc,
+                        ),
+                        child: Icon(
+                          move.elementalIcon,
+                          key: ValueKey('shop_ad_orb_icon_${move.name}'),
+                          size: 15,
+                          color: palette.elementalText(move),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             );
@@ -1065,11 +1079,11 @@ class _ShopDialogState extends State<ShopDialog> {
                           ScaffoldMessenger.of(context)
                             ..hideCurrentSnackBar()
                             ..showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  GameController.rewardedAdSnackBarMessage,
+                                  controller.activeRewardedAdSnackBarMessage,
                                 ),
-                                duration: Duration(seconds: 2),
+                                duration: const Duration(seconds: 2),
                               ),
                             );
                         },

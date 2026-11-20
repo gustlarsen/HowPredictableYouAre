@@ -234,17 +234,17 @@ void main() {
         final earned = await controller.watchRewardedAd();
         expect(earned, isTrue);
 
-        // +50 of each Elemental Orb granted and persisted
+        // +50 of the 3 main Elemental Orbs (Fire, Water, Wood) granted in Phase 1
         expect(controller.fireOrbs, 150);
         expect(controller.waterOrbs, 150);
         expect(controller.woodOrbs, 150);
-        expect(controller.earthOrbs, 150);
-        expect(controller.metalOrbs, 150);
+        expect(controller.earthOrbs, 100);
+        expect(controller.metalOrbs, 100);
         expect(storage.fireOrbs, 150);
         expect(storage.waterOrbs, 150);
         expect(storage.woodOrbs, 150);
-        expect(storage.earthOrbs, 150);
-        expect(storage.metalOrbs, 150);
+        expect(storage.earthOrbs, 100);
+        expect(storage.metalOrbs, 100);
 
         // Cloud save triggered
         expect(fakePlayGamesClient.saveCallCount, greaterThan(initialSaves));
@@ -372,14 +372,14 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('watch_rewarded_ad_button')));
         await tester.pump();
 
-        // All 5 Elemental Orbs increased by 50 and celebratory SnackBar is shown
+        // Phase 1: 3 main Elemental Orbs increased by 50 and Phase 1 SnackBar is shown
         expect(controller.fireOrbs, 2050);
         expect(controller.waterOrbs, 2050);
         expect(controller.woodOrbs, 2050);
-        expect(controller.earthOrbs, 1550);
-        expect(controller.metalOrbs, 1550);
+        expect(controller.earthOrbs, 1500);
+        expect(controller.metalOrbs, 1500);
         expect(
-          find.text(GameController.rewardedAdSnackBarMessage),
+          find.text(GameController.rewardedAdSnackBarMessageMain),
           findsOneWidget,
         );
 
@@ -655,21 +655,21 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.text('Watch a video ad for +50 of each Elemental Orb'),
+          find.text('Watch a video ad for +50 Fire, Water & Wood Orbs'),
           findsOneWidget,
         );
 
-        // Tap the Shop rewarded ad button -> grants +50 of each orb and enters 2m cooldown (disabled)
+        // Tap the Shop rewarded ad button -> grants +50 Fire/Water/Wood in Phase 1 and enters 2m cooldown
         await tester.tap(shopAdBtnFinder);
         await tester.pump();
 
         expect(controller.fireOrbs, 150);
         expect(controller.waterOrbs, 150);
         expect(controller.woodOrbs, 150);
-        expect(controller.earthOrbs, 150);
-        expect(controller.metalOrbs, 150);
+        expect(controller.earthOrbs, 100);
+        expect(controller.metalOrbs, 100);
         expect(
-          find.text(GameController.rewardedAdSnackBarMessage),
+          find.text(GameController.rewardedAdSnackBarMessageMain),
           findsOneWidget,
         );
         expect(controller.isRewardedAdReady, isFalse);

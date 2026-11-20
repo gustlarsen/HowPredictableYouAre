@@ -522,7 +522,7 @@ void main() {
         expect(syncedData.woodOrbs, 470);
         expect(syncedData.unlockedReset, isTrue);
 
-        // 2. Claiming periodic gift (+5 of each orb) triggers a cloud save
+        // 2. Claiming periodic gift (+5 of Fire/Water/Wood in Phase 1) triggers a cloud save
         controller.claimGift();
         await Future<void>.delayed(Duration.zero);
         expect(fakeClient.saveCallCount, equals(initialSaves + 2));
@@ -530,8 +530,8 @@ void main() {
         expect(syncedData.fireOrbs, 475);
         expect(syncedData.waterOrbs, 475);
         expect(syncedData.woodOrbs, 475);
-        expect(syncedData.earthOrbs, 5);
-        expect(syncedData.metalOrbs, 5);
+        expect(syncedData.earthOrbs, 0);
+        expect(syncedData.metalOrbs, 0);
         controller.cancelPendingTimers();
 
         // 3. Adding free orbs triggers a cloud save
@@ -540,7 +540,7 @@ void main() {
         expect(fakeClient.saveCallCount, equals(initialSaves + 3));
         syncedData = CloudSaveData.tryParse(fakeClient.cloudPayload)!;
         expect(syncedData.fireOrbs, 525);
-        expect(syncedData.earthOrbs, 55);
+        expect(syncedData.earthOrbs, 50);
 
         // 4. Changing settings triggers cloud saves for the signed-in account
         controller.setLanguage('de');

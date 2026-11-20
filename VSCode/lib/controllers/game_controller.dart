@@ -23,6 +23,10 @@ class GameController extends ChangeNotifier {
   static const Duration rewardedAdCooldownDuration = Duration(minutes: 2);
   static const String rewardedAdSnackBarMessage =
       '+50 Elemental Orbs earned!';
+  static const String rewardedAdSnackBarMessageMain =
+      '+50 Fire, Water & Wood Orbs earned!';
+  static const String rewardedAdSnackBarMessageAll =
+      '+50 Orbs of every element earned!';
   static const int baseMaxHp = 60;
   static const int baseMaxMana = 100;
   static const int maxHp = baseMaxHp;
@@ -588,6 +592,67 @@ class GameController extends ChangeNotifier {
   bool get isPhase2 => currentWeek >= phase2StartWeek;
 
   bool get isEarthAndMetalActive => unlockedNewHands && showNewHands;
+
+  /// Whether Rewarded Video Ad and periodic Gift Box bonuses include Earth & Metal
+  /// in addition to the 3 main elements (Fire, Water, Wood).
+  bool get includesEarthAndMetalInBonuses => isPhase2 || unlockedNewHands;
+
+  /// Active elements granted by Rewarded Video Ad and periodic Gift Box rewards.
+  List<HandMove> get bonusOrbMoves => includesEarthAndMetalInBonuses
+      ? HandMove.values
+      : const [HandMove.rock, HandMove.paper, HandMove.scissors];
+
+  String get rewardedAdDescription => includesEarthAndMetalInBonuses
+      ? localization.t(
+          'rewarded_ad_desc',
+          fallback: 'Watch a video ad for +50 of every element',
+        )
+      : localization.t(
+          'rewarded_ad_desc_main',
+          fallback: 'Watch a video ad for +50 Fire, Water & Wood Orbs',
+        );
+
+  String get activeRewardedAdSnackBarMessage => includesEarthAndMetalInBonuses
+      ? localization.t(
+          'rewarded_ad_claimed_all',
+          fallback: rewardedAdSnackBarMessageAll,
+        )
+      : localization.t(
+          'rewarded_ad_claimed_main',
+          fallback: rewardedAdSnackBarMessageMain,
+        );
+
+  String get giftBoxDescription => includesEarthAndMetalInBonuses
+      ? localization.t(
+          'gift_box_desc',
+          fallback:
+              'Unlocks a periodic 🎁 gift chest on the top bar granting +5 orbs of every element',
+        )
+      : localization.t(
+          'gift_box_desc_main',
+          fallback:
+              'Unlocks a periodic 🎁 gift chest on the top bar granting +5 Fire, Water & Wood orbs',
+        );
+
+  String get giftTooltipMessage => includesEarthAndMetalInBonuses
+      ? localization.t(
+          'gift_tooltip',
+          fallback: 'Claim Free +5 Orbs of Every Element Gift',
+        )
+      : localization.t(
+          'gift_tooltip_main',
+          fallback: 'Claim Free +5 Fire, Water & Wood Orbs Gift',
+        );
+
+  String get giftClaimedMessage => includesEarthAndMetalInBonuses
+      ? localization.t(
+          'gift_claimed_msg',
+          fallback: '🎁 +5 Orbs of Every Element Claimed!',
+        )
+      : localization.t(
+          'gift_claimed_msg_main',
+          fallback: '🎁 +5 Fire, Water & Wood Orbs Claimed!',
+        );
 
   int get playerWinDamageToBoss => isPhase2
       ? (showNewHands ? phase2BonusBossDamage : phase2BaseBossDamage)
@@ -2300,20 +2365,24 @@ class GameController extends ChangeNotifier {
     );
   }
 
-  /// Grants +50 of each of the 5 Elemental Orbs when the player finishes watching
-  /// a rewarded ad, persists immediately to [SharedPreferences], triggers a
-  /// [PlayGamesService] cloud save if signed in, and starts the 2-minute cooldown.
+  /// Grants +50 Elemental Orbs when the player finishes watching a rewarded ad
+  /// (Fire, Water & Wood in Phase 1; all 5 elements in Phase 2+ or when
+  /// Earth & Metal is unlocked), persists immediately to [SharedPreferences],
+  /// triggers a [PlayGamesService] cloud save if signed in, and starts the
+  /// 2-minute cooldown.
   void completeRewardedAd() {
     fireOrbs += rewardedAdOrbBonus;
     waterOrbs += rewardedAdOrbBonus;
     woodOrbs += rewardedAdOrbBonus;
-    earthOrbs += rewardedAdOrbBonus;
-    metalOrbs += rewardedAdOrbBonus;
     turn0FireOrbs += rewardedAdOrbBonus;
     turn0WaterOrbs += rewardedAdOrbBonus;
     turn0WoodOrbs += rewardedAdOrbBonus;
-    turn0EarthOrbs += rewardedAdOrbBonus;
-    turn0MetalOrbs += rewardedAdOrbBonus;
+    if (includesEarthAndMetalInBonuses) {
+      earthOrbs += rewardedAdOrbBonus;
+      metalOrbs += rewardedAdOrbBonus;
+      turn0EarthOrbs += rewardedAdOrbBonus;
+      turn0MetalOrbs += rewardedAdOrbBonus;
+    }
     _persistOrbsToStorage();
     _persistTurn0OrbsToStorage();
     isRewardedAdOnCooldown = true;
@@ -2541,14 +2610,18 @@ class GameController extends ChangeNotifier {
     return billingService.restorePurchases();
   }
 
-  /// Gift feature: periodic free +5 of each of the 5 Elemental Orbs
+  /// Gift feature: periodic free +5 Elemental Orbs
+  /// (Fire, Water & Wood in Phase 1; all 5 elements in Phase 2+ or when
+  /// Earth & Metal is unlocked).
   void claimGift() {
     if (!giftBoxUnlocked || !giftBoxEnabled || !isGiftAvailable) return;
     fireOrbs += periodicGiftOrbBonus;
     waterOrbs += periodicGiftOrbBonus;
     woodOrbs += periodicGiftOrbBonus;
-    earthOrbs += periodicGiftOrbBonus;
-    metalOrbs += periodicGiftOrbBonus;
+    if (includesEarthAndMetalInBonuses) {
+      earthOrbs += periodicGiftOrbBonus;
+      metalOrbs += periodicGiftOrbBonus;
+    }
     _persistOrbsToStorage();
     isGiftAvailable = false;
     audio.playVibrate();

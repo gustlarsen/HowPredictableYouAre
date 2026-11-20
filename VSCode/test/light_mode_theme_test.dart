@@ -276,7 +276,7 @@ void main() {
         expect(adShape.side.color, lightPalette.rewardedAdCardBorder);
 
         final adSubtitle = tester.widget<Text>(
-          find.text('Watch a video ad for +50 of each Elemental Orb'),
+          find.text('Watch a video ad for +50 Fire, Water & Wood Orbs'),
         );
         expect(adSubtitle.style?.color, lightPalette.amberText);
 

@@ -990,11 +990,7 @@ class _GameScreenState extends State<GameScreen>
                         maxWidth: constraints.maxWidth,
                         onTap: () =>
                             _handleWatchRewardedAd(context, controller),
-                        tooltip: loc.t(
-                          'rewarded_ad_desc',
-                          fallback:
-                              'Watch a video ad for +50 of each Elemental Orb',
-                        ),
+                        tooltip: controller.rewardedAdDescription,
                         label: AdService.rewardedAdButtonLabel,
                       ),
                     ),
@@ -1008,20 +1004,12 @@ class _GameScreenState extends State<GameScreen>
             IconButton(
               key: const ValueKey('gift_box_button'),
               icon: const Text('🎁', style: TextStyle(fontSize: 22)),
-              tooltip: loc.t(
-                'gift_tooltip',
-                fallback: 'Claim Free +5 Elemental Orbs Gift',
-              ),
+              tooltip: controller.giftTooltipMessage,
               onPressed: () {
                 controller.claimGift();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                      loc.t(
-                        'gift_claimed_msg',
-                        fallback: '🎁 +5 Elemental Orbs Gift Claimed!',
-                      ),
-                    ),
+                    content: Text(controller.giftClaimedMessage),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -1532,9 +1520,9 @@ class _GameScreenState extends State<GameScreen>
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            const SnackBar(
-              content: Text(GameController.rewardedAdSnackBarMessage),
-              duration: Duration(seconds: 2),
+            SnackBar(
+              content: Text(controller.activeRewardedAdSnackBarMessage),
+              duration: const Duration(seconds: 2),
             ),
           );
       },

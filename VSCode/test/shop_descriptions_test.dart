@@ -26,8 +26,8 @@ void main() {
         'Displays the move(s) the AI predicts you will play next',
     'pc_next_move_desc':
         'Reveals the move(s) the AI is preparing to play against you',
-    'gift_box_desc':
-        'Unlocks a periodic 🎁 gift chest on the top bar granting +5 orbs of every element',
+    'gift_box_desc_main':
+        'Unlocks a periodic 🎁 gift chest on the top bar granting +5 Fire, Water & Wood orbs',
     'suggestion_desc':
         "Recommends the optimal counter-move(s) to beat the AI's next play",
     'remove_ads_desc':

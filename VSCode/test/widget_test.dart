@@ -2028,7 +2028,7 @@ void main() {
 
     final freeOrbsFinder = find.text('Free Elemental Orbs');
     final subtitleFinder =
-        find.text('Watch a video ad for +50 of each Elemental Orb');
+        find.text('Watch a video ad for +50 Fire, Water & Wood Orbs');
     final watchAdBtnFinder =
         find.byKey(const ValueKey('shop_watch_rewarded_ad_button'));
 
@@ -3236,14 +3236,14 @@ void main() {
     expect(find.byKey(const ValueKey('gift_box_button')), findsOneWidget);
     expect(find.text('🎁'), findsOneWidget);
 
-    // 5. Claim periodic gift -> +5 of each orb, enters cooldown, hides button
+    // 5. Claim periodic gift in Phase 1 -> +5 Fire/Water/Wood (0 Earth/Metal), enters cooldown, hides button
     await tester.tap(find.byKey(const ValueKey('gift_box_button')));
     await tester.pump();
     expect(controller.fireOrbs, 105);
     expect(controller.waterOrbs, 105);
     expect(controller.woodOrbs, 105);
-    expect(controller.earthOrbs, 105);
-    expect(controller.metalOrbs, 105);
+    expect(controller.earthOrbs, 100);
+    expect(controller.metalOrbs, 100);
     expect(controller.isGiftAvailable, isFalse);
     expect(controller.isGiftTimerActive, isTrue);
     expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);

@@ -607,20 +607,12 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                   child: IconButton(
                     key: const ValueKey('gift_box_button'),
                     padding: EdgeInsets.zero,
-                    tooltip: loc.t(
-                      'gift_tooltip',
-                      fallback: 'Claim Free +5 Elemental Orbs Gift',
-                    ),
+                    tooltip: controller.giftTooltipMessage,
                     onPressed: () {
                       controller.claimGift();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(
-                            loc.t(
-                              'gift_claimed_msg',
-                              fallback: '🎁 +5 Elemental Orbs Gift Claimed!',
-                            ),
-                          ),
+                          content: Text(controller.giftClaimedMessage),
                           duration: const Duration(seconds: 2),
                         ),
                       );
