@@ -321,8 +321,9 @@ void main() {
         expect(controller.spoilsWoodOrbs, woodBeforeReset);
         expect(controller.spoilsEarthOrbs, earthBeforeReset);
         expect(controller.spoilsMetalOrbs, metalBeforeReset);
-        expect(controller.hallOfHeroesHpBonus, 7);
-        expect(controller.hallOfHeroesManaBonus, 3);
+        expect(controller.peakHpUpgradeLevel, 4);
+        expect(controller.peakManaUpgradeLevel, 2);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
         expect(controller.hasRoyalCastleNotification, isTrue);
 
         // 5. Global account data preserved
@@ -368,8 +369,9 @@ void main() {
         expect(controller.spoilsWoodOrbs, woodBeforeReset);
         expect(controller.spoilsEarthOrbs, earthBeforeReset);
         expect(controller.spoilsMetalOrbs, metalBeforeReset);
-        expect(controller.hallOfHeroesHpBonus, 7);
-        expect(controller.hallOfHeroesManaBonus, 3);
+        expect(controller.peakHpUpgradeLevel, 4);
+        expect(controller.peakManaUpgradeLevel, 2);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
 
         // 7. Cloud Save reflects Week 0 + archived Castle pools
         final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload)!;
@@ -380,8 +382,9 @@ void main() {
           cloud.relicChamberUpgrades,
           containsAll(['reset', 'algorithm', 'crystal_ball']),
         );
-        expect(cloud.hallOfHeroesHpBonus, 7);
-        expect(cloud.hallOfHeroesManaBonus, 3);
+        expect(cloud.peakHpUpgradeLevel, 4);
+        expect(cloud.peakManaUpgradeLevel, 2);
+        expect(cloud.hallOfHeroesClaimAvailable, isTrue);
         expect(cloud.hasSeenStoryIntro, isTrue);
         expect(cloud.hasSeenStoryReset, isTrue);
         expect(cloud.unlockedAds, isTrue);

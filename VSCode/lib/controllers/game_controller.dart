@@ -27,7 +27,7 @@ class GameController extends ChangeNotifier {
       '+50 Fire, Water & Wood Orbs earned!';
   static const String rewardedAdSnackBarMessageAll =
       '+50 Orbs of every element earned!';
-  static const int baseMaxHp = 60;
+  static const int baseMaxHp = 50;
   static const int baseMaxMana = 100;
   static const int maxHp = baseMaxHp;
   static const int maxMana = baseMaxMana;
@@ -351,8 +351,9 @@ class GameController extends ChangeNotifier {
   int spoilsMetalOrbs = 0;
 
   List<String> relicChamberStoredUpgrades = [];
-  int hallOfHeroesHpBonus = 0;
-  int hallOfHeroesManaBonus = 0;
+  int peakHpUpgradeLevel = 0;
+  int peakManaUpgradeLevel = 0;
+  bool hallOfHeroesClaimAvailable = false;
   Set<String> unlockedEndings = {};
   Set<String> encounteredBestiary = {};
 
@@ -815,8 +816,11 @@ class GameController extends ChangeNotifier {
     spoilsMetalOrbs = storage.spoilsMetalOrbs;
 
     relicChamberStoredUpgrades = List<String>.from(storage.relicChamberUpgrades);
-    hallOfHeroesHpBonus = storage.hallOfHeroesHpBonus;
-    hallOfHeroesManaBonus = storage.hallOfHeroesManaBonus;
+    peakHpUpgradeLevel = math.max(storage.peakHpUpgradeLevel, hpUpgradeLevel);
+    peakManaUpgradeLevel =
+        math.max(storage.peakManaUpgradeLevel, manaUpgradeLevel);
+    hallOfHeroesClaimAvailable = storage.hallOfHeroesClaimAvailable &&
+        (peakHpUpgradeLevel > 0 || peakManaUpgradeLevel > 0);
     unlockedEndings = Set<String>.from(storage.unlockedEndings);
     encounteredBestiary = Set<String>.from(storage.encounteredBestiary);
 
@@ -1004,7 +1008,11 @@ class GameController extends ChangeNotifier {
       availableRelicChamberArtifacts.isNotEmpty;
 
   bool get hasHallOfHeroesBlessings =>
-      hallOfHeroesHpBonus > 0 || hallOfHeroesManaBonus > 0;
+      hallOfHeroesClaimAvailable &&
+      (peakHpUpgradeLevel > 0 || peakManaUpgradeLevel > 0);
+
+  int get hallOfHeroesTargetMaxHp => baseMaxHp + peakHpUpgradeLevel;
+  int get hallOfHeroesTargetMaxMana => baseMaxMana + peakManaUpgradeLevel;
 
   bool get hasRoyalCastleNotification =>
       isAnyTreasuryElementFull ||
@@ -1524,18 +1532,16 @@ class GameController extends ChangeNotifier {
 
   bool _restoreHallOfHeroesBlessings() {
     if (!hasHallOfHeroesBlessings) return false;
-    hpUpgradeLevel += hallOfHeroesHpBonus;
-    manaUpgradeLevel += hallOfHeroesManaBonus;
-    hallOfHeroesHpBonus = 0;
-    hallOfHeroesManaBonus = 0;
+    hpUpgradeLevel = math.max(hpUpgradeLevel, peakHpUpgradeLevel);
+    manaUpgradeLevel = math.max(manaUpgradeLevel, peakManaUpgradeLevel);
+    hallOfHeroesClaimAvailable = false;
     if (!hasGameStarted) {
       userHp = playerMaxHp;
       storage.setUserHp(userHp);
     }
     storage.setHpUpgradeLevel(hpUpgradeLevel);
     storage.setManaUpgradeLevel(manaUpgradeLevel);
-    storage.setHallOfHeroesHpBonus(0);
-    storage.setHallOfHeroesManaBonus(0);
+    storage.setHallOfHeroesClaimAvailable(false);
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -1842,7 +1848,7 @@ class GameController extends ChangeNotifier {
   /// 3. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
   /// 4. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
   ///    IAP purchases persisted in [StorageService] or verified by [BillingService].
-  /// 5. Resets HP/Mana to base (60 HP / 100 Mana), clears the Markov matrix,
+  /// 5. Resets HP/Mana to base (50 HP / 100 Mana), clears the Markov matrix,
   ///    persists locally, and overwrites Cloud Save so old cloud data cannot revert
   ///    the Week 0 reset.
   Future<void> applyPermadeathReset() async {
@@ -1880,13 +1886,10 @@ class GameController extends ChangeNotifier {
         ? lostUpgrades
         : List<String>.from(relicChamberStoredUpgrades);
 
-    // 2b. Snapshot fallen Cleric's accumulated +Max HP & +Max Mana levels into Hall of Heroes
-    final nextHallHpBonus = hpUpgradeLevel > 0
-        ? hallOfHeroesHpBonus + hpUpgradeLevel
-        : hallOfHeroesHpBonus;
-    final nextHallManaBonus = manaUpgradeLevel > 0
-        ? hallOfHeroesManaBonus + manaUpgradeLevel
-        : hallOfHeroesManaBonus;
+    // 2b. Preserve independent all-time historical peaks and unlock Hall of Heroes claim for the next cycle
+    final nextPeakHp = math.max(peakHpUpgradeLevel, hpUpgradeLevel);
+    final nextPeakMana = math.max(peakManaUpgradeLevel, manaUpgradeLevel);
+    final nextClaimAvailable = nextPeakHp > 0 || nextPeakMana > 0;
 
     // 3. Record Kingdom Fall ending
     final nextEndings = <String>{
@@ -1907,8 +1910,9 @@ class GameController extends ChangeNotifier {
       metal: updatedSpoilsMetal,
     );
     await storage.setRelicChamberUpgrades(nextRelicUpgrades);
-    await storage.setHallOfHeroesHpBonus(nextHallHpBonus);
-    await storage.setHallOfHeroesManaBonus(nextHallManaBonus);
+    await storage.setPeakHpUpgradeLevel(nextPeakHp);
+    await storage.setPeakManaUpgradeLevel(nextPeakMana);
+    await storage.setHallOfHeroesClaimAvailable(nextClaimAvailable);
     await storage.setUnlockedEndings(nextEndings);
     await storage.setTurn0Orbs(
       fire: 0,
@@ -1946,13 +1950,12 @@ class GameController extends ChangeNotifier {
   }
 
   /// Archives the active run's lost artifacts/power-ups into the Royal Castle's
-  /// Relic Chamber, active Elemental Orbs into Spoils of War, and HP/Mana stat
-  /// levels into the Hall of Heroes (with a double-reset guard so an already-empty
-  /// hero does not wipe previously archived recovery rewards), then resets the
-  /// campaign back to Week 0 / Turn 0 while preserving global account data
-  /// (unlocked story cutscenes, Library endings & bestiary, Hall of Heroes
-  /// records, Royal Treasury, verified real-money IAPs such as Remove Ads, and
-  /// UI settings) and syncing with Cloud Save.
+  /// Relic Chamber, active Elemental Orbs into Spoils of War, and all-time peak
+  /// HP/Mana stat levels into the Hall of Heroes (never lowering a previously
+  /// achieved peak), then resets the campaign back to Week 0 / Turn 0 while
+  /// preserving global account data (unlocked story cutscenes, Library endings
+  /// & bestiary, Hall of Heroes records, Royal Treasury, verified real-money
+  /// IAPs such as Remove Ads, and UI settings) and syncing with Cloud Save.
   Future<void> resetAllProgress() async {
     _giftTimer?.cancel();
     _giftTimer = null;
@@ -1988,13 +1991,10 @@ class GameController extends ChangeNotifier {
         ? <String>{...relicChamberStoredUpgrades, ...lostUpgrades}.toList()
         : List<String>.from(relicChamberStoredUpgrades);
 
-    // 3. Archive active HP/Mana stat upgrade levels into Hall of Heroes
-    final nextHallHpBonus = hpUpgradeLevel > 0
-        ? hallOfHeroesHpBonus + hpUpgradeLevel
-        : hallOfHeroesHpBonus;
-    final nextHallManaBonus = manaUpgradeLevel > 0
-        ? hallOfHeroesManaBonus + manaUpgradeLevel
-        : hallOfHeroesManaBonus;
+    // 3. Preserve independent all-time historical peaks and unlock Hall of Heroes claim
+    final nextPeakHp = math.max(peakHpUpgradeLevel, hpUpgradeLevel);
+    final nextPeakMana = math.max(peakManaUpgradeLevel, manaUpgradeLevel);
+    final nextClaimAvailable = nextPeakHp > 0 || nextPeakMana > 0;
 
     // 4. Wipe active campaign & arena state while preserving global account data
     await storage.clearGameplayProgress(
@@ -2016,12 +2016,9 @@ class GameController extends ChangeNotifier {
     if (lostUpgrades.isNotEmpty) {
       await storage.setRelicChamberUpgrades(nextRelicUpgrades);
     }
-    if (hpUpgradeLevel > 0) {
-      await storage.setHallOfHeroesHpBonus(nextHallHpBonus);
-    }
-    if (manaUpgradeLevel > 0) {
-      await storage.setHallOfHeroesManaBonus(nextHallManaBonus);
-    }
+    await storage.setPeakHpUpgradeLevel(nextPeakHp);
+    await storage.setPeakManaUpgradeLevel(nextPeakMana);
+    await storage.setHallOfHeroesClaimAvailable(nextClaimAvailable);
     await storage.setPurchasedIapProductIds(verifiedPaidIds);
     await storage.setCurrentWeek(0);
 
@@ -2193,13 +2190,18 @@ class GameController extends ChangeNotifier {
   }
 
   /// Infinitely upgrades the Cleric's Max HP by +1 using only Fire, Water, and
-  /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat.
+  /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat
+  /// and tracking the all-time historical peak.
   bool upgradeMaxHp() {
     return purchaseWithOrbs(
       cost: nextMaxHpUpgradeCost,
       onUnlock: () {
         hpUpgradeLevel += 1;
         storage.setHpUpgradeLevel(hpUpgradeLevel);
+        if (hpUpgradeLevel > peakHpUpgradeLevel) {
+          peakHpUpgradeLevel = hpUpgradeLevel;
+          storage.setPeakHpUpgradeLevel(peakHpUpgradeLevel);
+        }
         if (!hasGameStarted) {
           userHp = playerMaxHp;
           storage.setUserHp(userHp);
@@ -2209,13 +2211,17 @@ class GameController extends ChangeNotifier {
   }
 
   /// Infinitely upgrades the Cleric's Max Mana Pool by +1 using only Fire, Water,
-  /// and Wood orbs (`3 + manaUpgradeLevel ~/ 2` each).
+  /// and Wood orbs (`3 + manaUpgradeLevel ~/ 2` each) and tracks the all-time peak.
   bool upgradeMaxMana() {
     return purchaseWithOrbs(
       cost: nextMaxManaUpgradeCost,
       onUnlock: () {
         manaUpgradeLevel += 1;
         storage.setManaUpgradeLevel(manaUpgradeLevel);
+        if (manaUpgradeLevel > peakManaUpgradeLevel) {
+          peakManaUpgradeLevel = manaUpgradeLevel;
+          storage.setPeakManaUpgradeLevel(peakManaUpgradeLevel);
+        }
       },
     );
   }

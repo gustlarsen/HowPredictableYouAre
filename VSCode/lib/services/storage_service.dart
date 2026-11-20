@@ -199,8 +199,8 @@ class StorageService {
   int get total => _prefs.getInt('total') ?? 0;
   Future<void> setTotal(int val) => _prefs.setInt('total', val);
 
-  // RPG Hand HP (Player base 60 + upgrades; PC 100)
-  int get userHp => _prefs.getInt('userHp') ?? 60;
+  // RPG Hand HP (Player base 50 + upgrades; PC 100)
+  int get userHp => _prefs.getInt('userHp') ?? 50;
   int? get userHpRaw => _prefs.getInt('userHp');
   Future<void> setUserHp(int val) => _prefs.setInt('userHp', val);
 
@@ -208,11 +208,15 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
-  // Cleric Infinite Stat Upgrades & Hall of Heroes Vault
+  // Cleric Infinite Stat Upgrades & Hall of Heroes All-Time Peaks
   static const String _hpUpgradeLevelKey = 'hp_upgrade_level';
   static const String _manaUpgradeLevelKey = 'mana_upgrade_level';
-  static const String _hallOfHeroesHpBonusKey = 'hall_of_heroes_hp_bonus';
-  static const String _hallOfHeroesManaBonusKey = 'hall_of_heroes_mana_bonus';
+  static const String _peakHpUpgradeLevelKey = 'peak_hp_upgrade_level';
+  static const String _peakManaUpgradeLevelKey = 'peak_mana_upgrade_level';
+  static const String _hallOfHeroesClaimAvailableKey =
+      'hall_of_heroes_claim_available';
+  static const String _legacyHallHpKey = 'hall_of_heroes_hp_bonus';
+  static const String _legacyHallManaKey = 'hall_of_heroes_mana_bonus';
 
   int get hpUpgradeLevel {
     final val = _prefs.getInt(_hpUpgradeLevelKey) ?? 0;
@@ -230,21 +234,39 @@ class StorageService {
   Future<void> setManaUpgradeLevel(int val) =>
       _prefs.setInt(_manaUpgradeLevelKey, val < 0 ? 0 : val);
 
-  int get hallOfHeroesHpBonus {
-    final val = _prefs.getInt(_hallOfHeroesHpBonusKey) ?? 0;
+  int get peakHpUpgradeLevel {
+    final val = _prefs.getInt(_peakHpUpgradeLevelKey) ??
+        _prefs.getInt(_legacyHallHpKey) ??
+        0;
     return val < 0 ? 0 : val;
   }
 
-  Future<void> setHallOfHeroesHpBonus(int val) =>
-      _prefs.setInt(_hallOfHeroesHpBonusKey, val < 0 ? 0 : val);
+  Future<void> setPeakHpUpgradeLevel(int val) => Future.wait([
+        _prefs.setInt(_peakHpUpgradeLevelKey, val < 0 ? 0 : val),
+        _prefs.remove(_legacyHallHpKey),
+      ]);
 
-  int get hallOfHeroesManaBonus {
-    final val = _prefs.getInt(_hallOfHeroesManaBonusKey) ?? 0;
+  int get peakManaUpgradeLevel {
+    final val = _prefs.getInt(_peakManaUpgradeLevelKey) ??
+        _prefs.getInt(_legacyHallManaKey) ??
+        0;
     return val < 0 ? 0 : val;
   }
 
-  Future<void> setHallOfHeroesManaBonus(int val) =>
-      _prefs.setInt(_hallOfHeroesManaBonusKey, val < 0 ? 0 : val);
+  Future<void> setPeakManaUpgradeLevel(int val) => Future.wait([
+        _prefs.setInt(_peakManaUpgradeLevelKey, val < 0 ? 0 : val),
+        _prefs.remove(_legacyHallManaKey),
+      ]);
+
+  bool get hallOfHeroesClaimAvailable {
+    final stored = _prefs.getBool(_hallOfHeroesClaimAvailableKey);
+    if (stored != null) return stored;
+    return (_prefs.getInt(_legacyHallHpKey) ?? 0) > 0 ||
+        (_prefs.getInt(_legacyHallManaKey) ?? 0) > 0;
+  }
+
+  Future<void> setHallOfHeroesClaimAvailable(bool val) =>
+      _prefs.setBool(_hallOfHeroesClaimAvailableKey, val);
 
   // Campaign Week Calendar (starts at Week 1; Permadeath resets to Week 0)
   static const String currentWeekKey = 'current_week';
@@ -736,8 +758,9 @@ class StorageService {
       setAllTreasuryOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setAllSpoilsOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setRelicChamberUpgrades(const []),
-      setHallOfHeroesHpBonus(0),
-      setHallOfHeroesManaBonus(0),
+      setPeakHpUpgradeLevel(0),
+      setPeakManaUpgradeLevel(0),
+      setHallOfHeroesClaimAvailable(false),
       setUnlockedEndings(const []),
       setEncounteredBestiary(const []),
       _prefs.remove(_activeDecreeIdsKey),
@@ -746,7 +769,7 @@ class StorageService {
     ]);
   }
 
-  Future<void> clearGameStats({int userMaxHp = 60, int pcMaxHp = 100}) {
+  Future<void> clearGameStats({int userMaxHp = 50, int pcMaxHp = 100}) {
     return Future.wait([
       setUserScore(0),
       setPcScore(0),
@@ -797,7 +820,7 @@ class StorageService {
       setUserScore(0),
       setPcScore(0),
       setTotal(0),
-      setUserHp(60),
+      setUserHp(50),
       setPcHp(100),
       setHpUpgradeLevel(0),
       setManaUpgradeLevel(0),

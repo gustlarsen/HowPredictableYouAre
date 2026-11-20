@@ -1016,29 +1016,29 @@ void main() {
     expect(controller.isRewardedAdReady, isTrue);
   });
 
-  test('HP mechanics: starts at 60, reduces on loss, persists to storage, and resets back to 60', () async {
+  test('HP mechanics: starts at 50, reduces on loss, persists to storage, and resets back to 50', () async {
     await createController(resetPreferences: true);
 
-    expect(controller.userHp, 60);
-    expect(controller.playerMaxHp, 60);
+    expect(controller.userHp, 50);
+    expect(controller.playerMaxHp, 50);
     expect(controller.computerHp, 100);
-    expect(storage.userHp, 60);
+    expect(storage.userHp, 50);
     expect(storage.pcHp, 100);
 
     controller.playTurn(HandMove.rock);
-    expect(controller.userHp, inInclusiveRange(0, 60));
+    expect(controller.userHp, inInclusiveRange(0, 50));
     expect(controller.computerHp, inInclusiveRange(0, 100));
 
     if (controller.lastWinner == RoundWinner.user) {
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 99);
       expect(storage.pcHp, 99);
     } else if (controller.lastWinner == RoundWinner.computer) {
-      expect(controller.userHp, 59);
+      expect(controller.userHp, 49);
       expect(controller.computerHp, 100);
-      expect(storage.userHp, 59);
+      expect(storage.userHp, 49);
     } else {
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 100);
     }
 
@@ -1049,18 +1049,18 @@ void main() {
     expect(controller.userHp, prevUserHp);
     expect(controller.computerHp, prevPcHp);
 
-    // Resetting game restores player to 60 and PC to 100
+    // Resetting game restores player to 50 and PC to 100
     controller.resetGame();
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 100);
-    expect(storage.userHp, 60);
+    expect(storage.userHp, 50);
     expect(storage.pcHp, 100);
 
-    // Resetting all progress restores player to 60 and PC to 100
+    // Resetting all progress restores player to 50 and PC to 100
     await controller.resetAllProgress();
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 100);
-    expect(storage.userHp, 60);
+    expect(storage.userHp, 50);
     expect(storage.pcHp, 100);
   });
 
@@ -1202,7 +1202,7 @@ void main() {
     expect(controller.lastWinner, RoundWinner.draw);
     expect(controller.totalRounds, 1);
     expect(controller.remainingMana, 99);
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 100);
     expect(controller.percentPredict, 0.0);
 
@@ -1212,7 +1212,7 @@ void main() {
     expect(controller.lastWinner, RoundWinner.user);
     expect(controller.totalRounds, 2);
     expect(controller.remainingMana, 98);
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 99);
     expect(controller.percentPredict, 100.0);
 
@@ -1222,7 +1222,7 @@ void main() {
     expect(controller.lastWinner, RoundWinner.draw);
     expect(controller.totalRounds, 3);
     expect(controller.remainingMana, 97);
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 99);
     expect(controller.percentPredict, 100.0);
 
@@ -1232,7 +1232,7 @@ void main() {
     expect(controller.lastWinner, RoundWinner.computer);
     expect(controller.totalRounds, 4);
     expect(controller.remainingMana, 96);
-    expect(controller.userHp, 59);
+    expect(controller.userHp, 49);
     expect(controller.computerHp, 99);
     expect(controller.percentPredict, 50.0);
     expect(storage.total, 4);
@@ -1288,7 +1288,7 @@ void main() {
     }
     expect(controller.totalRounds, 50);
     expect(controller.remainingMana, 50);
-    expect(controller.userHp, 60);
+    expect(controller.userHp, 50);
     expect(controller.computerHp, 100);
     expect(controller.percentPredict, 0.0);
     expect(controller.is100RoundsAlertPending, isFalse);

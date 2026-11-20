@@ -162,9 +162,9 @@ Future<GameController> _createController({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Cleric 60 HP Baseline, Infinite Stat Upgrades & Dynamic Bars', () {
+  group('Cleric 50 HP Baseline, Infinite Stat Upgrades & Dynamic Bars', () {
     test(
-      'Cleric starts at 60 Max HP (-1 per loss, 0 on tie) and 100 Max Mana; upgrades scale dynamically across resets and battles',
+      '1. Cleric starts at 50 Max HP (-1 per loss, 0 on tie) and 100 Max Mana; upgrades, Teleport & Reset scale dynamically',
       () async {
         final playGamesClient = _TestPlayGamesClient();
         final controller = await _createController(
@@ -179,47 +179,30 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        expect(GameController.baseMaxHp, 60);
+        expect(GameController.baseMaxHp, 50);
         expect(GameController.baseMaxMana, 100);
         expect(controller.hpUpgradeLevel, 0);
         expect(controller.manaUpgradeLevel, 0);
-        expect(controller.playerMaxHp, 60);
+        expect(controller.playerMaxHp, 50);
         expect(controller.playerMaxMana, 100);
-        expect(controller.userHp, 60);
+        expect(controller.userHp, 50);
         expect(controller.remainingMana, 100);
         expect(controller.computerHp, 100);
-
-        // Cost formulas (Fire, Water, Wood only; Earth & Metal always 0)
-        expect(GameController.maxHpUpgradeCostForLevel(0).fire, 2);
-        expect(GameController.maxHpUpgradeCostForLevel(1).fire, 2);
-        expect(GameController.maxHpUpgradeCostForLevel(2).fire, 3);
-        expect(GameController.maxHpUpgradeCostForLevel(10).fire, 7);
-        expect(GameController.maxHpUpgradeCostForLevel(10).earth, 0);
-        expect(GameController.maxHpUpgradeCostForLevel(10).metal, 0);
-
-        expect(GameController.maxManaUpgradeCostForLevel(0).fire, 3);
-        expect(GameController.maxManaUpgradeCostForLevel(1).fire, 3);
-        expect(GameController.maxManaUpgradeCostForLevel(2).fire, 4);
-        expect(GameController.maxManaUpgradeCostForLevel(10).fire, 8);
-        expect(GameController.maxManaUpgradeCostForLevel(10).earth, 0);
-        expect(GameController.maxManaUpgradeCostForLevel(10).metal, 0);
 
         // Purchase +1 Max HP 12 times uncapped with 0 Earth & 0 Metal orbs
         var expectedSpentHp = 0;
         for (var lv = 0; lv < 12; lv++) {
           final expectedCost = 2 + (lv ~/ 2);
           expect(controller.nextMaxHpUpgradeCost.fire, expectedCost);
-          expect(controller.nextMaxHpUpgradeCost.water, expectedCost);
-          expect(controller.nextMaxHpUpgradeCost.wood, expectedCost);
           expect(controller.nextMaxHpUpgradeCost.earth, 0);
           expect(controller.nextMaxHpUpgradeCost.metal, 0);
           expect(controller.upgradeMaxHp(), isTrue);
           expectedSpentHp += expectedCost;
         }
         expect(controller.hpUpgradeLevel, 12);
-        expect(controller.playerMaxHp, 72);
-        expect(controller.userHp, 72); // Out-of-combat updates current HP
-        expect(controller.fireOrbs, 200 - expectedSpentHp);
+        expect(controller.peakHpUpgradeLevel, 12);
+        expect(controller.playerMaxHp, 62);
+        expect(controller.userHp, 62);
 
         // Purchase +1 Max Mana 11 times uncapped
         var expectedSpentMana = 0;
@@ -230,6 +213,7 @@ void main() {
           expectedSpentMana += expectedCost;
         }
         expect(controller.manaUpgradeLevel, 11);
+        expect(controller.peakManaUpgradeLevel, 11);
         expect(controller.playerMaxMana, 111);
         expect(controller.remainingMana, 111);
         expect(
@@ -237,72 +221,42 @@ void main() {
           200 - expectedSpentHp - expectedSpentMana,
         );
 
-        // Verify Storage & Cloud Save persistence across reload
+        // Verify Cloud Save persistence
         await Future<void>.delayed(const Duration(milliseconds: 20));
         final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload)!;
         expect(cloud.hpUpgradeLevel, 12);
         expect(cloud.manaUpgradeLevel, 11);
+        expect(cloud.peakHpUpgradeLevel, 12);
+        expect(cloud.peakManaUpgradeLevel, 11);
 
-        // Play 1 loss (-1 HP from 72 -> 71) and 1 draw (0 HP loss, -1 Mana)
+        // Lose 1 round (-1 HP -> 61) and draw 1 round (0 HP damage, -1 Mana)
         controller.crystalBallMove = HandMove.paper;
         controller.playTurn(HandMove.rock);
-        expect(controller.userHp, 71);
+        expect(controller.userHp, 61);
         expect(controller.remainingMana, 110);
 
         controller.crystalBallMove = HandMove.rock;
         controller.playTurn(HandMove.rock);
-        expect(controller.userHp, 71);
+        expect(controller.userHp, 61);
         expect(controller.remainingMana, 109);
 
-        // Purchasing mid-battle expands Max HP without healing damage taken
-        expect(controller.upgradeMaxHp(), isTrue);
-        expect(controller.playerMaxHp, 73);
-        expect(controller.userHp, 71);
-
-        // Turn 0 Reset & Teleport/New Battle restore HP to playerMaxHp & Mana to playerMaxMana
+        // Turn 0 Reset & Teleport restore HP to playerMaxHp & Mana to playerMaxMana
         controller.resetGame();
-        expect(controller.userHp, 73);
+        expect(controller.userHp, 62);
         expect(controller.remainingMana, 111);
 
         controller.crystalBallMove = HandMove.paper;
         controller.playTurn(HandMove.rock);
-        expect(controller.userHp, 72);
-        controller.completeBattleWeek();
-        expect(controller.userHp, 73);
+        expect(controller.userHp, 61);
+        controller.teleportToWorldMap();
+        expect(controller.userHp, 62);
         expect(controller.remainingMana, 111);
-
-        // Battle reaches completion at playerMaxMana (111 rounds), NOT at 100
-        for (var i = 0; i < 100; i++) {
-          controller.crystalBallMove = HandMove.rock;
-          controller.playTurn(HandMove.rock);
-        }
-        expect(controller.totalRounds, 100);
-        expect(controller.remainingMana, 11);
-        expect(controller.is100RoundsAlertPending, isFalse);
-
-        for (var i = 0; i < 11; i++) {
-          controller.crystalBallMove = HandMove.rock;
-          controller.playTurn(HandMove.rock);
-        }
-        expect(controller.totalRounds, 111);
-        expect(controller.remainingMana, 0);
-        expect(controller.is100RoundsAlertPending, isTrue);
-
-        // Insufficient orbs rejects purchase cleanly
-        controller.fireOrbs = 0;
-        expect(controller.upgradeMaxHp(), isFalse);
-        expect(controller.upgradeMaxMana(), isFalse);
       },
     );
 
     testWidgets(
-      'RpgHpBar and ManaPoolOrb scale proportions, colors, and warning thresholds dynamically with playerMaxHp & playerMaxMana',
+      '1b. RpgHpBar, ManaPoolOrb, and VersusArena scale proportionally against 50 base HP and dynamic maxMana; ShopDialog shows Lv. 0 • 50 → 51 HP',
       (WidgetTester tester) async {
-        // Test dynamic maxHp = 60:
-        // 36/60 = 60% -> Emerald Green
-        // 35/60 = 58.3% -> Amber
-        // 18/60 = 30% -> Amber (non-critical)
-        // 17/60 = 28.3% -> Crimson Red + critical glow
         Future<void> pumpHpBar({required int hp, required int maxHp}) async {
           await tester.pumpWidget(
             MaterialApp(
@@ -353,30 +307,41 @@ void main() {
           return container.decoration! as BoxDecoration;
         }
 
-        await pumpHpBar(hp: 36, maxHp: 60);
-        expect(find.text('HP 36'), findsOneWidget);
+        // Baseline maxHp = 50:
+        // 30/50 = 60% -> Emerald Green
+        // 29/50 = 58% -> Amber
+        // 15/50 = 30% -> Amber (non-critical)
+        // 14/50 = 28% -> Crimson Red + critical pulse glow
+        await pumpHpBar(hp: 30, maxHp: 50);
+        expect(find.text('HP 30'), findsOneWidget);
         expect(readWidthFactor(), closeTo(0.60, 0.001));
-        expect(readFillColor().toARGB32(), const Color(0xFF2ECC71).withValues(alpha: 0.95).toARGB32());
+        expect(
+          readFillColor().toARGB32(),
+          const Color(0xFF2ECC71).withValues(alpha: 0.95).toARGB32(),
+        );
 
-        await pumpHpBar(hp: 35, maxHp: 60);
-        expect(readWidthFactor(), closeTo(35 / 60, 0.001));
-        expect(readFillColor().toARGB32(), const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32());
+        await pumpHpBar(hp: 29, maxHp: 50);
+        expect(readWidthFactor(), closeTo(29 / 50, 0.001));
+        expect(
+          readFillColor().toARGB32(),
+          const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32(),
+        );
 
-        await pumpHpBar(hp: 18, maxHp: 60);
+        await pumpHpBar(hp: 15, maxHp: 50);
         expect(readOuterDecor().boxShadow!.first.color, Colors.black54);
-        expect(readFillColor().toARGB32(), const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32());
+        expect(
+          readFillColor().toARGB32(),
+          const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32(),
+        );
 
-        await pumpHpBar(hp: 17, maxHp: 60);
+        await pumpHpBar(hp: 14, maxHp: 50);
         expect(readOuterDecor().boxShadow!.first.color.r, greaterThan(0.8));
-        expect(readFillColor().toARGB32(), const Color(0xFFE74C3C).withValues(alpha: 0.95).toARGB32());
+        expect(
+          readFillColor().toARGB32(),
+          const Color(0xFFE74C3C).withValues(alpha: 0.95).toARGB32(),
+        );
 
-        // Dynamic upgraded maxHp = 80: 24/80 = 30% non-critical vs 23/80 = 28.75% critical
-        await pumpHpBar(hp: 24, maxHp: 80);
-        expect(readOuterDecor().boxShadow!.first.color, Colors.black54);
-        await pumpHpBar(hp: 23, maxHp: 80);
-        expect(readOuterDecor().boxShadow!.first.color.r, greaterThan(0.8));
-
-        // ManaPoolOrb dynamic maxMana = 120: 25/120 > 20% normal cyan vs 24/120 <= 20% urgent amber/violet
+        // ManaPoolOrb dynamic maxMana = 120: 25/120 > 20% normal cyan vs 24/120 <= 20% low mana
         Future<BoxDecoration> pumpManaOrb(int mana) async {
           await tester.pumpWidget(
             MaterialApp(
@@ -409,7 +374,7 @@ void main() {
           isNot(const Color(0xFF00E5FF).withValues(alpha: 0.40).toARGB32()),
         );
 
-        // VersusArena renders upgraded player HP 72 and Mana 120 cleanly
+        // VersusArena defaults & ShopDialog display 50-based progression
         final localization = LocalizationService();
         await tester.pumpWidget(
           MaterialApp(
@@ -423,32 +388,18 @@ void main() {
                   localization: localization,
                   animationsEnabled: false,
                   roundId: 1,
-                  userHp: 72,
-                  playerMaxHp: 72,
-                  computerHp: 99,
-                  computerMaxHp: 100,
-                  remainingMana: 120,
-                  maxMana: 120,
                 ),
               ),
             ),
           ),
         );
-        expect(find.text('HP 72'), findsOneWidget);
-        expect(find.text('120'), findsOneWidget);
-      },
-    );
+        expect(find.text('HP 50'), findsOneWidget);
 
-    testWidgets(
-      'ShopDialog displays Max HP and Max Mana infinite upgrades right below Free Elemental Orbs with dynamic costs & immediate purchases',
-      (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
             'orbs_fire': 20,
             'orbs_water': 20,
             'orbs_wood': 20,
-            'orbs_earth': 0,
-            'orbs_metal': 0,
             'darkMode': true,
           },
           loadStrings: true,
@@ -464,56 +415,22 @@ void main() {
         await tester.pumpAndSettle();
 
         final hpCard = find.byKey(const ValueKey('shop_upgrade_max_hp_card'));
-        final manaCard = find.byKey(const ValueKey('shop_upgrade_max_mana_card'));
         final hpBtn = find.byKey(const ValueKey('shop_upgrade_max_hp_button'));
         final manaBtn = find.byKey(const ValueKey('shop_upgrade_max_mana_button'));
-        final adCard = find.byKey(const ValueKey('shop_rewarded_ad_card'));
-
-        expect(adCard, findsOneWidget);
-        expect(hpCard, findsOneWidget);
-        expect(manaCard, findsOneWidget);
-        expect(hpBtn, findsOneWidget);
-        expect(manaBtn, findsOneWidget);
-
-        // Positioned right below Free Elemental Orbs and has NO Switch toggle
-        expect(
-          tester.getTopLeft(adCard).dy,
-          lessThan(tester.getTopLeft(hpCard).dy),
-        );
-        expect(
-          tester.getTopLeft(hpCard).dy,
-          lessThan(tester.getTopLeft(manaCard).dy),
-        );
         expect(
           find.descendant(of: hpCard, matching: find.byType(Switch)),
           findsNothing,
         );
-        expect(
-          find.descendant(of: manaCard, matching: find.byType(Switch)),
-          findsNothing,
-        );
-
-        expect(find.text('Lv. 0 • 60 → 61 HP'), findsOneWidget);
+        expect(find.text('Lv. 0 • 50 → 51 HP'), findsOneWidget);
         expect(find.text('Lv. 0 • 100 → 101 MANA'), findsOneWidget);
 
-        // Purchase 2x +1 Max HP (cost 2 each -> cost increases to 3 at Lv 2)
         await tester.tap(hpBtn);
         await tester.pumpAndSettle();
         expect(controller.hpUpgradeLevel, 1);
-        expect(controller.userHp, 61);
-        expect(find.text('Lv. 1 • 61 → 62 HP'), findsOneWidget);
+        expect(controller.playerMaxHp, 51);
+        expect(controller.userHp, 51);
+        expect(find.text('Lv. 1 • 51 → 52 HP'), findsOneWidget);
 
-        await tester.tap(hpBtn);
-        await tester.pumpAndSettle();
-        expect(controller.hpUpgradeLevel, 2);
-        expect(controller.userHp, 62);
-        expect(find.text('Lv. 2 • 62 → 63 HP'), findsOneWidget);
-        expect(
-          find.descendant(of: hpBtn, matching: find.text('3')),
-          findsNWidgets(3),
-        );
-
-        // Purchase +1 Max Mana (cost 3)
         await tester.ensureVisible(manaBtn);
         await tester.pumpAndSettle();
         await tester.tap(manaBtn);
@@ -525,9 +442,158 @@ void main() {
     );
   });
 
-  group('Hall of Heroes Castle Wing & Defeat Preservation', () {
+  group('Hall of Heroes Historical Peak Restoration (max, never +=)', () {
     test(
-      'Defeat snapshots HP & Mana upgrade levels into Hall of Heroes, ad & Remove Ads restore and clear vault cleanly',
+      '2. Independent all-time peaks never downgrade across weaker runs, permadeath defeats, or Reset All Progress',
+      () async {
+        final controller = await _createController(
+          prefs: {
+            'orbs_fire': 500,
+            'orbs_water': 500,
+            'orbs_wood': 500,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        // Run 1: Reach HP Lv. 9, Mana Lv. 2
+        for (var i = 0; i < 9; i++) {
+          expect(controller.upgradeMaxHp(), isTrue);
+        }
+        for (var i = 0; i < 2; i++) {
+          expect(controller.upgradeMaxMana(), isTrue);
+        }
+        expect(controller.peakHpUpgradeLevel, 9);
+        expect(controller.peakManaUpgradeLevel, 2);
+
+        // Permadeath defeat -> active stats reset to 50 HP / 100 Mana, claim unlocked
+        await controller.applyPermadeathReset();
+        expect(controller.hpUpgradeLevel, 0);
+        expect(controller.manaUpgradeLevel, 0);
+        expect(controller.playerMaxHp, 50);
+        expect(controller.playerMaxMana, 100);
+        expect(controller.userHp, 50);
+        expect(controller.peakHpUpgradeLevel, 9);
+        expect(controller.peakManaUpgradeLevel, 2);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
+        expect(controller.hasHallOfHeroesBlessings, isTrue);
+
+        // Run 2 (weaker HP, stronger Mana): Reach HP Lv. 3, Mana Lv. 11
+        await controller.storage.setAllOrbs(
+          fire: 500,
+          water: 500,
+          wood: 500,
+          earth: 0,
+          metal: 0,
+        );
+        controller.fireOrbs = 500;
+        controller.waterOrbs = 500;
+        controller.woodOrbs = 500;
+        for (var i = 0; i < 3; i++) {
+          expect(controller.upgradeMaxHp(), isTrue);
+        }
+        for (var i = 0; i < 11; i++) {
+          expect(controller.upgradeMaxMana(), isTrue);
+        }
+        expect(controller.hpUpgradeLevel, 3);
+        expect(controller.manaUpgradeLevel, 11);
+        expect(controller.peakHpUpgradeLevel, 9); // Never downgraded from 9 to 3
+        expect(controller.peakManaUpgradeLevel, 11); // Upgraded from 2 to 11
+
+        // Permadeath defeat preserves independent peaks: HP = 9, Mana = 11
+        await controller.applyPermadeathReset();
+        expect(controller.hpUpgradeLevel, 0);
+        expect(controller.manaUpgradeLevel, 0);
+        expect(controller.peakHpUpgradeLevel, 9);
+        expect(controller.peakManaUpgradeLevel, 11);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
+
+        // Reset All Progress also evaluates max and keeps hallOfHeroesClaimAvailable == true
+        await controller.resetAllProgress();
+        expect(controller.hpUpgradeLevel, 0);
+        expect(controller.manaUpgradeLevel, 0);
+        expect(controller.playerMaxHp, 50);
+        expect(controller.peakHpUpgradeLevel, 9);
+        expect(controller.peakManaUpgradeLevel, 11);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
+      },
+    );
+
+    test(
+      '3. Partial mid-run purchase before claiming Hall of Heroes uses max(current, peak) ceiling, NOT sum (+=)',
+      () async {
+        final adClient = _TestAdMobClient(
+          rewardedAvailable: true,
+          grantRewardOnShow: true,
+        );
+        final controller = await _createController(
+          prefs: {
+            'orbs_fire': 200,
+            'orbs_water': 200,
+            'orbs_wood': 200,
+            'peak_hp_upgrade_level': 10,
+            'peak_mana_upgrade_level': 12,
+            'hall_of_heroes_claim_available': true,
+          },
+          adClient: adClient,
+        );
+        addTearDown(controller.dispose);
+
+        // Buy 2 HP levels (Lv. 2 -> 52 Max HP) and 4 Mana levels (Lv. 4 -> 104 Max Mana)
+        expect(controller.upgradeMaxHp(), isTrue);
+        expect(controller.upgradeMaxHp(), isTrue);
+        for (var i = 0; i < 4; i++) {
+          expect(controller.upgradeMaxMana(), isTrue);
+        }
+        expect(controller.hpUpgradeLevel, 2);
+        expect(controller.manaUpgradeLevel, 4);
+        expect(controller.playerMaxHp, 52);
+        expect(controller.playerMaxMana, 104);
+
+        // Claim Hall of Heroes -> restores to Peak HP Lv. 10 (60 Max HP) & Peak Mana Lv. 12 (112 Max Mana), NOT 12 or 16
+        final restored = await controller.watchAdToRestoreHallOfHeroes();
+        expect(restored, isTrue);
+        expect(controller.hpUpgradeLevel, 10);
+        expect(controller.manaUpgradeLevel, 12);
+        expect(controller.playerMaxHp, 60);
+        expect(controller.playerMaxMana, 112);
+        expect(controller.userHp, 60);
+        expect(controller.remainingMana, 112);
+      },
+    );
+
+    test(
+      '4. Higher current upgrade levels in active run are preserved without downgrading on claim',
+      () async {
+        final controller = await _createController(
+          prefs: {
+            'orbs_fire': 500,
+            'orbs_water': 500,
+            'orbs_wood': 500,
+            'hp_upgrade_level': 14,
+            'mana_upgrade_level': 15,
+            'peak_hp_upgrade_level': 10,
+            'peak_mana_upgrade_level': 12,
+            'hall_of_heroes_claim_available': true,
+            'unlockedAds': true,
+            'removeAdsEnabled': true,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        expect(controller.playerMaxHp, 64);
+        expect(controller.playerMaxMana, 115);
+
+        final restored = controller.restoreHallOfHeroesDirect();
+        expect(restored, isTrue);
+        expect(controller.hpUpgradeLevel, 14); // max(14, 10) == 14
+        expect(controller.manaUpgradeLevel, 15); // max(15, 12) == 15
+        expect(controller.playerMaxHp, 64);
+        expect(controller.playerMaxMana, 115);
+      },
+    );
+
+    test(
+      '5 & 6. Single-claim lock, Remove Ads bypass, StorageService reload, and CloudSaveData round-trip',
       () async {
         final adClient = _TestAdMobClient(
           rewardedAvailable: true,
@@ -536,82 +602,73 @@ void main() {
         final playGamesClient = _TestPlayGamesClient();
         final controller = await _createController(
           prefs: {
-            'orbs_fire': 100,
-            'orbs_water': 100,
-            'orbs_wood': 100,
-            'hp_upgrade_level': 18,
-            'mana_upgrade_level': 12,
+            'peak_hp_upgrade_level': 10,
+            'peak_mana_upgrade_level': 8,
+            'hall_of_heroes_claim_available': true,
           },
           adClient: adClient,
           playGamesClient: playGamesClient,
         );
         addTearDown(controller.dispose);
 
-        expect(controller.playerMaxHp, 78);
-        expect(controller.playerMaxMana, 112);
-        expect(controller.hasHallOfHeroesBlessings, isFalse);
-
-        // Total defeat resets active Cleric to 60 HP / 100 Mana and stores Hall of Heroes blessings
-        await controller.applyPermadeathReset();
-        expect(controller.hpUpgradeLevel, 0);
-        expect(controller.manaUpgradeLevel, 0);
-        expect(controller.playerMaxHp, 60);
-        expect(controller.playerMaxMana, 100);
-        expect(controller.userHp, 60);
-        expect(controller.hallOfHeroesHpBonus, 18);
-        expect(controller.hallOfHeroesManaBonus, 12);
-        expect(controller.hasHallOfHeroesBlessings, isTrue);
-        expect(controller.hasRoyalCastleNotification, isTrue);
-
-        // Cloud Save persists Hall of Heroes vault
-        final cloudAfterDefeat =
-            CloudSaveData.tryParse(playGamesClient.savedPayload)!;
-        expect(cloudAfterDefeat.hallOfHeroesHpBonus, 18);
-        expect(cloudAfterDefeat.hallOfHeroesManaBonus, 12);
-
-        // Early ad dismissal does not restore or clear vault
+        // Early ad dismissal neither restores nor clears flag
         adClient.grantRewardOnShow = false;
-        final failedRestore = await controller.watchAdToRestoreHallOfHeroes();
-        expect(failedRestore, isFalse);
-        expect(controller.hallOfHeroesHpBonus, 18);
+        expect(await controller.watchAdToRestoreHallOfHeroes(), isFalse);
+        expect(controller.hallOfHeroesClaimAvailable, isTrue);
         expect(controller.hpUpgradeLevel, 0);
 
-        // Complete Rewarded Ad restores stats and immediately zeroes vault (no duplication loop)
+        // Rewarded Ad claim succeeds and locks further claims in the same cycle
         adClient.grantRewardOnShow = true;
-        final restored = await controller.watchAdToRestoreHallOfHeroes();
-        expect(restored, isTrue);
-        expect(controller.hpUpgradeLevel, 18);
-        expect(controller.manaUpgradeLevel, 12);
-        expect(controller.playerMaxHp, 78);
-        expect(controller.playerMaxMana, 112);
-        expect(controller.userHp, 78);
-        expect(controller.hallOfHeroesHpBonus, 0);
-        expect(controller.hallOfHeroesManaBonus, 0);
+        expect(await controller.watchAdToRestoreHallOfHeroes(), isTrue);
+        expect(controller.hpUpgradeLevel, 10);
+        expect(controller.manaUpgradeLevel, 8);
+        expect(controller.hallOfHeroesClaimAvailable, isFalse);
         expect(controller.hasHallOfHeroesBlessings, isFalse);
+        expect(controller.hasRoyalCastleNotification, isFalse);
+        expect(controller.peakHpUpgradeLevel, 10);
+        expect(controller.peakManaUpgradeLevel, 8);
 
-        // Subsequent claim or empty defeat cannot duplicate restored stats
-        expect(controller.restoreHallOfHeroesDirect(), isFalse);
+        // Second claim attempt in same run fails
+        expect(await controller.watchAdToRestoreHallOfHeroes(), isFalse);
 
-        // Remove Ads users restore blessings directly without ad
-        await controller.applyPermadeathReset();
-        expect(controller.hallOfHeroesHpBonus, 18);
-        expect(controller.hallOfHeroesManaBonus, 12);
-        expect(controller.restoreHallOfHeroesDirect(), isFalse); // Not Remove Ads yet
+        // Verify Cloud Save round-trip and StorageService persistence across reload
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload)!;
+        expect(cloud.hpUpgradeLevel, 10);
+        expect(cloud.manaUpgradeLevel, 8);
+        expect(cloud.peakHpUpgradeLevel, 10);
+        expect(cloud.peakManaUpgradeLevel, 8);
+        expect(cloud.hallOfHeroesClaimAvailable, isFalse);
 
+        // New defeat re-enables claimAvailable without losing peaks; Remove Ads claims without ad
         controller.unlockedAds = true;
         controller.removeAdsEnabled = true;
+        await controller.storage.setUnlockedAds(true);
+        await controller.storage.setRemoveAdsEnabled(true);
+        await controller.applyPermadeathReset();
+
+        // Reload StorageService & controller from storage
+        final reloadedStorage = StorageService();
+        await reloadedStorage.init();
+        expect(reloadedStorage.peakHpUpgradeLevel, 10);
+        expect(reloadedStorage.peakManaUpgradeLevel, 8);
+        expect(reloadedStorage.hallOfHeroesClaimAvailable, isTrue);
+
         final adCountBefore = adClient.showRewardedCount;
+        controller.unlockedAds = true;
+        controller.removeAdsEnabled = true;
         expect(controller.restoreHallOfHeroesDirect(), isTrue);
         expect(adClient.showRewardedCount, adCountBefore);
-        expect(controller.hpUpgradeLevel, 18);
-        expect(controller.manaUpgradeLevel, 12);
-        expect(controller.hallOfHeroesHpBonus, 0);
-        expect(controller.hallOfHeroesManaBonus, 0);
+        expect(controller.hpUpgradeLevel, 10);
+        expect(controller.manaUpgradeLevel, 8);
+        expect(controller.playerMaxHp, 60);
+        expect(controller.playerMaxMana, 108);
+        expect(controller.hallOfHeroesClaimAvailable, isFalse);
       },
     );
 
     testWidgets(
-      'RoyalCastleDialog renders all 6 compact tabs without scrolling on 390x844, claims Hall of Heroes blessings, and clears WorldMap badge',
+      '7. RoyalCastleDialog compact 6-tab bar displays Heroes peak level & max stat (Lv. 10 • 60 Max HP), claims cleanly, and clears WorldMap badge',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -622,8 +679,9 @@ void main() {
 
         final controller = await _createController(
           prefs: {
-            'hall_of_heroes_hp_bonus': 18,
-            'hall_of_heroes_mana_bonus': 12,
+            'peak_hp_upgrade_level': 10,
+            'peak_mana_upgrade_level': 8,
+            'hall_of_heroes_claim_available': true,
             'unlockedAds': false,
           },
           loadStrings: true,
@@ -669,26 +727,28 @@ void main() {
           find.byKey(const ValueKey('hall_of_heroes_mana_bonus_row')),
           findsOneWidget,
         );
-        expect(find.text('+18 Max HP'), findsOneWidget);
-        expect(find.text('+12 Max MANA'), findsOneWidget);
+        expect(find.text('Lv. 10 • 60 Max HP'), findsOneWidget);
+        expect(find.text('Lv. 8 • 108 Max Mana'), findsOneWidget);
 
-        // Claim via Rewarded Ad button
+        // Tap Watch Ad to Restore
         final restoreAdBtn =
             find.byKey(const ValueKey('hall_of_heroes_restore_ad_button'));
         expect(restoreAdBtn, findsOneWidget);
+        await tester.ensureVisible(restoreAdBtn);
+        await tester.pumpAndSettle();
         await tester.tap(restoreAdBtn);
         await tester.pumpAndSettle();
 
-        expect(controller.hpUpgradeLevel, 18);
-        expect(controller.manaUpgradeLevel, 12);
-        expect(controller.hallOfHeroesHpBonus, 0);
-        expect(controller.hallOfHeroesManaBonus, 0);
+        expect(controller.hpUpgradeLevel, 10);
+        expect(controller.manaUpgradeLevel, 8);
+        expect(controller.playerMaxHp, 60);
+        expect(controller.playerMaxMana, 108);
+        expect(controller.hallOfHeroesClaimAvailable, isFalse);
         expect(
           find.byKey(const ValueKey('hall_of_heroes_empty_state')),
           findsOneWidget,
         );
 
-        // Close Castle -> World Map notification badge is cleared
         await tester.tap(find.byKey(const ValueKey('royal_castle_close_button')));
         await tester.pumpAndSettle();
         expect(
@@ -699,7 +759,7 @@ void main() {
     );
 
     test(
-      'All new Cleric progression & Hall of Heroes localization keys exist cleanly across en, pt, es, and de',
+      'All Cleric progression & Hall of Heroes localization keys exist cleanly across en, pt, es, and de',
       () async {
         final rawJson =
             await rootBundle.loadString('assets/data/stringsHowPredict.json');
@@ -717,6 +777,7 @@ void main() {
           'castle_heroes_empty',
           'castle_heroes_hp_blessing',
           'castle_heroes_mana_blessing',
+          'mana_title_word',
           'castle_heroes_restore_direct',
           'castle_heroes_restore_ad',
           'castle_heroes_ad_disclosure',
@@ -727,11 +788,7 @@ void main() {
           for (final key in requiredKeys) {
             final flatKey = '${lang}_$key';
             final value = map[flatKey];
-            expect(
-              value,
-              isA<String>(),
-              reason: 'Missing $flatKey',
-            );
+            expect(value, isA<String>(), reason: 'Missing $flatKey');
             expect(
               (value as String).trim(),
               isNotEmpty,

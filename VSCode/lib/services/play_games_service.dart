@@ -262,8 +262,9 @@ class CloudSaveData {
   final List<String> relicChamberUpgrades;
   final int hpUpgradeLevel;
   final int manaUpgradeLevel;
-  final int hallOfHeroesHpBonus;
-  final int hallOfHeroesManaBonus;
+  final int peakHpUpgradeLevel;
+  final int peakManaUpgradeLevel;
+  final bool hallOfHeroesClaimAvailable;
   final List<String> unlockedEndings;
   final List<String> encounteredBestiary;
   final List<String>? activeDecreeIds;
@@ -287,7 +288,7 @@ class CloudSaveData {
     this.userScore = 0,
     this.pcScore = 0,
     this.total = 0,
-    this.userHp = 60,
+    this.userHp = 50,
     this.pcHp = 100,
     this.currentWeek = 1,
     this.unlockedReset = false,
@@ -351,8 +352,9 @@ class CloudSaveData {
     this.relicChamberUpgrades = const [],
     this.hpUpgradeLevel = 0,
     this.manaUpgradeLevel = 0,
-    this.hallOfHeroesHpBonus = 0,
-    this.hallOfHeroesManaBonus = 0,
+    this.peakHpUpgradeLevel = 0,
+    this.peakManaUpgradeLevel = 0,
+    this.hallOfHeroesClaimAvailable = false,
     this.unlockedEndings = const [],
     this.encounteredBestiary = const [],
     this.activeDecreeIds,
@@ -466,8 +468,9 @@ class CloudSaveData {
             relicChamberUpgrades.length > local.relicChamberUpgrades.length ||
             hpUpgradeLevel > local.hpUpgradeLevel ||
             manaUpgradeLevel > local.manaUpgradeLevel ||
-            hallOfHeroesHpBonus > local.hallOfHeroesHpBonus ||
-            hallOfHeroesManaBonus > local.hallOfHeroesManaBonus ||
+            peakHpUpgradeLevel > local.peakHpUpgradeLevel ||
+            peakManaUpgradeLevel > local.peakManaUpgradeLevel ||
+            (hallOfHeroesClaimAvailable && !local.hallOfHeroesClaimAvailable) ||
             unlockedEndings.length > local.unlockedEndings.length ||
             encounteredBestiary.length > local.encounteredBestiary.length ||
             totalDecreesCompleted > local.totalDecreesCompleted)) {
@@ -571,8 +574,13 @@ class CloudSaveData {
       relicChamberUpgrades: relicChamberUpgrades,
       hpUpgradeLevel: hpUpgradeLevel,
       manaUpgradeLevel: manaUpgradeLevel,
-      hallOfHeroesHpBonus: hallOfHeroesHpBonus,
-      hallOfHeroesManaBonus: hallOfHeroesManaBonus,
+      peakHpUpgradeLevel: peakHpUpgradeLevel > local.peakHpUpgradeLevel
+          ? peakHpUpgradeLevel
+          : local.peakHpUpgradeLevel,
+      peakManaUpgradeLevel: peakManaUpgradeLevel > local.peakManaUpgradeLevel
+          ? peakManaUpgradeLevel
+          : local.peakManaUpgradeLevel,
+      hallOfHeroesClaimAvailable: hallOfHeroesClaimAvailable,
       unlockedEndings: (
         {...unlockedEndings, ...local.unlockedEndings}.toList()..sort()
       ),
@@ -674,8 +682,9 @@ class CloudSaveData {
       relicChamberUpgrades: storage.relicChamberUpgrades,
       hpUpgradeLevel: storage.hpUpgradeLevel,
       manaUpgradeLevel: storage.manaUpgradeLevel,
-      hallOfHeroesHpBonus: storage.hallOfHeroesHpBonus,
-      hallOfHeroesManaBonus: storage.hallOfHeroesManaBonus,
+      peakHpUpgradeLevel: storage.peakHpUpgradeLevel,
+      peakManaUpgradeLevel: storage.peakManaUpgradeLevel,
+      hallOfHeroesClaimAvailable: storage.hallOfHeroesClaimAvailable,
       unlockedEndings: storage.unlockedEndings,
       encounteredBestiary: storage.encounteredBestiary,
       activeDecreeIds: storage.activeDecreeIds,
@@ -732,8 +741,9 @@ class CloudSaveData {
     await storage.setRelicChamberUpgrades(relicChamberUpgrades);
     await storage.setHpUpgradeLevel(hpUpgradeLevel);
     await storage.setManaUpgradeLevel(manaUpgradeLevel);
-    await storage.setHallOfHeroesHpBonus(hallOfHeroesHpBonus);
-    await storage.setHallOfHeroesManaBonus(hallOfHeroesManaBonus);
+    await storage.setPeakHpUpgradeLevel(peakHpUpgradeLevel);
+    await storage.setPeakManaUpgradeLevel(peakManaUpgradeLevel);
+    await storage.setHallOfHeroesClaimAvailable(hallOfHeroesClaimAvailable);
     await storage.setUnlockedEndings(unlockedEndings);
     await storage.setEncounteredBestiary(encounteredBestiary);
     if (activeDecreeIds != null && activeDecreeIds!.isNotEmpty) {
@@ -856,8 +866,9 @@ class CloudSaveData {
       'relicChamberUpgrades': relicChamberUpgrades,
       'hpUpgradeLevel': hpUpgradeLevel,
       'manaUpgradeLevel': manaUpgradeLevel,
-      'hallOfHeroesHpBonus': hallOfHeroesHpBonus,
-      'hallOfHeroesManaBonus': hallOfHeroesManaBonus,
+      'peakHpUpgradeLevel': peakHpUpgradeLevel,
+      'peakManaUpgradeLevel': peakManaUpgradeLevel,
+      'hallOfHeroesClaimAvailable': hallOfHeroesClaimAvailable,
       'unlockedEndings': unlockedEndings,
       'encounteredBestiary': encounteredBestiary,
       if (activeDecreeIds != null) 'activeDecreeIds': activeDecreeIds,
@@ -1015,9 +1026,15 @@ class CloudSaveData {
       relicChamberUpgrades: _parseStringList(map['relicChamberUpgrades']),
       hpUpgradeLevel: (map['hpUpgradeLevel'] as num?)?.toInt() ?? 0,
       manaUpgradeLevel: (map['manaUpgradeLevel'] as num?)?.toInt() ?? 0,
-      hallOfHeroesHpBonus: (map['hallOfHeroesHpBonus'] as num?)?.toInt() ?? 0,
-      hallOfHeroesManaBonus:
-          (map['hallOfHeroesManaBonus'] as num?)?.toInt() ?? 0,
+      peakHpUpgradeLevel: (map['peakHpUpgradeLevel'] as num?)?.toInt() ??
+          (map['hallOfHeroesHpBonus'] as num?)?.toInt() ??
+          0,
+      peakManaUpgradeLevel: (map['peakManaUpgradeLevel'] as num?)?.toInt() ??
+          (map['hallOfHeroesManaBonus'] as num?)?.toInt() ??
+          0,
+      hallOfHeroesClaimAvailable: map['hallOfHeroesClaimAvailable'] as bool? ??
+          (((map['hallOfHeroesHpBonus'] as num?)?.toInt() ?? 0) > 0 ||
+              ((map['hallOfHeroesManaBonus'] as num?)?.toInt() ?? 0) > 0),
       unlockedEndings: _parseStringList(map['unlockedEndings']),
       encounteredBestiary: _parseStringList(map['encounteredBestiary']),
       activeDecreeIds: map['activeDecreeIds'] is List
@@ -1030,7 +1047,7 @@ class CloudSaveData {
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
       total: (map['total'] as num?)?.toInt() ?? 0,
-      userHp: (map['userHp'] as num?)?.toInt() ?? 60,
+      userHp: (map['userHp'] as num?)?.toInt() ?? 50,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
       currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 0
           ? 0

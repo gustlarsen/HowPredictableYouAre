@@ -105,7 +105,7 @@ void main() {
   testWidgets('100-round alert dialog offers Return to Map option, advances week, and resets battle', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'userScore': 50,
-      'pcScore': 50,
+      'pcScore': 20,
       'total': 100,
       'animationsEnabled': false,
     });
@@ -3397,7 +3397,7 @@ void main() {
       expect(controller.remainingMana, 100);
       expect(controller.totalRounds, 0);
       expect(controller.woodOrbs, 0);
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 100);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),
@@ -3443,7 +3443,7 @@ void main() {
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
       final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
 
-      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, Player HP stays 60, Gauge = 0.0%
+      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, Player HP stays 50, Gauge = 0.0%
       controller.crystalBallMove = HandMove.rock;
       await tester.tap(rockBtnFinder);
       await tester.pump();
@@ -3452,7 +3452,7 @@ void main() {
       expect(controller.lastWinner, RoundWinner.draw);
       expect(controller.remainingMana, 99);
       expect(controller.totalRounds, 1);
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 100);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('99')),
@@ -3483,7 +3483,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1100));
       expect(controller.remainingMana, 98);
       expect(controller.totalRounds, 2);
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 99);
       expect(
         find.descendant(of: find.byType(ScoreHeader), matching: find.text('100.0%')),
@@ -3498,7 +3498,7 @@ void main() {
 
       expect(controller.remainingMana, 97);
       expect(controller.totalRounds, 3);
-      expect(controller.userHp, 60);
+      expect(controller.userHp, 50);
       expect(controller.computerHp, 99);
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('97')),

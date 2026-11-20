@@ -1706,8 +1706,10 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     AppPalette palette,
     LocalizationService loc,
   ) {
-    final hpBonus = controller.hallOfHeroesHpBonus;
-    final manaBonus = controller.hallOfHeroesManaBonus;
+    final peakHp = controller.peakHpUpgradeLevel;
+    final peakMana = controller.peakManaUpgradeLevel;
+    final targetHp = controller.hallOfHeroesTargetMaxHp;
+    final targetMana = controller.hallOfHeroesTargetMaxMana;
     final hasBlessings = controller.hasHallOfHeroesBlessings;
     final isRemoveAds = controller.isRemoveAdsActive;
     final canRestoreAd = hasBlessings && controller.adService.isRewardedAdReady;
@@ -1737,7 +1739,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   loc.t(
                     'castle_heroes_desc',
                     fallback:
-                        'Stat blessings forged by a fallen Cleric (+Max HP & +Max Mana) are enshrined here. Restore them once into your current campaign.',
+                        'Restores your Cleric\'s Max HP and Max Mana back up to the highest levels achieved in past journeys (once per campaign cycle).',
                   ),
                   style: TextStyle(
                     fontSize: 12,
@@ -1795,7 +1797,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             ),
             child: Column(
               children: [
-                if (hpBonus > 0)
+                if (peakHp > 0)
                   Row(
                     key: const ValueKey('hall_of_heroes_hp_bonus_row'),
                     children: [
@@ -1804,32 +1806,39 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         size: 18,
                         color: palette.dangerText,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           loc.t(
                             'castle_heroes_hp_blessing',
-                            fallback: 'Fallen Hero Max HP Blessing',
+                            fallback: 'Peak Max HP Record',
                           ),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: 12.5,
                             color: palette.primaryText,
                           ),
                         ),
                       ),
-                      Text(
-                        '+$hpBonus Max HP',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: palette.dangerText,
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Lv. $peakHp • $targetHp Max HP',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: palette.dangerText,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                if (hpBonus > 0 && manaBonus > 0) const SizedBox(height: 10),
-                if (manaBonus > 0)
+                if (peakHp > 0 && peakMana > 0) const SizedBox(height: 10),
+                if (peakMana > 0)
                   Row(
                     key: const ValueKey('hall_of_heroes_mana_bonus_row'),
                     children: [
@@ -1838,26 +1847,33 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         size: 18,
                         color: Color(0xFF00B0FF),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           loc.t(
                             'castle_heroes_mana_blessing',
-                            fallback: 'Fallen Hero Max Mana Blessing',
+                            fallback: 'Peak Max Mana Record',
                           ),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: 12.5,
                             color: palette.primaryText,
                           ),
                         ),
                       ),
-                      Text(
-                        '+$manaBonus Max ${loc.t('mana_label', fallback: 'Mana')}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: Color(0xFF00B0FF),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Lv. $peakMana • $targetMana Max ${loc.t('mana_title_word', fallback: 'Mana')}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF00B0FF),
+                            ),
+                          ),
                         ),
                       ),
                     ],

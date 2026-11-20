@@ -149,7 +149,7 @@ void main() {
         controller.playTurn(HandMove.paper);
         controller.crystalBallMove = HandMove.scissors;
         controller.playTurn(HandMove.rock);
-        // Also lose 1 round so userHp drops to 59
+        // Also lose 1 round so userHp drops to 49
         controller.crystalBallMove = HandMove.paper;
         controller.playTurn(HandMove.rock);
 
@@ -159,7 +159,7 @@ void main() {
         expect(controller.pcScore, 1);
         expect(controller.totalRounds, 4);
         expect(controller.remainingMana, 96);
-        expect(controller.userHp, 59);
+        expect(controller.userHp, 49);
         expect(controller.computerHp, 97);
 
         // 2. Claim periodic Gift Box (+5 Fire/Water/Wood in Phase 1) -> reversible
@@ -215,7 +215,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
 
         // Battle stats, HP, Mana, Markov matrix, and hands restored to Turn 0
-        expect(reopenedController.userHp, 60);
+        expect(reopenedController.userHp, 50);
         expect(reopenedController.computerHp, 100);
         expect(reopenedController.remainingMana, 100);
         expect(reopenedController.totalRounds, 0);
@@ -252,7 +252,7 @@ void main() {
         expect(saved.fireOrbs, 60);
         expect(saved.turn0FireOrbs, 60);
         expect(saved.total, 0);
-        expect(saved.userHp, 60);
+        expect(saved.userHp, 50);
         expect(saved.pcHp, 100);
         expect(saved.currentWeek, 4);
       },
@@ -381,7 +381,7 @@ void main() {
         expect(find.byKey(const ValueKey('reset_confirm_dialog')), findsOneWidget);
         expect(find.text('Rewind to Turn 0?'), findsOneWidget);
         expect(
-          find.textContaining('Mana to 100, HP to 60, scores to 0'),
+          find.textContaining('Mana to 100, HP to 50, scores to 0'),
           findsOneWidget,
         );
         expect(find.byKey(const ValueKey('reset_orbs_lost_card')), findsOneWidget);
@@ -412,9 +412,9 @@ void main() {
         expect(controller.earthOrbs, 60);
         expect(controller.metalOrbs, 60);
 
-        // Mana 100, HP 60, scores 0, Markov cleared
+        // Mana 100, HP 50, scores 0, Markov cleared
         expect(controller.remainingMana, 100);
-        expect(controller.userHp, 60);
+        expect(controller.userHp, 50);
         expect(controller.computerHp, 100);
         expect(controller.userScore, 0);
         expect(controller.pcScore, 0);
@@ -469,7 +469,7 @@ void main() {
         controller.playTurn(HandMove.rock);
         await tester.pump();
 
-        expect(controller.userHp, 59);
+        expect(controller.userHp, 49);
         expect(controller.remainingMana, 99);
         expect(controller.fireOrbs, 50);
 
@@ -493,7 +493,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('reset_confirm_button')));
         await tester.pumpAndSettle();
 
-        expect(controller.userHp, 60);
+        expect(controller.userHp, 50);
         expect(controller.remainingMana, 100);
         expect(controller.fireOrbs, 50);
         expect(controller.waterOrbs, 50);
