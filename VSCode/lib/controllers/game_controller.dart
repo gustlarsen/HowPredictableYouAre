@@ -133,6 +133,24 @@ class GameController extends ChangeNotifier {
     earth: 5000,
     metal: 5000,
   );
+  static const ElementalCost costMarkovRecalibrator = ElementalCost(
+    fire: 1200,
+    water: 1200,
+    wood: 1200,
+    earth: 1200,
+    metal: 1200,
+  );
+
+  static int maxHpForEnemyPhase(int phase) {
+    switch (phase) {
+      case 2:
+        return 200;
+      case 3:
+        return 400;
+      default:
+        return pcMaxHp;
+    }
+  }
 
   final StorageService storage;
   final LocalizationService localization;
@@ -253,6 +271,9 @@ class GameController extends ChangeNotifier {
   int turnCount = 0;
   int userHp = baseMaxHp;
   int computerHp = pcMaxHp;
+  int enemyPhase = 1;
+  int enemyMaxHp = pcMaxHp;
+  int get enemyHp => computerHp;
   int currentWeek = 1;
 
   bool darkMode = true;
@@ -277,6 +298,7 @@ class GameController extends ChangeNotifier {
   bool unlockedNewSkin = false;
   bool unlockedCrystalBall = false;
   bool unlockedCrystalBallPlus = false;
+  bool unlockedMarkovRecalibrator = false;
   bool giftBoxUnlocked = false;
 
   // Active toggles
@@ -300,10 +322,23 @@ class GameController extends ChangeNotifier {
   bool showCrystalBall = false;
   bool showCrystalBallPlus = false;
   bool crystalBallPlusSavedState = false;
+  bool showMarkovRecalibrator = false;
   bool giftBoxEnabled = false;
+
+  bool get markovRecalibratorUnlocked => unlockedMarkovRecalibrator;
+  bool get markovRecalibratorEnabled => showMarkovRecalibrator;
+  bool get isMarkovRecalibratorActive =>
+      unlockedMarkovRecalibrator && showMarkovRecalibrator;
+  bool get isMarkovRecalibratorVisibleInShop =>
+      unlockedMarkovRecalibrator ||
+      enemyPhase == 2 ||
+      encounteredBestiary.contains(BestiaryCreature.archmageRobot.id);
 
   bool is100RoundsAlertPending = false;
   bool isDeathAlertPending = false;
+  bool isBossVictoryPending = false;
+  int? pendingBossVictoryPhase;
+  int? pendingBossVictoryWeek;
   bool isGiftAvailable = true;
   Timer? _giftTimer;
   DateTime? _giftCooldownUntil;
@@ -611,7 +646,37 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  bool get isPhase2 => currentWeek >= phase2StartWeek;
+  bool get isWeekPhase2 => currentWeek >= phase2StartWeek;
+
+  bool get isPhase2 => isWeekPhase2 || enemyPhase >= 2;
+
+  bool get enemyUses5Elements => enemyPhase >= 2 || isWeekPhase2;
+
+  bool get isArchmageBoss => enemyPhase == 2;
+
+  bool get isBabyMageBoss => enemyPhase == 3;
+
+  String enemyNameForPhase(int phase) {
+    switch (phase) {
+      case 2:
+        return localization.t(
+          'boss_name_archmage',
+          fallback: 'Robot Archmage',
+        );
+      case 3:
+        return localization.t(
+          'boss_name_baby_mage',
+          fallback: 'Baby Mage Robot',
+        );
+      default:
+        return localization.t(
+          'boss_name_guardian',
+          fallback: 'Guardian Robot',
+        );
+    }
+  }
+
+  String get currentEnemyName => enemyNameForPhase(enemyPhase);
 
   bool get isEarthAndMetalActive => unlockedNewHands && showNewHands;
 
@@ -676,7 +741,7 @@ class GameController extends ChangeNotifier {
           fallback: '🎁 +5 Fire, Water & Wood Orbs Claimed!',
         );
 
-  int get playerWinDamageToBoss => isPhase2
+  int get playerWinDamageToBoss => (enemyPhase >= 2 || isWeekPhase2)
       ? (showNewHands ? phase2BonusBossDamage : phase2BaseBossDamage)
       : damagePerLoss;
 
@@ -724,7 +789,11 @@ class GameController extends ChangeNotifier {
     unlockedNewSkin = storage.unlockedNewSkin;
     unlockedCrystalBall = storage.unlockedCrystalBall;
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
+    unlockedMarkovRecalibrator = storage.unlockedMarkovRecalibrator;
     giftBoxUnlocked = storage.giftBoxUnlocked;
+
+    enemyPhase = storage.enemyPhase.clamp(1, 3);
+    enemyMaxHp = storage.enemyMaxHpRaw ?? maxHpForEnemyPhase(enemyPhase);
 
     showReset = storage.showReset;
     showPredictability =
@@ -740,16 +809,28 @@ class GameController extends ChangeNotifier {
     crystalBallPlusSavedState = storage.crystalBallPlusSavedState;
     showCrystalBallPlus =
         showCrystalBall ? storage.showCrystalBallPlus : false;
+    showMarkovRecalibrator =
+        unlockedMarkovRecalibrator ? storage.showMarkovRecalibrator : false;
     giftBoxEnabled = giftBoxUnlocked ? storage.giftBoxEnabled : false;
 
     if (storage.pcHpRaw != null) {
-      computerHp = storage.pcHp.clamp(0, pcMaxHp);
+      computerHp = storage.pcHp.clamp(0, enemyMaxHp);
     } else {
-      computerHp = math.max(0, pcMaxHp - userScore * playerWinDamageToBoss);
+      computerHp =
+          math.max(0, enemyMaxHp - userScore * playerWinDamageToBoss);
     }
     isDeathAlertPending = userHp <= 0;
-    is100RoundsAlertPending =
-        !isDeathAlertPending && totalRounds >= playerMaxMana;
+    isBossVictoryPending = !isDeathAlertPending && computerHp <= 0;
+    if (isBossVictoryPending) {
+      pendingBossVictoryPhase = enemyPhase;
+      pendingBossVictoryWeek = currentWeek;
+    } else {
+      pendingBossVictoryPhase = null;
+      pendingBossVictoryWeek = null;
+    }
+    is100RoundsAlertPending = !isDeathAlertPending &&
+        !isBossVictoryPending &&
+        totalRounds >= playerMaxMana;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
     }
@@ -789,13 +870,14 @@ class GameController extends ChangeNotifier {
 
     _engine = MarkovEngine(
       enableExtendedHands: showNewHands,
-      enableEnemyExtendedHands: isPhase2,
+      enableEnemyExtendedHands: enemyUses5Elements,
       enableElementalMode: isElementalMode,
     );
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
     if (savedMatrix != null) {
       _engine.setMatrix(savedMatrix);
     }
+    _engine.setLastTransitions(storage.shortTermTransitions);
 
     currentUserMove = storage.lastUserMove;
     currentComputerMove = storage.lastComputerMove;
@@ -804,7 +886,7 @@ class GameController extends ChangeNotifier {
           currentUserMove == HandMove.spock) {
         currentUserMove = null;
       }
-      if (!isPhase2 &&
+      if (!enemyUses5Elements &&
           (currentComputerMove == HandMove.lizard ||
               currentComputerMove == HandMove.spock)) {
         currentComputerMove = null;
@@ -982,6 +1064,8 @@ class GameController extends ChangeNotifier {
         return unlockedCrystalBall;
       case ShopUpgradeArtifact.crystalBallPlus:
         return unlockedCrystalBallPlus;
+      case ShopUpgradeArtifact.markovRecalibrator:
+        return unlockedMarkovRecalibrator;
     }
   }
 
@@ -1010,6 +1094,7 @@ class GameController extends ChangeNotifier {
       case ShopUpgradeArtifact.giftBox:
       case ShopUpgradeArtifact.newSkin:
       case ShopUpgradeArtifact.crystalBallPlus:
+      case ShopUpgradeArtifact.markovRecalibrator:
         return null;
     }
   }
@@ -1473,6 +1558,10 @@ class GameController extends ChangeNotifier {
         storage.setUnlockedCrystalBall(true);
         storage.setUnlockedCrystalBallPlus(true);
         break;
+      case ShopUpgradeArtifact.markovRecalibrator:
+        unlockedMarkovRecalibrator = true;
+        storage.setUnlockedMarkovRecalibrator(true);
+        break;
     }
   }
 
@@ -1632,6 +1721,15 @@ class GameController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    if (computerHp <= 0 || isBossVictoryPending) {
+      isBossVictoryPending = true;
+      is100RoundsAlertPending = false;
+      pendingBossVictoryPhase ??= enemyPhase;
+      pendingBossVictoryWeek ??= currentWeek;
+      audio.playVibrate();
+      notifyListeners();
+      return;
+    }
     if (totalRounds >= playerMaxMana) {
       is100RoundsAlertPending = true;
       audio.playVibrate();
@@ -1639,25 +1737,21 @@ class GameController extends ChangeNotifier {
       return;
     }
     turnCount++;
-    _engine.enableEnemyExtendedHands = isPhase2;
+    _engine.enableEnemyExtendedHands = enemyUses5Elements;
     final previousMove = lastUserMove;
-    final hadPrediction = _engine.hasPrediction(previousMove);
     currentUserMove = userChoice;
 
-    if (!hadPrediction) {
-      _markBestiaryEncountered(BestiaryCreature.babyRobot);
-    } else {
+    if (enemyPhase == 1) {
       _markBestiaryEncountered(BestiaryCreature.guardianRobot);
-    }
-    if (isPhase2) {
+    } else if (enemyPhase == 2) {
       _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    } else if (enemyPhase == 3) {
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
     }
 
     // AI uses the move already pre-computed before the user chose their hand
-    currentComputerMove = crystalBallMove ??
-        (!hadPrediction
-            ? _engine.getRandomEnemyMove()
-            : _engine.computeSmartChoice(previousMove));
+    currentComputerMove =
+        crystalBallMove ?? _chooseComputerMoveForCurrentPhase(previousMove);
 
     // Determine round outcome via HandMove.resolvesAgainst (supports 3-vs-5 Wu Xing)
     final roundOutcome = currentUserMove!.resolvesAgainst(
@@ -1682,7 +1776,7 @@ class GameController extends ChangeNotifier {
       _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
       orbCollectionEventId += 1;
-      computerHp = (computerHp - playerWinDamageToBoss).clamp(0, pcMaxHp);
+      computerHp = (computerHp - playerWinDamageToBoss).clamp(0, enemyMaxHp);
       storage.setUserScore(userScore);
       storage.setPcHp(computerHp);
 
@@ -1717,9 +1811,10 @@ class GameController extends ChangeNotifier {
     totalRounds += 1;
     storage.setTotal(totalRounds);
 
-    // Record transition into Markov matrix
+    // Record transition into cumulative Markov matrix and 1-step short-term map
     _engine.recordTransition(lastUserMove, currentUserMove!);
     storage.setMarkovMatrix(_engine.matrix);
+    storage.setShortTermTransitions(_engine.serializedLastTransitions);
     lastUserMove = currentUserMove;
     storage.setLastUserMove(currentUserMove);
     storage.setLastComputerMove(currentComputerMove);
@@ -1729,6 +1824,15 @@ class GameController extends ChangeNotifier {
     if (userHp <= 0) {
       isDeathAlertPending = true;
       is100RoundsAlertPending = false;
+      isBossVictoryPending = false;
+    } else if (computerHp <= 0) {
+      isBossVictoryPending = true;
+      is100RoundsAlertPending = false;
+      pendingBossVictoryPhase = enemyPhase;
+      pendingBossVictoryWeek = currentWeek;
+      _applyImmediateBossDefeatMetadata(enemyPhase, currentWeek);
+      audio.playWinVibrate();
+      audio.playStoryChime();
     } else if (totalRounds >= playerMaxMana) {
       is100RoundsAlertPending = true;
       if (percentPredict == 100) {
@@ -1740,12 +1844,95 @@ class GameController extends ChangeNotifier {
       }
     }
 
-    if (lastWinner == RoundWinner.user || totalRounds >= playerMaxMana) {
+    if (lastWinner == RoundWinner.user ||
+        computerHp <= 0 ||
+        totalRounds >= playerMaxMana) {
       _triggerCloudSave();
     }
 
     _computeNextHints();
     notifyListeners();
+  }
+
+  HandMove _chooseComputerMoveForCurrentPhase(HandMove? previousMove) {
+    if (enemyPhase == 3) {
+      // Phase 3 Baby Mage Robot: pure uniform random (1/5 per element).
+      return _engine.getRandomEnemyMove();
+    }
+    if (enemyPhase == 2) {
+      // Phase 2 Robot Archmage: 1-step short-term memory counter if available.
+      if (_engine.hasShortTermPrediction(previousMove)) {
+        return _engine.computeShortTermSmartChoice(previousMove);
+      }
+      return _engine.getRandomEnemyMove();
+    }
+    // Phase 1 Guardian Robot: standard cumulative Markov prediction.
+    if (_engine.hasPrediction(previousMove)) {
+      return _engine.computeSmartChoice(previousMove);
+    }
+    return _engine.getRandomEnemyMove();
+  }
+
+  void _applyImmediateBossDefeatMetadata(int defeatedPhase, int week) {
+    if (defeatedPhase == 1) {
+      if (week == 1) {
+        _markEndingUnlocked(NarrativeEnding.secretWeek1);
+      } else if (week >= phase2StartWeek) {
+        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+      } else {
+        _markBestiaryEncountered(BestiaryCreature.babyRobot);
+      }
+    } else if (defeatedPhase == 2) {
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
+    } else if (defeatedPhase == 3) {
+      _markEndingUnlocked(NarrativeEnding.standardVictory);
+    }
+  }
+
+  /// Advances the campaign state after the user confirms the Boss Defeated modal
+  /// (and any ending cutscene). Returns `true` if the campaign cycle concluded
+  /// (Secret Week-1 Ending or Phase-3 Standard Victory Ending) so the caller can
+  /// return to the World Map.
+  bool advanceAfterBossVictory() {
+    final defeatedPhase = pendingBossVictoryPhase ?? enemyPhase;
+    final week = pendingBossVictoryWeek ?? currentWeek;
+    isBossVictoryPending = false;
+    pendingBossVictoryPhase = null;
+    pendingBossVictoryWeek = null;
+
+    final bool concludesCycle =
+        (defeatedPhase == 1 && week == 1) || defeatedPhase == 3;
+    if (concludesCycle) {
+      enemyPhase = 1;
+      enemyMaxHp = pcMaxHp;
+      currentWeek = 1;
+      storage.setEnemyPhase(1);
+      storage.setEnemyMaxHp(pcMaxHp);
+      storage.setCurrentWeek(1);
+      _refreshCompletedDecreesAndResetBattleTrackers();
+      _resetBattleState();
+      recordTurn0OrbSnapshot();
+      _triggerCloudSave();
+      notifyListeners();
+      return true;
+    }
+
+    if (defeatedPhase == 1 && week >= phase2StartWeek) {
+      enemyPhase = 2;
+      _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    } else {
+      enemyPhase = 3;
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
+    }
+    enemyMaxHp = maxHpForEnemyPhase(enemyPhase);
+    storage.setEnemyPhase(enemyPhase);
+    storage.setEnemyMaxHp(enemyMaxHp);
+    _refreshCompletedDecreesAndResetBattleTrackers();
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
+    _triggerCloudSave();
+    notifyListeners();
+    return false;
   }
 
   void playRandom() {
@@ -1754,21 +1941,44 @@ class GameController extends ChangeNotifier {
   }
 
   void _computeNextHints() {
-    _engine.enableEnemyExtendedHands = isPhase2;
+    _engine.enableEnemyExtendedHands = enemyUses5Elements;
+    crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
+    crystalBallPlusMove = _engine.computeSuggestion(crystalBallMove!);
+
+    if (enemyPhase == 3) {
+      // Pure uniform random 1/5 AI: Markov prediction hints are meaningless.
+      predictedUserMoves = const [];
+      pcNextMoves = const [];
+      suggestedMoves = const [];
+      predictedUserMove = null;
+      pcNextMove = null;
+      suggestedMove = null;
+      return;
+    }
+
+    if (enemyPhase == 2 && isMarkovRecalibratorActive) {
+      predictedUserMoves =
+          _engine.predictShortTermNextUserMoves(lastUserMove);
+      pcNextMoves = _engine.computeShortTermSmartChoices(lastUserMove);
+      suggestedMoves = _engine.computeSuggestions(pcNextMoves);
+      predictedUserMove =
+          predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+      pcNextMove = crystalBallMove;
+      suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
+      return;
+    }
+
+    // Standard cumulative frequency hints (used for Phase 1 AND as the
+    // deceptive un-recalibrated view during Phase 2 Robot Archmage).
     predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
     pcNextMoves = _engine.computeSmartChoices(lastUserMove);
     suggestedMoves = _engine.computeSuggestions(pcNextMoves);
 
-    // Pre-decide the exact PC move (Markov counter or random fallback) before the user chooses a hand
-    if (!_engine.hasPrediction(lastUserMove)) {
-      crystalBallMove = _engine.getRandomEnemyMove();
-    } else {
-      crystalBallMove = _engine.computeSmartChoice(lastUserMove);
-    }
-    crystalBallPlusMove = _engine.computeSuggestion(crystalBallMove!);
-
-    predictedUserMove = predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-    pcNextMove = crystalBallMove;
+    predictedUserMove =
+        predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+    pcNextMove = (enemyPhase == 2)
+        ? (pcNextMoves.isNotEmpty ? pcNextMoves.first : null)
+        : crystalBallMove;
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
@@ -1783,15 +1993,21 @@ class GameController extends ChangeNotifier {
     lastWinner = null;
     lastCollectedOrbMove = null;
     userHp = playerMaxHp;
-    computerHp = pcMaxHp;
+    enemyMaxHp = maxHpForEnemyPhase(enemyPhase);
+    computerHp = enemyMaxHp;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
-    _engine.enableEnemyExtendedHands = isPhase2;
+    isBossVictoryPending = false;
+    pendingBossVictoryPhase = null;
+    pendingBossVictoryWeek = null;
+    _engine.enableEnemyExtendedHands = enemyUses5Elements;
     _engine.reset();
 
-    storage.clearGameStats(userMaxHp: playerMaxHp, pcMaxHp: pcMaxHp);
+    storage.clearGameStats(userMaxHp: playerMaxHp, pcMaxHp: enemyMaxHp);
+    storage.setEnemyPhase(enemyPhase);
+    storage.setEnemyMaxHp(enemyMaxHp);
     storage.setUserHp(playerMaxHp);
-    storage.setPcHp(pcMaxHp);
+    storage.setPcHp(enemyMaxHp);
     _computeNextHints();
   }
 
@@ -1979,6 +2195,9 @@ class GameController extends ChangeNotifier {
     lastCollectedOrbMove = null;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
+    isBossVictoryPending = false;
+    pendingBossVictoryPhase = null;
+    pendingBossVictoryWeek = null;
 
     _loadState(restartAudio: false);
 
@@ -2074,6 +2293,9 @@ class GameController extends ChangeNotifier {
     lastCollectedOrbMove = null;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
+    isBossVictoryPending = false;
+    pendingBossVictoryPhase = null;
+    pendingBossVictoryWeek = null;
 
     _loadState(restartAudio: false);
 
@@ -2498,6 +2720,23 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  bool unlockMarkovRecalibrator() {
+    if (!isMarkovRecalibratorVisibleInShop) {
+      audio.playVibrate();
+      return false;
+    }
+    return purchaseWithOrbs(
+      cost: costMarkovRecalibrator,
+      onUnlock: () {
+        unlockedMarkovRecalibrator = true;
+        showMarkovRecalibrator = true;
+        storage.setUnlockedMarkovRecalibrator(true);
+        storage.setShowMarkovRecalibrator(true);
+        _computeNextHints();
+      },
+    );
+  }
+
   /// Immediately unlocks the shop item mapped to [productId] upon a verified
   /// Google Play purchase ([PurchaseStatus.purchased]) or restore
   /// ([PurchaseStatus.restored]), persisting to [SharedPreferences] and
@@ -2867,12 +3106,23 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleMarkovRecalibrator(bool val) {
+    if (!unlockedMarkovRecalibrator) {
+      return;
+    }
+    showMarkovRecalibrator = val;
+    storage.setShowMarkovRecalibrator(val);
+    _computeNextHints();
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
   void toggleShowNewHands(bool val) {
     showNewHands = val;
     storage.setShowNewHands(val);
     _engine = MarkovEngine(
       enableExtendedHands: val,
-      enableEnemyExtendedHands: isPhase2,
+      enableEnemyExtendedHands: enemyUses5Elements,
       enableElementalMode: isElementalMode,
     );
     _resetBattleState();

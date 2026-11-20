@@ -80,6 +80,12 @@ enum ShopUpgradeArtifact {
     titleKey: 'string82',
     fallbackTitle: 'Crystal Ball+',
     icon: Icons.flare_rounded,
+  ),
+  markovRecalibrator(
+    id: 'markov_recalibrator',
+    titleKey: 'markov_recalibrator_title',
+    fallbackTitle: 'Markov Recalibrator',
+    icon: Icons.tune_rounded,
   );
 
   final String id;
@@ -221,28 +227,30 @@ enum BestiaryCreature {
   archmageRobot(
     id: 'archmage_robot',
     nameKey: 'castle_bestiary_archmage_name',
-    fallbackName: 'Archmage Robot',
+    fallbackName: 'Robot Archmage',
     mathModelKey: 'castle_bestiary_archmage_model',
-    fallbackMathModel: 'Short-Memory Transition',
+    fallbackMathModel: '1-Step Short-Term Memory',
     loreKey: 'castle_bestiary_archmage_lore',
     fallbackLore:
-        'Awakens after Week 10: weighs your immediate short-memory transitions aggressively to punish repeated rhythms before they stabilize.',
+        '200 HP • Conjugates all 5 elements. Ignores cumulative history and tracks only your single most recent transition from each state to counter your next move.',
     hintKey: 'castle_bestiary_archmage_hint',
-    fallbackHint: 'Confront the Metal Wizard at Week 10 or later.',
+    fallbackHint:
+        'Defeat Guardian Robot at Week 10 or later to confront this construct.',
     icon: Icons.auto_fix_high_rounded,
     accentColor: Color(0xFFFF9800),
   ),
   babyRobot(
     id: 'baby_robot',
     nameKey: 'castle_bestiary_baby_name',
-    fallbackName: 'Baby Robot',
+    fallbackName: 'Baby Mage Robot',
     mathModelKey: 'castle_bestiary_baby_model',
-    fallbackMathModel: 'Pure Random Chaos',
+    fallbackMathModel: 'Pure Uniform Random (1/5)',
     loreKey: 'castle_bestiary_baby_lore',
     fallbackLore:
-        'Strikes with pure uniform randomness whenever no prior move exists or all transition probabilities in a row are evenly tied.',
+        '400 HP • Conjugates all 5 elements. Completely ignores the Markov transition matrix and selects every move with pure uniform randomness (1/5 per element).',
     hintKey: 'castle_bestiary_baby_hint',
-    fallbackHint: 'Witness an unpredictable opening or tied-matrix round.',
+    fallbackHint:
+        'Defeat Guardian Robot in Weeks 2–9 or defeat Robot Archmage to confront this chaotic prototype.',
     icon: Icons.casino_outlined,
     accentColor: Color(0xFFBA68C8),
   );
@@ -274,8 +282,32 @@ enum BestiaryCreature {
   });
 }
 
-/// The 4 narrative endings tracked in the Royal Library.
+/// The narrative endings tracked in the Royal Library.
 enum NarrativeEnding {
+  secretWeek1(
+    id: 'ending_secret_week1',
+    titleKey: 'castle_ending_secret_w1_title',
+    fallbackTitle: 'Swift Savior (Secret Week-1)',
+    descKey: 'castle_ending_secret_w1_desc',
+    fallbackDesc:
+        'Destroyed the Guardian Robot in Week 1 before backup constructs could be built, rescuing the princess intact!',
+    hintKey: 'castle_ending_secret_w1_hint',
+    fallbackHint: 'Defeat the Phase 1 Guardian Robot in Week 1.',
+    icon: Icons.auto_awesome_rounded,
+    accentColor: Color(0xFF00E5FF),
+  ),
+  standardVictory(
+    id: 'ending_standard_victory',
+    titleKey: 'castle_ending_standard_victory_title',
+    fallbackTitle: 'Metal Lair Liberated',
+    descKey: 'castle_ending_standard_victory_desc',
+    fallbackDesc:
+        'Destroyed the Phase 3 Baby Mage Robot and vanquished the Metal Wizard\'s lair!',
+    hintKey: 'castle_ending_standard_victory_hint',
+    fallbackHint: 'Defeat the Phase 3 Baby Mage Robot (400 HP).',
+    icon: Icons.emoji_events_rounded,
+    accentColor: Color(0xFFFFD54F),
+  ),
   perfectPredictor(
     id: 'ending_perfect',
     titleKey: 'castle_ending_perfect_title',

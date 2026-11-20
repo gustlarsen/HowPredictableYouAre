@@ -187,6 +187,8 @@ class CloudSaveData {
   final int total;
   final int userHp;
   final int pcHp;
+  final int enemyPhase;
+  final int enemyMaxHp;
   final int currentWeek;
 
   // Unlocks (Purchased in shop)
@@ -202,6 +204,7 @@ class CloudSaveData {
   final bool unlockedNewSkin;
   final bool unlockedCrystalBall;
   final bool unlockedCrystalBallPlus;
+  final bool unlockedMarkovRecalibrator;
   final bool giftBoxUnlocked;
 
   // Feature Active Toggles
@@ -218,6 +221,7 @@ class CloudSaveData {
   final bool showCrystalBall;
   final bool showCrystalBallPlus;
   final bool crystalBallPlusSavedState;
+  final bool showMarkovRecalibrator;
   final bool giftBoxEnabled;
 
   // Story Cutscene Persistence Flags
@@ -236,6 +240,7 @@ class CloudSaveData {
   final int? lastComputerMoveId;
   final List<List<int>>? markovMatrix3;
   final List<List<int>>? markovMatrix5;
+  final Map<int, int>? shortTermTransitions;
 
   // Per-Account Settings
   final String language;
@@ -290,6 +295,8 @@ class CloudSaveData {
     this.total = 0,
     this.userHp = 50,
     this.pcHp = 100,
+    this.enemyPhase = 1,
+    this.enemyMaxHp = 100,
     this.currentWeek = 1,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
@@ -303,6 +310,7 @@ class CloudSaveData {
     this.unlockedNewSkin = false,
     this.unlockedCrystalBall = false,
     this.unlockedCrystalBallPlus = false,
+    this.unlockedMarkovRecalibrator = false,
     this.giftBoxUnlocked = false,
     this.showReset = false,
     this.showPredictability = false,
@@ -317,6 +325,7 @@ class CloudSaveData {
     this.showCrystalBall = false,
     this.showCrystalBallPlus = false,
     this.crystalBallPlusSavedState = false,
+    this.showMarkovRecalibrator = false,
     this.giftBoxEnabled = false,
     this.hasSeenStoryIntro = false,
     this.hasSeenStoryReset = false,
@@ -331,6 +340,7 @@ class CloudSaveData {
     this.lastComputerMoveId,
     this.markovMatrix3,
     this.markovMatrix5,
+    this.shortTermTransitions,
     this.language = 'en',
     this.darkMode = true,
     this.soundEnabled = true,
@@ -396,6 +406,7 @@ class CloudSaveData {
     if (unlockedNewSkin) count++;
     if (unlockedCrystalBall) count++;
     if (unlockedCrystalBallPlus) count++;
+    if (unlockedMarkovRecalibrator) count++;
     if (giftBoxUnlocked) count++;
     return count;
   }
@@ -424,6 +435,7 @@ class CloudSaveData {
     if (unlockedNextMove) value += 2400;
     if (giftBoxUnlocked) value += 2500;
     if (unlockedSuggestion) value += 4000;
+    if (unlockedMarkovRecalibrator) value += 6000;
     if (unlockedNewSkin) value += 6500;
     if (unlockedAds) value += 9000;
     if (unlockedCrystalBall) value += 15500;
@@ -460,6 +472,7 @@ class CloudSaveData {
     if (unlockedCount == local.unlockedCount &&
         totalOrbs == local.totalOrbs &&
         (currentWeek > local.currentWeek ||
+            enemyPhase > local.enemyPhase ||
             total > local.total ||
             userScore > local.userScore ||
             markovTransitionsCount > local.markovTransitionsCount ||
@@ -499,6 +512,8 @@ class CloudSaveData {
       total: total,
       userHp: userHp,
       pcHp: pcHp,
+      enemyPhase: enemyPhase,
+      enemyMaxHp: enemyMaxHp,
       currentWeek:
           currentWeek > local.currentWeek ? currentWeek : local.currentWeek,
       unlockedReset: unlockedReset || local.unlockedReset,
@@ -516,6 +531,8 @@ class CloudSaveData {
       unlockedCrystalBall: unlockedCrystalBall || local.unlockedCrystalBall,
       unlockedCrystalBallPlus:
           unlockedCrystalBallPlus || local.unlockedCrystalBallPlus,
+      unlockedMarkovRecalibrator:
+          unlockedMarkovRecalibrator || local.unlockedMarkovRecalibrator,
       giftBoxUnlocked: giftBoxUnlocked || local.giftBoxUnlocked,
       showReset: showReset,
       showPredictability: showPredictability,
@@ -530,6 +547,7 @@ class CloudSaveData {
       showCrystalBall: showCrystalBall,
       showCrystalBallPlus: showCrystalBallPlus,
       crystalBallPlusSavedState: crystalBallPlusSavedState,
+      showMarkovRecalibrator: showMarkovRecalibrator,
       giftBoxEnabled: giftBoxEnabled,
       hasSeenStoryIntro: hasSeenStoryIntro || local.hasSeenStoryIntro,
       hasSeenStoryReset: hasSeenStoryReset || local.hasSeenStoryReset,
@@ -550,6 +568,7 @@ class CloudSaveData {
       lastComputerMoveId: lastComputerMoveId ?? local.lastComputerMoveId,
       markovMatrix3: markovMatrix3 ?? local.markovMatrix3,
       markovMatrix5: markovMatrix5 ?? local.markovMatrix5,
+      shortTermTransitions: shortTermTransitions ?? local.shortTermTransitions,
       language: language,
       darkMode: darkMode,
       soundEnabled: soundEnabled,
@@ -620,6 +639,8 @@ class CloudSaveData {
       total: storage.total,
       userHp: storage.userHp,
       pcHp: storage.pcHp,
+      enemyPhase: storage.enemyPhase,
+      enemyMaxHp: storage.enemyMaxHp,
       currentWeek: storage.currentWeek,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
@@ -633,6 +654,7 @@ class CloudSaveData {
       unlockedNewSkin: storage.unlockedNewSkin,
       unlockedCrystalBall: storage.unlockedCrystalBall,
       unlockedCrystalBallPlus: storage.unlockedCrystalBallPlus,
+      unlockedMarkovRecalibrator: storage.unlockedMarkovRecalibrator,
       giftBoxUnlocked: storage.giftBoxUnlocked,
       showReset: storage.showReset,
       showPredictability: storage.showPredictability,
@@ -647,6 +669,7 @@ class CloudSaveData {
       showCrystalBall: storage.showCrystalBall,
       showCrystalBallPlus: storage.showCrystalBallPlus,
       crystalBallPlusSavedState: storage.crystalBallPlusSavedState,
+      showMarkovRecalibrator: storage.showMarkovRecalibrator,
       giftBoxEnabled: storage.giftBoxEnabled,
       hasSeenStoryIntro: storage.hasSeenStoryIntro,
       hasSeenStoryReset: storage.hasSeenStoryReset,
@@ -661,6 +684,7 @@ class CloudSaveData {
       lastComputerMoveId: storage.lastComputerMove?.id,
       markovMatrix3: storage.getMarkovMatrix(3),
       markovMatrix5: storage.getMarkovMatrix(5),
+      shortTermTransitions: storage.shortTermTransitions,
       language: storage.language,
       darkMode: storage.darkMode,
       soundEnabled: storage.soundEnabled,
@@ -716,6 +740,8 @@ class CloudSaveData {
     await storage.setTotal(total);
     await storage.setUserHp(userHp);
     await storage.setPcHp(pcHp);
+    await storage.setEnemyPhase(enemyPhase);
+    await storage.setEnemyMaxHp(enemyMaxHp);
     await storage.setCurrentWeek(currentWeek);
     if (purchasedIapProductIds.isNotEmpty) {
       await storage.setPurchasedIapProductIds({
@@ -772,6 +798,7 @@ class CloudSaveData {
     await storage.setUnlockedNewSkin(unlockedNewSkin);
     await storage.setUnlockedCrystalBall(unlockedCrystalBall);
     await storage.setUnlockedCrystalBallPlus(unlockedCrystalBallPlus);
+    await storage.setUnlockedMarkovRecalibrator(unlockedMarkovRecalibrator);
     await storage.setGiftBoxUnlocked(giftBoxUnlocked);
 
     await storage.setShowReset(showReset);
@@ -787,6 +814,8 @@ class CloudSaveData {
     await storage.setShowCrystalBall(showCrystalBall);
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
+    await storage.setShowMarkovRecalibrator(
+        unlockedMarkovRecalibrator ? showMarkovRecalibrator : false);
     await storage.setGiftBoxEnabled(giftBoxUnlocked ? giftBoxEnabled : false);
 
     await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
@@ -819,6 +848,11 @@ class CloudSaveData {
       await storage.setMarkovMatrix(markovMatrix5!);
     } else {
       await storage.removeMarkovMatrix(5);
+    }
+    if (shortTermTransitions != null && shortTermTransitions!.isNotEmpty) {
+      await storage.setShortTermTransitions(shortTermTransitions!);
+    } else {
+      await storage.removeShortTermTransitions();
     }
   }
 
@@ -880,6 +914,8 @@ class CloudSaveData {
       'total': total,
       'userHp': userHp,
       'pcHp': pcHp,
+      'enemyPhase': enemyPhase,
+      'enemyMaxHp': enemyMaxHp,
       'currentWeek': currentWeek,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
@@ -893,6 +929,7 @@ class CloudSaveData {
       'unlockedNewSkin': unlockedNewSkin,
       'unlockedCrystalBall': unlockedCrystalBall,
       'unlockedCrystalBallPlus': unlockedCrystalBallPlus,
+      'unlockedMarkovRecalibrator': unlockedMarkovRecalibrator,
       'giftBoxUnlocked': giftBoxUnlocked,
       'showReset': showReset,
       'showPredictability': showPredictability,
@@ -907,6 +944,7 @@ class CloudSaveData {
       'showCrystalBall': showCrystalBall,
       'showCrystalBallPlus': showCrystalBallPlus,
       'crystalBallPlusSavedState': crystalBallPlusSavedState,
+      'showMarkovRecalibrator': showMarkovRecalibrator,
       'giftBoxEnabled': giftBoxEnabled,
       'hasSeenStoryIntro': hasSeenStoryIntro,
       'hasSeenStoryReset': hasSeenStoryReset,
@@ -921,6 +959,9 @@ class CloudSaveData {
       'lastComputerMoveId': lastComputerMoveId,
       'markovMatrix3': markovMatrix3,
       'markovMatrix5': markovMatrix5,
+      'shortTermTransitions': shortTermTransitions?.map(
+        (key, value) => MapEntry(key.toString(), value),
+      ),
       'language': language,
       'darkMode': darkMode,
       'soundEnabled': soundEnabled,
@@ -1049,6 +1090,16 @@ class CloudSaveData {
       total: (map['total'] as num?)?.toInt() ?? 0,
       userHp: (map['userHp'] as num?)?.toInt() ?? 50,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
+      enemyPhase: ((map['enemyPhase'] as num?)?.toInt() ?? 1).clamp(1, 3),
+      enemyMaxHp: ((map['enemyMaxHp'] as num?)?.toInt() ??
+              (() {
+                final phase =
+                    ((map['enemyPhase'] as num?)?.toInt() ?? 1).clamp(1, 3);
+                if (phase == 2) return 200;
+                if (phase == 3) return 400;
+                return 100;
+              })())
+          .clamp(100, 9999),
       currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 0
           ? 0
           : ((map['currentWeek'] as num?)?.toInt() ?? 1),
@@ -1064,6 +1115,8 @@ class CloudSaveData {
       unlockedNewSkin: map['unlockedNewSkin'] as bool? ?? false,
       unlockedCrystalBall: map['unlockedCrystalBall'] as bool? ?? false,
       unlockedCrystalBallPlus: map['unlockedCrystalBallPlus'] as bool? ?? false,
+      unlockedMarkovRecalibrator:
+          map['unlockedMarkovRecalibrator'] as bool? ?? false,
       giftBoxUnlocked: map['giftBoxUnlocked'] as bool? ?? false,
       showReset: map['showReset'] as bool? ?? false,
       showPredictability: map['showPredictability'] as bool? ?? false,
@@ -1080,6 +1133,7 @@ class CloudSaveData {
       showCrystalBallPlus: map['showCrystalBallPlus'] as bool? ?? false,
       crystalBallPlusSavedState:
           map['crystalBallPlusSavedState'] as bool? ?? false,
+      showMarkovRecalibrator: map['showMarkovRecalibrator'] as bool? ?? false,
       giftBoxEnabled: map['giftBoxEnabled'] as bool? ?? false,
       hasSeenStoryIntro: map['hasSeenStoryIntro'] as bool? ?? false,
       hasSeenStoryReset: map['hasSeenStoryReset'] as bool? ?? false,
@@ -1096,6 +1150,7 @@ class CloudSaveData {
       lastComputerMoveId: (map['lastComputerMoveId'] as num?)?.toInt(),
       markovMatrix3: _parseMatrix(map['markovMatrix3'], 3),
       markovMatrix5: _parseMatrix(map['markovMatrix5'], 5),
+      shortTermTransitions: _parseIntMap(map['shortTermTransitions']),
       language: (map['language'] as String?) ?? 'en',
       darkMode: map['darkMode'] as bool? ?? true,
       soundEnabled: map['soundEnabled'] as bool? ?? true,
@@ -1112,6 +1167,20 @@ class CloudSaveData {
           : const [],
       updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  static Map<int, int>? _parseIntMap(dynamic raw) {
+    if (raw is! Map) return null;
+    final parsed = <int, int>{};
+    for (final entry in raw.entries) {
+      final k = int.tryParse(entry.key.toString());
+      final v = (entry.value as num?)?.toInt() ??
+          int.tryParse(entry.value.toString());
+      if (k != null && v != null && k >= 1 && k <= 5 && v >= 1 && v <= 5) {
+        parsed[k] = v;
+      }
+    }
+    return parsed.isEmpty ? null : parsed;
   }
 
   static CloudSaveData? tryParse(String? rawJson) {

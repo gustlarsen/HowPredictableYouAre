@@ -937,6 +937,47 @@ class _ShopDialogState extends State<ShopDialog> {
                           );
                         },
                       ),
+                    if (controller.isMarkovRecalibratorVisibleInShop)
+                      _buildShopItem(
+                        context: context,
+                        title: loc.t(
+                          'markov_recalibrator_title',
+                          fallback: 'Markov Recalibrator',
+                        ),
+                        subtitle: loc.t(
+                          'markov_recalibrator_desc',
+                          fallback:
+                              'Reconfigures the Algorithm matrix and hints to expose the Robot Archmage\'s true 1-step short-term memory',
+                        ),
+                        cost: GameController.costMarkovRecalibrator,
+                        productId: null,
+                        isUnlocked: controller.unlockedMarkovRecalibrator,
+                        isActive: controller.showMarkovRecalibrator,
+                        enabledLabel: enabledStr,
+                        disabledLabel: disabledStr,
+                        onUnlock: () {
+                          final ok = controller.unlockMarkovRecalibrator();
+                          _handleUnlock(
+                            context,
+                            loc.t(
+                              'markov_recalibrator_title',
+                              fallback: 'Markov Recalibrator',
+                            ),
+                            ok,
+                          );
+                        },
+                        onToggle: (val) {
+                          controller.toggleMarkovRecalibrator(val);
+                          _handleToggle(
+                            context,
+                            loc.t(
+                              'markov_recalibrator_title',
+                              fallback: 'Markov Recalibrator',
+                            ),
+                            controller.showMarkovRecalibrator,
+                          );
+                        },
+                      ),
 
                   ],
                 ),

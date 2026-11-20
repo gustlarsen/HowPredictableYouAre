@@ -23,6 +23,7 @@ class MarkovEngine {
 
   late List<List<int>> _matrix;
   late List<HandMove> _activeMoves;
+  final Map<HandMove, HandMove> _lastTransitionFrom = {};
 
   MarkovEngine({
     this.enableExtendedHands = false,
@@ -47,10 +48,49 @@ class MarkovEngine {
   int get size => _activeMoves.length;
   int get enemySize => enemyMoves.length;
 
-  /// Resets the transition matrix counts back to zero
+  /// Read-only view of the single most recent transition out of each state.
+  Map<HandMove, HandMove> get lastTransitionFrom =>
+      Map.unmodifiable(_lastTransitionFrom);
+
+  /// Returns the single most recent move played after [move] within the
+  /// active move deck, or null if no transition from [move] has been recorded.
+  HandMove? lastTransitionFor(HandMove? move) {
+    if (move == null || !_activeMoves.contains(move)) return null;
+    final target = _lastTransitionFrom[move];
+    if (target == null || !_activeMoves.contains(target)) return null;
+    return target;
+  }
+
+  /// Serializes short-term transitions as `<fromId: toId>` for storage/cloud save.
+  Map<int, int> get serializedLastTransitions => {
+    for (final entry in _lastTransitionFrom.entries)
+      entry.key.id: entry.value.id,
+  };
+
+  /// Restores short-term transitions from saved `<fromId: toId>` pairs.
+  void setLastTransitions(Map<int, int> saved) {
+    _lastTransitionFrom.clear();
+    for (final entry in saved.entries) {
+      HandMove? fromMove;
+      HandMove? toMove;
+      for (final m in HandMove.values) {
+        if (m.id == entry.key) fromMove = m;
+        if (m.id == entry.value) toMove = m;
+      }
+      if (fromMove != null &&
+          toMove != null &&
+          _activeMoves.contains(fromMove) &&
+          _activeMoves.contains(toMove)) {
+        _lastTransitionFrom[fromMove] = toMove;
+      }
+    }
+  }
+
+  /// Resets the transition matrix counts and short-term memory back to zero
   void reset() {
     final s = _activeMoves.length;
     _matrix = List.generate(s, (_) => List.filled(s, 0));
+    _lastTransitionFrom.clear();
   }
 
   /// Sets matrix from a saved 2D list
@@ -63,7 +103,8 @@ class MarkovEngine {
 
   int _activeIndexOf(HandMove move) => _activeMoves.indexOf(move);
 
-  /// Updates transition matrix with observed transition: [lastMove] -> [currentMove]
+  /// Updates cumulative transition matrix and overwrites the single latest
+  /// short-term transition observed from [lastMove] -> [currentMove].
   void recordTransition(HandMove? lastMove, HandMove currentMove) {
     if (lastMove == null) return;
     final rowIdx = _activeIndexOf(lastMove);
@@ -75,6 +116,7 @@ class MarkovEngine {
       return;
     }
     _matrix[rowIdx][colIdx] += 1;
+    _lastTransitionFrom[lastMove] = currentMove;
   }
 
   /// Returns true if there is at least one recorded transition from [lastUserMove]
@@ -84,6 +126,18 @@ class MarkovEngine {
     if (rowIdx < 0 || rowIdx >= _matrix.length) return false;
     final row = _matrix[rowIdx];
     return row.any((count) => count > 0);
+  }
+
+  /// Returns true if a 1-step short-term transition exists from [lastUserMove].
+  bool hasShortTermPrediction(HandMove? lastUserMove) {
+    return lastTransitionFor(lastUserMove) != null;
+  }
+
+  /// Returns the single most recent move played after [lastUserMove], or empty.
+  List<HandMove> predictShortTermNextUserMoves(HandMove? lastUserMove) {
+    final target = lastTransitionFor(lastUserMove);
+    if (target == null) return [];
+    return [target];
   }
 
   /// Returns all most likely next user moves tied for the highest transition count.
@@ -130,10 +184,7 @@ class MarkovEngine {
     return bestMoves[_random.nextInt(bestMoves.length)];
   }
 
-  /// Returns all possible counter-moves the PC could choose corresponding to the
-  /// user's most likely next move(s). Returns an empty list if no prediction is available.
-  List<HandMove> computeSmartChoices(HandMove? lastUserMove) {
-    final predictedMoves = predictNextUserMoves(lastUserMove);
+  List<HandMove> _countersForPredictedMoves(List<HandMove> predictedMoves) {
     if (predictedMoves.isEmpty) {
       return [];
     }
@@ -165,9 +216,32 @@ class MarkovEngine {
     return choices;
   }
 
+  /// Returns all possible counter-moves the PC could choose corresponding to the
+  /// user's most likely next move(s). Returns an empty list if no prediction is available.
+  List<HandMove> computeSmartChoices(HandMove? lastUserMove) {
+    return _countersForPredictedMoves(predictNextUserMoves(lastUserMove));
+  }
+
   /// AI chooses the counter-move to defeat the predicted user move
   HandMove computeSmartChoice(HandMove? lastUserMove) {
     final choices = computeSmartChoices(lastUserMove);
+    if (choices.isEmpty) {
+      return getRandomEnemyMove();
+    }
+    return choices[_random.nextInt(choices.length)];
+  }
+
+  /// Returns counter-moves using only the single most recent transition from [lastUserMove].
+  List<HandMove> computeShortTermSmartChoices(HandMove? lastUserMove) {
+    return _countersForPredictedMoves(
+      predictShortTermNextUserMoves(lastUserMove),
+    );
+  }
+
+  /// Robot Archmage AI: counters strictly based on the single most recent
+  /// transition from [lastUserMove], or chooses uniformly at random if none exists.
+  HandMove computeShortTermSmartChoice(HandMove? lastUserMove) {
+    final choices = computeShortTermSmartChoices(lastUserMove);
     if (choices.isEmpty) {
       return getRandomEnemyMove();
     }
@@ -179,7 +253,7 @@ class MarkovEngine {
     return _activeMoves[_random.nextInt(_activeMoves.length)];
   }
 
-  /// Picks a random move from the enemy's current move pool (5 elements in Phase 2)
+  /// Picks a random move from the enemy's current move pool (5 elements in Phase 2+)
   HandMove getRandomEnemyMove() {
     final pool = enemyMoves;
     return pool[_random.nextInt(pool.length)];

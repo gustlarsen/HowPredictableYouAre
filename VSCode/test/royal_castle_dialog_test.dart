@@ -436,24 +436,25 @@ void main() {
         expect(controller.treasuryWaterOrbs, 10);
         expect(controller.treasuryEarthOrbs, 10);
 
-        // Bestiary: Baby Robot (turn 1 random), Guardian Robot (turn 2+ prediction), Archmage Robot (Week 10)
-        expect(
-          controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
-          isTrue,
-        );
+        // Bestiary: Phase 1 battle unlocks Guardian Robot; Archmage & Baby Mage unlock on boss progression
         expect(
           controller.isBestiaryEncountered(BestiaryCreature.guardianRobot),
           isTrue,
         );
         expect(
           controller.isBestiaryEncountered(BestiaryCreature.archmageRobot),
-          isTrue,
+          isFalse,
+        );
+        expect(
+          controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
+          isFalse,
         );
 
-        // Complete 100 rounds at 100% score -> unlocks ending_perfect & predictAbove70 decree
+        // Complete 100 rounds at 100% score (15 wins + 85 draws so Phase 1 Guardian stays > 0 HP)
+        // -> unlocks ending_perfect & predictAbove70 decree
         for (int i = 15; i < 100; i++) {
           controller.crystalBallMove = HandMove.rock;
-          controller.playTurn(HandMove.paper);
+          controller.playTurn(HandMove.rock);
         }
         expect(
           controller.isEndingUnlocked(NarrativeEnding.perfectPredictor),
@@ -470,7 +471,7 @@ void main() {
         expect(cloud.unlockedEndings, contains('ending_perfect'));
         expect(
           cloud.encounteredBestiary,
-          containsAll(['baby_robot', 'guardian_robot', 'archmage_robot']),
+          contains('guardian_robot'),
         );
         expect(cloud.treasuryWaterOrbs, greaterThanOrEqualTo(10));
       },
@@ -574,7 +575,7 @@ void main() {
             find.byKey(const ValueKey('castle_wing_library')),
             findsOneWidget,
           );
-          expect(find.text('Endings Discovered: 1 / 4'), findsOneWidget);
+          expect(find.text('Endings Discovered: 1 / 6'), findsOneWidget);
           expect(find.text('Guardian Robot'), findsOneWidget);
           expect(find.text('Story Memories'), findsOneWidget);
 

@@ -23,6 +23,7 @@ import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
+import '../dialogs/victory_cutscene_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   static const int orbSpawnDelayMs = VersusArena.clashTimeMs;
@@ -69,6 +70,7 @@ class _GameScreenState extends State<GameScreen>
   bool _isDeathSequenceActive = false;
   bool _isDeathDialogOpen = false;
   bool _isKingdomFallDialogOpen = false;
+  bool _isBossVictoryDialogOpen = false;
   bool _metricsRebuildScheduled = false;
   Timer? _deathDialogTimer;
   GameController? _controller;
@@ -786,6 +788,325 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  Widget _buildBossPhasePill(BuildContext context, GameController controller) {
+    final palette = AppPalette.of(context);
+    final phase = controller.enemyPhase;
+    final bossName = controller.currentEnemyName;
+    final Color accent;
+    final IconData icon;
+    if (phase == 2) {
+      accent = const Color(0xFFCE93D8);
+      icon = Icons.auto_fix_high_rounded;
+    } else if (phase == 3) {
+      accent = const Color(0xFFFF8A65);
+      icon = Icons.bolt_rounded;
+    } else {
+      accent = const Color(0xFF4FC3F7);
+      icon = Icons.shield_outlined;
+    }
+    return Container(
+      key: ValueKey('boss_phase_pill_$phase'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.isDark
+            ? Colors.black.withValues(alpha: 0.45)
+            : palette.deckSurface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.72),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: accent),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Phase $phase • $bossName (${controller.enemyMaxHp} HP)',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: palette.isDark ? Colors.white : palette.primaryText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _checkBossVictoryAlert(BuildContext context, GameController controller) {
+    if (!controller.isBossVictoryPending ||
+        _isBossVictoryDialogOpen ||
+        _isDeathSequenceActive ||
+        _isDeathDialogOpen) {
+      return;
+    }
+    _isBossVictoryDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _isBossVictoryDialogOpen = false;
+        return;
+      }
+      unawaited(_showBossVictoryModal(controller));
+    });
+  }
+
+  Future<void> _showBossVictoryModal(GameController controller) async {
+    final loc = controller.localization;
+    final defeatedPhase =
+        controller.pendingBossVictoryPhase ?? controller.enemyPhase;
+    final week = controller.pendingBossVictoryWeek ?? controller.currentWeek;
+
+    final bool isSecretWeek1 = defeatedPhase == 1 && week == 1;
+    final bool isEarlyRush =
+        defeatedPhase == 1 && week >= 2 && week < GameController.phase2StartWeek;
+    final bool isLatePhase1 =
+        defeatedPhase == 1 && week >= GameController.phase2StartWeek;
+    final bool isPhase2Defeat = defeatedPhase == 2;
+    final bool isPhase3Defeat = defeatedPhase == 3;
+
+    late final String emoji;
+    late final Color accent;
+    late final String title;
+    late final String subtitle;
+    late final String body;
+    late final String buttonLabel;
+
+    if (isSecretWeek1) {
+      emoji = '👑';
+      accent = const Color(0xFF00E5FF);
+      title = loc.t(
+        'boss_victory_p1_title',
+        fallback: 'Guardian Robot Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_secret_w1_subtitle',
+        fallback: 'Week 1 Lightning Victory!',
+      );
+      body = loc.t(
+        'boss_victory_secret_w1_body',
+        fallback:
+            'You shattered the Guardian Robot immediately in Week 1 before the Metal Wizard could build any backup constructs! The Princess is rescued intact.',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_watch_cutscene_btn',
+        fallback: 'Watch Ending Cutscene',
+      );
+    } else if (isEarlyRush) {
+      emoji = '⚡🤖';
+      accent = const Color(0xFFFF7043);
+      title = loc.t(
+        'boss_victory_p1_title',
+        fallback: 'Guardian Robot Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_early_rush_subtitle',
+        fallback: 'Panicked Metal Wizard Unleashes Prototype!',
+      );
+      body = loc.t(
+        'boss_victory_early_rush_body',
+        fallback:
+            'Alert! Caught off-guard, the panicked Metal Wizard unleashes his chaotic prototype: Baby Mage Robot (400 HP, 5 elements, pure uniform random AI)!',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_baby_mage_btn',
+        fallback: 'Face Baby Mage Robot',
+      );
+    } else if (isLatePhase1) {
+      emoji = '🔮🤖';
+      accent = const Color(0xFFAB47BC);
+      title = loc.t(
+        'boss_victory_p1_title',
+        fallback: 'Guardian Robot Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_p2_spawn_subtitle',
+        fallback: 'Phase 2: Robot Archmage Approaches!',
+      );
+      body = loc.t(
+        'boss_victory_p2_spawn_body',
+        fallback:
+            'A superior construct steps forward: Robot Archmage (200 HP, 5 elements, 1-step short-term memory)! Bestiary & Markov Recalibrator shop item unlocked.',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_archmage_btn',
+        fallback: 'Challenge Robot Archmage',
+      );
+    } else if (isPhase2Defeat) {
+      emoji = '⚡🤖';
+      accent = const Color(0xFFFF7043);
+      title = loc.t(
+        'boss_victory_p2_defeated_title',
+        fallback: 'Robot Archmage Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_p2_defeated_subtitle',
+        fallback: 'Final Construct: Baby Mage Robot',
+      );
+      body = loc.t(
+        'boss_victory_p2_defeated_body',
+        fallback:
+            'The Robot Archmage is destroyed! Desperate, the Metal Wizard deploys his final chaotic prototype: Baby Mage Robot (400 HP, 5 elements, pure random AI).',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_baby_mage_btn',
+        fallback: 'Face Baby Mage Robot',
+      );
+    } else {
+      emoji = '🏆';
+      accent = const Color(0xFFFFCA28);
+      title = loc.t(
+        'boss_victory_p3_defeated_title',
+        fallback: 'Baby Mage Robot Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_p3_defeated_subtitle',
+        fallback: "Metal Wizard's Lair Defeated!",
+      );
+      body = loc.t(
+        'boss_victory_p3_defeated_body',
+        fallback:
+            "The Baby Mage Robot has been destroyed and the Metal Wizard's lair is defeated! Standard Victory Ending unlocked.",
+      );
+      buttonLabel = loc.t(
+        'boss_victory_watch_cutscene_btn',
+        fallback: 'Watch Ending Cutscene',
+      );
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        final palette = AppPalette.of(dialogCtx);
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            key: const ValueKey('boss_victory_modal'),
+            backgroundColor: palette.dialogSurface,
+            surfaceTintColor: palette.isDark ? null : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: accent.withValues(alpha: 0.78),
+                width: 1.8,
+              ),
+            ),
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 36)),
+                const SizedBox(height: 6),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 19,
+                    color: palette.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: palette.isDark ? accent : palette.amberText,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              body,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.45,
+                color: palette.secondaryText,
+              ),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  key: const ValueKey('boss_victory_confirm_button'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent,
+                    foregroundColor: const Color(0xFF12151E),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    controller.audio.playTapVibrate();
+                    Navigator.of(dialogCtx).pop();
+                  },
+                  child: Text(
+                    buttonLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) {
+      _isBossVictoryDialogOpen = false;
+      return;
+    }
+
+    if (isSecretWeek1) {
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.secretWeek1,
+        controller: controller,
+      );
+      if (!mounted) {
+        _isBossVictoryDialogOpen = false;
+        return;
+      }
+      controller.advanceAfterBossVictory();
+      _isBossVictoryDialogOpen = false;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
+    if (isPhase3Defeat) {
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.standardVictory,
+        controller: controller,
+      );
+      if (!mounted) {
+        _isBossVictoryDialogOpen = false;
+        return;
+      }
+      controller.advanceAfterBossVictory();
+      _isBossVictoryDialogOpen = false;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
+    controller.advanceAfterBossVictory();
+    _isBossVictoryDialogOpen = false;
+  }
+
   void _checkQaBonusSnackBar(BuildContext context, GameController controller) {
     if (controller.pendingStoryChapter != null) return;
     if (controller.pendingQaBonusSnackBar != null) {
@@ -914,11 +1235,15 @@ class _GameScreenState extends State<GameScreen>
     final loc = controller.localization;
     final bgImage = _resolveBackgroundImage(controller);
     final inputsLocked = controller.userHp <= 0 ||
+        controller.computerHp <= 0 ||
+        controller.isBossVictoryPending ||
         controller.totalRounds >= controller.playerMaxMana ||
-        _isDeathSequenceActive;
+        _isDeathSequenceActive ||
+        _isBossVictoryDialogOpen;
 
     _checkIntroStory(context, controller);
     _checkDeathAlert(context, controller);
+    _checkBossVictoryAlert(context, controller);
     _check100RoundAlert(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
@@ -1174,6 +1499,10 @@ class _GameScreenState extends State<GameScreen>
                                 HintsBar(controller: controller),
                                 if (hasVisibleHints) const SizedBox(height: 8),
 
+                                // Compact Boss Phase Indicator Pill
+                                _buildBossPhasePill(context, controller),
+                                const SizedBox(height: 6),
+
                                 // Versus Arena: Classic Hand-Lunge (New Skin OFF) or Stationary Orbs + Projectile Clash VFX (New Skin ON)
                                 VersusArena(
                                   userMove: controller.currentUserMove,
@@ -1186,7 +1515,7 @@ class _GameScreenState extends State<GameScreen>
                                   userHp: controller.userHp,
                                   playerMaxHp: controller.playerMaxHp,
                                   computerHp: controller.computerHp,
-                                  computerMaxHp: GameController.pcMaxHp,
+                                  computerMaxHp: controller.enemyMaxHp,
                                   remainingMana: controller.remainingMana,
                                   maxMana: controller.playerMaxMana,
                                   elementalMode: controller.isElementalMode,
@@ -1194,7 +1523,7 @@ class _GameScreenState extends State<GameScreen>
                                       controller.bossWinDamageToPlayer,
                                   computerDamageAmount:
                                       controller.playerWinDamageToBoss,
-                                  isPhase2: controller.isPhase2,
+                                  isPhase2: controller.enemyUses5Elements,
                                   pcSlotKey: _pcSlotKey,
                                   clashCenterKey: _clashCenterKey,
                                   onImpactHaptic: controller.isElementalMode
@@ -1210,6 +1539,11 @@ class _GameScreenState extends State<GameScreen>
                                     lastUserMove: controller.lastUserMove,
                                     elementalMode: controller.isElementalMode,
                                     localization: loc,
+                                    isArchmageShortTermView:
+                                        controller.isArchmageBoss &&
+                                        controller.isMarkovRecalibratorActive,
+                                    isBabyMageRandomView:
+                                        controller.isBabyMageBoss,
                                   ),
                                 ],
                               ],

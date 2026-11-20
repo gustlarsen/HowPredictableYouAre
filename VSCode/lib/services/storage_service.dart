@@ -208,6 +208,37 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
+  // Boss Phase Progression (1 = Guardian Robot, 2 = Robot Archmage, 3 = Baby Mage Robot)
+  static const String enemyPhaseKey = 'enemy_phase';
+  static const String enemyMaxHpKey = 'enemy_max_hp';
+
+  int get enemyPhase {
+    final raw = _prefs.getInt(enemyPhaseKey) ?? 1;
+    if (raw < 1) return 1;
+    if (raw > 3) return 3;
+    return raw;
+  }
+
+  Future<void> setEnemyPhase(int val) =>
+      _prefs.setInt(enemyPhaseKey, val.clamp(1, 3));
+
+  int get enemyMaxHp {
+    final raw = _prefs.getInt(enemyMaxHpKey);
+    if (raw != null && raw > 0) return raw;
+    switch (enemyPhase) {
+      case 2:
+        return 200;
+      case 3:
+        return 400;
+      default:
+        return 100;
+    }
+  }
+
+  int? get enemyMaxHpRaw => _prefs.getInt(enemyMaxHpKey);
+  Future<void> setEnemyMaxHp(int val) =>
+      _prefs.setInt(enemyMaxHpKey, val < 1 ? 100 : val);
+
   // Cleric Infinite Stat Upgrades & Hall of Heroes All-Time Peaks
   static const String _hpUpgradeLevelKey = 'hp_upgrade_level';
   static const String _manaUpgradeLevelKey = 'mana_upgrade_level';
@@ -395,6 +426,11 @@ class StorageService {
   Future<void> setUnlockedCrystalBallPlus(bool val) =>
       _prefs.setBool('unlockedCrystalBallPlus', val);
 
+  bool get unlockedMarkovRecalibrator =>
+      _prefs.getBool('unlockedMarkovRecalibrator') ?? false;
+  Future<void> setUnlockedMarkovRecalibrator(bool val) =>
+      _prefs.setBool('unlockedMarkovRecalibrator', val);
+
   // Feature Active Toggles
   bool get showCrystalBall => _prefs.getBool('showCrystalBall') ?? false;
   Future<void> setShowCrystalBall(bool val) =>
@@ -441,6 +477,11 @@ class StorageService {
 
   bool get showReset => _prefs.getBool('showReset') ?? false;
   Future<void> setShowReset(bool val) => _prefs.setBool('showReset', val);
+
+  bool get showMarkovRecalibrator =>
+      _prefs.getBool('showMarkovRecalibrator') ?? false;
+  Future<void> setShowMarkovRecalibrator(bool val) =>
+      _prefs.setBool('showMarkovRecalibrator', val);
 
   bool get giftBoxUnlocked => _prefs.getBool('giftBoxUnlocked') ?? false;
   Future<void> setGiftBoxUnlocked(bool val) =>
@@ -554,6 +595,42 @@ class StorageService {
 
   Future<void> removeMarkovMatrix(int size) {
     return _prefs.remove('markov_matrix_$size');
+  }
+
+  static const String shortTermTransitionsKey = 'short_term_transitions';
+
+  Map<int, int> get shortTermTransitions {
+    final str = _prefs.getString(shortTermTransitionsKey);
+    if (str == null || str.isEmpty) return const {};
+    try {
+      final decoded = json.decode(str);
+      if (decoded is! Map) return const {};
+      final result = <int, int>{};
+      for (final entry in decoded.entries) {
+        final k = int.tryParse(entry.key.toString());
+        final v = (entry.value as num?)?.toInt();
+        if (k != null && v != null) {
+          result[k] = v;
+        }
+      }
+      return result;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> setShortTermTransitions(Map<int, int> transitions) {
+    if (transitions.isEmpty) {
+      return _prefs.remove(shortTermTransitionsKey);
+    }
+    final encoded = <String, int>{
+      for (final entry in transitions.entries) '${entry.key}': entry.value,
+    };
+    return _prefs.setString(shortTermTransitionsKey, json.encode(encoded));
+  }
+
+  Future<void> removeShortTermTransitions() {
+    return _prefs.remove(shortTermTransitionsKey);
   }
 
   // Royal Treasury Piggy Bank Orbs (capped at 50 per element)
@@ -780,6 +857,7 @@ class StorageService {
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
+      removeShortTermTransitions(),
     ]);
   }
 
@@ -822,6 +900,8 @@ class StorageService {
       setTotal(0),
       setUserHp(50),
       setPcHp(100),
+      setEnemyPhase(1),
+      setEnemyMaxHp(100),
       setHpUpgradeLevel(0),
       setManaUpgradeLevel(0),
       setCurrentWeek(1),
@@ -838,6 +918,7 @@ class StorageService {
       setUnlockedNewSkin(false),
       setUnlockedCrystalBall(false),
       setUnlockedCrystalBallPlus(false),
+      setUnlockedMarkovRecalibrator(false),
       setGiftBoxUnlocked(false),
       setShowReset(false),
       setShowPredictability(false),
@@ -851,6 +932,7 @@ class StorageService {
       setShowCrystalBall(false),
       setShowCrystalBallPlus(false),
       setCrystalBallPlusSavedState(false),
+      setShowMarkovRecalibrator(false),
       setGiftBoxEnabled(false),
       if (!preserveStoryFlags) ...[
         setHasSeenStoryIntro(false),
@@ -867,6 +949,7 @@ class StorageService {
       _prefs.remove('last_computer_move'),
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
+      removeShortTermTransitions(),
     ]);
   }
 }
