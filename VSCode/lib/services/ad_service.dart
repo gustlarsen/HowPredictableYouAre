@@ -270,11 +270,15 @@ class AdService extends ChangeNotifier {
   bool _isLoadingRewardedAd = false;
   bool _isPrivacyOptionsRequiredCached = false;
   int _rewardedConsecutiveFailures = 0;
+  int _bannerViewGeneration = 0;
+  double? _lastMetricsDpr;
+  Size? _lastMetricsLogicalSize;
 
   AdService({AdMobClient? client}) : _client = client ?? DefaultAdMobClient();
 
   bool get isInitialized => _isInitialized;
   bool get adsRemoved => _adsRemoved;
+  int get bannerViewGeneration => _bannerViewGeneration;
 
   /// Synchronous last-known value of [isPrivacyOptionsRequired] for immediate UI rendering.
   bool get isPrivacyOptionsRequiredSync => _isPrivacyOptionsRequiredCached;
@@ -490,6 +494,53 @@ class AdService extends ChangeNotifier {
     }
   }
 
+  /// Refreshes the native banner PlatformView if display density or logical
+  /// viewport dimensions change significantly (e.g. recovering from OS/Game
+  /// Booster resolution scaling after an in-app update).
+  void handleMetricsChanged({
+    required double devicePixelRatio,
+    required Size logicalSize,
+  }) {
+    if (devicePixelRatio <= 0 ||
+        logicalSize.width <= 0 ||
+        logicalSize.height <= 0) {
+      return;
+    }
+
+    final prevDpr = _lastMetricsDpr;
+    final prevSize = _lastMetricsLogicalSize;
+    _lastMetricsDpr = devicePixelRatio;
+    _lastMetricsLogicalSize = logicalSize;
+
+    if (prevDpr == null || prevSize == null) {
+      return;
+    }
+
+    final dprChanged = (devicePixelRatio - prevDpr).abs() > 0.05;
+    final sizeChanged = (logicalSize.width - prevSize.width).abs() > 2.0 ||
+        (logicalSize.height - prevSize.height).abs() > 2.0;
+
+    if (!dprChanged && !sizeChanged) {
+      return;
+    }
+
+    _bannerViewGeneration++;
+    if (!_adsRemoved && _isInitialized) {
+      unawaited(loadBannerAd());
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Ensures a banner ad is loaded when returning to foreground if previously
+  /// initialized and not removed.
+  Future<void> handleAppResumed() async {
+    if (_adsRemoved || !_isInitialized) return;
+    if (!_isBannerAdLoaded) {
+      await loadBannerAd();
+    }
+  }
+
   /// Builds the bottom banner widget when loaded and ads are not removed,
   /// or collapses to a zero-height [SizedBox.shrink] when offline, failed, or removed.
   Widget buildBannerWidget() {
@@ -504,7 +555,10 @@ class AdService extends ChangeNotifier {
       key: const ValueKey('admob_banner_box'),
       width: bannerWidth,
       height: bannerHeight,
-      child: widget,
+      child: KeyedSubtree(
+        key: ValueKey('admob_banner_view_$_bannerViewGeneration'),
+        child: widget,
+      ),
     );
   }
 

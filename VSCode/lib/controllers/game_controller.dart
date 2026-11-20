@@ -575,13 +575,34 @@ class GameController extends ChangeNotifier {
 
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      updateService.setAppForeground(false);
+    } else if (state == AppLifecycleState.resumed) {
+      updateService.setAppForeground(true);
+    }
+
+    if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       audio.pauseMusic();
     } else if (state == AppLifecycleState.resumed) {
       audio.resumeMusic();
       unawaited(playGames.handleAppResumed());
       unawaited(updateService.handleAppResumed());
+      unawaited(adService.handleAppResumed());
     }
+  }
+
+  /// Forwards display density / logical viewport size changes to [AdService]
+  /// so native platform banner views refresh if metrics change after an update.
+  void handleMetricsChanged({
+    required double devicePixelRatio,
+    required Size logicalSize,
+  }) {
+    adService.handleMetricsChanged(
+      devicePixelRatio: devicePixelRatio,
+      logicalSize: logicalSize,
+    );
   }
 
   void _triggerCloudSave() {

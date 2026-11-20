@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
@@ -47,6 +48,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _isIntroDialogScheduled = false;
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
+  bool _metricsRebuildScheduled = false;
 
   @override
   void initState() {
@@ -95,8 +97,28 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   }
 
   @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!mounted || _metricsRebuildScheduled) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
+      setState(() {});
+      return;
+    }
+    _metricsRebuildScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _metricsRebuildScheduled = false;
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
     context.read<GameController>().didChangeAppLifecycleState(state);
   }
 

@@ -696,5 +696,57 @@ void main() {
         );
       },
     );
+
+    test(
+      '10. completeFlexibleUpdate guards against background and duplicate calls and reconciles state on handleAppResumed',
+      () async {
+        final fakeClient = FakeInAppUpdateClient(
+          updateInfo: AppUpdateInfo(
+            updateAvailability:
+                UpdateAvailability.developerTriggeredUpdateInProgress,
+            immediateUpdateAllowed: false,
+            immediateAllowedPreconditions: const [],
+            flexibleUpdateAllowed: true,
+            flexibleAllowedPreconditions: const [],
+            availableVersionCode: 105,
+            installStatus: InstallStatus.downloaded,
+            packageName: 'com.howpredictable.app',
+            clientVersionStalenessDays: 1,
+            updatePriority: 2,
+          ),
+        );
+        addTearDown(fakeClient.dispose);
+
+        final updateService = UpdateService(client: fakeClient);
+        addTearDown(updateService.dispose);
+
+        await updateService.checkForUpdate();
+        expect(updateService.isUpdateDownloaded, isTrue);
+
+        // Backgrounded -> completeFlexibleUpdate is blocked safely
+        updateService.setAppForeground(false);
+        expect(await updateService.completeFlexibleUpdate(), isFalse);
+        expect(fakeClient.completeFlexibleUpdateCallCount, 0);
+        expect(updateService.isUpdateDownloaded, isTrue);
+
+        // Foregrounded again, with throwing completeFlexibleUpdate -> restores downloaded state
+        updateService.setAppForeground(true);
+        fakeClient.shouldThrowOnComplete = true;
+        expect(await updateService.completeFlexibleUpdate(), isFalse);
+        expect(updateService.isCompletingUpdate, isFalse);
+        expect(updateService.isUpdateDownloaded, isTrue);
+        expect(updateService.installStatus, InstallStatus.downloaded);
+
+        // If native call succeeds, state transitions cleanly and resume reconciles
+        fakeClient.shouldThrowOnComplete = false;
+        expect(await updateService.completeFlexibleUpdate(), isTrue);
+        expect(updateService.isCompletingUpdate, isFalse);
+        expect(updateService.isUpdateDownloaded, isFalse);
+        expect(updateService.installStatus, InstallStatus.installing);
+
+        await updateService.handleAppResumed();
+        expect(updateService.isCompletingUpdate, isFalse);
+      },
+    );
   });
 }

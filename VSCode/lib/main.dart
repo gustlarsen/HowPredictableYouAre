@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/storage_service.dart';
 import 'services/localization_service.dart';
@@ -37,7 +40,6 @@ void main() async {
     billingService: billingService,
     updateService: updateService,
   );
-  unawaited(adService.initialize(adsRemoved: controller.unlockedAds));
   unawaited(billingService.initialize());
 
   runApp(
@@ -48,14 +50,120 @@ void main() async {
   );
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(adService.initialize(adsRemoved: controller.unlockedAds));
     unawaited(playGames.initialize());
   });
 }
 
-class HowPredictableApp extends StatelessWidget {
+class HowPredictableApp extends StatefulWidget {
   final Widget? home;
 
   const HowPredictableApp({super.key, this.home});
+
+  @override
+  State<HowPredictableApp> createState() => _HowPredictableAppState();
+}
+
+class _HowPredictableAppState extends State<HowPredictableApp>
+    with WidgetsBindingObserver {
+  static const MethodChannel _viewportChannel = MethodChannel(
+    'com.gustlarsen.howpredictable/viewport',
+  );
+
+  bool _rebuildScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _applyEdgeToEdgeSystemUi();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncMetricsWithController();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!mounted) return;
+    _syncMetricsWithController();
+    _scheduleSafeRebuild();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed) {
+      _applyEdgeToEdgeSystemUi();
+      unawaited(_requestNativeViewportSync());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncMetricsWithController();
+        _scheduleSafeRebuild();
+      });
+    }
+  }
+
+  void _applyEdgeToEdgeSystemUi() {
+    try {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    } catch (_) {
+      // Ignore on unsupported platforms or test bindings.
+    }
+  }
+
+  Future<void> _requestNativeViewportSync() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _viewportChannel.invokeMethod<bool>('syncViewport');
+    } catch (_) {
+      // Ignore MissingPluginException in tests or unsupported runners.
+    }
+  }
+
+  void _syncMetricsWithController() {
+    final view = View.maybeOf(context) ??
+        WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
+    if (view == null) return;
+    final dpr = view.devicePixelRatio;
+    if (dpr <= 0) return;
+    final logicalSize = view.physicalSize / dpr;
+    if (logicalSize.isEmpty) return;
+
+    try {
+      context.read<GameController>().handleMetricsChanged(
+        devicePixelRatio: dpr,
+        logicalSize: logicalSize,
+      );
+    } catch (_) {
+      // Ignore if provider is absent in isolated widget tests.
+    }
+  }
+
+  void _scheduleSafeRebuild() {
+    if (_rebuildScheduled || !mounted) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
+      setState(() {});
+      return;
+    }
+    _rebuildScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rebuildScheduled = false;
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +197,7 @@ class HowPredictableApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF0D0E12),
       ),
-      home: home ?? const WorldMapScreen(),
+      home: widget.home ?? const WorldMapScreen(),
     );
   }
 }

@@ -55,6 +55,8 @@ class UpdateService extends ChangeNotifier {
   bool _isChecking = false;
   bool _isManualChecking = false;
   bool _isDownloading = false;
+  bool _isCompletingUpdate = false;
+  bool _isAppForeground = true;
   bool _isUpdateAvailable = false;
   bool _isUpdateDownloaded = false;
   AppUpdateInfo? _updateInfo;
@@ -81,10 +83,15 @@ class UpdateService extends ChangeNotifier {
   bool get isChecking => _isChecking || _isManualChecking;
   bool get isManualChecking => _isManualChecking;
   bool get isDownloading => _isDownloading;
+  bool get isCompletingUpdate => _isCompletingUpdate;
   bool get isUpdateAvailable => _isUpdateAvailable;
   bool get isUpdateDownloaded => _isUpdateDownloaded;
   AppUpdateInfo? get updateInfo => _updateInfo;
   InstallStatus get installStatus => _installStatus;
+
+  void setAppForeground(bool isForeground) {
+    _isAppForeground = isForeground;
+  }
 
   void _ensureInstallListenerSubscribed() {
     if (_installStatusSubscription != null) return;
@@ -110,6 +117,7 @@ class UpdateService extends ChangeNotifier {
         break;
       case InstallStatus.downloaded:
         _isDownloading = false;
+        _isCompletingUpdate = false;
         _markUpdateDownloaded();
         break;
       case InstallStatus.installing:
@@ -118,6 +126,9 @@ class UpdateService extends ChangeNotifier {
       case InstallStatus.canceled:
       case InstallStatus.unknown:
         _isDownloading = false;
+        if (status != InstallStatus.installing) {
+          _isCompletingUpdate = false;
+        }
         notifyListeners();
         break;
     }
@@ -144,7 +155,11 @@ class UpdateService extends ChangeNotifier {
   ///    player can trigger the final installation and restart.
   /// 5. Fails silently when offline, sideloaded, or missing Play Services.
   Future<void> checkForUpdate() async {
-    if (!isSupportedPlatform || _isChecking) {
+    if (!isSupportedPlatform ||
+        _isChecking ||
+        _isDownloading ||
+        _isUpdateDownloaded ||
+        _isCompletingUpdate) {
       return;
     }
 
@@ -277,10 +292,16 @@ class UpdateService extends ChangeNotifier {
     }
   }
 
-  /// Re-checks whether a background flexible update finished downloading while
-  /// the app was backgrounded.
+  /// Re-checks whether a background flexible update finished downloading or
+  /// completed/canceled installation while the app was backgrounded.
   Future<void> handleAppResumed() async {
-    if (!isSupportedPlatform || !_isDownloading) {
+    _isAppForeground = true;
+    if (!isSupportedPlatform) {
+      return;
+    }
+    final wasCompleting = _isCompletingUpdate;
+    _isCompletingUpdate = false;
+    if (!_isDownloading && !wasCompleting) {
       return;
     }
     try {
@@ -290,25 +311,48 @@ class UpdateService extends ChangeNotifier {
       if (info.installStatus == InstallStatus.downloaded) {
         _isDownloading = false;
         _markUpdateDownloaded();
+      } else if (info.installStatus == InstallStatus.installed ||
+          info.updateAvailability == UpdateAvailability.updateNotAvailable) {
+        _isDownloading = false;
+        _isUpdateDownloaded = false;
+        notifyListeners();
+      } else if (wasCompleting) {
+        notifyListeners();
       }
     } catch (_) {
       // Fail silently on resume check errors.
+      if (wasCompleting) {
+        notifyListeners();
+      }
     }
   }
 
   /// Triggers the final installation and restart for a downloaded flexible
   /// update via Play Core's `completeFlexibleUpdate()`.
+  ///
+  /// Guards against duplicate calls and background invocations so Play Core
+  /// restarts the Activity cleanly while the Flutter window is active.
   Future<bool> completeFlexibleUpdate() async {
-    if (!isSupportedPlatform) {
+    if (!isSupportedPlatform || _isCompletingUpdate || !_isAppForeground) {
       return false;
     }
+    final wasDownloaded = _isUpdateDownloaded;
+    _isCompletingUpdate = true;
+    _isUpdateDownloaded = false;
+    _installStatus = InstallStatus.installing;
+    notifyListeners();
     try {
       await _client.completeFlexibleUpdate();
-      _isUpdateDownloaded = false;
-      _installStatus = InstallStatus.installing;
+      _isCompletingUpdate = false;
       notifyListeners();
       return true;
     } catch (_) {
+      _isCompletingUpdate = false;
+      _isUpdateDownloaded = wasDownloaded;
+      _installStatus = wasDownloaded
+          ? InstallStatus.downloaded
+          : InstallStatus.unknown;
+      notifyListeners();
       return false;
     }
   }

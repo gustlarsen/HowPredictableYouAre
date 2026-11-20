@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -68,6 +69,7 @@ class _GameScreenState extends State<GameScreen>
   bool _isDeathSequenceActive = false;
   bool _isDeathDialogOpen = false;
   bool _isKingdomFallDialogOpen = false;
+  bool _metricsRebuildScheduled = false;
   Timer? _deathDialogTimer;
   GameController? _controller;
 
@@ -185,8 +187,28 @@ class _GameScreenState extends State<GameScreen>
   }
 
   @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!mounted || _metricsRebuildScheduled) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
+      setState(() {});
+      return;
+    }
+    _metricsRebuildScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _metricsRebuildScheduled = false;
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
     final controller = context.read<GameController>();
     controller.didChangeAppLifecycleState(state);
   }
