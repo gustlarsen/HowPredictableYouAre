@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -17,6 +18,26 @@ enum CastleWing {
   relicChamber,
   spoilsOfWar,
   hallOfHeroes,
+}
+
+enum _AlchemyBatchOption {
+  x1(1, 'alchemy_multiplier_1x'),
+  x10(10, 'alchemy_multiplier_10x'),
+  x100(100, 'alchemy_multiplier_100x'),
+  x1000(1000, 'alchemy_multiplier_1000x'),
+  max(null, 'alchemy_multiplier_max');
+
+  final int? fixedMultiplier;
+  final String keyName;
+
+  const _AlchemyBatchOption(this.fixedMultiplier, this.keyName);
+
+  String label(LocalizationService loc) {
+    if (fixedMultiplier != null) {
+      return '${fixedMultiplier}x';
+    }
+    return loc.t('castle_alchemy_max', fallback: 'MAX');
+  }
 }
 
 /// Comprehensive 6-wing Royal Castle Hub dialog accessed from the Royal Castle
@@ -43,6 +64,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   late CastleWing _selectedWing;
   late HandMove _alchemySource;
   late HandMove _alchemyTarget;
+  _AlchemyBatchOption _selectedBatchOption = _AlchemyBatchOption.x1;
+  String? _alchemyConfirmationText;
+  Timer? _alchemyConfirmationTimer;
 
   GameController get controller => widget.controller;
 
@@ -59,6 +83,54 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         : HandMove.paper;
   }
 
+  @override
+  void dispose() {
+    _alchemyConfirmationTimer?.cancel();
+    super.dispose();
+  }
+
+  bool _isBatchOptionEnabled(_AlchemyBatchOption option, int sourceBalance) {
+    final mult = option.fixedMultiplier;
+    if (mult == null) {
+      return sourceBalance >= 3;
+    }
+    if (mult == 1) {
+      return true;
+    }
+    return sourceBalance >= 3 * mult;
+  }
+
+  void _stepDownFixedMultiplierIfNeeded() {
+    final fixed = _selectedBatchOption.fixedMultiplier;
+    if (fixed == null) return;
+    final sourceBalance = controller.orbsFor(_alchemySource);
+    if (sourceBalance >= 3 * fixed) return;
+
+    const descendingFixed = [
+      _AlchemyBatchOption.x1000,
+      _AlchemyBatchOption.x100,
+      _AlchemyBatchOption.x10,
+      _AlchemyBatchOption.x1,
+    ];
+    for (final candidate in descendingFixed) {
+      final candidateMult = candidate.fixedMultiplier!;
+      if (candidateMult == 1 || sourceBalance >= 3 * candidateMult) {
+        _selectedBatchOption = candidate;
+        return;
+      }
+    }
+    _selectedBatchOption = _AlchemyBatchOption.x1;
+  }
+
+  void _showAlchemyConfirmation(String text) {
+    _alchemyConfirmationTimer?.cancel();
+    setState(() => _alchemyConfirmationText = text);
+    _alchemyConfirmationTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _alchemyConfirmationText = null);
+    });
+  }
+
   void _cycleAlchemySource() {
     controller.audio.playTapVibrate();
     const moves = HandMove.values;
@@ -66,7 +138,10 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     for (int offset = 1; offset < moves.length; offset++) {
       final candidate = moves[(startIdx + offset) % moves.length];
       if (candidate != _alchemyTarget) {
-        setState(() => _alchemySource = candidate);
+        setState(() {
+          _alchemySource = candidate;
+          _stepDownFixedMultiplierIfNeeded();
+        });
         return;
       }
     }
@@ -719,8 +794,16 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 
     final sourceAvailable = controller.orbsFor(_alchemySource);
     final targetAvailable = controller.orbsFor(_alchemyTarget);
+    final maxBatches = sourceAvailable ~/ 3;
+    final int executeBatches =
+        _selectedBatchOption.fixedMultiplier ?? maxBatches;
+    final int previewBatches = _selectedBatchOption.fixedMultiplier != null
+        ? _selectedBatchOption.fixedMultiplier!
+        : (maxBatches > 0 ? maxBatches : 1);
     final canTransmute =
-        _alchemySource != _alchemyTarget && sourceAvailable >= 3;
+        _alchemySource != _alchemyTarget &&
+        executeBatches >= 1 &&
+        sourceAvailable >= 3 * executeBatches;
 
     final vaultBg = palette.isDark
         ? const LinearGradient(
@@ -996,10 +1079,10 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ),
         const SizedBox(height: 10),
 
-        // 2. Compact Visual Royal Alchemy Card (3 -> 1 Side-by-Side)
+        // 2. Compact Visual Royal Alchemy Card (3 -> 1 Side-by-Side + Batch Selector)
         Container(
           key: const ValueKey('royal_alchemy_card'),
-          padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
+          padding: const EdgeInsets.fromLTRB(13, 10, 13, 11),
           decoration: BoxDecoration(
             color: alchemyBg,
             borderRadius: BorderRadius.circular(16),
@@ -1011,39 +1094,71 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Flexible(
-                    child: Text(
-                      loc.t(
-                        'castle_alchemy_short_title',
-                        fallback: 'Royal Alchemy',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                        color: palette.primaryText,
-                      ),
+                  Text(
+                    loc.t(
+                      'castle_alchemy_short_title',
+                      fallback: 'Royal Alchemy',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                      color: palette.primaryText,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: Text(
-                      loc.t(
-                        'castle_alchemy_tap_hint',
-                        fallback: 'Tap orbs to switch',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: palette.mutedText,
-                      ),
-                    ),
+                    child: _alchemyConfirmationText != null
+                        ? Container(
+                            key: const ValueKey('alchemy_confirmation_badge'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: palette.successText.withValues(
+                                alpha: palette.isDark ? 0.16 : 0.12,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: palette.successText.withValues(
+                                  alpha: 0.45,
+                                ),
+                              ),
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                _alchemyConfirmationText!,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: palette.successText,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            loc.t(
+                              'castle_alchemy_tap_hint',
+                              fallback: 'Tap orbs to switch',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: palette.mutedText,
+                            ),
+                          ),
                   ),
                 ],
               ),
+              const SizedBox(height: 7),
+              _buildAlchemyBatchSelector(palette, loc, sourceAvailable),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1116,12 +1231,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '3× ${_shortElementTitle(_alchemySource, loc)} ($sourceAvailable)',
+                                    '${3 * previewBatches}x ${_shortElementTitle(_alchemySource, loc)} ($sourceAvailable)',
                                     key: const ValueKey('alchemy_source_label'),
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: sourceAvailable >= 3
+                                      color: sourceAvailable >=
+                                              3 * previewBatches
                                           ? palette.elementalText(_alchemySource)
                                           : palette.dangerText,
                                     ),
@@ -1168,7 +1284,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '1× ${_shortElementTitle(_alchemyTarget, loc)} ($targetAvailable)',
+                                    '${previewBatches}x ${_shortElementTitle(_alchemyTarget, loc)} ($targetAvailable)',
                                     key: const ValueKey('alchemy_target_label'),
                                     style: TextStyle(
                                       fontSize: 10,
@@ -1191,23 +1307,23 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     key: const ValueKey('alchemy_transmute_button'),
                     onPressed: canTransmute
                         ? () {
+                            final batches = executeBatches;
+                            final srcTitle =
+                                _shortElementTitle(_alchemySource, loc);
+                            final dstTitle =
+                                _shortElementTitle(_alchemyTarget, loc);
                             final ok = controller.transmuteOrbs(
                               _alchemySource,
                               _alchemyTarget,
+                              batches: batches,
                             );
-                            if (ok && context.mounted) {
-                              final srcName =
-                                  _alchemySource.elementalOrbName(loc);
-                              final dstName =
-                                  _alchemyTarget.elementalOrbName(loc);
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('3 $srcName → 1 $dstName'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
+                            if (ok) {
+                              setState(() {
+                                _stepDownFixedMultiplierIfNeeded();
+                              });
+                              _showAlchemyConfirmation(
+                                '-${3 * batches} $srcTitle ➔ +$batches $dstTitle',
+                              );
                             }
                           }
                         : null,
@@ -1243,6 +1359,126 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAlchemyBatchSelector(
+    AppPalette palette,
+    LocalizationService loc,
+    int sourceAvailable,
+  ) {
+    final trackBg = palette.isDark
+        ? const Color(0xFF14171F)
+        : const Color(0xFFE9E0CD);
+    final trackBorder = palette.amberBorder.withValues(
+      alpha: palette.isDark ? 0.25 : 0.45,
+    );
+
+    return Container(
+      key: const ValueKey('alchemy_multiplier_row'),
+      padding: const EdgeInsets.all(2.5),
+      decoration: BoxDecoration(
+        color: trackBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: trackBorder, width: 1.0),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < _AlchemyBatchOption.values.length; i++) ...[
+            if (i > 0) const SizedBox(width: 3),
+            Expanded(
+              child: _buildAlchemyBatchPill(
+                option: _AlchemyBatchOption.values[i],
+                palette: palette,
+                loc: loc,
+                sourceAvailable: sourceAvailable,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlchemyBatchPill({
+    required _AlchemyBatchOption option,
+    required AppPalette palette,
+    required LocalizationService loc,
+    required int sourceAvailable,
+  }) {
+    final isSelected = _selectedBatchOption == option;
+    final isEnabled = _isBatchOptionEnabled(option, sourceAvailable);
+
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+
+    if (isSelected) {
+      bgColor = isEnabled ? _goldFill : _goldFill.withValues(alpha: 0.45);
+      borderColor = bgColor;
+      textColor = isEnabled
+          ? _goldDarkInk
+          : _goldDarkInk.withValues(alpha: 0.72);
+    } else if (isEnabled) {
+      bgColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : const Color(0xFFFAF6EE);
+      borderColor = palette.amberBorder.withValues(
+        alpha: palette.isDark ? 0.28 : 0.42,
+      );
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.90)
+          : palette.primaryText;
+    } else {
+      bgColor = Colors.transparent;
+      borderColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : palette.sandCardBorder.withValues(alpha: 0.55);
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.28)
+          : palette.mutedText.withValues(alpha: 0.42);
+    }
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      enabled: isEnabled,
+      label: option.label(loc),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey(option.keyName),
+          onTap: isEnabled
+              ? () {
+                  controller.audio.playTapVibrate();
+                  setState(() => _selectedBatchOption = option);
+                }
+              : null,
+          borderRadius: BorderRadius.circular(7.5),
+          child: Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(7.5),
+              border: Border.all(color: borderColor, width: 1.0),
+            ),
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                option.label(loc),
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

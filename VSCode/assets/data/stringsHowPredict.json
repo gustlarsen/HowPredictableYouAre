@@ -1564,6 +1564,10 @@
     "pt_castle_alchemy_tap_hint": "Toque para trocar",
     "es_castle_alchemy_tap_hint": "Toca para cambiar",
     "de_castle_alchemy_tap_hint": "Tippen zum Wechseln",
+    "en_castle_alchemy_max": "MAX",
+    "pt_castle_alchemy_max": "MÁX",
+    "es_castle_alchemy_max": "MÁX",
+    "de_castle_alchemy_max": "MAX",
 
     "en_castle_heroes_title": "Hall of Heroes",
     "pt_castle_heroes_title": "Salão dos Heróis",

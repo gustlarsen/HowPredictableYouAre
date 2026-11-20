@@ -154,6 +154,18 @@ class AudioService {
     }
   }
 
+  /// Plays light/medium haptic feedback and transmutation chime SFX on Royal Alchemy exchange.
+  Future<void> playAlchemyTransmute() async {
+    playWinVibrate();
+    if (!soundEnabled) return;
+    try {
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/chime.wav'));
+    } catch (error) {
+      debugPrint('Could not play alchemy transmute sound: $error');
+    }
+  }
+
   Future<void> startMusic() async {
     if (!musicEnabled) return;
     try {

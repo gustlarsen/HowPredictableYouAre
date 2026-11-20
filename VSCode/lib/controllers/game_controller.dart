@@ -1322,26 +1322,53 @@ class GameController extends ChangeNotifier {
     return shown && earned;
   }
 
-  /// Royal Alchemy: transmutes 3 Elemental Orbs of [source] into 1 Elemental Orb
-  /// of [target].
-  bool transmuteOrbs(HandMove source, HandMove target) {
-    if (source == target || orbsFor(source) < 3) {
+  void _addOrbInMemory(HandMove move, int delta) {
+    switch (move) {
+      case HandMove.rock:
+        fireOrbs += delta;
+        break;
+      case HandMove.paper:
+        waterOrbs += delta;
+        break;
+      case HandMove.scissors:
+        woodOrbs += delta;
+        break;
+      case HandMove.lizard:
+        earthOrbs += delta;
+        break;
+      case HandMove.spock:
+        metalOrbs += delta;
+        break;
+    }
+  }
+
+  /// Royal Alchemy: atomically transmutes `3 * batches` Elemental Orbs of
+  /// [source] into `batches` Elemental Orbs of [target].
+  bool transmuteOrbs(HandMove source, HandMove target, {int batches = 1}) {
+    if (batches < 1 || source == target || batches > orbsFor(source) ~/ 3) {
       audio.playVibrate();
       return false;
     }
-    final sourceTurn0WasEnough = turn0OrbsFor(source) >= 3;
-    _incrementOrbForMove(source, -3);
-    _incrementOrbForMove(target, 1);
 
-    if (sourceTurn0WasEnough) {
-      _adjustTurn0OrbForMove(source, -3);
-      _adjustTurn0OrbForMove(target, 1);
+    final sourceCost = 3 * batches;
+    final prevTurn0Source = turn0OrbsFor(source);
+    final baselineBatches = math.min(prevTurn0Source, sourceCost) ~/ 3;
+
+    _addOrbInMemory(source, -sourceCost);
+    _addOrbInMemory(target, batches);
+
+    if (prevTurn0Source >= sourceCost) {
+      _adjustTurn0OrbForMove(source, -sourceCost);
     } else {
       _clampTurn0OrbToBalance(source);
     }
+    if (baselineBatches > 0) {
+      _adjustTurn0OrbForMove(target, baselineBatches);
+    }
 
+    _persistOrbsToStorage();
     _persistTurn0OrbsToStorage();
-    audio.playWinVibrate();
+    unawaited(audio.playAlchemyTransmute());
     _triggerCloudSave();
     notifyListeners();
     return true;

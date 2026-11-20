@@ -95,6 +95,7 @@ class _TestAdMobClient implements AdMobClient {
 
 class _TestPlayGamesClient implements PlayGamesClient {
   String? savedPayload;
+  int saveGameCount = 0;
 
   @override
   Future<String?> signIn() async => 'success';
@@ -111,6 +112,7 @@ class _TestPlayGamesClient implements PlayGamesClient {
     required String name,
   }) async {
     savedPayload = data;
+    saveGameCount++;
     return 'success';
   }
 
@@ -118,10 +120,20 @@ class _TestPlayGamesClient implements PlayGamesClient {
   Future<String?> loadGame({required String name}) async => savedPayload;
 }
 
+class _SpyAudioService extends AudioService {
+  int alchemyTransmuteCount = 0;
+
+  @override
+  Future<void> playAlchemyTransmute() async {
+    alchemyTransmuteCount++;
+  }
+}
+
 Future<GameController> _createController({
   Map<String, Object> prefs = const {},
   _TestAdMobClient? adClient,
   _TestPlayGamesClient? playGamesClient,
+  AudioService? audioService,
   bool loadJsonStrings = false,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -151,7 +163,7 @@ Future<GameController> _createController({
   return GameController(
     storage: storage,
     localization: localization,
-    audio: AudioService(),
+    audio: audioService ?? AudioService(),
     adService: adService,
     playGames: playGames,
   );
@@ -320,24 +332,73 @@ void main() {
     );
 
     test(
-      '3-to-1 Royal Alchemy deducts 3 source orbs, adds 1 target orb, and rejects invalid exchanges',
+      '3-to-1 Royal Alchemy deducts 3*batches source orbs, adds batches target orbs atomically with single cloud save and audio feedback, and rejects invalid exchanges',
       () async {
+        final playGamesClient = _TestPlayGamesClient();
+        final spyAudio = _SpyAudioService();
         final controller = await _createController(
-          prefs: {'orbs_fire': 7, 'orbs_water': 1},
+          playGamesClient: playGamesClient,
+          audioService: spyAudio,
+          prefs: {
+            'orbs_fire': 3010,
+            'orbs_water': 1,
+            'turn0_orbs_fire': 3004,
+            'turn0_orbs_water': 1,
+            'turn0_orbs_wood': 0,
+            'turn0_orbs_earth': 0,
+            'turn0_orbs_metal': 0,
+          },
         );
         addTearDown(controller.dispose);
 
+        final savesBefore = playGamesClient.saveGameCount;
+
         // Cannot transmute to same element
         expect(controller.transmuteOrbs(HandMove.rock, HandMove.rock), isFalse);
-        // Cannot transmute when < 3
+        // Cannot transmute with invalid batch count (< 1)
+        expect(
+          controller.transmuteOrbs(HandMove.rock, HandMove.paper, batches: 0),
+          isFalse,
+        );
+        expect(
+          controller.transmuteOrbs(HandMove.rock, HandMove.paper, batches: -3),
+          isFalse,
+        );
+        // Cannot transmute when source balance < 3 * batches
         expect(controller.transmuteOrbs(HandMove.paper, HandMove.rock), isFalse);
+        expect(
+          controller.transmuteOrbs(HandMove.rock, HandMove.paper, batches: 1004),
+          isFalse,
+        );
+        expect(playGamesClient.saveGameCount, savesBefore);
+        expect(spyAudio.alchemyTransmuteCount, 0);
 
-        // Valid 3 Fire -> 1 Earth
+        // Single batch (default batches = 1): 3 Fire -> 1 Earth
         expect(controller.transmuteOrbs(HandMove.rock, HandMove.lizard), isTrue);
-        expect(controller.fireOrbs, 4);
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.fireOrbs, 3007);
         expect(controller.earthOrbs, 1);
-        expect(controller.turn0FireOrbs, 4);
+        expect(controller.turn0FireOrbs, 3001);
         expect(controller.turn0EarthOrbs, 1);
+        expect(controller.storage.fireOrbs, 3007);
+        expect(controller.storage.earthOrbs, 1);
+        expect(playGamesClient.saveGameCount, savesBefore + 1);
+        expect(spyAudio.alchemyTransmuteCount, 1);
+
+        // Atomic 1000x batch: 3000 Fire -> 1000 Water in a single save
+        expect(
+          controller.transmuteOrbs(HandMove.rock, HandMove.paper, batches: 1000),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.fireOrbs, 7);
+        expect(controller.waterOrbs, 1001);
+        expect(controller.turn0FireOrbs, 1);
+        expect(controller.turn0WaterOrbs, 1001);
+        expect(controller.storage.fireOrbs, 7);
+        expect(controller.storage.waterOrbs, 1001);
+        expect(playGamesClient.saveGameCount, savesBefore + 2);
+        expect(spyAudio.alchemyTransmuteCount, 2);
       },
     );
 
@@ -791,6 +852,224 @@ void main() {
           tester.widget<RoyalCastleIcon>(throneIconFinder).isOnGoldBackground,
           isFalse,
         );
+      },
+    );
+
+    testWidgets(
+      'Royal Alchemy batch selector updates live previews for 1x/10x/100x/1000x/MAX, executes exact atomic transfers, and fits 360dp screen without overflow in Dark & Light modes',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 760);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {
+            'orbs_fire': 3450,
+            'orbs_water': 12,
+            'orbs_wood': 40,
+            'orbs_earth': 2,
+            'orbs_metal': 0,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: RoyalCastleDialog(
+                  controller: controller,
+                  initialWing: CastleWing.treasury,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          // All 5 multiplier pills render on a single horizontal row within 360dp
+          final pillKeys = [
+            const ValueKey('alchemy_multiplier_1x'),
+            const ValueKey('alchemy_multiplier_10x'),
+            const ValueKey('alchemy_multiplier_100x'),
+            const ValueKey('alchemy_multiplier_1000x'),
+            const ValueKey('alchemy_multiplier_max'),
+          ];
+          final firstPillY = tester.getTopLeft(find.byKey(pillKeys.first)).dy;
+          for (final key in pillKeys) {
+            expect(find.byKey(key), findsOneWidget);
+            expect(
+              tester.getTopLeft(find.byKey(key)).dy,
+              closeTo(firstPillY, 1.0),
+            );
+            expect(
+              tester.getBottomRight(find.byKey(key)).dx,
+              lessThanOrEqualTo(360),
+            );
+          }
+
+          // Zero-scroll viewport check on 360x760
+          final alchemyBottom = tester
+              .getBottomRight(find.byKey(const ValueKey('royal_alchemy_card')))
+              .dy;
+          final okBottom = tester.getBottomRight(find.text('Ok')).dy;
+          expect(alchemyBottom, lessThanOrEqualTo(760));
+          expect(okBottom, lessThanOrEqualTo(760));
+        }
+
+        // Default 1x preview
+        expect(find.text('3x Fire (3450)'), findsOneWidget);
+        expect(find.text('1x Water (12)'), findsOneWidget);
+
+        // Select 10x -> 30x Fire -> 10x Water
+        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_10x')));
+        await tester.pumpAndSettle();
+        expect(find.text('30x Fire (3450)'), findsOneWidget);
+        expect(find.text('10x Water (12)'), findsOneWidget);
+
+        // Select 100x -> 300x Fire -> 100x Water
+        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_100x')));
+        await tester.pumpAndSettle();
+        expect(find.text('300x Fire (3450)'), findsOneWidget);
+        expect(find.text('100x Water (12)'), findsOneWidget);
+
+        // Select 1000x -> 3000x Fire -> 1000x Water
+        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_1000x')));
+        await tester.pumpAndSettle();
+        expect(find.text('3000x Fire (3450)'), findsOneWidget);
+        expect(find.text('1000x Water (12)'), findsOneWidget);
+
+        // Execute 1000x trade: 3450 Fire -> 450 Fire, 12 Water -> 1012 Water
+        // Remaining 450 Fire cannot afford 1000x, so it auto-steps down to 100x!
+        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
+        await tester.pumpAndSettle();
+        expect(controller.fireOrbs, 450);
+        expect(controller.waterOrbs, 1012);
+        expect(
+          find.byKey(const ValueKey('alchemy_confirmation_badge')),
+          findsOneWidget,
+        );
+        expect(find.text('-3000 Fire ➔ +1000 Water'), findsOneWidget);
+
+        // Auto-step-down moved selection from 1000x to 100x (450 >= 300)
+        expect(find.text('300x Fire (450)'), findsOneWidget);
+        expect(find.text('100x Water (1012)'), findsOneWidget);
+
+        // 1000x pill is now disabled
+        final pill1000 = tester.widget<InkWell>(
+          find.byKey(const ValueKey('alchemy_multiplier_1000x')),
+        );
+        expect(pill1000.onTap, isNull);
+
+        // Execute 100x trade: 450 Fire -> 150 Fire, 1012 Water -> 1112 Water
+        // Auto-steps down from 100x to 10x (150 >= 30)
+        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
+        await tester.pumpAndSettle();
+        expect(controller.fireOrbs, 150);
+        expect(controller.waterOrbs, 1112);
+        expect(find.text('-300 Fire ➔ +100 Water'), findsOneWidget);
+        expect(find.text('30x Fire (150)'), findsOneWidget);
+        expect(find.text('10x Water (1112)'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Royal Alchemy MAX calculates floor(balance / 3) accurately, handles < 3 orbs, skips opposite element, and steps down on source switch',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {
+            'orbs_fire': 3002,
+            'orbs_water': 12,
+            'orbs_wood': 40,
+            'orbs_earth': 2,
+            'orbs_metal': 0,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: RoyalCastleDialog(
+                controller: controller,
+                initialWing: CastleWing.treasury,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap MAX with 3002 Fire -> previews 3000x Fire (3002) -> 1000x Water (12)
+        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_max')));
+        await tester.pumpAndSettle();
+        expect(find.text('3000x Fire (3002)'), findsOneWidget);
+        expect(find.text('1000x Water (12)'), findsOneWidget);
+
+        // Execute MAX trade -> leaves 2 Fire, adds 1000 Water
+        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
+        await tester.pumpAndSettle();
+        expect(controller.fireOrbs, 2);
+        expect(controller.waterOrbs, 1012);
+        expect(find.text('-3000 Fire ➔ +1000 Water'), findsOneWidget);
+
+        // With 2 Fire remaining (< 3), MAX preview keeps 3x -> 1x ratio clear,
+        // while Exchange button and MAX pill are disabled
+        expect(find.text('3x Fire (2)'), findsOneWidget);
+        expect(find.text('1x Water (1012)'), findsOneWidget);
+        final exchangeBtn = tester.widget<ElevatedButton>(
+          find.byKey(const ValueKey('alchemy_transmute_button')),
+        );
+        expect(exchangeBtn.onPressed, isNull);
+        final maxPill = tester.widget<InkWell>(
+          find.byKey(const ValueKey('alchemy_multiplier_max')),
+        );
+        expect(maxPill.onTap, isNull);
+
+        // Cycle source orb from Fire -> skips Water (target) -> lands on Wood (40)!
+        await tester.tap(find.byKey(const ValueKey('alchemy_source_selector')));
+        await tester.pumpAndSettle();
+        expect(find.text('39x Wood (40)'), findsOneWidget);
+        expect(find.text('13x Water (1012)'), findsOneWidget);
+
+        // Select 10x on Wood (40 >= 30), then cycle source to Earth (2 < 30) -> auto-steps down to 1x
+        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_10x')));
+        await tester.pumpAndSettle();
+        expect(find.text('30x Wood (40)'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('alchemy_source_selector')));
+        await tester.pumpAndSettle();
+        expect(find.text('3x Earth (2)'), findsOneWidget);
+        expect(find.text('1x Water (1012)'), findsOneWidget);
+
+        // Unaffordable 10x / 100x / 1000x pills are disabled on Earth (2)
+        for (final key in const [
+          ValueKey('alchemy_multiplier_10x'),
+          ValueKey('alchemy_multiplier_100x'),
+          ValueKey('alchemy_multiplier_1000x'),
+        ]) {
+          expect(tester.widget<InkWell>(find.byKey(key)).onTap, isNull);
+        }
+
+        // Verify localized MAX label in Portuguese ('MÁX')
+        controller.setLanguage('pt');
+        await tester.pumpAndSettle();
+        expect(find.text('MÁX'), findsOneWidget);
       },
     );
   });
