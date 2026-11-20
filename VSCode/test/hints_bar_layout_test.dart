@@ -410,5 +410,111 @@ void main() {
       expect(data['de_string13'], 'PC-Wahl:');
       expect(data['de_string14'], 'Vorschlag:');
     });
+
+    testWidgets('Crystal Ball+ pill derives from Crystal Ball and displays 2 winning elements side-by-side when Earth & Metal are active', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedCrystalBall': true,
+        'showCrystalBall': true,
+        'unlockedCrystalBallPlus': true,
+        'showCrystalBallPlus': true,
+        'unlockedNewHands': true,
+        'showNewHands': true,
+        'unlockedNewSkin': true,
+        'showNewSkin': false, // Elemental mode
+        'animationsEnabled': false,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: AudioService(),
+      );
+
+      // Set Crystal Ball prediction directly to Wood (scissors) -> Fire & Metal beat Wood
+      controller.crystalBallMove = HandMove.scissors;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                return Center(
+                  child: SizedBox(
+                    width: 320,
+                    child: HintsBar(controller: controller),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Crystal Ball+:'), findsOneWidget);
+      expect(find.text('Crystal Ball:'), findsNothing);
+      expect(controller.crystalBallPlusMoves, [HandMove.rock, HandMove.spock]);
+
+      final cbPlusChip = find.ancestor(
+        of: find.text('Crystal Ball+:'),
+        matching: find.byType(Container),
+      ).first;
+      expect(tester.getSize(cbPlusChip).height, equals(34.0));
+
+      // Both winning elemental icons (Fire & Metal) are rendered inside the pill
+      final fireIcon = find.descendant(
+        of: cbPlusChip,
+        matching: find.byIcon(HandMove.rock.elementalIcon),
+      );
+      final metalIcon = find.descendant(
+        of: cbPlusChip,
+        matching: find.byIcon(HandMove.spock.elementalIcon),
+      );
+      expect(fireIcon, findsOneWidget);
+      expect(metalIcon, findsOneWidget);
+      expect(
+        tester.getTopLeft(fireIcon).dx,
+        lessThan(tester.getTopLeft(metalIcon).dx),
+      );
+
+      // Verify all 5 elements yield 2 winning icons inside the fixed-height pill
+      for (final pcMove in HandMove.values) {
+        controller.crystalBallMove = pcMove;
+        controller.notifyListeners();
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        expect(tester.getSize(cbPlusChip).height, equals(34.0));
+        final counters = controller.crystalBallPlusMoves;
+        expect(counters, hasLength(2));
+        for (final counter in counters) {
+          expect(
+            find.descendant(
+              of: cbPlusChip,
+              matching: find.byIcon(counter.elementalIcon),
+            ),
+            findsOneWidget,
+          );
+        }
+      }
+
+      // Classic Hands mode also shows both winning emojis side-by-side without overflow
+      controller.toggleShowNewSkin(true);
+      controller.crystalBallMove = HandMove.rock;
+      controller.notifyListeners();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(cbPlusChip).height, equals(34.0));
+      expect(
+        find.descendant(
+          of: cbPlusChip,
+          matching: find.text('${HandMove.paper.emoji} ${HandMove.spock.emoji}'),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }

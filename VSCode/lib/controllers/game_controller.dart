@@ -170,7 +170,27 @@ class GameController extends ChangeNotifier {
   HandMove? pcNextMove;
   HandMove? suggestedMove;
   HandMove? crystalBallMove;
-  HandMove? crystalBallPlusMove;
+
+  /// Predicted upcoming PC move(s) revealed by Crystal Ball.
+  List<HandMove> get crystalBallMoves =>
+      crystalBallMove != null ? [crystalBallMove!] : const [];
+
+  /// All active player elements that defeat the Crystal Ball's predicted PC
+  /// element(s), derived directly from [crystalBallMoves].
+  List<HandMove> get crystalBallPlusMoves {
+    final predictedPcMoves = crystalBallMoves;
+    if (predictedPcMoves.isEmpty) return const [];
+    final counters = <HandMove>[];
+    for (final pcMove in predictedPcMoves) {
+      for (final playerMove in _engine.activeMoves) {
+        if (playerMove.beats(pcMove, elemental: isElementalMode) &&
+            !counters.contains(playerMove)) {
+          counters.add(playerMove);
+        }
+      }
+    }
+    return List.unmodifiable(counters);
+  }
 
   List<HandMove> predictedUserMoves = [];
   List<HandMove> pcNextMoves = [];
@@ -1943,7 +1963,6 @@ class GameController extends ChangeNotifier {
   void _computeNextHints() {
     _engine.enableEnemyExtendedHands = enemyUses5Elements;
     crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
-    crystalBallPlusMove = _engine.computeSuggestion(crystalBallMove!);
 
     if (enemyPhase == 3) {
       // Pure uniform random 1/5 AI: Markov prediction hints are meaningless.

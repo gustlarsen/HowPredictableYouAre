@@ -693,12 +693,18 @@ void main() {
     expect(find.text('Crystal Ball:'), findsNothing);
     expect(find.text('Crystal Ball+:'), findsOneWidget);
 
-    final winningMove = controller.crystalBallPlusMove!;
+    final winningMoves = controller.crystalBallPlusMoves;
     final pcMove = controller.crystalBallMove!;
-    expect(winningMove.beats(pcMove), isTrue);
+    expect(winningMoves, hasLength(1));
+    expect(
+      winningMoves.every(
+        (m) => m.beats(pcMove, elemental: controller.isElementalMode),
+      ),
+      isTrue,
+    );
 
     // Playing the hand shown by Crystal Ball+ beats the PC
-    controller.playTurn(winningMove);
+    controller.playTurn(winningMoves.first);
     await tester.pump();
     expect(controller.lastWinner, RoundWinner.user);
 

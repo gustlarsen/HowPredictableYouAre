@@ -1315,4 +1315,70 @@ void main() {
     expect(controller.is100RoundsAlertPending, isTrue);
     expect(controller.percentPredict, closeTo((30 / 49) * 100.0, 1e-6));
   });
+
+  test('crystalBallPlusMoves derives all winning active elements directly from crystalBallMoves in 3- and 5-element modes', () async {
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 10000,
+      'orbs_water': 10000,
+      'orbs_wood': 10000,
+      'orbs_earth': 10000,
+      'orbs_metal': 10000,
+      'musicEnabled': false,
+    });
+    await createController();
+
+    expect(controller.isElementalMode, isTrue);
+    expect(controller.showNewHands, isFalse);
+
+    // 3-element mode: returns the single active counter element
+    controller.crystalBallMove = HandMove.scissors; // Wood
+    expect(controller.crystalBallMoves, [HandMove.scissors]);
+    expect(controller.crystalBallPlusMoves, [HandMove.rock]); // Fire
+
+    controller.crystalBallMove = HandMove.rock; // Fire
+    expect(controller.crystalBallMoves, [HandMove.rock]);
+    expect(controller.crystalBallPlusMoves, [HandMove.paper]); // Water
+
+    controller.crystalBallMove = HandMove.paper; // Water
+    expect(controller.crystalBallMoves, [HandMove.paper]);
+    expect(controller.crystalBallPlusMoves, [HandMove.scissors]); // Wood
+
+    // Enable Unlock Earth & Metal (5-element mode): returns both winning elements
+    expect(controller.unlockNewHands(), isTrue);
+    controller.toggleShowNewHands(true);
+    expect(controller.showNewHands, isTrue);
+
+    controller.crystalBallMove = HandMove.scissors; // Wood -> Fire & Metal
+    expect(controller.crystalBallPlusMoves, [HandMove.rock, HandMove.spock]);
+
+    controller.crystalBallMove = HandMove.rock; // Fire -> Water & Earth
+    expect(controller.crystalBallPlusMoves, [HandMove.paper, HandMove.lizard]);
+
+    controller.crystalBallMove = HandMove.paper; // Water -> Wood & Earth
+    expect(controller.crystalBallPlusMoves, [HandMove.scissors, HandMove.lizard]);
+
+    controller.crystalBallMove = HandMove.lizard; // Earth -> Wood & Metal
+    expect(controller.crystalBallPlusMoves, [HandMove.scissors, HandMove.spock]);
+
+    controller.crystalBallMove = HandMove.spock; // Metal -> Fire & Water
+    expect(controller.crystalBallPlusMoves, [HandMove.rock, HandMove.paper]);
+
+    // Every returned counter defeats the Crystal Ball's predicted move
+    for (final pcMove in HandMove.values) {
+      controller.crystalBallMove = pcMove;
+      final counters = controller.crystalBallPlusMoves;
+      expect(counters, hasLength(2));
+      expect(
+        counters.every((c) => c.beats(pcMove, elemental: true)),
+        isTrue,
+      );
+    }
+
+    // Classic Hands mode (New Skin ON) follows classic RPSLS beats() rules
+    expect(controller.unlockNewSkin(), isTrue);
+    controller.toggleShowNewSkin(true);
+    expect(controller.isElementalMode, isFalse);
+    controller.crystalBallMove = HandMove.rock;
+    expect(controller.crystalBallPlusMoves, [HandMove.paper, HandMove.spock]);
+  });
 }
