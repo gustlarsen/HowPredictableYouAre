@@ -510,7 +510,7 @@ void main() {
 
         expect(controller.unlockedNewHands, isTrue);
         expect(
-          find.text('New Hands (Lizard & Spock): Restored!'),
+          find.text('Unlock Earth & Metal: Restored!'),
           findsOneWidget,
         );
       },

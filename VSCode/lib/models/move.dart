@@ -173,6 +173,15 @@ enum HandMove {
     }
   }
 
+  /// Resolves a round between [this] (player's move) and [other] (opponent's move)
+  /// using Classic RPS/RPSLS or 5-element Wu Xing rules when [elemental] is true.
+  RoundWinner resolvesAgainst(HandMove other, {bool elemental = false}) {
+    if (this == other) return RoundWinner.draw;
+    return beats(other, elemental: elemental)
+        ? RoundWinner.user
+        : RoundWinner.computer;
+  }
+
   /// Returns a localized or fallback battle outcome description when [this] defeats [loser].
   /// Returns null if [this] does not defeat [loser].
   String? battleDescriptionAgainst(

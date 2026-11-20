@@ -17,7 +17,7 @@ void main() {
     'reset_button_desc':
         'Adds a Reset button to clear the current match and Markov matrix anytime',
     'new_hands_desc':
-        'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
+        'Unlocks Earth & Metal in your move deck and deals bonus damage to the Phase 2 boss. Earn Earth & Metal orbs by defeating them in Phase 2.',
     'random_button_desc':
         'Adds a Random button to play unpredictable moves and outsmart the AI',
     'show_algorithm_desc':

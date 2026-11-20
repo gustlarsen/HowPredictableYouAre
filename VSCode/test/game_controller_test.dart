@@ -640,6 +640,8 @@ void main() {
       'orbs_fire': 500,
       'orbs_water': 500,
       'orbs_wood': 500,
+      'orbs_earth': 500,
+      'orbs_metal': 500,
       'musicEnabled': false,
     });
     await createController();
@@ -736,13 +738,13 @@ void main() {
     expect(controller.showCrystalBallPlus, isFalse);
 
     // Total deducted for all 11 standard items + CrystalBall+:
-    // Fire/Water/Wood: 15+30+40+80+120+250+600+1000+1500+2000+3500+5000 = 14,135
-    // Earth/Metal: 50+100+300+500+1000+1500+2500+5000 = 10,950
-    expect(controller.fireOrbs, 100000 - 14135);
-    expect(controller.waterOrbs, 100000 - 14135);
-    expect(controller.woodOrbs, 100000 - 14135);
-    expect(controller.earthOrbs, 100000 - 10950);
-    expect(controller.metalOrbs, 100000 - 10950);
+    // Fire/Water/Wood: 15+30+80+120+250+600+1000+1500+2000+3500+5000 = 14,095
+    // Earth/Metal: 50+50+100+300+500+1000+1500+2500+5000 = 11,000
+    expect(controller.fireOrbs, 100000 - 14095);
+    expect(controller.waterOrbs, 100000 - 14095);
+    expect(controller.woodOrbs, 100000 - 14095);
+    expect(controller.earthOrbs, 100000 - 11000);
+    expect(controller.metalOrbs, 100000 - 11000);
   });
 
   test('New Skin purchase costs 1500 Fire/Water/Wood + 1000 Earth/Metal, starts disabled, and toggling ON/OFF applies seamlessly without resetting match, scores, or Markov matrix', () async {

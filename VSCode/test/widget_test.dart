@@ -1246,7 +1246,7 @@ void main() {
     expect(find.text('Gauge'), findsNothing);
   });
 
-  testWidgets('Predictability Score costs 15 Fire + 15 Water + 15 Wood, renders at #1 position in ShopDialog ahead of Reset Button and New Hands, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
+  testWidgets('Predictability Score costs 15 Fire + 15 Water + 15 Wood, renders at #1 position in ShopDialog ahead of Reset Button and Unlock Earth & Metal, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'has_seen_story_predictability': true,
@@ -1288,10 +1288,10 @@ void main() {
       matching: find.byType(Scrollable),
     );
 
-    // Verify Predictability Score is ahead of Reset Button and New Hands and costs 15 Fire + 15 Water + 15 Wood
+    // Verify Predictability Score is ahead of Reset Button and Unlock Earth & Metal and costs 15 Fire + 15 Water + 15 Wood
     final predTitle = find.text('Predictability Score');
     final resetTitle = find.text('Reset Button');
-    final newHandsTitle = find.text('New Hands');
+    final newHandsTitle = find.text('Unlock Earth & Metal');
     final scrollState = tester.state<ScrollableState>(shopScrollable);
 
     await tester.scrollUntilVisible(
@@ -1429,15 +1429,18 @@ void main() {
     expect(tester.getCenter(paperFinder).dy, equals(classicCenterY));
     expect(tester.getCenter(scissorsFinder).dy, equals(classicCenterY));
 
-    // Purchase New Hands -> remains disabled until user enables it
-    controller.addAllOrbs(40);
+    // Purchase Unlock Earth & Metal (50 Earth + 50 Metal) -> remains disabled until user enables it
+    controller.addOrbForMove(HandMove.lizard, 50);
+    controller.addOrbForMove(HandMove.spock, 50);
     expect(controller.unlockNewHands(), isTrue);
+    expect(controller.earthOrbs, 0);
+    expect(controller.metalOrbs, 0);
     expect(controller.showNewHands, isFalse);
     await tester.pump();
     expect(lizardFinder, findsNothing);
     expect(spockFinder, findsNothing);
 
-    // Enable New Hands (5 hands total)
+    // Enable Unlock Earth & Metal (5 hands total)
     controller.toggleShowNewHands(true);
     await tester.pump();
 
@@ -1465,7 +1468,7 @@ void main() {
     expect(compactScissorsSize.width, lessThan(classicScissorsSize.width));
     expect(compactScissorsSize.height, lessThan(classicScissorsSize.height));
 
-    // Deactivate New Hands -> 3 classic hands restore their exact old size
+    // Deactivate Unlock Earth & Metal -> 3 classic hands restore their exact old size
     controller.toggleShowNewHands(false);
     await tester.pump();
 
@@ -1476,7 +1479,7 @@ void main() {
     expect(tester.getSize(scissorsFinder), equals(classicScissorsSize));
   });
 
-  testWidgets('Enabling/disabling New Hands prompts to reset game only when a hand has been chosen, supporting cancel and confirm', (WidgetTester tester) async {
+  testWidgets('Enabling/disabling Unlock Earth & Metal prompts to reset game only when a hand has been chosen, supporting cancel and confirm', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'unlockedNewHands': true,
@@ -1502,7 +1505,7 @@ void main() {
     );
 
     // 1. At the beginning of the game (no hand chosen yet):
-    // Toggling New Hands in ShopDialog does NOT ask to reset the game
+    // Toggling Unlock Earth & Metal in ShopDialog does NOT ask to reset the game
     expect(controller.hasGameStarted, isFalse);
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
@@ -1510,7 +1513,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('New Hands (Lizard & Spock)'),
+      find.text('Unlock Earth & Metal'),
       140,
       scrollable: find.descendant(
         of: find.byType(ShopDialog),
@@ -1518,15 +1521,15 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.tap(find.text('Unlock Earth & Metal'));
     await tester.pumpAndSettle();
 
-    // No RESET confirmation dialog should appear; New Hands is enabled immediately
+    // No RESET confirmation dialog should appear; Unlock Earth & Metal is enabled immediately
     expect(find.text('This will clear your scores and prediction history.'), findsNothing);
     expect(controller.showNewHands, isTrue);
 
-    // Disabling New Hands while still at the beginning also does NOT ask to reset
-    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    // Disabling Unlock Earth & Metal while still at the beginning also does NOT ask to reset
+    await tester.tap(find.text('Unlock Earth & Metal'));
     await tester.pumpAndSettle();
     expect(find.text('This will clear your scores and prediction history.'), findsNothing);
     expect(controller.showNewHands, isFalse);
@@ -1540,14 +1543,14 @@ void main() {
     expect(controller.turnCount, 1);
     expect(controller.hasGameStarted, isTrue);
 
-    // 2. Open ShopDialog and press New Hands to enable it while game is in progress
+    // 2. Open ShopDialog and press Unlock Earth & Metal to enable it while game is in progress
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('New Hands (Lizard & Spock)'),
+      find.text('Unlock Earth & Metal'),
       140,
       scrollable: find.descendant(
         of: find.byType(ShopDialog),
@@ -1555,7 +1558,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    await tester.tap(find.text('Unlock Earth & Metal'));
     await tester.pumpAndSettle();
 
     // Reset confirmation dialog must appear
@@ -1574,8 +1577,8 @@ void main() {
     expect(controller.currentUserMove, HandMove.rock);
     expect(controller.hasGameStarted, isTrue);
 
-    // 4. Press New Hands again and confirm RESET -> enables 5 hands AND resets the game
-    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    // 4. Press Unlock Earth & Metal again and confirm RESET -> enables 5 hands AND resets the game
+    await tester.tap(find.text('Unlock Earth & Metal'));
     await tester.pumpAndSettle();
     expect(find.text('This will clear your scores and prediction history.'), findsOneWidget);
 
@@ -1592,8 +1595,8 @@ void main() {
     expect(controller.hasGameStarted, isFalse);
 
     // 5. Since the game was just reset and no hand has been chosen yet,
-    // disabling New Hands now does NOT ask to reset the game
-    await tester.tap(find.text('New Hands (Lizard & Spock)'));
+    // disabling Unlock Earth & Metal now does NOT ask to reset the game
+    await tester.tap(find.text('Unlock Earth & Metal'));
     await tester.pumpAndSettle();
     expect(find.text('This will clear your scores and prediction history.'), findsNothing);
     expect(controller.showNewHands, isFalse);
@@ -2322,7 +2325,7 @@ void main() {
 
     // Earth and Metal show simplified Locked status while showNewHands is false
     expect(
-      find.text('Locked (Enable New Hands)'),
+      find.text('Locked (Unlock Earth & Metal)'),
       findsNWidgets(2),
     );
     expect(find.text('Active'), findsNWidgets(3));
@@ -3083,7 +3086,7 @@ void main() {
     }
 
     expect(find.text('Active'), findsNWidgets(3));
-    expect(find.text('Locked (Enable New Hands)'), findsNWidgets(2));
+    expect(find.text('Locked (Unlock Earth & Metal)'), findsNWidgets(2));
     expect(find.textContaining('in combat'), findsNothing);
 
     final darkCard = tester.widget<Container>(
@@ -3114,9 +3117,9 @@ void main() {
     );
 
     const expectedByLang = <String, (String, String)>{
-      'pt': ('Ativo', 'Bloqueado (Ative Novas Mãos)'),
-      'es': ('Activo', 'Bloqueado (Activa Nuevas Manos)'),
-      'de': ('Aktiv', 'Gesperrt (Neue Hände aktivieren)'),
+      'pt': ('Ativo', 'Bloqueado (Desbloquear Terra e Metal)'),
+      'es': ('Activo', 'Bloqueado (Desbloquear Tierra y Metal)'),
+      'de': ('Aktiv', 'Gesperrt (Erde & Metall freischalten)'),
     };
 
     for (final entry in expectedByLang.entries) {

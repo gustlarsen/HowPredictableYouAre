@@ -118,6 +118,9 @@ class BillingService extends ChangeNotifier {
     if (shopItemProductIds.containsKey(trimmed)) {
       return shopItemProductIds[trimmed];
     }
+    if (trimmed == 'Unlock Earth & Metal') {
+      return productNewHands;
+    }
     if (trimmed == 'Suggestion') {
       return productSuggestion;
     }

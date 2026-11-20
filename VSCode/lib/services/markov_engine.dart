@@ -2,8 +2,23 @@ import 'dart:math';
 import '../models/move.dart';
 
 class MarkovEngine {
+  static const List<HandMove> _baseMoves = [
+    HandMove.rock,
+    HandMove.paper,
+    HandMove.scissors,
+  ];
+
+  static const List<HandMove> _allMoves = [
+    HandMove.rock,
+    HandMove.paper,
+    HandMove.scissors,
+    HandMove.lizard,
+    HandMove.spock,
+  ];
+
   final Random _random;
   final bool enableExtendedHands;
+  bool enableEnemyExtendedHands;
   bool enableElementalMode;
 
   late List<List<int>> _matrix;
@@ -11,6 +26,7 @@ class MarkovEngine {
 
   MarkovEngine({
     this.enableExtendedHands = false,
+    this.enableEnemyExtendedHands = false,
     this.enableElementalMode = false,
     Random? random,
   }) : _random = random ?? Random() {
@@ -18,9 +34,7 @@ class MarkovEngine {
   }
 
   void _initMatrix() {
-    _activeMoves = enableExtendedHands
-        ? [HandMove.rock, HandMove.paper, HandMove.scissors, HandMove.lizard, HandMove.spock]
-        : [HandMove.rock, HandMove.paper, HandMove.scissors];
+    _activeMoves = enableExtendedHands ? _allMoves : _baseMoves;
 
     final size = _activeMoves.length;
     _matrix = List.generate(size, (_) => List.filled(size, 0));
@@ -28,7 +42,10 @@ class MarkovEngine {
 
   List<List<int>> get matrix => _matrix;
   List<HandMove> get activeMoves => _activeMoves;
+  List<HandMove> get enemyMoves =>
+      (enableExtendedHands || enableEnemyExtendedHands) ? _allMoves : _baseMoves;
   int get size => _activeMoves.length;
+  int get enemySize => enemyMoves.length;
 
   /// Resets the transition matrix counts back to zero
   void reset() {
@@ -44,23 +61,27 @@ class MarkovEngine {
     }
   }
 
-  int _indexOf(HandMove move) {
-    final idx = _activeMoves.indexOf(move);
-    return idx >= 0 ? idx : 0;
-  }
+  int _activeIndexOf(HandMove move) => _activeMoves.indexOf(move);
 
   /// Updates transition matrix with observed transition: [lastMove] -> [currentMove]
   void recordTransition(HandMove? lastMove, HandMove currentMove) {
     if (lastMove == null) return;
-    final rowIdx = _indexOf(lastMove);
-    final colIdx = _indexOf(currentMove);
+    final rowIdx = _activeIndexOf(lastMove);
+    final colIdx = _activeIndexOf(currentMove);
+    if (rowIdx < 0 ||
+        rowIdx >= _matrix.length ||
+        colIdx < 0 ||
+        colIdx >= _matrix[rowIdx].length) {
+      return;
+    }
     _matrix[rowIdx][colIdx] += 1;
   }
 
   /// Returns true if there is at least one recorded transition from [lastUserMove]
   bool hasPrediction(HandMove? lastUserMove) {
     if (lastUserMove == null) return false;
-    final rowIdx = _indexOf(lastUserMove);
+    final rowIdx = _activeIndexOf(lastUserMove);
+    if (rowIdx < 0 || rowIdx >= _matrix.length) return false;
     final row = _matrix[rowIdx];
     return row.any((count) => count > 0);
   }
@@ -72,13 +93,19 @@ class MarkovEngine {
       return [];
     }
 
-    final rowIdx = _indexOf(lastUserMove);
+    final rowIdx = _activeIndexOf(lastUserMove);
+    if (rowIdx < 0 || rowIdx >= _matrix.length) {
+      return [];
+    }
     final row = _matrix[rowIdx];
+    final colLimit = row.length < _activeMoves.length
+        ? row.length
+        : _activeMoves.length;
 
     int maxCount = 0;
     List<HandMove> bestMoves = [];
 
-    for (int col = 0; col < row.length; col++) {
+    for (int col = 0; col < colLimit; col++) {
       if (row[col] > maxCount) {
         maxCount = row[col];
         bestMoves = [_activeMoves[col]];
@@ -111,9 +138,10 @@ class MarkovEngine {
       return [];
     }
 
+    final pool = enemyMoves;
     final List<HandMove> choices = [];
     for (final predicted in predictedMoves) {
-      final winningCounters = _activeMoves
+      final winningCounters = pool
           .where((m) => m.beats(predicted, elemental: enableElementalMode))
           .toList();
       if (winningCounters.isNotEmpty) {
@@ -126,12 +154,12 @@ class MarkovEngine {
         final fallback = predicted.counterForMode(
           elemental: enableElementalMode,
         );
-        if (!choices.contains(fallback)) {
+        if (pool.contains(fallback) && !choices.contains(fallback)) {
           choices.add(fallback);
         }
       }
     }
-    if (choices.length >= _activeMoves.length) {
+    if (choices.length >= pool.length) {
       return [];
     }
     return choices;
@@ -141,18 +169,25 @@ class MarkovEngine {
   HandMove computeSmartChoice(HandMove? lastUserMove) {
     final choices = computeSmartChoices(lastUserMove);
     if (choices.isEmpty) {
-      return getRandomMove();
+      return getRandomEnemyMove();
     }
     return choices[_random.nextInt(choices.length)];
   }
 
-  /// Picks a random move from currently active moves
+  /// Picks a random move from the player's currently active moves
   HandMove getRandomMove() {
     return _activeMoves[_random.nextInt(_activeMoves.length)];
   }
 
-  /// Suggests the most probable hand(s) for the player to defeat the computer's expected move(s),
-  /// ordered corresponding to [anticipatedPcMoves]. Returns an empty list if PC plays random.
+  /// Picks a random move from the enemy's current move pool (5 elements in Phase 2)
+  HandMove getRandomEnemyMove() {
+    final pool = enemyMoves;
+    return pool[_random.nextInt(pool.length)];
+  }
+
+  /// Suggests the most probable hand(s) from the player's active move deck
+  /// to defeat the computer's expected move(s), ordered corresponding to [anticipatedPcMoves].
+  /// Returns an empty list if PC plays random.
   List<HandMove> computeSuggestions(List<HandMove> anticipatedPcMoves) {
     if (anticipatedPcMoves.isEmpty) {
       return [];
@@ -201,12 +236,21 @@ class MarkovEngine {
     return suggestions;
   }
 
-  /// Suggests a move for the player to defeat the computer's expected move
+  /// Suggests a move from the player's active move deck to defeat the computer's expected move
   HandMove computeSuggestion(HandMove anticipatedPcMove) {
     final suggestions = computeSuggestions([anticipatedPcMove]);
     if (suggestions.isNotEmpty) {
       return suggestions[_random.nextInt(suggestions.length)];
     }
-    return anticipatedPcMove.counterForMode(elemental: enableElementalMode);
+    final activeCounters = _activeMoves
+        .where((m) => m.beats(anticipatedPcMove, elemental: enableElementalMode))
+        .toList();
+    if (activeCounters.isNotEmpty) {
+      return activeCounters[_random.nextInt(activeCounters.length)];
+    }
+    final fallback = anticipatedPcMove.counterForMode(
+      elemental: enableElementalMode,
+    );
+    return _activeMoves.contains(fallback) ? fallback : _activeMoves.first;
   }
 }

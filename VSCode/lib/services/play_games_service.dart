@@ -415,7 +415,7 @@ class CloudSaveData {
     int value = statUpgradeOrbValue;
     if (unlockedPredictability) value += 45;
     if (unlockedReset) value += 90;
-    if (unlockedNewHands) value += 120;
+    if (unlockedNewHands) value += 100;
     if (unlockedRandom) value += 240;
     if (unlockedAlgorithm) value += 460;
     if (unlockedYourPrediction) value += 950;

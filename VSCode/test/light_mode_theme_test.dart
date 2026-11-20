@@ -197,7 +197,7 @@ void main() {
         expect(activeStatus.style?.color, lightPalette.secondaryText);
 
         final lockedStatus = tester.widget<Text>(
-          find.text('Locked (Enable New Hands)').first,
+          find.text('Locked (Unlock Earth & Metal)').first,
         );
         expect(lockedStatus.style?.color, lightPalette.amberText);
 

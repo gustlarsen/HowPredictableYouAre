@@ -44,6 +44,9 @@ class VersusArena extends StatefulWidget {
   final int remainingMana;
   final int maxMana;
   final bool elementalMode;
+  final int userDamageAmount;
+  final int computerDamageAmount;
+  final bool isPhase2;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
   final Key? clashCenterKey;
@@ -63,6 +66,9 @@ class VersusArena extends StatefulWidget {
     this.remainingMana = 100,
     this.maxMana = 100,
     this.elementalMode = false,
+    this.userDamageAmount = 1,
+    this.computerDamageAmount = 1,
+    this.isPhase2 = false,
     this.onImpactHaptic,
     this.pcSlotKey,
     this.clashCenterKey,
@@ -155,10 +161,16 @@ class _VersusArenaState extends State<VersusArena>
     if (widget.roundId > 0 && widget.animationsEnabled) {
       if (widget.winner == RoundWinner.user) {
         _pendingPcHp = widget.computerHp;
-        displayedPcHp = math.min(widget.computerMaxHp, widget.computerHp + 1);
+        displayedPcHp = math.min(
+          widget.computerMaxHp,
+          widget.computerHp + widget.computerDamageAmount,
+        );
       } else if (widget.winner == RoundWinner.computer) {
         _pendingPlayerHp = widget.userHp;
-        displayedPlayerHp = math.min(widget.playerMaxHp, widget.userHp + 1);
+        displayedPlayerHp = math.min(
+          widget.playerMaxHp,
+          widget.userHp + widget.userDamageAmount,
+        );
       }
       _startRoundAnimations();
     }
@@ -665,7 +677,7 @@ class _VersusArenaState extends State<VersusArena>
                         shakeOffset: _calculateShake(isDamaged),
                         damageIndicatorProgress:
                             _calculateDamageProgress(isUser: true),
-                        damageAmount: 1,
+                        damageAmount: widget.userDamageAmount,
                         handBuilder: (context, handWidget) {
                           Widget animatedChild = handWidget;
                           if (!widget.elementalMode &&
@@ -742,7 +754,8 @@ class _VersusArenaState extends State<VersusArena>
                           shakeOffset: _calculateShake(isDamaged),
                           damageIndicatorProgress:
                               _calculateDamageProgress(isUser: false),
-                          damageAmount: 1,
+                          damageAmount: widget.computerDamageAmount,
+                          showElementalShield: widget.isPhase2,
                           handBuilder: (context, handWidget) {
                             Widget animatedChild = handWidget;
                             if (!widget.elementalMode &&
@@ -1808,6 +1821,7 @@ class _MoveCard extends StatelessWidget {
   final double shakeOffset;
   final double? damageIndicatorProgress;
   final int damageAmount;
+  final bool showElementalShield;
   final Widget Function(BuildContext context, Widget handWidget) handBuilder;
 
   const _MoveCard({
@@ -1827,6 +1841,7 @@ class _MoveCard extends StatelessWidget {
     required this.shakeOffset,
     required this.damageIndicatorProgress,
     required this.damageAmount,
+    this.showElementalShield = false,
     required this.handBuilder,
   });
 
@@ -2005,6 +2020,37 @@ class _MoveCard extends StatelessWidget {
                 )!.withValues(
                   alpha: flashOpacity.clamp(0.0, 1.0) * 0.65,
                 ),
+              ),
+            ),
+          ),
+
+        // Phase 2 Archmage Elemental Shield badge (overlay, zero layout height change)
+        if (showElementalShield)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              key: const ValueKey('phase2_boss_shield_badge'),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF14161D),
+                border: Border.all(
+                  color: Colors.amber,
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.amber.withValues(alpha: 0.55),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.shield_rounded,
+                size: 13,
+                color: Colors.amber,
               ),
             ),
           ),

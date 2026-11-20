@@ -221,7 +221,7 @@ class _InventoryDialogState extends State<InventoryDialog>
                                           !isNewHandsActive,
                                       lockedStatusText: loc.t(
                                         'inventory_locked_combat',
-                                        fallback: 'Locked (Enable New Hands)',
+                                        fallback: 'Locked (Unlock Earth & Metal)',
                                       ),
                                       activeStatusText: loc.t(
                                         'inventory_active_combat',

@@ -1180,6 +1180,11 @@ class _GameScreenState extends State<GameScreen>
                                   remainingMana: controller.remainingMana,
                                   maxMana: controller.playerMaxMana,
                                   elementalMode: controller.isElementalMode,
+                                  userDamageAmount:
+                                      controller.bossWinDamageToPlayer,
+                                  computerDamageAmount:
+                                      controller.playerWinDamageToBoss,
+                                  isPhase2: controller.isPhase2,
                                   pcSlotKey: _pcSlotKey,
                                   clashCenterKey: _clashCenterKey,
                                   onImpactHaptic: controller.isElementalMode

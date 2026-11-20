@@ -8,15 +8,15 @@ class HintsBar extends StatelessWidget {
 
   const HintsBar({super.key, required this.controller});
 
-  String _formatMoves(List<HandMove> moves) {
-    if (moves.isEmpty || moves.length >= controller.engine.size) {
+  String _formatMoves(List<HandMove> moves, {required int poolSize}) {
+    if (moves.isEmpty || moves.length >= poolSize) {
       return '?';
     }
     return moves.map((m) => m.emoji).join(' ');
   }
 
-  List<HandMove> _visibleMoves(List<HandMove> moves) {
-    if (moves.isEmpty || moves.length >= controller.engine.size) {
+  List<HandMove> _visibleMoves(List<HandMove> moves, {required int poolSize}) {
+    if (moves.isEmpty || moves.length >= poolSize) {
       return const [];
     }
     return moves;
@@ -39,14 +39,22 @@ class HintsBar extends StatelessWidget {
     final loc = controller.localization;
     final palette = AppPalette.of(context);
     final elemental = controller.isElementalMode;
+    final playerPoolSize = controller.engine.size;
+    final enemyPoolSize = controller.engine.enemySize;
 
     final topChips = <Widget>[
       if (controller.showYourPrediction)
         _HintChip(
           icon: Icons.psychology_outlined,
           label: loc.t('string12', fallback: 'Your Choice:'),
-          value: _formatMoves(controller.predictedUserMoves),
-          moves: _visibleMoves(controller.predictedUserMoves),
+          value: _formatMoves(
+            controller.predictedUserMoves,
+            poolSize: playerPoolSize,
+          ),
+          moves: _visibleMoves(
+            controller.predictedUserMoves,
+            poolSize: playerPoolSize,
+          ),
           elementalMode: elemental,
           color: palette.blueAccent,
         ),
@@ -54,8 +62,14 @@ class HintsBar extends StatelessWidget {
         _HintChip(
           icon: Icons.smart_toy_outlined,
           label: loc.t('string13', fallback: 'PC\'s Choice:'),
-          value: _formatMoves(controller.pcNextMoves),
-          moves: _visibleMoves(controller.pcNextMoves),
+          value: _formatMoves(
+            controller.pcNextMoves,
+            poolSize: enemyPoolSize,
+          ),
+          moves: _visibleMoves(
+            controller.pcNextMoves,
+            poolSize: enemyPoolSize,
+          ),
           elementalMode: elemental,
           color: palette.orangeAccent,
         ),
@@ -66,8 +80,14 @@ class HintsBar extends StatelessWidget {
         _HintChip(
           icon: Icons.lightbulb_outline,
           label: loc.t('string14', fallback: 'Suggestion:'),
-          value: _formatMoves(controller.suggestedMoves),
-          moves: _visibleMoves(controller.suggestedMoves),
+          value: _formatMoves(
+            controller.suggestedMoves,
+            poolSize: playerPoolSize,
+          ),
+          moves: _visibleMoves(
+            controller.suggestedMoves,
+            poolSize: playerPoolSize,
+          ),
           elementalMode: elemental,
           color: palette.successText,
         ),

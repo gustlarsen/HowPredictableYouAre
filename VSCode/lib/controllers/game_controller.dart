@@ -29,7 +29,10 @@ class GameController extends ChangeNotifier {
   static const int maxMana = baseMaxMana;
   static const int pcMaxHp = 100;
   static const int maxCampaignWeeks = 40;
+  static const int phase2StartWeek = 10;
   static const int damagePerLoss = 1;
+  static const int phase2BaseBossDamage = 2;
+  static const int phase2BonusBossDamage = 4;
   static const int maxTreasuryPerElement = 50;
   static const int maxTreasuryTotal = 250;
 
@@ -55,9 +58,8 @@ class GameController extends ChangeNotifier {
     wood: 30,
   );
   static const ElementalCost costNewHands = ElementalCost(
-    fire: 40,
-    water: 40,
-    wood: 40,
+    earth: 50,
+    metal: 50,
   );
   static const ElementalCost costRandom = ElementalCost(
     fire: 80,
@@ -583,6 +585,16 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  bool get isPhase2 => currentWeek >= phase2StartWeek;
+
+  bool get isEarthAndMetalActive => unlockedNewHands && showNewHands;
+
+  int get playerWinDamageToBoss => isPhase2
+      ? (showNewHands ? phase2BonusBossDamage : phase2BaseBossDamage)
+      : damagePerLoss;
+
+  int get bossWinDamageToPlayer => damagePerLoss;
+
   void _loadState({bool restartAudio = true}) {
     _syncOrbsFromStorage();
     if (storage.hasTurn0OrbSnapshot) {
@@ -601,17 +613,6 @@ class GameController extends ChangeNotifier {
       userHp = storage.userHp.clamp(0, playerMaxHp);
     } else {
       userHp = math.max(0, playerMaxHp - pcScore * damagePerLoss);
-    }
-    if (storage.pcHpRaw != null) {
-      computerHp = storage.pcHp.clamp(0, pcMaxHp);
-    } else {
-      computerHp = math.max(0, pcMaxHp - userScore * damagePerLoss);
-    }
-    isDeathAlertPending = userHp <= 0;
-    is100RoundsAlertPending =
-        !isDeathAlertPending && totalRounds >= playerMaxMana;
-    if (totalRounds == 0 && storage.lastUserMove == null) {
-      turnCount = 0;
     }
 
     darkMode = storage.darkMode;
@@ -653,6 +654,19 @@ class GameController extends ChangeNotifier {
     showCrystalBallPlus =
         showCrystalBall ? storage.showCrystalBallPlus : false;
     giftBoxEnabled = giftBoxUnlocked ? storage.giftBoxEnabled : false;
+
+    if (storage.pcHpRaw != null) {
+      computerHp = storage.pcHp.clamp(0, pcMaxHp);
+    } else {
+      computerHp = math.max(0, pcMaxHp - userScore * playerWinDamageToBoss);
+    }
+    isDeathAlertPending = userHp <= 0;
+    is100RoundsAlertPending =
+        !isDeathAlertPending && totalRounds >= playerMaxMana;
+    if (totalRounds == 0 && storage.lastUserMove == null) {
+      turnCount = 0;
+    }
+
     if (!giftBoxUnlocked || !giftBoxEnabled) {
       _pauseGiftTimer();
       if (!giftBoxUnlocked) {
@@ -688,6 +702,7 @@ class GameController extends ChangeNotifier {
 
     _engine = MarkovEngine(
       enableExtendedHands: showNewHands,
+      enableEnemyExtendedHands: isPhase2,
       enableElementalMode: isElementalMode,
     );
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
@@ -702,8 +717,9 @@ class GameController extends ChangeNotifier {
           currentUserMove == HandMove.spock) {
         currentUserMove = null;
       }
-      if (currentComputerMove == HandMove.lizard ||
-          currentComputerMove == HandMove.spock) {
+      if (!isPhase2 &&
+          (currentComputerMove == HandMove.lizard ||
+              currentComputerMove == HandMove.spock)) {
         currentComputerMove = null;
       }
     }
@@ -711,15 +727,11 @@ class GameController extends ChangeNotifier {
       currentUserMove = null;
       currentComputerMove = null;
       lastWinner = null;
-    } else if (currentUserMove == currentComputerMove) {
-      lastWinner = RoundWinner.draw;
-    } else if (currentUserMove!.beats(
-      currentComputerMove!,
-      elemental: isElementalMode,
-    )) {
-      lastWinner = RoundWinner.user;
     } else {
-      lastWinner = RoundWinner.computer;
+      lastWinner = currentUserMove!.resolvesAgainst(
+        currentComputerMove!,
+        elemental: isElementalMode,
+      );
     }
     lastUserMove = currentUserMove;
 
@@ -1508,6 +1520,7 @@ class GameController extends ChangeNotifier {
       return;
     }
     turnCount++;
+    _engine.enableEnemyExtendedHands = isPhase2;
     final previousMove = lastUserMove;
     final hadPrediction = _engine.hasPrediction(previousMove);
     currentUserMove = userChoice;
@@ -1517,18 +1530,22 @@ class GameController extends ChangeNotifier {
     } else {
       _markBestiaryEncountered(BestiaryCreature.guardianRobot);
     }
-    if (currentWeek >= 10) {
+    if (isPhase2) {
       _markBestiaryEncountered(BestiaryCreature.archmageRobot);
     }
 
     // AI uses the move already pre-computed before the user chose their hand
     currentComputerMove = crystalBallMove ??
         (!hadPrediction
-            ? _engine.getRandomMove()
+            ? _engine.getRandomEnemyMove()
             : _engine.computeSmartChoice(previousMove));
 
-    // Determine round outcome
-    if (currentUserMove == currentComputerMove) {
+    // Determine round outcome via HandMove.resolvesAgainst (supports 3-vs-5 Wu Xing)
+    final roundOutcome = currentUserMove!.resolvesAgainst(
+      currentComputerMove!,
+      elemental: isElementalMode,
+    );
+    if (roundOutcome == RoundWinner.draw) {
       lastWinner = RoundWinner.draw;
       decreeWinStreak = 0;
       if (previousMove != null && userChoice == previousMove) {
@@ -1537,10 +1554,7 @@ class GameController extends ChangeNotifier {
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
       audio.playDraw();
-    } else if (currentUserMove!.beats(
-      currentComputerMove!,
-      elemental: isElementalMode,
-    )) {
+    } else if (roundOutcome == RoundWinner.user) {
       lastWinner = RoundWinner.user;
       userScore += 1;
       // Grant +1 Elemental Orb of the defeated AI/PC element
@@ -1549,7 +1563,7 @@ class GameController extends ChangeNotifier {
       _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
       orbCollectionEventId += 1;
-      computerHp = (computerHp - damagePerLoss).clamp(0, pcMaxHp);
+      computerHp = (computerHp - playerWinDamageToBoss).clamp(0, pcMaxHp);
       storage.setUserScore(userScore);
       storage.setPcHp(computerHp);
 
@@ -1569,7 +1583,7 @@ class GameController extends ChangeNotifier {
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
-      userHp = (userHp - damagePerLoss).clamp(0, playerMaxHp);
+      userHp = (userHp - bossWinDamageToPlayer).clamp(0, playerMaxHp);
       storage.setPcScore(pcScore);
       storage.setUserHp(userHp);
       decreeWinStreak = 0;
@@ -1621,13 +1635,14 @@ class GameController extends ChangeNotifier {
   }
 
   void _computeNextHints() {
+    _engine.enableEnemyExtendedHands = isPhase2;
     predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
     pcNextMoves = _engine.computeSmartChoices(lastUserMove);
     suggestedMoves = _engine.computeSuggestions(pcNextMoves);
 
     // Pre-decide the exact PC move (Markov counter or random fallback) before the user chooses a hand
     if (!_engine.hasPrediction(lastUserMove)) {
-      crystalBallMove = _engine.getRandomMove();
+      crystalBallMove = _engine.getRandomEnemyMove();
     } else {
       crystalBallMove = _engine.computeSmartChoice(lastUserMove);
     }
@@ -1652,6 +1667,7 @@ class GameController extends ChangeNotifier {
     computerHp = pcMaxHp;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
+    _engine.enableEnemyExtendedHands = isPhase2;
     _engine.reset();
 
     storage.clearGameStats(userMaxHp: playerMaxHp, pcMaxHp: pcMaxHp);
@@ -2729,6 +2745,7 @@ class GameController extends ChangeNotifier {
     storage.setShowNewHands(val);
     _engine = MarkovEngine(
       enableExtendedHands: val,
+      enableEnemyExtendedHands: isPhase2,
       enableElementalMode: isElementalMode,
     );
     _resetBattleState();
@@ -2749,16 +2766,10 @@ class GameController extends ChangeNotifier {
     _engine.enableElementalMode = isElementalMode;
 
     if (currentUserMove != null && currentComputerMove != null) {
-      if (currentUserMove == currentComputerMove) {
-        lastWinner = RoundWinner.draw;
-      } else if (currentUserMove!.beats(
+      lastWinner = currentUserMove!.resolvesAgainst(
         currentComputerMove!,
         elemental: isElementalMode,
-      )) {
-        lastWinner = RoundWinner.user;
-      } else {
-        lastWinner = RoundWinner.computer;
-      }
+      );
     }
 
     _computeNextHints();
