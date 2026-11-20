@@ -611,7 +611,7 @@ void main() {
     );
 
     testWidgets(
-      'RoyalCastleDialog renders all 6 horizontally scrollable tabs on 390x844, claims Hall of Heroes blessings, and clears WorldMap badge',
+      'RoyalCastleDialog renders all 6 compact tabs without scrolling on 390x844, claims Hall of Heroes blessings, and clears WorldMap badge',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -644,17 +644,16 @@ void main() {
           findsOneWidget,
         );
 
-        // Open Royal Castle and scroll horizontally to 6th wing (Hall of Heroes)
+        // Open Royal Castle and tap 6th wing (Hall of Heroes) directly in single-row tab bar
         await tester.tap(find.byKey(const ValueKey('landmark_royal_castle')));
         await tester.pumpAndSettle();
 
         final hallTab = find.byKey(const ValueKey('castle_tab_hall_of_heroes'));
         expect(
-          find.byKey(const ValueKey('castle_wing_tab_strip')),
+          find.byKey(const ValueKey('royal_castle_tab_bar')),
           findsOneWidget,
         );
-        await tester.ensureVisible(hallTab);
-        await tester.pumpAndSettle();
+        expect(hallTab, findsOneWidget);
         await tester.tap(hallTab);
         await tester.pumpAndSettle();
 

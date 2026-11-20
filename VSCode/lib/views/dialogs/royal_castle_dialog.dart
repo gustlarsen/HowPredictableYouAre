@@ -5,6 +5,7 @@ import '../../models/royal_castle.dart';
 import '../../models/story_chapter.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/elemental_energy_sphere.dart';
 import 'story_gallery_dialog.dart';
 
 /// Identifies the 6 wings inside the [RoyalCastleDialog] hub.
@@ -34,9 +35,13 @@ class RoyalCastleDialog extends StatefulWidget {
 }
 
 class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
+  static const Color _goldFill = Color(0xFFF5C22B);
+  static const Color _goldDarkInk = Color(0xFF1E1B16);
+  static const Color _alertRed = Color(0xFFE53935);
+
   late CastleWing _selectedWing;
-  HandMove _alchemySource = HandMove.rock;
-  HandMove _alchemyTarget = HandMove.paper;
+  late HandMove _alchemySource;
+  late HandMove _alchemyTarget;
 
   GameController get controller => widget.controller;
 
@@ -44,41 +49,46 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   void initState() {
     super.initState();
     _selectedWing = widget.initialWing;
+    _alchemySource = HandMove.values.firstWhere(
+      (m) => controller.orbsFor(m) >= 3,
+      orElse: () => HandMove.rock,
+    );
+    _alchemyTarget = _alchemySource == HandMove.paper
+        ? HandMove.rock
+        : HandMove.paper;
   }
 
-  String _wingSubtitle(LocalizationService loc) {
-    switch (_selectedWing) {
-      case CastleWing.throneRoom:
-        return loc.t(
-          'castle_wing_throne_subtitle',
-          fallback: "King's Throne Room & Royal Decrees",
-        );
-      case CastleWing.library:
-        return loc.t(
-          'castle_wing_library_subtitle',
-          fallback: 'Royal Library, Bestiary & Story Memories',
-        );
-      case CastleWing.treasury:
-        return loc.t(
-          'castle_wing_treasury_subtitle',
-          fallback: 'Royal Treasury & 3-to-1 Alchemy',
-        );
-      case CastleWing.relicChamber:
-        return loc.t(
-          'castle_wing_relics_subtitle',
-          fallback: 'Restore Lost Artifacts',
-        );
-      case CastleWing.spoilsOfWar:
-        return loc.t(
-          'castle_wing_spoils_subtitle',
-          fallback: 'Reclaim Lost Elemental Orbs',
-        );
-      case CastleWing.hallOfHeroes:
-        return loc.t(
-          'castle_wing_heroes_subtitle',
-          fallback: "Restore Fallen Hero's Stat Blessings",
-        );
+  void _cycleAlchemySource() {
+    controller.audio.playTapVibrate();
+    const moves = HandMove.values;
+    final startIdx = moves.indexOf(_alchemySource);
+    for (int offset = 1; offset < moves.length; offset++) {
+      final candidate = moves[(startIdx + offset) % moves.length];
+      if (candidate != _alchemyTarget) {
+        setState(() => _alchemySource = candidate);
+        return;
+      }
     }
+  }
+
+  void _cycleAlchemyTarget() {
+    controller.audio.playTapVibrate();
+    const moves = HandMove.values;
+    final startIdx = moves.indexOf(_alchemyTarget);
+    for (int offset = 1; offset < moves.length; offset++) {
+      final candidate = moves[(startIdx + offset) % moves.length];
+      if (candidate != _alchemySource) {
+        setState(() => _alchemyTarget = candidate);
+        return;
+      }
+    }
+  }
+
+  String _shortElementTitle(HandMove move, LocalizationService loc) {
+    final raw = move.displayLabel(elemental: true, localization: loc).trim();
+    if (raw.isEmpty) return move.elementalLabel;
+    if (raw.length == 1) return raw.toUpperCase();
+    return raw[0].toUpperCase() + raw.substring(1).toLowerCase();
   }
 
   @override
@@ -98,7 +108,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           surfaceTintColor: palette.isDark ? null : Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 20,
+            vertical: 16,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -110,9 +120,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             ),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480, maxHeight: 700),
+            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 720),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,11 +165,14 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                               ),
                             ),
                             Text(
-                              _wingSubtitle(loc),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              loc.t(
+                                'castle_hub_subtitle',
+                                fallback: 'Kingdom Hub & Royal Wings',
+                              ),
+                              maxLines: 2,
                               style: TextStyle(
                                 fontSize: 11.5,
+                                height: 1.2,
                                 color: palette.amberSubtitle,
                               ),
                             ),
@@ -190,18 +203,18 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
-                  // 5 Castle Wing Navigation Pills
-                  _buildWingTabStrip(context, palette, loc),
+                  // 6 Compact Vertical Navigation Tabs in a Single Row
+                  _buildWingTabBar(context, palette, loc),
 
                   Divider(
-                    height: 18,
+                    height: 14,
                     color: palette.isDark ? null : palette.divider,
                   ),
 
-                  // Wing Body
-                  Expanded(
+                  // Active Wing Content
+                  Flexible(
                     child: SingleChildScrollView(
                       key: ValueKey('castle_wing_scroll_${_selectedWing.name}'),
                       child: _buildSelectedWing(context, palette, loc),
@@ -213,13 +226,27 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       key: const ValueKey('royal_castle_close_button'),
-                      style: palette.isDark
-                          ? null
-                          : TextButton.styleFrom(
-                              foregroundColor: palette.amberText,
-                            ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: palette.amberText,
+                        backgroundColor: palette.isDark
+                            ? palette.amberBorder.withValues(alpha: 0.16)
+                            : palette.rewardedAdCardSurface,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: palette.amberBorder.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(loc.t('string36', fallback: 'Ok')),
+                      child: Text(
+                        loc.t('string36', fallback: 'Ok'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -231,7 +258,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     );
   }
 
-  Widget _buildWingTabStrip(
+  Widget _buildWingTabBar(
     BuildContext context,
     AppPalette palette,
     LocalizationService loc,
@@ -241,54 +268,53 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         wing: CastleWing.throneRoom,
         key: const ValueKey('castle_tab_throne'),
         icon: Icons.castle_rounded,
-        label: loc.t('castle_tab_throne', fallback: 'Throne Room'),
+        label: loc.t('castle_tab_throne_short', fallback: 'Throne'),
         hasDot: false,
       ),
       (
         wing: CastleWing.library,
         key: const ValueKey('castle_tab_library'),
-        icon: Icons.auto_stories_rounded,
-        label: loc.t('castle_tab_library', fallback: 'Library'),
+        icon: Icons.menu_book_rounded,
+        label: loc.t('castle_tab_library_short', fallback: 'Library'),
         hasDot: false,
       ),
       (
         wing: CastleWing.treasury,
         key: const ValueKey('castle_tab_treasury'),
-        icon: Icons.savings_rounded,
-        label: loc.t('castle_tab_treasury', fallback: 'Treasury'),
+        icon: Icons.inventory_2_rounded,
+        label: loc.t('castle_tab_treasury_short', fallback: 'Treasury'),
         hasDot: controller.isAnyTreasuryElementFull,
       ),
       (
         wing: CastleWing.relicChamber,
         key: const ValueKey('castle_tab_relics'),
         icon: Icons.auto_awesome_rounded,
-        label: loc.t('castle_tab_relics', fallback: 'Relic Chamber'),
+        label: loc.t('castle_tab_relics_short', fallback: 'Relics'),
         hasDot: controller.hasAvailableRelicChamberUpgrades,
       ),
       (
         wing: CastleWing.spoilsOfWar,
         key: const ValueKey('castle_tab_spoils'),
-        icon: Icons.military_tech_rounded,
-        label: loc.t('castle_tab_spoils', fallback: 'Spoils of War'),
+        icon: Icons.savings_rounded,
+        label: loc.t('castle_tab_spoils_short', fallback: 'Spoils'),
         hasDot: controller.hasSpoilsOfWarOrbs,
       ),
       (
         wing: CastleWing.hallOfHeroes,
         key: const ValueKey('castle_tab_hall_of_heroes'),
         icon: Icons.workspace_premium_rounded,
-        label: loc.t('castle_tab_hall_of_heroes', fallback: 'Hall of Heroes'),
+        label: loc.t('castle_tab_heroes_short', fallback: 'Heroes'),
         hasDot: controller.hasHallOfHeroesBlessings,
       ),
     ];
 
-    return SingleChildScrollView(
-      key: const ValueKey('castle_wing_tab_strip'),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (int i = 0; i < tabs.length; i++) ...[
-            if (i > 0) const SizedBox(width: 6),
-            _WingNavPill(
+    return Row(
+      key: const ValueKey('royal_castle_tab_bar'),
+      children: [
+        for (int i = 0; i < tabs.length; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          Expanded(
+            child: _CompactVerticalTabPill(
               key: tabs[i].key,
               icon: tabs[i].icon,
               label: tabs[i].label,
@@ -300,9 +326,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 setState(() => _selectedWing = tabs[i].wing);
               },
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -372,7 +398,6 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       key: const ValueKey('castle_wing_throne_room'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Wing Title Banner
         Text(
           loc.t('throne_title', fallback: "King's Throne Room"),
           style: TextStyle(
@@ -549,7 +574,6 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       key: const ValueKey('castle_wing_library'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 1. Endings Discovered (X / 4)
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -595,7 +619,6 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ],
         const SizedBox(height: 12),
 
-        // 2. Arcane Bestiary (Markov Bestiary)
         Text(
           loc.t('castle_bestiary_title', fallback: 'Arcane Bestiary'),
           style: TextStyle(
@@ -609,7 +632,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           loc.t(
             'castle_bestiary_subtitle',
             fallback:
-                'Mathematical constructs encountered in the Metal Wizard\'s Lair.',
+                "Mathematical constructs encountered in the Metal Wizard's Lair.",
           ),
           style: TextStyle(fontSize: 11.5, color: palette.secondaryText),
         ),
@@ -626,7 +649,6 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ],
         const SizedBox(height: 8),
 
-        // 3. Story Memories Comic Gallery
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -667,7 +689,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   }
 
   // ---------------------------------------------------------------------------
-  // WING 3: ROYAL TREASURY (PIGGY BANK + 3-TO-1 ALCHEMY EXCHANGE)
+  // WING 3: ROYAL TREASURY (VAULT WITH 5 3D ORBS + VISUAL 3->1 ROYAL ALCHEMY)
   // ---------------------------------------------------------------------------
   Widget _buildTreasuryWing(
     BuildContext context,
@@ -680,28 +702,48 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     final isRemoveAds = controller.isRemoveAdsActive;
     final canClaimAd = totalStored > 0 && controller.adService.isRewardedAdReady;
     final canClaimDirect = isRemoveAds && totalStored > 0;
-    final canTransmute = _alchemySource != _alchemyTarget &&
-        controller.orbsFor(_alchemySource) >= 3;
+
+    final sourceAvailable = controller.orbsFor(_alchemySource);
+    final targetAvailable = controller.orbsFor(_alchemyTarget);
+    final canTransmute =
+        _alchemySource != _alchemyTarget && sourceAvailable >= 3;
+
+    final vaultBg = palette.isDark
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF5A451B), Color(0xFF3E3012)],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF6E8C6), Color(0xFFEBDCB4)],
+          );
+    final vaultBorderColor = palette.isDark ? _goldFill : palette.amberBorder;
+
+    final alchemyBg =
+        palette.isDark ? const Color(0xFF1E222B) : palette.dialogCardSurface;
+    final alchemyBorder = palette.isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : palette.sandCardBorder;
 
     return Column(
       key: const ValueKey('castle_wing_treasury'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Piggy Bank Vault Section
+        // 1. Royal Treasury Vault Card
         Container(
-          padding: const EdgeInsets.all(14),
+          key: const ValueKey('treasury_vault_card'),
+          padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
           decoration: BoxDecoration(
-            color: palette.dialogCardSurface,
+            gradient: vaultBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: palette.amberBorder.withValues(
-                alpha: palette.isDark ? 0.45 : 0.65,
-              ),
-            ),
+            border: Border.all(color: vaultBorderColor, width: 1.4),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Title & Chest Icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -711,114 +753,116 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         'castle_treasury_vault_title',
                         fallback: 'Royal Treasury Vault',
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: palette.primaryText,
+                        fontSize: 14.5,
+                        color: palette.isDark
+                            ? const Color(0xFFFBE29A)
+                            : palette.primaryText,
                       ),
                     ),
                   ),
-                  Text(
-                    '$totalStored / ${GameController.maxTreasuryTotal}',
-                    key: const ValueKey('treasury_total_count'),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.5,
-                      color: palette.amberText,
-                    ),
+                  Icon(
+                    Icons.inventory_2_rounded,
+                    size: 19,
+                    color: vaultBorderColor,
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                loc.t(
-                  'castle_treasury_vault_desc',
-                  fallback:
-                      'Every battle round won deposits +1 mirror orb here (max 50 per element).',
-                ),
-                style: TextStyle(fontSize: 11.5, color: palette.secondaryText),
-              ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  key: const ValueKey('treasury_total_progress'),
-                  value: overallFraction,
-                  minHeight: 8,
-                  backgroundColor: palette.sandCardSurface,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    controller.isAnyTreasuryElementFull
-                        ? Colors.amber
-                        : palette.amberBorder,
+
+              // Full-Width Integrated Progress Bar (X / 250 centered inside)
+              Container(
+                height: 21,
+                decoration: BoxDecoration(
+                  color: palette.isDark
+                      ? const Color(0xFF281F0C)
+                      : const Color(0xFFDCC99E),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: vaultBorderColor.withValues(alpha: 0.55),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: overallFraction,
+                        child: Container(
+                          key: const ValueKey('treasury_total_progress'),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFFD97B12), _goldFill],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Text(
+                          '$totalStored / ${GameController.maxTreasuryTotal}',
+                          key: const ValueKey('treasury_total_count'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11.5,
+                            color: palette.isDark
+                                ? Colors.white
+                                : const Color(0xFF231F1A),
+                            shadows: palette.isDark
+                                ? const [
+                                    Shadow(
+                                      color: Colors.black54,
+                                      blurRadius: 3,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // Per-element capacity breakdown
-              for (final move in HandMove.values) ...[
-                _TreasuryElementRow(
-                  key: ValueKey('treasury_element_${move.orbKey}'),
-                  move: move,
-                  count: controller.treasuryOrbsFor(move),
-                  cap: GameController.maxTreasuryPerElement,
-                  loc: loc,
-                  palette: palette,
-                ),
-                const SizedBox(height: 6),
-              ],
-              const SizedBox(height: 8),
+              // 5 Glowing 3D Elemental Spheres in One Horizontal Row
+              Row(
+                key: const ValueKey('treasury_orbs_horizontal_row'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final move in HandMove.values)
+                    Expanded(
+                      child: _TreasuryHorizontalOrbColumn(
+                        key: ValueKey('treasury_element_${move.orbKey}'),
+                        move: move,
+                        count: controller.treasuryOrbsFor(move),
+                        cap: GameController.maxTreasuryPerElement,
+                        label: _shortElementTitle(move, loc),
+                        fullTag: loc.t(
+                          'castle_treasury_full_tag',
+                          fallback: 'FULL',
+                        ),
+                        palette: palette,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-              // AdMob-compliant Claim Button or Remove Ads Direct Claim
+              // Wide Bright-Gold Claim Button & AdMob Disclosure
               if (isRemoveAds)
-                ElevatedButton.icon(
-                  key: const ValueKey('treasury_claim_direct_button'),
-                  onPressed: canClaimDirect
-                      ? () {
-                          final ok = controller.claimTreasuryDirect();
-                          if (ok && context.mounted) {
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    loc.t(
-                                      'castle_treasury_claimed_msg',
-                                      fallback:
-                                          'Treasury orbs transferred to your backpack!',
-                                    ),
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                          }
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    foregroundColor: const Color(0xFF231F1A),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.savings_rounded, size: 18),
-                  label: Text(
-                    loc.t(
-                      'castle_treasury_claim_direct',
-                      fallback: 'Claim Treasury Orbs',
-                    ),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                )
-              else ...[
-                ElevatedButton.icon(
-                  key: const ValueKey('treasury_claim_ad_button'),
-                  onPressed: canClaimAd
-                      ? () {
-                          controller.watchAdToClaimTreasury(
-                            onClaimed: () {
-                              if (!context.mounted) return;
+                SizedBox(
+                  height: 42,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('treasury_claim_direct_button'),
+                    onPressed: canClaimDirect
+                        ? () {
+                            final ok = controller.claimTreasuryDirect();
+                            if (ok && context.mounted) {
                               ScaffoldMessenger.of(context)
                                 ..hideCurrentSnackBar()
                                 ..showSnackBar(
@@ -833,234 +877,353 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                                     duration: const Duration(seconds: 2),
                                   ),
                                 );
-                            },
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    foregroundColor: const Color(0xFF231F1A),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                            }
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _goldFill,
+                      foregroundColor: _goldDarkInk,
+                      disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.savings_rounded, size: 18),
+                    label: Text(
+                      loc.t(
+                        'castle_treasury_claim_direct_short',
+                        fallback: 'Claim Treasury',
+                      ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
                     ),
                   ),
-                  icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-                  label: Text(
-                    loc.t(
-                      'castle_treasury_claim_ad',
-                      fallback: 'Watch Ad to Claim Treasury',
+                )
+              else ...[
+                SizedBox(
+                  height: 42,
+                  child: ElevatedButton(
+                    key: const ValueKey('treasury_claim_ad_button'),
+                    onPressed: canClaimAd
+                        ? () {
+                            controller.watchAdToClaimTreasury(
+                              onClaimed: () {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        loc.t(
+                                          'castle_treasury_claimed_msg',
+                                          fallback:
+                                              'Treasury orbs transferred to your backpack!',
+                                        ),
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                              },
+                            );
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _goldFill,
+                      foregroundColor: _goldDarkInk,
+                      disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            loc.t(
+                              'castle_treasury_claim_ad_short',
+                              fallback: 'Watch Ad to Claim',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.ondemand_video_rounded, size: 19),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   loc.t(
-                    'castle_treasury_ad_disclosure',
+                    'castle_treasury_ad_disclosure_short',
                     fallback:
-                        'Rewarded Video Ad: watch an ad to claim all accumulated Treasury orbs into your backpack.',
+                        'Watch a rewarded video ad to transfer orbs to your backpack.',
                   ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 10.5,
-                    color: palette.mutedText,
+                    fontSize: 10,
+                    height: 1.25,
+                    color: palette.isDark
+                        ? Colors.white.withValues(alpha: 0.72)
+                        : palette.secondaryText,
                   ),
                 ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
-        // Royal Alchemy (3-to-1 Orb Exchange)
+        // 2. Compact Visual Royal Alchemy Card (3 -> 1 Side-by-Side)
         Container(
           key: const ValueKey('royal_alchemy_card'),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
           decoration: BoxDecoration(
-            color: palette.dialogCardSurface,
+            color: alchemyBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: palette.purpleAccent.withValues(
-                alpha: palette.isDark ? 0.45 : 0.55,
-              ),
-            ),
+            border: Border.all(color: alchemyBorder, width: 1.1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    Icons.science_rounded,
-                    color: palette.purpleAccent,
-                    size: 19,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       loc.t(
-                        'castle_alchemy_title',
-                        fallback: 'Royal Alchemy (3 → 1 Exchange)',
+                        'castle_alchemy_short_title',
+                        fallback: 'Royal Alchemy',
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 13.5,
                         color: palette.primaryText,
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                loc.t(
-                  'castle_alchemy_desc',
-                  fallback:
-                      'Transmute 3 surplus Elemental Orbs of one element into 1 Elemental Orb of another.',
-                ),
-                style: TextStyle(fontSize: 11.5, color: palette.secondaryText),
-              ),
-              const SizedBox(height: 10),
-
-              // Source Element Selector
-              Text(
-                loc.t(
-                  'castle_alchemy_source_label',
-                  fallback: 'Spend 3 Orbs From:',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: palette.amberText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final move in HandMove.values)
-                    _AlchemyElementChip(
-                      key: ValueKey('alchemy_source_${move.orbKey}'),
-                      move: move,
-                      balance: controller.orbsFor(move),
-                      selected: _alchemySource == move,
-                      palette: palette,
-                      loc: loc,
-                      onTap: () {
-                        controller.audio.playTapVibrate();
-                        setState(() => _alchemySource = move);
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Target Element Selector
-              Text(
-                loc.t(
-                  'castle_alchemy_target_label',
-                  fallback: 'Create 1 Orb Of:',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: palette.amberText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final move in HandMove.values)
-                    _AlchemyElementChip(
-                      key: ValueKey('alchemy_target_${move.orbKey}'),
-                      move: move,
-                      balance: controller.orbsFor(move),
-                      selected: _alchemyTarget == move,
-                      palette: palette,
-                      loc: loc,
-                      onTap: () {
-                        controller.audio.playTapVibrate();
-                        setState(() => _alchemyTarget = move);
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Preview & Validation Feedback
-              if (_alchemySource == _alchemyTarget)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    loc.t(
-                      'castle_alchemy_same_error',
-                      fallback: 'Choose two different elements to transmute.',
-                    ),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: palette.dangerText,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      loc.t(
+                        'castle_alchemy_tap_hint',
+                        fallback: 'Tap orbs to switch',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: palette.mutedText,
+                      ),
                     ),
                   ),
-                )
-              else if (controller.orbsFor(_alchemySource) < 3)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    loc.t(
-                      'castle_alchemy_insufficient_error',
-                      fallback: 'Need at least 3 orbs of the source element.',
-                    ),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: palette.dangerText,
-                    ),
-                  ),
-                ),
-
-              ElevatedButton.icon(
-                key: const ValueKey('alchemy_transmute_button'),
-                onPressed: canTransmute
-                    ? () {
-                        final ok = controller.transmuteOrbs(
-                          _alchemySource,
-                          _alchemyTarget,
-                        );
-                        if (ok && context.mounted) {
-                          final srcName = _alchemySource.elementalOrbName(loc);
-                          final dstName = _alchemyTarget.elementalOrbName(loc);
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text('3 $srcName → 1 $dstName'),
-                                duration: const Duration(seconds: 2),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  // Left Side: Interactive 3 -> 1 Orb Diagram
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // 3 Clustered Glowing Source Orbs (tappable to cycle)
+                          InkWell(
+                            key: const ValueKey('alchemy_source_selector'),
+                            onTap: _cycleAlchemySource,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
                               ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 56,
+                                    height: 48,
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Positioned(
+                                          top: 0,
+                                          left: 15,
+                                          child: ElementalEnergySphere(
+                                            size: 26,
+                                            primaryColor: _alchemySource
+                                                .elementalPrimaryColor,
+                                            secondaryColor: _alchemySource
+                                                .elementalSecondaryColor,
+                                            isDark: palette.isDark,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          bottom: 0,
+                                          left: 0,
+                                          child: ElementalEnergySphere(
+                                            size: 26,
+                                            primaryColor: _alchemySource
+                                                .elementalPrimaryColor,
+                                            secondaryColor: _alchemySource
+                                                .elementalSecondaryColor,
+                                            isDark: palette.isDark,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: ElementalEnergySphere(
+                                            size: 26,
+                                            primaryColor: _alchemySource
+                                                .elementalPrimaryColor,
+                                            secondaryColor: _alchemySource
+                                                .elementalSecondaryColor,
+                                            isDark: palette.isDark,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '3× ${_shortElementTitle(_alchemySource, loc)} ($sourceAvailable)',
+                                    key: const ValueKey('alchemy_source_label'),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: sourceAvailable >= 3
+                                          ? palette.elementalText(_alchemySource)
+                                          : palette.dangerText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+
+                          // Bold Golden Arrow
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 24,
+                            color: palette.isDark ? _goldFill : palette.amberIcon,
+                          ),
+                          const SizedBox(width: 6),
+
+                          // 1 Target Orb (tappable to cycle)
+                          InkWell(
+                            key: const ValueKey('alchemy_target_selector'),
+                            onTap: _cycleAlchemyTarget,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    height: 48,
+                                    child: Center(
+                                      child: ElementalEnergySphere(
+                                        size: 38,
+                                        primaryColor:
+                                            _alchemyTarget.elementalPrimaryColor,
+                                        secondaryColor: _alchemyTarget
+                                            .elementalSecondaryColor,
+                                        isDark: palette.isDark,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '1× ${_shortElementTitle(_alchemyTarget, loc)} ($targetAvailable)',
+                                    key: const ValueKey('alchemy_target_label'),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: palette.elementalText(_alchemyTarget),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Right Side: Compact Bright-Gold Exchange Button
+                  ElevatedButton.icon(
+                    key: const ValueKey('alchemy_transmute_button'),
+                    onPressed: canTransmute
+                        ? () {
+                            final ok = controller.transmuteOrbs(
+                              _alchemySource,
+                              _alchemyTarget,
                             );
-                        }
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.purpleAccent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                            if (ok && context.mounted) {
+                              final srcName =
+                                  _alchemySource.elementalOrbName(loc);
+                              final dstName =
+                                  _alchemyTarget.elementalOrbName(loc);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('3 $srcName → 1 $dstName'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                            }
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _goldFill,
+                      foregroundColor: _goldDarkInk,
+                      disabledBackgroundColor: _goldFill.withValues(alpha: 0.28),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                    label: Text(
+                      loc.t(
+                        'castle_alchemy_exchange_btn',
+                        fallback: 'Exchange',
+                      ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                ),
-                icon: const Icon(Icons.auto_fix_high_rounded, size: 17),
-                label: Text(
-                  loc.t(
-                    'castle_alchemy_transmute_btn',
-                    fallback: 'Transmute (3 → 1)',
-                  ),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+                ],
               ),
             ],
           ),
@@ -1215,8 +1378,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                foregroundColor: const Color(0xFF231F1A),
+                backgroundColor: _goldFill,
+                foregroundColor: _goldDarkInk,
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1258,8 +1421,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     }
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                foregroundColor: const Color(0xFF231F1A),
+                backgroundColor: _goldFill,
+                foregroundColor: _goldDarkInk,
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1390,12 +1553,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   Row(
                     key: ValueKey('spoils_orb_row_${move.orbKey}'),
                     children: [
-                      Icon(
-                        move.elementalIcon,
-                        size: 18,
-                        color: palette.elementalText(move),
+                      ElementalEnergySphere(
+                        size: 24,
+                        primaryColor: move.elementalPrimaryColor,
+                        secondaryColor: move.elementalSecondaryColor,
+                        isDark: palette.isDark,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           move.elementalOrbName(loc),
@@ -1445,8 +1609,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                foregroundColor: const Color(0xFF231F1A),
+                backgroundColor: _goldFill,
+                foregroundColor: _goldDarkInk,
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1488,8 +1652,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     }
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
-                foregroundColor: const Color(0xFF231F1A),
+                backgroundColor: _goldFill,
+                foregroundColor: _goldDarkInk,
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1787,7 +1951,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   }
 }
 
-class _WingNavPill extends StatelessWidget {
+class _CompactVerticalTabPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
@@ -1795,7 +1959,7 @@ class _WingNavPill extends StatelessWidget {
   final AppPalette palette;
   final VoidCallback onTap;
 
-  const _WingNavPill({
+  const _CompactVerticalTabPill({
     super.key,
     required this.icon,
     required this.label,
@@ -1807,65 +1971,168 @@ class _WingNavPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected
-                ? (palette.isDark
-                      ? Colors.amber.withValues(alpha: 0.22)
-                      : Colors.amber.withValues(alpha: 0.30))
-                : palette.dialogCardSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? palette.amberBorder
-                  : palette.sandCardBorder,
-              width: selected ? 1.4 : 1.0,
+    const goldFill = _RoyalCastleDialogState._goldFill;
+    const goldDarkInk = _RoyalCastleDialogState._goldDarkInk;
+    const alertRed = _RoyalCastleDialogState._alertRed;
+
+    final bgColor = selected
+        ? goldFill
+        : (palette.isDark
+              ? const Color(0xFF1F1C16)
+              : palette.dialogCardSurface);
+    final borderColor = selected
+        ? goldFill
+        : palette.amberBorder.withValues(alpha: palette.isDark ? 0.45 : 0.6);
+    final fgColor = selected
+        ? goldDarkInk
+        : (palette.isDark ? goldFill : palette.amberIcon);
+    final textColor = selected
+        ? goldDarkInk
+        : (palette.isDark
+              ? Colors.white.withValues(alpha: 0.88)
+              : palette.primaryText);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: borderColor,
+                  width: selected ? 1.4 : 1.0,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 17, color: fgColor),
+                  const SizedBox(height: 3),
+                  SizedBox(
+                    height: 13,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: selected ? palette.amberIcon : palette.secondaryText,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                  color: selected ? palette.amberText : palette.secondaryText,
+        ),
+        if (showDot)
+          Positioned(
+            top: -3,
+            right: -2,
+            child: Container(
+              key: Key('${(key as ValueKey<String>).value}_dot'),
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: alertRed,
+                border: Border.all(
+                  color: palette.dialogSurface,
+                  width: 1.4,
                 ),
               ),
-              if (showDot) ...[
-                const SizedBox(width: 5),
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.amber,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.65),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TreasuryHorizontalOrbColumn extends StatelessWidget {
+  final HandMove move;
+  final int count;
+  final int cap;
+  final String label;
+  final String fullTag;
+  final AppPalette palette;
+
+  const _TreasuryHorizontalOrbColumn({
+    super.key,
+    required this.move,
+    required this.count,
+    required this.cap,
+    required this.label,
+    required this.fullTag,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isFull = count >= cap;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ElementalEnergySphere(
+          size: 38,
+          primaryColor: move.elementalPrimaryColor,
+          secondaryColor: move.elementalSecondaryColor,
+          isDark: palette.isDark,
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '$count',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13.5,
+            color: isFull
+                ? (palette.isDark
+                      ? _RoyalCastleDialogState._goldFill
+                      : palette.amberText)
+                : palette.primaryText,
           ),
         ),
-      ),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10.5,
+            color: palette.isDark
+                ? Colors.white.withValues(alpha: 0.78)
+                : palette.secondaryText,
+          ),
+        ),
+        if (isFull) ...[
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: _RoyalCastleDialogState._goldFill,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              fullTag,
+              style: const TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+                color: _RoyalCastleDialogState._goldDarkInk,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -2090,7 +2357,8 @@ class _EndingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lockedLabel = loc.t('castle_locked_mystery', fallback: '??? (Locked)');
+    final lockedLabel =
+        loc.t('castle_locked_mystery', fallback: '??? (Locked)');
     return Container(
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
@@ -2260,142 +2528,6 @@ class _BestiaryCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TreasuryElementRow extends StatelessWidget {
-  final HandMove move;
-  final int count;
-  final int cap;
-  final LocalizationService loc;
-  final AppPalette palette;
-
-  const _TreasuryElementRow({
-    super.key,
-    required this.move,
-    required this.count,
-    required this.cap,
-    required this.loc,
-    required this.palette,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isFull = count >= cap;
-    final fg = palette.elementalText(move);
-    return Row(
-      children: [
-        Icon(move.elementalIcon, size: 17, color: fg),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 82,
-          child: Text(
-            move.elementalOrbName(loc),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: palette.primaryText,
-            ),
-          ),
-        ),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LinearProgressIndicator(
-              value: (count / cap).clamp(0.0, 1.0),
-              minHeight: 6,
-              backgroundColor: palette.sandCardSurface,
-              valueColor: AlwaysStoppedAnimation<Color>(fg),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '$count / $cap',
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.bold,
-            color: isFull ? palette.amberText : palette.secondaryText,
-          ),
-        ),
-        if (isFull) ...[
-          const SizedBox(width: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: Colors.amber,
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              loc.t('castle_treasury_full_tag', fallback: 'FULL'),
-              style: const TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF231F1A),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _AlchemyElementChip extends StatelessWidget {
-  final HandMove move;
-  final int balance;
-  final bool selected;
-  final AppPalette palette;
-  final LocalizationService loc;
-  final VoidCallback onTap;
-
-  const _AlchemyElementChip({
-    super.key,
-    required this.move,
-    required this.balance,
-    required this.selected,
-    required this.palette,
-    required this.loc,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = palette.elementalText(move);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        decoration: BoxDecoration(
-          color: selected
-              ? fg.withValues(alpha: palette.isDark ? 0.22 : 0.16)
-              : palette.sandCardSurface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? fg : palette.sandCardBorder,
-            width: selected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(move.elementalIcon, size: 14, color: fg),
-            const SizedBox(width: 4),
-            Text(
-              '${move.displayLabel(elemental: true, localization: loc)} ($balance)',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                color: selected ? palette.primaryText : palette.secondaryText,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

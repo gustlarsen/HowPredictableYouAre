@@ -16,6 +16,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/theme/app_theme.dart';
 import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
 
 class _TestAdMobClient implements AdMobClient {
   bool rewardedAvailable;
@@ -441,6 +442,13 @@ void main() {
         );
         addTearDown(controller.dispose);
 
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
         for (final isDark in [true, false]) {
           controller.darkMode = isDark;
           final expectedPalette = AppPalette(isDark: isDark);
@@ -462,6 +470,24 @@ void main() {
             find.byKey(const ValueKey('royal_castle_dialog')),
           );
           expect(dialog.backgroundColor, expectedPalette.dialogSurface);
+
+          // All 6 compact tabs are visible in a single horizontal row
+          final tabKeys = [
+            const ValueKey('castle_tab_throne'),
+            const ValueKey('castle_tab_library'),
+            const ValueKey('castle_tab_treasury'),
+            const ValueKey('castle_tab_relics'),
+            const ValueKey('castle_tab_spoils'),
+            const ValueKey('castle_tab_hall_of_heroes'),
+          ];
+          final firstTabY = tester.getTopLeft(find.byKey(tabKeys.first)).dy;
+          for (final key in tabKeys) {
+            expect(find.byKey(key), findsOneWidget);
+            expect(tester.getTopLeft(find.byKey(key)).dy, closeTo(firstTabY, 1.0));
+          }
+          expect(find.byKey(const Key('castle_tab_treasury_dot')), findsOneWidget);
+          expect(find.byKey(const Key('castle_tab_relics_dot')), findsOneWidget);
+          expect(find.byKey(const Key('castle_tab_spoils_dot')), findsOneWidget);
 
           // Wing 1: Throne Room + Milestones + Royal Decrees
           final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
@@ -490,25 +516,58 @@ void main() {
           expect(find.text('Guardian Robot'), findsOneWidget);
           expect(find.text('Story Memories'), findsOneWidget);
 
-          // Wing 3: Treasury (Piggy Bank + 3-to-1 Alchemy)
-          final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
-          await tester.ensureVisible(treasuryTab);
-          await tester.pumpAndSettle();
-          await tester.tap(treasuryTab);
+          // Wing 3: Treasury (Piggy Bank 3D Orbs + Visual 3-to-1 Alchemy)
+          await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('castle_wing_treasury')),
             findsOneWidget,
           );
+          expect(
+            find.byKey(const ValueKey('treasury_vault_card')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('treasury_orbs_horizontal_row')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('treasury_total_count')),
+            findsOneWidget,
+          );
+          expect(find.text('60 / 250'), findsOneWidget);
           expect(find.text('FULL'), findsOneWidget);
+          expect(find.byType(ElementalEnergySphere), findsAtLeastNWidgets(7));
           expect(
             find.byKey(const ValueKey('treasury_claim_ad_button')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('royal_alchemy_card')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('alchemy_source_selector')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('alchemy_target_selector')),
             findsOneWidget,
           );
           expect(
             find.byKey(const ValueKey('alchemy_transmute_button')),
             findsOneWidget,
           );
+
+          // Verify Treasury + Royal Alchemy + Ok button fit within 390x844 viewport
+          final alchemyBottom = tester
+              .getBottomRight(find.byKey(const ValueKey('royal_alchemy_card')))
+              .dy;
+          final okFinder = find.text('Ok');
+          expect(okFinder, findsOneWidget);
+          final okBottom = tester.getBottomRight(okFinder).dy;
+          expect(alchemyBottom, lessThanOrEqualTo(844));
+          expect(okBottom, lessThanOrEqualTo(844));
 
           // Wing 4: Relic Chamber
           final relicsTab = find.byKey(const ValueKey('castle_tab_relics'));
@@ -539,34 +598,34 @@ void main() {
             find.byKey(const ValueKey('spoils_reclaim_ad_button')),
             findsOneWidget,
           );
+
+          // Wing 6: Hall of Heroes
+          await tester.tap(find.byKey(const ValueKey('castle_tab_hall_of_heroes')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('castle_wing_hall_of_heroes')),
+            findsOneWidget,
+          );
         }
 
-        // Now test interactive Alchemy + Claiming inside UI
-        final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
-        await tester.ensureVisible(treasuryTab);
-        await tester.pumpAndSettle();
-        await tester.tap(treasuryTab);
+        // Now test interactive Alchemy orb cycling + Exchange + Claiming inside UI
+        await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
         await tester.pumpAndSettle();
 
-        // Transmute 3 Fire -> 1 Water
-        await tester.ensureVisible(
-          find.byKey(const ValueKey('alchemy_transmute_button')),
-        );
+        // Tap target selector to verify orb cycling (default Water -> Wood), then back around
+        await tester.tap(find.byKey(const ValueKey('alchemy_target_selector')));
         await tester.pumpAndSettle();
+        // Transmute 3 Fire -> 1 Wood
         await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
         await tester.pumpAndSettle();
         expect(controller.fireOrbs, 6);
-        expect(controller.waterOrbs, 3);
+        expect(controller.woodOrbs, 1);
 
-        // Claim Treasury via Rewarded Ad
-        await tester.ensureVisible(
-          find.byKey(const ValueKey('treasury_claim_ad_button')),
-        );
-        await tester.pumpAndSettle();
+        // Claim Treasury via Rewarded Ad (no scrolling needed)
         await tester.tap(find.byKey(const ValueKey('treasury_claim_ad_button')));
         await tester.pumpAndSettle();
         expect(controller.fireOrbs, 56);
-        expect(controller.woodOrbs, 10);
+        expect(controller.woodOrbs, 11);
         expect(controller.totalTreasuryOrbs, 0);
       },
     );
