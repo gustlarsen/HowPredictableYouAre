@@ -909,6 +909,85 @@ class StorageService {
     ]);
   }
 
+  // Lifetime Account Chronicles & Run Statistics (never reset on cycle end; cleared only on account switch)
+  static const String _totalCyclesCountKey = 'total_cycles_count';
+  static const String _deathDefeatCountKey = 'death_defeat_count';
+  static const String _timeoutDefeatCountKey = 'timeout_defeat_count';
+  static const String _forfeitRunCountKey = 'forfeit_run_count';
+  static const String _standardVictoryCountKey = 'standard_victory_count';
+  static const String _secretVictoryCountKey = 'secret_victory_count';
+  static const String _fastestVictoryWeekKey = 'fastest_victory_week';
+  static const String _guardianRobotDefeatedCountKey =
+      'guardian_robot_defeated_count';
+  static const String _robotArchmageDefeatedCountKey =
+      'robot_archmage_defeated_count';
+  static const String _metalWizardDefeatedCountKey =
+      'metal_wizard_defeated_count';
+  static const String _babyMageRobotDefeatedCountKey =
+      'baby_mage_robot_defeated_count';
+
+  int _nonNegativeInt(String key) {
+    final val = _prefs.getInt(key) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  int get totalCyclesCount => _nonNegativeInt(_totalCyclesCountKey);
+  Future<void> setTotalCyclesCount(int val) =>
+      _prefs.setInt(_totalCyclesCountKey, val < 0 ? 0 : val);
+
+  int get deathDefeatCount => _nonNegativeInt(_deathDefeatCountKey);
+  Future<void> setDeathDefeatCount(int val) =>
+      _prefs.setInt(_deathDefeatCountKey, val < 0 ? 0 : val);
+
+  int get timeoutDefeatCount => _nonNegativeInt(_timeoutDefeatCountKey);
+  Future<void> setTimeoutDefeatCount(int val) =>
+      _prefs.setInt(_timeoutDefeatCountKey, val < 0 ? 0 : val);
+
+  int get forfeitRunCount => _nonNegativeInt(_forfeitRunCountKey);
+  Future<void> setForfeitRunCount(int val) =>
+      _prefs.setInt(_forfeitRunCountKey, val < 0 ? 0 : val);
+
+  int get standardVictoryCount => _nonNegativeInt(_standardVictoryCountKey);
+  Future<void> setStandardVictoryCount(int val) =>
+      _prefs.setInt(_standardVictoryCountKey, val < 0 ? 0 : val);
+
+  int get secretVictoryCount => _nonNegativeInt(_secretVictoryCountKey);
+  Future<void> setSecretVictoryCount(int val) =>
+      _prefs.setInt(_secretVictoryCountKey, val < 0 ? 0 : val);
+
+  int? get fastestVictoryWeek {
+    final val = _prefs.getInt(_fastestVictoryWeekKey);
+    if (val == null || val <= 0) return null;
+    return val;
+  }
+
+  Future<void> setFastestVictoryWeek(int? val) {
+    if (val == null || val <= 0) {
+      return _prefs.remove(_fastestVictoryWeekKey);
+    }
+    return _prefs.setInt(_fastestVictoryWeekKey, val);
+  }
+
+  int get guardianRobotDefeatedCount =>
+      _nonNegativeInt(_guardianRobotDefeatedCountKey);
+  Future<void> setGuardianRobotDefeatedCount(int val) =>
+      _prefs.setInt(_guardianRobotDefeatedCountKey, val < 0 ? 0 : val);
+
+  int get robotArchmageDefeatedCount =>
+      _nonNegativeInt(_robotArchmageDefeatedCountKey);
+  Future<void> setRobotArchmageDefeatedCount(int val) =>
+      _prefs.setInt(_robotArchmageDefeatedCountKey, val < 0 ? 0 : val);
+
+  int get metalWizardDefeatedCount =>
+      _nonNegativeInt(_metalWizardDefeatedCountKey);
+  Future<void> setMetalWizardDefeatedCount(int val) =>
+      _prefs.setInt(_metalWizardDefeatedCountKey, val < 0 ? 0 : val);
+
+  int get babyMageRobotDefeatedCount =>
+      _nonNegativeInt(_babyMageRobotDefeatedCountKey);
+  Future<void> setBabyMageRobotDefeatedCount(int val) =>
+      _prefs.setInt(_babyMageRobotDefeatedCountKey, val < 0 ? 0 : val);
+
   Future<void> clearAllCastleData() {
     return Future.wait([
       setAllTreasuryOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
@@ -921,6 +1000,17 @@ class StorageService {
       setEncounteredBestiary(const []),
       _prefs.remove(_activeDecreeIdsKey),
       setTotalDecreesCompleted(0),
+      setTotalCyclesCount(0),
+      setDeathDefeatCount(0),
+      setTimeoutDefeatCount(0),
+      setForfeitRunCount(0),
+      setStandardVictoryCount(0),
+      setSecretVictoryCount(0),
+      setFastestVictoryWeek(null),
+      setGuardianRobotDefeatedCount(0),
+      setRobotArchmageDefeatedCount(0),
+      setMetalWizardDefeatedCount(0),
+      setBabyMageRobotDefeatedCount(0),
       clearBattleDecreeProgress(),
     ]);
   }

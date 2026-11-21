@@ -16,6 +16,12 @@ import '../services/ad_service.dart';
 import '../services/billing_service.dart';
 import '../services/update_service.dart';
 
+/// Identifies why a campaign cycle ended via permadeath reset.
+enum PermadeathCause {
+  battleDefeat,
+  deadlineExceeded,
+}
+
 class GameController extends ChangeNotifier {
   static const int rewardedAdOrbBonus = 50;
   static const int periodicGiftOrbBonus = 5;
@@ -471,6 +477,19 @@ class GameController extends ChangeNotifier {
   bool hallOfHeroesClaimAvailable = false;
   Set<String> unlockedEndings = {};
   Set<String> encounteredBestiary = {};
+
+  // Permanent Lifetime Account Chronicles & Run Statistics
+  int totalCyclesCount = 0;
+  int deathDefeatCount = 0;
+  int timeoutDefeatCount = 0;
+  int forfeitRunCount = 0;
+  int standardVictoryCount = 0;
+  int secretVictoryCount = 0;
+  int? fastestVictoryWeek;
+  int guardianRobotDefeatedCount = 0;
+  int robotArchmageDefeatedCount = 0;
+  int metalWizardDefeatedCount = 0;
+  int babyMageRobotDefeatedCount = 0;
 
   List<String> activeDecreeIds =
       List<String>.from(RoyalDecreeType.defaultActiveIds);
@@ -1024,6 +1043,18 @@ class GameController extends ChangeNotifier {
         (peakHpUpgradeLevel > 0 || peakManaUpgradeLevel > 0);
     unlockedEndings = Set<String>.from(storage.unlockedEndings);
     encounteredBestiary = Set<String>.from(storage.encounteredBestiary);
+
+    totalCyclesCount = storage.totalCyclesCount;
+    deathDefeatCount = storage.deathDefeatCount;
+    timeoutDefeatCount = storage.timeoutDefeatCount;
+    forfeitRunCount = storage.forfeitRunCount;
+    standardVictoryCount = storage.standardVictoryCount;
+    secretVictoryCount = storage.secretVictoryCount;
+    fastestVictoryWeek = storage.fastestVictoryWeek;
+    guardianRobotDefeatedCount = storage.guardianRobotDefeatedCount;
+    robotArchmageDefeatedCount = storage.robotArchmageDefeatedCount;
+    metalWizardDefeatedCount = storage.metalWizardDefeatedCount;
+    babyMageRobotDefeatedCount = storage.babyMageRobotDefeatedCount;
 
     final storedDecrees = storage.activeDecreeIds;
     activeDecreeIds = (storedDecrees != null && storedDecrees.length == 3)
@@ -1978,23 +2009,49 @@ class GameController extends ChangeNotifier {
     return _engine.getRandomEnemyMove();
   }
 
+  void _recordFastestVictoryWeek(int week) {
+    final effectiveWeek = week < 1 ? 1 : week;
+    fastestVictoryWeek = fastestVictoryWeek == null
+        ? effectiveWeek
+        : math.min(fastestVictoryWeek!, effectiveWeek);
+    storage.setFastestVictoryWeek(fastestVictoryWeek);
+  }
+
   void _applyImmediateBossDefeatMetadata(int defeatedStage, int week) {
     if (defeatedStage == 1) {
+      guardianRobotDefeatedCount += 1;
+      storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
       if (week >= phase2StartWeek) {
         _markBestiaryEncountered(BestiaryCreature.archmageRobot);
       } else {
         _markBestiaryEncountered(BestiaryCreature.metalWizard);
       }
     } else if (defeatedStage == 2) {
+      robotArchmageDefeatedCount += 1;
+      storage.setRobotArchmageDefeatedCount(robotArchmageDefeatedCount);
       _markBestiaryEncountered(BestiaryCreature.metalWizard);
     } else if (defeatedStage == 3) {
+      metalWizardDefeatedCount += 1;
+      storage.setMetalWizardDefeatedCount(metalWizardDefeatedCount);
       if (week == 1) {
         _markEndingUnlocked(NarrativeEnding.secretWeek1);
+        secretVictoryCount += 1;
+        totalCyclesCount += 1;
+        storage.setSecretVictoryCount(secretVictoryCount);
+        storage.setTotalCyclesCount(totalCyclesCount);
+        _recordFastestVictoryWeek(1);
       } else {
         _markBestiaryEncountered(BestiaryCreature.babyRobot);
       }
     } else if (defeatedStage == 4) {
+      babyMageRobotDefeatedCount += 1;
+      storage.setBabyMageRobotDefeatedCount(babyMageRobotDefeatedCount);
       _markEndingUnlocked(NarrativeEnding.standardVictory);
+      standardVictoryCount += 1;
+      totalCyclesCount += 1;
+      storage.setStandardVictoryCount(standardVictoryCount);
+      storage.setTotalCyclesCount(totalCyclesCount);
+      _recordFastestVictoryWeek(week);
     }
   }
 
@@ -2271,12 +2328,26 @@ class GameController extends ChangeNotifier {
   /// 5. Resets HP/Mana to base (50 HP / 100 Mana), clears the Markov matrix,
   ///    persists locally, and overwrites Cloud Save so old cloud data cannot revert
   ///    the Week 0 reset.
-  Future<void> applyPermadeathReset() async {
+  Future<void> applyPermadeathReset({PermadeathCause? cause}) async {
     _giftTimer?.cancel();
     _giftTimer = null;
     _giftCooldownUntil = null;
     _remainingGiftCooldown = Duration.zero;
     isGiftAvailable = true;
+
+    final resolvedCause = cause ??
+        (currentWeek >= maxCampaignWeeks && userHp > 0
+            ? PermadeathCause.deadlineExceeded
+            : PermadeathCause.battleDefeat);
+
+    final nextTotalCycles = totalCyclesCount + 1;
+    final nextDeathDefeats = resolvedCause == PermadeathCause.battleDefeat
+        ? deathDefeatCount + 1
+        : deathDefeatCount;
+    final nextTimeoutDefeats =
+        resolvedCause == PermadeathCause.deadlineExceeded
+            ? timeoutDefeatCount + 1
+            : timeoutDefeatCount;
 
     final verifiedPaidIds = <String>{
       ...storage.purchasedIapProductIds,
@@ -2334,6 +2405,9 @@ class GameController extends ChangeNotifier {
     await storage.setPeakManaUpgradeLevel(nextPeakMana);
     await storage.setHallOfHeroesClaimAvailable(nextClaimAvailable);
     await storage.setUnlockedEndings(nextEndings);
+    await storage.setTotalCyclesCount(nextTotalCycles);
+    await storage.setDeathDefeatCount(nextDeathDefeats);
+    await storage.setTimeoutDefeatCount(nextTimeoutDefeats);
     await storage.setTurn0Orbs(
       fire: 0,
       water: 0,
@@ -2385,6 +2459,9 @@ class GameController extends ChangeNotifier {
     _giftCooldownUntil = null;
     _remainingGiftCooldown = Duration.zero;
     isGiftAvailable = true;
+
+    final nextTotalCycles = totalCyclesCount + 1;
+    final nextForfeitRuns = forfeitRunCount + 1;
 
     final verifiedPaidIds = <String>{
       ...storage.purchasedIapProductIds,
@@ -2442,6 +2519,8 @@ class GameController extends ChangeNotifier {
     await storage.setPeakHpUpgradeLevel(nextPeakHp);
     await storage.setPeakManaUpgradeLevel(nextPeakMana);
     await storage.setHallOfHeroesClaimAvailable(nextClaimAvailable);
+    await storage.setTotalCyclesCount(nextTotalCycles);
+    await storage.setForfeitRunCount(nextForfeitRuns);
     await storage.setPurchasedIapProductIds(verifiedPaidIds);
     await storage.setCurrentWeek(0);
 

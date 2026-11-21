@@ -277,6 +277,19 @@ class CloudSaveData {
   final List<String> completedCycleDecreeIds;
   final int totalDecreesCompleted;
 
+  // Lifetime Account Chronicles & Run Statistics
+  final int totalCyclesCount;
+  final int deathDefeatCount;
+  final int timeoutDefeatCount;
+  final int forfeitRunCount;
+  final int standardVictoryCount;
+  final int secretVictoryCount;
+  final int? fastestVictoryWeek;
+  final int guardianRobotDefeatedCount;
+  final int robotArchmageDefeatedCount;
+  final int metalWizardDefeatedCount;
+  final int babyMageRobotDefeatedCount;
+
   // Sacred Temple Consagration & Blessings State
   final int adConsagrationsThisWeek;
   final String? pendingBattleBlessing;
@@ -379,6 +392,17 @@ class CloudSaveData {
     this.activeDecreeIds,
     this.completedCycleDecreeIds = const [],
     this.totalDecreesCompleted = 0,
+    this.totalCyclesCount = 0,
+    this.deathDefeatCount = 0,
+    this.timeoutDefeatCount = 0,
+    this.forfeitRunCount = 0,
+    this.standardVictoryCount = 0,
+    this.secretVictoryCount = 0,
+    this.fastestVictoryWeek,
+    this.guardianRobotDefeatedCount = 0,
+    this.robotArchmageDefeatedCount = 0,
+    this.metalWizardDefeatedCount = 0,
+    this.babyMageRobotDefeatedCount = 0,
     this.adConsagrationsThisWeek = 0,
     this.pendingBattleBlessing,
     this.activeBattleBlessing,
@@ -501,10 +525,35 @@ class CloudSaveData {
             (hallOfHeroesClaimAvailable && !local.hallOfHeroesClaimAvailable) ||
             unlockedEndings.length > local.unlockedEndings.length ||
             encounteredBestiary.length > local.encounteredBestiary.length ||
-            totalDecreesCompleted > local.totalDecreesCompleted)) {
+            totalDecreesCompleted > local.totalDecreesCompleted ||
+            totalCyclesCount > local.totalCyclesCount ||
+            deathDefeatCount > local.deathDefeatCount ||
+            timeoutDefeatCount > local.timeoutDefeatCount ||
+            forfeitRunCount > local.forfeitRunCount ||
+            standardVictoryCount > local.standardVictoryCount ||
+            secretVictoryCount > local.secretVictoryCount ||
+            guardianRobotDefeatedCount > local.guardianRobotDefeatedCount ||
+            robotArchmageDefeatedCount > local.robotArchmageDefeatedCount ||
+            metalWizardDefeatedCount > local.metalWizardDefeatedCount ||
+            babyMageRobotDefeatedCount > local.babyMageRobotDefeatedCount ||
+            (fastestVictoryWeek != null &&
+                fastestVictoryWeek! > 0 &&
+                (local.fastestVictoryWeek == null ||
+                    local.fastestVictoryWeek! <= 0 ||
+                    fastestVictoryWeek! < local.fastestVictoryWeek!)))) {
       return true;
     }
     return false;
+  }
+
+  static int _maxInt(int a, int b) => a > b ? a : b;
+
+  static int? _minNonZeroWeek(int? a, int? b) {
+    final validA = (a != null && a > 0) ? a : null;
+    final validB = (b != null && b > 0) ? b : null;
+    if (validA == null) return validB;
+    if (validB == null) return validA;
+    return validA < validB ? validA : validB;
   }
 
   /// Merges [this] cloud save over [local] when cloud has higher progression or orbs,
@@ -608,12 +657,9 @@ class CloudSaveData {
       relicChamberUpgrades: relicChamberUpgrades,
       hpUpgradeLevel: hpUpgradeLevel,
       manaUpgradeLevel: manaUpgradeLevel,
-      peakHpUpgradeLevel: peakHpUpgradeLevel > local.peakHpUpgradeLevel
-          ? peakHpUpgradeLevel
-          : local.peakHpUpgradeLevel,
-      peakManaUpgradeLevel: peakManaUpgradeLevel > local.peakManaUpgradeLevel
-          ? peakManaUpgradeLevel
-          : local.peakManaUpgradeLevel,
+      peakHpUpgradeLevel: _maxInt(peakHpUpgradeLevel, local.peakHpUpgradeLevel),
+      peakManaUpgradeLevel:
+          _maxInt(peakManaUpgradeLevel, local.peakManaUpgradeLevel),
       hallOfHeroesClaimAvailable: hallOfHeroesClaimAvailable,
       unlockedEndings: (
         {...unlockedEndings, ...local.unlockedEndings}.toList()..sort()
@@ -624,9 +670,24 @@ class CloudSaveData {
       activeDecreeIds: activeDecreeIds ?? local.activeDecreeIds,
       completedCycleDecreeIds: completedCycleDecreeIds,
       totalDecreesCompleted:
-          totalDecreesCompleted > local.totalDecreesCompleted
-              ? totalDecreesCompleted
-              : local.totalDecreesCompleted,
+          _maxInt(totalDecreesCompleted, local.totalDecreesCompleted),
+      totalCyclesCount: _maxInt(totalCyclesCount, local.totalCyclesCount),
+      deathDefeatCount: _maxInt(deathDefeatCount, local.deathDefeatCount),
+      timeoutDefeatCount: _maxInt(timeoutDefeatCount, local.timeoutDefeatCount),
+      forfeitRunCount: _maxInt(forfeitRunCount, local.forfeitRunCount),
+      standardVictoryCount:
+          _maxInt(standardVictoryCount, local.standardVictoryCount),
+      secretVictoryCount: _maxInt(secretVictoryCount, local.secretVictoryCount),
+      fastestVictoryWeek:
+          _minNonZeroWeek(fastestVictoryWeek, local.fastestVictoryWeek),
+      guardianRobotDefeatedCount:
+          _maxInt(guardianRobotDefeatedCount, local.guardianRobotDefeatedCount),
+      robotArchmageDefeatedCount:
+          _maxInt(robotArchmageDefeatedCount, local.robotArchmageDefeatedCount),
+      metalWizardDefeatedCount:
+          _maxInt(metalWizardDefeatedCount, local.metalWizardDefeatedCount),
+      babyMageRobotDefeatedCount:
+          _maxInt(babyMageRobotDefeatedCount, local.babyMageRobotDefeatedCount),
       adConsagrationsThisWeek: adConsagrationsThisWeek,
       pendingBattleBlessing: pendingBattleBlessing ?? local.pendingBattleBlessing,
       activeBattleBlessing: activeBattleBlessing,
@@ -735,6 +796,17 @@ class CloudSaveData {
       activeDecreeIds: storage.activeDecreeIds,
       completedCycleDecreeIds: storage.completedCycleDecreeIds,
       totalDecreesCompleted: storage.totalDecreesCompleted,
+      totalCyclesCount: storage.totalCyclesCount,
+      deathDefeatCount: storage.deathDefeatCount,
+      timeoutDefeatCount: storage.timeoutDefeatCount,
+      forfeitRunCount: storage.forfeitRunCount,
+      standardVictoryCount: storage.standardVictoryCount,
+      secretVictoryCount: storage.secretVictoryCount,
+      fastestVictoryWeek: storage.fastestVictoryWeek,
+      guardianRobotDefeatedCount: storage.guardianRobotDefeatedCount,
+      robotArchmageDefeatedCount: storage.robotArchmageDefeatedCount,
+      metalWizardDefeatedCount: storage.metalWizardDefeatedCount,
+      babyMageRobotDefeatedCount: storage.babyMageRobotDefeatedCount,
       adConsagrationsThisWeek: storage.adConsagrationsThisWeek,
       pendingBattleBlessing: storage.pendingBattleBlessing,
       activeBattleBlessing: storage.activeBattleBlessing,
@@ -808,6 +880,17 @@ class CloudSaveData {
     }
     await storage.setCompletedCycleDecreeIds(completedCycleDecreeIds);
     await storage.setTotalDecreesCompleted(totalDecreesCompleted);
+    await storage.setTotalCyclesCount(totalCyclesCount);
+    await storage.setDeathDefeatCount(deathDefeatCount);
+    await storage.setTimeoutDefeatCount(timeoutDefeatCount);
+    await storage.setForfeitRunCount(forfeitRunCount);
+    await storage.setStandardVictoryCount(standardVictoryCount);
+    await storage.setSecretVictoryCount(secretVictoryCount);
+    await storage.setFastestVictoryWeek(fastestVictoryWeek);
+    await storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
+    await storage.setRobotArchmageDefeatedCount(robotArchmageDefeatedCount);
+    await storage.setMetalWizardDefeatedCount(metalWizardDefeatedCount);
+    await storage.setBabyMageRobotDefeatedCount(babyMageRobotDefeatedCount);
 
     await storage.setLanguage(language);
     await storage.setDarkMode(darkMode);
@@ -939,6 +1022,18 @@ class CloudSaveData {
       if (activeDecreeIds != null) 'activeDecreeIds': activeDecreeIds,
       'completedCycleDecreeIds': completedCycleDecreeIds,
       'totalDecreesCompleted': totalDecreesCompleted,
+      'totalCyclesCount': totalCyclesCount,
+      'deathDefeatCount': deathDefeatCount,
+      'timeoutDefeatCount': timeoutDefeatCount,
+      'forfeitRunCount': forfeitRunCount,
+      'standardVictoryCount': standardVictoryCount,
+      'secretVictoryCount': secretVictoryCount,
+      if (fastestVictoryWeek != null && fastestVictoryWeek! > 0)
+        'fastestVictoryWeek': fastestVictoryWeek,
+      'guardianRobotDefeatedCount': guardianRobotDefeatedCount,
+      'robotArchmageDefeatedCount': robotArchmageDefeatedCount,
+      'metalWizardDefeatedCount': metalWizardDefeatedCount,
+      'babyMageRobotDefeatedCount': babyMageRobotDefeatedCount,
       'adConsagrationsThisWeek': adConsagrationsThisWeek,
       if (pendingBattleBlessing != null)
         'pendingBattleBlessing': pendingBattleBlessing,
@@ -1027,6 +1122,55 @@ class CloudSaveData {
     } catch (_) {
       return null;
     }
+  }
+
+  static int _parseNonNegativeInt(dynamic raw) {
+    final val = (raw as num?)?.toInt() ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  /// Merges permanent lifetime chronicles & peak records from [this] into [storage]
+  /// using max(local, cloud) for counters and min non-zero for fastestVictoryWeek.
+  Future<void> mergeLifetimeChroniclesIntoStorage(StorageService storage) async {
+    await storage.setPeakHpUpgradeLevel(
+      _maxInt(storage.peakHpUpgradeLevel, peakHpUpgradeLevel),
+    );
+    await storage.setPeakManaUpgradeLevel(
+      _maxInt(storage.peakManaUpgradeLevel, peakManaUpgradeLevel),
+    );
+    await storage.setTotalCyclesCount(
+      _maxInt(storage.totalCyclesCount, totalCyclesCount),
+    );
+    await storage.setDeathDefeatCount(
+      _maxInt(storage.deathDefeatCount, deathDefeatCount),
+    );
+    await storage.setTimeoutDefeatCount(
+      _maxInt(storage.timeoutDefeatCount, timeoutDefeatCount),
+    );
+    await storage.setForfeitRunCount(
+      _maxInt(storage.forfeitRunCount, forfeitRunCount),
+    );
+    await storage.setStandardVictoryCount(
+      _maxInt(storage.standardVictoryCount, standardVictoryCount),
+    );
+    await storage.setSecretVictoryCount(
+      _maxInt(storage.secretVictoryCount, secretVictoryCount),
+    );
+    await storage.setFastestVictoryWeek(
+      _minNonZeroWeek(storage.fastestVictoryWeek, fastestVictoryWeek),
+    );
+    await storage.setGuardianRobotDefeatedCount(
+      _maxInt(storage.guardianRobotDefeatedCount, guardianRobotDefeatedCount),
+    );
+    await storage.setRobotArchmageDefeatedCount(
+      _maxInt(storage.robotArchmageDefeatedCount, robotArchmageDefeatedCount),
+    );
+    await storage.setMetalWizardDefeatedCount(
+      _maxInt(storage.metalWizardDefeatedCount, metalWizardDefeatedCount),
+    );
+    await storage.setBabyMageRobotDefeatedCount(
+      _maxInt(storage.babyMageRobotDefeatedCount, babyMageRobotDefeatedCount),
+    );
   }
 
   static List<String> _parseStringList(dynamic raw) {
@@ -1124,6 +1268,24 @@ class CloudSaveData {
       completedCycleDecreeIds: _parseStringList(map['completedCycleDecreeIds']),
       totalDecreesCompleted:
           (map['totalDecreesCompleted'] as num?)?.toInt() ?? 0,
+      totalCyclesCount: _parseNonNegativeInt(map['totalCyclesCount']),
+      deathDefeatCount: _parseNonNegativeInt(map['deathDefeatCount']),
+      timeoutDefeatCount: _parseNonNegativeInt(map['timeoutDefeatCount']),
+      forfeitRunCount: _parseNonNegativeInt(map['forfeitRunCount']),
+      standardVictoryCount: _parseNonNegativeInt(map['standardVictoryCount']),
+      secretVictoryCount: _parseNonNegativeInt(map['secretVictoryCount']),
+      fastestVictoryWeek: (() {
+        final raw = (map['fastestVictoryWeek'] as num?)?.toInt();
+        return (raw != null && raw > 0) ? raw : null;
+      })(),
+      guardianRobotDefeatedCount:
+          _parseNonNegativeInt(map['guardianRobotDefeatedCount']),
+      robotArchmageDefeatedCount:
+          _parseNonNegativeInt(map['robotArchmageDefeatedCount']),
+      metalWizardDefeatedCount:
+          _parseNonNegativeInt(map['metalWizardDefeatedCount']),
+      babyMageRobotDefeatedCount:
+          _parseNonNegativeInt(map['babyMageRobotDefeatedCount']),
       adConsagrationsThisWeek:
           ((map['adConsagrationsThisWeek'] as num?)?.toInt() ?? 0) < 0
               ? 0
@@ -1714,10 +1876,12 @@ class PlayGamesService extends ChangeNotifier {
       } else if (localData.hasHigherProgressionOrOrbsThan(
             cloudData ?? const CloudSaveData(),
           )) {
-        if (cloudData != null &&
-            cloudData.hasClaimedQaBonus &&
-            !storage.hasClaimedQaBonus) {
-          await storage.setHasClaimedQaBonus(true);
+        if (cloudData != null) {
+          if (cloudData.hasClaimedQaBonus && !storage.hasClaimedQaBonus) {
+            await storage.setHasClaimedQaBonus(true);
+          }
+          await cloudData.mergeLifetimeChroniclesIntoStorage(storage);
+          onCloudDataRestored?.call();
         }
         // Keep local progression and back it up to the cloud
         final updatedLocal = CloudSaveData.fromStorage(storage);

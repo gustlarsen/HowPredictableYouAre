@@ -586,7 +586,9 @@ class _GameScreenState extends State<GameScreen>
                                   ? null
                                   : () async {
                                       setDialogState(() => isProcessing = true);
-                                      await controller.applyPermadeathReset();
+                                      await controller.applyPermadeathReset(
+                                        cause: PermadeathCause.battleDefeat,
+                                      );
                                       _isDeathDialogOpen = false;
                                       _isDeathSequenceActive = false;
                                       if (dialogCtx.mounted) {
