@@ -7,6 +7,7 @@ import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/castle_wing_icons.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import 'story_dialog.dart';
 
@@ -1570,17 +1571,28 @@ class _ShopDialogState extends State<ShopDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      loc.t(
-                        'temple_transmute_rate_label',
-                        fallback: '3 → 1 Exchange',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                        color: palette.primaryText,
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const AlchemyFlaskIcon(size: 22),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              loc.t(
+                                'temple_transmute_rate_label',
+                                fallback: '3 → 1 Exchange',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                                color: palette.primaryText,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),

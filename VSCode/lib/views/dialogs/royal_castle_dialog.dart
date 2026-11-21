@@ -5,6 +5,7 @@ import '../../models/royal_castle.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import '../screens/intro_story_screen.dart';
+import '../widgets/castle_wing_icons.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/royal_castle_icon.dart';
 import 'story_gallery_dialog.dart';
@@ -228,17 +229,15 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     final List<({
       CastleWing wing,
       ValueKey<String> key,
-      IconData? icon,
-      Widget Function(bool isSelected)? iconBuilder,
+      Widget Function(bool isSelected) iconBuilder,
       String label,
       bool hasDot,
     })> tabs = [
       (
         wing: CastleWing.throneRoom,
         key: const ValueKey('castle_tab_throne'),
-        icon: null,
-        iconBuilder: (isSelected) => RoyalCastleIcon(
-          size: 17,
+        iconBuilder: (isSelected) => ThroneCrownIcon(
+          size: 20,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('castle_tab_throne_short', fallback: 'Throne'),
@@ -247,40 +246,50 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.library,
         key: const ValueKey('castle_tab_library'),
-        icon: Icons.menu_book_rounded,
-        iconBuilder: null,
+        iconBuilder: (isSelected) => LibraryTomeIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_library_short', fallback: 'Library'),
         hasDot: false,
       ),
       (
         wing: CastleWing.treasury,
         key: const ValueKey('castle_tab_treasury'),
-        icon: Icons.inventory_2_rounded,
-        iconBuilder: null,
+        iconBuilder: (isSelected) => TreasuryChestIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_treasury_short', fallback: 'Treasury'),
         hasDot: controller.isAnyTreasuryElementFull,
       ),
       (
         wing: CastleWing.relicChamber,
         key: const ValueKey('castle_tab_relics'),
-        icon: Icons.auto_awesome_rounded,
-        iconBuilder: null,
+        iconBuilder: (isSelected) => RelicsSwordIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_relics_short', fallback: 'Relics'),
         hasDot: controller.hasAvailableRelicChamberUpgrades,
       ),
       (
         wing: CastleWing.spoilsOfWar,
         key: const ValueKey('castle_tab_spoils'),
-        icon: Icons.savings_rounded,
-        iconBuilder: null,
+        iconBuilder: (isSelected) => SpoilsPouchIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_spoils_short', fallback: 'Spoils'),
         hasDot: controller.hasSpoilsOfWarOrbs,
       ),
       (
         wing: CastleWing.hallOfHeroes,
         key: const ValueKey('castle_tab_hall_of_heroes'),
-        icon: Icons.workspace_premium_rounded,
-        iconBuilder: null,
+        iconBuilder: (isSelected) => HeroesHelmIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('castle_tab_heroes_short', fallback: 'Heroes'),
         hasDot: controller.hasHallOfHeroesBlessings,
       ),
@@ -294,7 +303,6 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           Expanded(
             child: _CompactVerticalTabPill(
               key: tabs[i].key,
-              icon: tabs[i].icon,
               iconBuilder: tabs[i].iconBuilder,
               label: tabs[i].label,
               selected: _selectedWing == tabs[i].wing,
@@ -468,6 +476,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           ),
           isReached: week >= GameController.maxCampaignWeeks,
           accentColor: palette.dangerText,
+          leadingIcon: const GoldenHourglassIcon(size: 24),
         ),
         const SizedBox(height: 16),
 
@@ -475,6 +484,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            const RoyalScrollIcon(size: 22),
+            const SizedBox(width: 7),
             Expanded(
               child: Text(
                 loc.t('castle_decrees_title', fallback: 'Royal Decrees'),
@@ -565,20 +576,34 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 ),
               ),
             ),
-            Container(
-              key: const ValueKey('library_endings_counter_badge'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: palette.rewardedAdCardSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: palette.rewardedAdCardBorder),
-              ),
-              child: Text(
-                '${loc.t('castle_endings_discovered', fallback: 'Endings Discovered')}: ${controller.unlockedEndingsCount} / ${NarrativeEnding.values.length}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11.5,
-                  color: palette.amberText,
+            const SizedBox(width: 6),
+            Flexible(
+              child: Container(
+                key: const ValueKey('library_endings_counter_badge'),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: palette.rewardedAdCardSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: palette.rewardedAdCardBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LaurelWreathIcon(size: 22),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        '${loc.t('castle_endings_discovered', fallback: 'Endings Discovered')}: ${controller.unlockedEndingsCount} / ${NarrativeEnding.values.length}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                          color: palette.amberText,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -597,13 +622,21 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ],
         const SizedBox(height: 12),
 
-        Text(
-          loc.t('castle_bestiary_title', fallback: 'Arcane Bestiary'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13.5,
-            color: palette.amberText,
-          ),
+        Row(
+          children: [
+            const AutomatonHeadIcon(size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.t('castle_bestiary_title', fallback: 'Arcane Bestiary'),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: palette.amberText,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -757,11 +790,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                     ),
                   ),
-                  Icon(
-                    Icons.inventory_2_rounded,
-                    size: 19,
-                    color: vaultBorderColor,
-                  ),
+                  const TreasuryChestIcon(size: 22),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1004,11 +1033,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                color: palette.amberIcon,
-                size: 20,
-              ),
+              const RunicShieldIcon(size: 24),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1225,11 +1250,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.military_tech_rounded,
-                color: palette.amberIcon,
-                size: 20,
-              ),
+              const WarBannerIcon(size: 24),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1459,11 +1480,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.workspace_premium_rounded,
-                color: palette.amberIcon,
-                size: 20,
-              ),
+              const HeroesHelmIcon(size: 24),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1532,12 +1549,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   Row(
                     key: const ValueKey('hall_of_heroes_hp_bonus_row'),
                     children: [
-                      Icon(
-                        Icons.favorite_rounded,
-                        size: 18,
-                        color: palette.dangerText,
-                      ),
-                      const SizedBox(width: 6),
+                      const RubyHeartIcon(size: 22),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           loc.t(
@@ -1573,12 +1586,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   Row(
                     key: const ValueKey('hall_of_heroes_mana_bonus_row'),
                     children: [
-                      const Icon(
-                        Icons.water_drop_rounded,
-                        size: 18,
-                        color: Color(0xFF00B0FF),
-                      ),
-                      const SizedBox(width: 6),
+                      const ManaCrystalIcon(size: 22),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           loc.t(
@@ -1713,8 +1722,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 }
 
 class _CompactVerticalTabPill extends StatelessWidget {
-  final IconData? icon;
-  final Widget Function(bool isSelected)? iconBuilder;
+  final Widget Function(bool isSelected) iconBuilder;
   final String label;
   final bool selected;
   final bool showDot;
@@ -1723,14 +1731,13 @@ class _CompactVerticalTabPill extends StatelessWidget {
 
   const _CompactVerticalTabPill({
     super.key,
-    this.icon,
-    this.iconBuilder,
+    required this.iconBuilder,
     required this.label,
     required this.selected,
     required this.showDot,
     required this.palette,
     required this.onTap,
-  }) : assert(icon != null || iconBuilder != null);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1746,9 +1753,6 @@ class _CompactVerticalTabPill extends StatelessWidget {
     final borderColor = selected
         ? goldFill
         : palette.amberBorder.withValues(alpha: palette.isDark ? 0.45 : 0.6);
-    final fgColor = selected
-        ? goldDarkInk
-        : (palette.isDark ? goldFill : palette.amberIcon);
     final textColor = selected
         ? goldDarkInk
         : (palette.isDark
@@ -1777,9 +1781,7 @@ class _CompactVerticalTabPill extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  iconBuilder != null
-                      ? iconBuilder!(selected)
-                      : Icon(icon, size: 17, color: fgColor),
+                  iconBuilder(selected),
                   const SizedBox(height: 3),
                   SizedBox(
                     height: 13,
@@ -1907,6 +1909,7 @@ class _MilestoneTile extends StatelessWidget {
   final String description;
   final bool isReached;
   final Color accentColor;
+  final Widget? leadingIcon;
 
   const _MilestoneTile({
     super.key,
@@ -1914,6 +1917,7 @@ class _MilestoneTile extends StatelessWidget {
     required this.description,
     required this.isReached,
     required this.accentColor,
+    this.leadingIcon,
   });
 
   @override
@@ -1938,13 +1942,14 @@ class _MilestoneTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isReached
-                ? Icons.check_circle_rounded
-                : Icons.hourglass_empty_rounded,
-            size: 18,
-            color: isReached ? accentColor : palette.mutedText,
-          ),
+          leadingIcon ??
+              Icon(
+                isReached
+                    ? Icons.check_circle_rounded
+                    : Icons.hourglass_empty_rounded,
+                size: 18,
+                color: isReached ? accentColor : palette.mutedText,
+              ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

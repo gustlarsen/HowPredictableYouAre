@@ -16,6 +16,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/theme/app_theme.dart';
 import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/castle_wing_icons.dart';
 import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
 import 'package:how_predictable/views/widgets/royal_castle_icon.dart';
 
@@ -809,31 +810,31 @@ void main() {
           findsNothing,
         );
 
-        // Both header badge and Throne tab render RoyalCastleIcon
+        // Modal header badge renders RoyalCastleIcon while Throne tab renders ThroneCrownIcon
         expect(
           find.descendant(
             of: dialogFinder,
             matching: find.byType(RoyalCastleIcon),
           ),
-          findsNWidgets(2),
+          findsOneWidget,
         );
 
         final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
         final throneIconFinder = find.descendant(
           of: throneTab,
-          matching: find.byType(RoyalCastleIcon),
+          matching: find.byType(ThroneCrownIcon),
         );
         expect(throneIconFinder, findsOneWidget);
         expect(
-          tester.widget<RoyalCastleIcon>(throneIconFinder).isOnGoldBackground,
+          tester.widget<ThroneCrownIcon>(throneIconFinder).isOnGoldBackground,
           isTrue,
         );
 
-        // Switch to Library tab -> Throne tab switches to inactive stone-gray palette
+        // Switch to Library tab -> Throne tab switches to inactive palette
         await tester.tap(find.byKey(const ValueKey('castle_tab_library')));
         await tester.pumpAndSettle();
         expect(
-          tester.widget<RoyalCastleIcon>(throneIconFinder).isOnGoldBackground,
+          tester.widget<ThroneCrownIcon>(throneIconFinder).isOnGoldBackground,
           isFalse,
         );
       },
@@ -898,6 +899,163 @@ void main() {
           final okBottom = tester.getBottomRight(find.text('Ok')).dy;
           expect(vaultBottom, lessThanOrEqualTo(760));
           expect(okBottom, lessThanOrEqualTo(760));
+        }
+      },
+    );
+
+    testWidgets(
+      'All 6 Castle tabs and internal section headers render bespoke CustomPainter RPG icons cleanly in both Dark Mode and Light Mode',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Standalone painter smoke checks for all 9 internal wing accent icons
+        final accentIcons = <Widget>[
+          const RoyalScrollIcon(size: 22),
+          const GoldenHourglassIcon(size: 24),
+          const LaurelWreathIcon(size: 22),
+          const AutomatonHeadIcon(size: 24),
+          const AlchemyFlaskIcon(size: 22),
+          const RunicShieldIcon(size: 24),
+          const WarBannerIcon(size: 24),
+          const RubyHeartIcon(size: 22),
+          const ManaCrystalIcon(size: 22),
+        ];
+        for (final icon in accentIcons) {
+          await tester.pumpWidget(
+            MaterialApp(home: Scaffold(body: Center(child: icon))),
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        // 2. Full RoyalCastleDialog verification across Dark Mode & Light Mode
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {
+            'hall_of_heroes_hp_bonus': 12,
+            'hall_of_heroes_mana_bonus': 8,
+            'treasury_orbs_fire': 10,
+            'spoils_orbs_fire': 5,
+            'relic_chamber_items': ['reset'],
+          },
+        );
+        addTearDown(controller.dispose);
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: RoyalCastleDialog(
+                  key: ValueKey('castle_dialog_theme_$isDark'),
+                  controller: controller,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
+          final libraryTab = find.byKey(const ValueKey('castle_tab_library'));
+          final treasuryTab = find.byKey(const ValueKey('castle_tab_treasury'));
+          final relicsTab = find.byKey(const ValueKey('castle_tab_relics'));
+          final spoilsTab = find.byKey(const ValueKey('castle_tab_spoils'));
+          final heroesTab =
+              find.byKey(const ValueKey('castle_tab_hall_of_heroes'));
+
+          // All 6 bespoke tab icons are mounted simultaneously at 20x20
+          final crownFinder = find.descendant(
+            of: throneTab,
+            matching: find.byType(ThroneCrownIcon),
+          );
+          final tomeFinder = find.descendant(
+            of: libraryTab,
+            matching: find.byType(LibraryTomeIcon),
+          );
+          final chestFinder = find.descendant(
+            of: treasuryTab,
+            matching: find.byType(TreasuryChestIcon),
+          );
+          final swordFinder = find.descendant(
+            of: relicsTab,
+            matching: find.byType(RelicsSwordIcon),
+          );
+          final pouchFinder = find.descendant(
+            of: spoilsTab,
+            matching: find.byType(SpoilsPouchIcon),
+          );
+          final helmFinder = find.descendant(
+            of: heroesTab,
+            matching: find.byType(HeroesHelmIcon),
+          );
+
+          for (final finder in [
+            crownFinder,
+            tomeFinder,
+            chestFinder,
+            swordFinder,
+            pouchFinder,
+            helmFinder,
+          ]) {
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(const Size(20.0, 20.0)));
+          }
+
+          // Wing 1 (Throne) active by default -> high contrast on gold; others inactive
+          expect(tester.widget<ThroneCrownIcon>(crownFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HeroesHelmIcon>(helmFinder).isOnGoldBackground, isFalse);
+          expect(find.byType(GoldenHourglassIcon), findsOneWidget);
+          expect(find.byType(RoyalScrollIcon), findsOneWidget);
+
+          // Wing 2 (Library)
+          await tester.tap(libraryTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<ThroneCrownIcon>(crownFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(LaurelWreathIcon), findsOneWidget);
+          expect(find.byType(AutomatonHeadIcon), findsOneWidget);
+
+          // Wing 3 (Treasury)
+          await tester.tap(treasuryTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(TreasuryChestIcon), findsNWidgets(2));
+
+          // Wing 4 (Relics)
+          await tester.tap(relicsTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(RunicShieldIcon), findsOneWidget);
+
+          // Wing 5 (Spoils)
+          await tester.tap(spoilsTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(WarBannerIcon), findsOneWidget);
+
+          // Wing 6 (Hall of Heroes)
+          await tester.tap(heroesTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HeroesHelmIcon>(helmFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(HeroesHelmIcon), findsNWidgets(2));
+          expect(find.byType(RubyHeartIcon), findsOneWidget);
+          expect(find.byType(ManaCrystalIcon), findsOneWidget);
+          expect(tester.takeException(), isNull);
         }
       },
     );
