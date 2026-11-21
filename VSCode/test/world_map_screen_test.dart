@@ -20,6 +20,7 @@ import 'package:how_predictable/views/dialogs/throne_room_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
+import 'package:how_predictable/views/widgets/sacred_temple_icon.dart';
 
 class _TestAdMobClient implements AdMobClient {
   @override
@@ -569,8 +570,32 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(RoyalCastleDialog), findsNothing);
 
-        // 3. Sacred Temple -> 5-Tab Sanctuary (Consagration default, Offerings & Prayer)
-        await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
+        // 3. Sacred Temple -> bespoke SacredTempleIcon pin & 5-Tab Sanctuary
+        final sacredTemplePin = find.byKey(
+          const ValueKey('landmark_sacred_temple'),
+        );
+        expect(
+          find.descendant(
+            of: sacredTemplePin,
+            matching: find.byIcon(Icons.auto_awesome_rounded),
+          ),
+          findsNothing,
+        );
+        final mapTempleIconFinder = find.descendant(
+          of: sacredTemplePin,
+          matching: find.byType(SacredTempleIcon),
+        );
+        expect(mapTempleIconFinder, findsOneWidget);
+        expect(
+          tester.getSize(mapTempleIconFinder),
+          equals(const Size(25.0, 25.0)),
+        );
+        expect(
+          tester.widget<SacredTempleIcon>(mapTempleIconFinder).isOnGoldBackground,
+          isFalse,
+        );
+
+        await tester.tap(sacredTemplePin);
         await tester.pumpAndSettle();
 
         expect(find.byType(ShopDialog), findsOneWidget);

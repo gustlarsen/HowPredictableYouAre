@@ -14,6 +14,7 @@ import '../dialogs/shop_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
+import '../widgets/sacred_temple_icon.dart';
 import 'game_screen.dart';
 
 /// Interactive 9:16 Kingdom World Map hub screen.
@@ -375,7 +376,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             mapWidth: mapWidth,
                             mapHeight: mapHeight,
                             normalizedPos: WorldMapScreen.sacredTemplePos,
-                            icon: Icons.auto_awesome_rounded,
+                            iconWidget: const SacredTempleIcon(size: 25),
                             label: loc.t(
                               'map_landmark_sacred_temple',
                               fallback: 'Sacred Temple',

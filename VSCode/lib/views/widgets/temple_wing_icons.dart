@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'sacred_temple_icon.dart';
 
 /// Shared helper wrapper matching [RoyalCastleIcon] and [castle_wing_icons.dart]
 /// so every Sacred Temple custom vector icon renders cleanly at a fixed square
@@ -1173,9 +1174,8 @@ class _PrayerHandsPainter extends CustomPainter {
 // MODAL HEADER & INTERNAL WING FOCAL / SECTION ICONS
 // =============================================================================
 
-/// Modal Header Emblem: Classical Golden-and-Ivory Pillared Temple with a
-/// triangular pediment roof, stepped base, and 4 distinct fluted ivory columns
-/// separated by dark vertical spacing.
+/// Modal Header Emblem: Delegates to [SacredTempleIcon] so the Sacred Temple
+/// map pin and the modal header badge share the exact same bespoke vector icon.
 class SacredTempleEmblemIcon extends StatelessWidget {
   final double size;
 
@@ -1183,147 +1183,8 @@ class SacredTempleEmblemIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _TempleVectorIcon(
-      size: size,
-      painter: const _SacredTempleEmblemPainter(),
-    );
+    return SacredTempleIcon(size: size);
   }
-}
-
-class _SacredTempleEmblemPainter extends CustomPainter {
-  const _SacredTempleEmblemPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = math.min(size.width, size.height);
-    final ox = (size.width - s) * 0.5;
-    final oy = (size.height - s) * 0.5;
-    final scale = s / 24.0;
-    final outline = _outlinePaint(scale, baseWidth: 1.25);
-    final detail = _detailPaint(scale, alpha: 0.65);
-
-    canvas.save();
-    canvas.translate(ox, oy);
-
-    // 1. Dark recessed sanctuary interior behind the 4 columns
-    canvas.drawRect(
-      Rect.fromLTRB(s * 0.18, s * 0.37, s * 0.82, s * 0.79),
-      Paint()..color = const Color(0xFF1A2226),
-    );
-
-    // 2. Four distinct fluted ivory columns with dark vertical gaps
-    for (final cx in [s * 0.245, s * 0.415, s * 0.585, s * 0.755]) {
-      final colRect = Rect.fromCenter(
-        center: Offset(cx, s * 0.58),
-        width: s * 0.105,
-        height: s * 0.37,
-      );
-      canvas.drawRect(
-        colRect,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [Color(0xFFFAFBFD), Color(0xFFECEFF1), Color(0xFFB0BEC5)],
-          ).createShader(colRect),
-      );
-      canvas.drawRect(colRect, outline);
-      // Central vertical flute line
-      canvas.drawLine(
-        Offset(cx, s * 0.42),
-        Offset(cx, s * 0.74),
-        detail,
-      );
-      // Column capital & base blocks
-      final cap = Rect.fromCenter(
-        center: Offset(cx, s * 0.405),
-        width: s * 0.135,
-        height: s * 0.045,
-      );
-      final colBase = Rect.fromCenter(
-        center: Offset(cx, s * 0.76),
-        width: s * 0.135,
-        height: s * 0.045,
-      );
-      for (final block in [cap, colBase]) {
-        canvas.drawRect(
-          block,
-          Paint()
-            ..shader = const LinearGradient(
-              colors: [Color(0xFFFFE082), Color(0xFFFFB300)],
-            ).createShader(block),
-        );
-        canvas.drawRect(block, detail);
-      }
-    }
-
-    // 3. Stepped stone & gold base plinth (y: 0.78..0.915)
-    final baseUpper = Rect.fromLTRB(s * 0.14, s * 0.78, s * 0.86, s * 0.845);
-    canvas.drawRect(
-      baseUpper,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFECEFF1), Color(0xFFCFD8DC), Color(0xFF90A4AE)],
-        ).createShader(baseUpper),
-    );
-    canvas.drawRect(baseUpper, outline);
-
-    final baseLower = RRect.fromRectAndRadius(
-      Rect.fromLTRB(s * 0.09, s * 0.845, s * 0.91, s * 0.915),
-      Radius.circular(s * 0.025),
-    );
-    canvas.drawRRect(
-      baseLower,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Color(0xFFFFF3B0), Color(0xFFFFD54F), Color(0xFFB27800)],
-        ).createShader(baseLower.outerRect),
-    );
-    canvas.drawRRect(baseLower, outline);
-
-    // 4. Classical golden architrave & triangular pediment roof (y: 0.10..0.385)
-    final architrave = Rect.fromLTRB(s * 0.13, s * 0.34, s * 0.87, s * 0.388);
-    canvas.drawRect(
-      architrave,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFB27800)],
-        ).createShader(architrave),
-    );
-    canvas.drawRect(architrave, outline);
-
-    final roofPath = Path()
-      ..moveTo(s * 0.50, s * 0.095)
-      ..lineTo(s * 0.92, s * 0.345)
-      ..lineTo(s * 0.08, s * 0.345)
-      ..close();
-    canvas.drawPath(
-      roofPath,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF3B0), Color(0xFFFFD54F), Color(0xFFB27800)],
-        ).createShader(Rect.fromLTRB(s * 0.08, s * 0.095, s * 0.92, s * 0.345)),
-    );
-    canvas.drawPath(roofPath, outline);
-
-    // Recessed tympanum triangle inside pediment
-    final tympanum = Path()
-      ..moveTo(s * 0.50, s * 0.155)
-      ..lineTo(s * 0.78, s * 0.318)
-      ..lineTo(s * 0.22, s * 0.318)
-      ..close();
-    canvas.drawPath(tympanum, Paint()..color = const Color(0xFF7C5100));
-    canvas.drawPath(tympanum, detail);
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_SacredTempleEmblemPainter oldDelegate) => false;
 }
 
 /// Wing 1 — `+1 Max HP`: Large faceted crimson-ruby crystal heart framed

@@ -16,6 +16,8 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/sacred_temple_icon.dart';
 import 'package:how_predictable/views/widgets/temple_wing_icons.dart';
 
 class _TempleAdMobClient implements AdMobClient {
@@ -910,6 +912,8 @@ void main() {
           const AdorationHarpIcon(size: 28, isOnGoldBackground: true),
           const PrayerHandsIcon(size: 28, isOnGoldBackground: false),
           const PrayerHandsIcon(size: 28, isOnGoldBackground: true),
+          const SacredTempleIcon(size: 25, isOnGoldBackground: false),
+          const SacredTempleIcon(size: 25, isOnGoldBackground: true),
           const SacredTempleEmblemIcon(size: 32),
           const VitalityHeartIcon(size: 46),
           const ManaDropIcon(size: 46),
@@ -958,6 +962,11 @@ void main() {
           expect(find.byType(SacredTempleEmblemIcon), findsOneWidget);
           expect(
             tester.getSize(find.byType(SacredTempleEmblemIcon)),
+            equals(const Size(32.0, 32.0)),
+          );
+          expect(find.byType(SacredTempleIcon), findsOneWidget);
+          expect(
+            tester.getSize(find.byType(SacredTempleIcon)),
             equals(const Size(32.0, 32.0)),
           );
 
@@ -1051,6 +1060,88 @@ void main() {
           expect(find.byType(SacredBlessingIcon), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
+      },
+    );
+
+    testWidgets(
+      'SacredTempleIcon renders standard and on-gold variants across sizes and replaces sparkles icon on WorldMapScreen pin and SacredTempleDialog header',
+      (WidgetTester tester) async {
+        // 1. Standalone SacredTempleIcon variants & sizes
+        for (final onGold in [false, true]) {
+          for (final iconSize in [22.0, 25.0, 32.0, 48.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: Center(
+                    child: SacredTempleIcon(
+                      size: iconSize,
+                      isOnGoldBackground: onGold,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final finder = find.byType(SacredTempleIcon);
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(Size(iconSize, iconSize)));
+            expect(tester.takeException(), isNull);
+          }
+        }
+
+        // 2. WorldMapScreen Sacred Temple pin + SacredTempleDialog header
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createTempleHarness();
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(home: WorldMapScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final templePin = find.byKey(const ValueKey('landmark_sacred_temple'));
+        expect(templePin, findsOneWidget);
+        expect(
+          find.descendant(
+            of: templePin,
+            matching: find.byIcon(Icons.auto_awesome_rounded),
+          ),
+          findsNothing,
+        );
+        final mapIconFinder = find.descendant(
+          of: templePin,
+          matching: find.byType(SacredTempleIcon),
+        );
+        expect(mapIconFinder, findsOneWidget);
+        expect(
+          tester.widget<SacredTempleIcon>(mapIconFinder).isOnGoldBackground,
+          isFalse,
+        );
+
+        await tester.tap(templePin);
+        await tester.pumpAndSettle();
+
+        final dialogFinder = find.byType(SacredTempleDialog);
+        expect(dialogFinder, findsOneWidget);
+        expect(
+          find.descendant(
+            of: dialogFinder,
+            matching: find.byType(SacredTempleIcon),
+          ),
+          findsOneWidget,
+        );
       },
     );
   });
