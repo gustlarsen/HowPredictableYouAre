@@ -161,7 +161,7 @@ enum StoryChapter {
   String get assetPath {
     switch (this) {
       case StoryChapter.intro:
-        return 'assets/images/story/intro_comic.jpeg';
+        return 'assets/images/story/intro_1.jpeg';
       case StoryChapter.resetButton:
         return 'assets/images/story/reset_button_comic.jpeg';
       case StoryChapter.predictabilityScore:
@@ -218,7 +218,7 @@ enum StoryChapter {
   String get fallbackTitle {
     switch (this) {
       case StoryChapter.intro:
-        return "Prologue: The Master Hand's Shadow";
+        return "Prologue: The Metal Wizard's Plot";
       case StoryChapter.resetButton:
         return 'Chapter I: The Hourglass of Oblivion';
       case StoryChapter.predictabilityScore:
@@ -241,7 +241,7 @@ enum StoryChapter {
   String get itemNameKey {
     switch (this) {
       case StoryChapter.intro:
-        return 'story_intro_badge';
+        return 'story_intro_summary';
       case StoryChapter.resetButton:
         return 'string37';
       case StoryChapter.predictabilityScore:
@@ -264,7 +264,7 @@ enum StoryChapter {
   String get fallbackItemName {
     switch (this) {
       case StoryChapter.intro:
-        return "The King's Quest";
+        return "The Metal Wizard's automaton kidnaps the Princess, and the King summons a young Cleric to strike back.";
       case StoryChapter.resetButton:
         return 'Reset Button';
       case StoryChapter.predictabilityScore:

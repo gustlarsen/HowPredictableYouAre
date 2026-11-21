@@ -137,6 +137,12 @@ void main() {
         expect(loc.t('story_next'), isNot('story_next'));
         expect(loc.t('story_begin_quest'), isNot('story_begin_quest'));
         expect(loc.t('story_replay_intro'), isNot('story_replay_intro'));
+        expect(loc.t('story_intro_title'), isNot('story_intro_title'));
+        expect(loc.t('story_intro_summary'), isNot('story_intro_summary'));
+        expect(
+          loc.t('story_intro_pages_badge'),
+          isNot('story_intro_pages_badge'),
+        );
 
         for (int i = 0; i < IntroStoryCardData.cards.length; i++) {
           final card = IntroStoryCardData.cards[i];
@@ -384,7 +390,7 @@ void main() {
     );
 
     testWidgets(
-      'Royal Castle Library shows intro_1..intro_4 in the first 4 unlocked memory slots and Replay Intro replays the carousel cleanly',
+      'Royal Castle Library consolidates intro into single #1 card (1/9..9/9) that opens the 4-slide IntroStoryScreen carousel, and Replay Intro works identically',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -420,8 +426,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('castle_wing_library')), findsOneWidget);
 
-        // Verify 4 / 12 Story Memories unlocked (intro_1..intro_4)
-        expect(find.text('4 / 12'), findsOneWidget);
+        // Verify 1 / 9 Story Memories unlocked (unified #1 Intro card)
+        expect(find.text('1 / 9'), findsOneWidget);
 
         final replayIntroBtn = find.byKey(
           const ValueKey('library_replay_intro_button'),
@@ -431,18 +437,44 @@ void main() {
         expect(replayIntroBtn, findsOneWidget);
         expect(find.text('Replay Intro'), findsOneWidget);
 
+        // Unified #1 card is present; old 4 duplicate intro_1..intro_4 list entries are absent
+        final introSlot = find.byKey(const ValueKey('story_gallery_item_intro'));
+        await tester.ensureVisible(introSlot);
+        await tester.pumpAndSettle();
+        expect(introSlot, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('story_gallery_thumb_intro')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('story_gallery_badge_intro')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('story_gallery_read_btn_intro')),
+          findsOneWidget,
+        );
+        expect(find.text('#1'), findsOneWidget);
+        expect(find.text("Prologue: The Metal Wizard's Plot"), findsOneWidget);
+        expect(find.text('4 Scenes'), findsOneWidget);
+        expect(find.text('Read Comic'), findsOneWidget);
+
         for (int i = 1; i <= 4; i++) {
           expect(
             find.byKey(ValueKey('story_gallery_item_intro_$i')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(ValueKey('story_gallery_thumb_intro_$i')),
-            findsOneWidget,
+            findsNothing,
           );
         }
 
+        // Remaining 8 artifact chapters are numbered #2..#9
+        for (int n = 2; n <= 9; n++) {
+          expect(find.text('#$n'), findsOneWidget);
+        }
+        expect(find.text('#10'), findsNothing);
+
         // Tapping Replay Intro opens IntroStoryScreen at Card 1, and Skip returns to Library
+        await tester.ensureVisible(replayIntroBtn);
+        await tester.pumpAndSettle();
         await tester.tap(replayIntroBtn);
         await tester.pumpAndSettle();
         expect(find.byType(IntroStoryScreen), findsOneWidget);
@@ -455,15 +487,45 @@ void main() {
         expect(find.byType(RoyalCastleDialog), findsOneWidget);
         expect(controller.currentWeek, 3);
 
-        // Tapping slot 2 directly opens IntroStoryScreen at Card 2
-        final slot2 = find.byKey(const ValueKey('story_gallery_item_intro_2'));
-        await tester.ensureVisible(slot2);
+        // Tapping the unified #1 Intro card opens the full 4-slide IntroStoryScreen carousel
+        final readBtn = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
+        await tester.ensureVisible(readBtn);
         await tester.pumpAndSettle();
-        await tester.tap(slot2);
+        await tester.tap(readBtn);
         await tester.pumpAndSettle();
+
         expect(find.byType(IntroStoryScreen), findsOneWidget);
+        expect(find.text('1 / 4'), findsOneWidget);
+        expect(find.text('The Metal Automaton'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
         expect(find.text('2 / 4'), findsOneWidget);
         expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('3 / 4'), findsOneWidget);
+        expect(find.text("The King's Summons"), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('4 / 4'), findsOneWidget);
+        expect(find.text('The Quest Begins'), findsOneWidget);
+
+        // Begin Quest on slide 4 returns cleanly to Royal Castle Library
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(IntroStoryScreen), findsNothing);
+        expect(find.byType(RoyalCastleDialog), findsOneWidget);
+        expect(controller.currentWeek, 3);
+
+        // Unlocking all 8 artifact chapters brings Story Memories counter to 9 / 9
+        for (final chapter in controller.artifactStoryChapters) {
+          controller.markStorySeen(chapter);
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('9 / 9'), findsOneWidget);
       },
     );
   });

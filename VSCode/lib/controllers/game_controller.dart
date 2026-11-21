@@ -2592,12 +2592,10 @@ class GameController extends ChangeNotifier {
       .where((c) => c != StoryChapter.intro)
       .toList(growable: false);
 
-  int get totalStoryMemoriesCount =>
-      IntroStoryCardData.cards.length + artifactStoryChapters.length;
+  int get totalStoryMemoriesCount => StoryChapter.values.length;
 
   int get unlockedStoryMemoriesCount =>
-      IntroStoryCardData.cards.length +
-      artifactStoryChapters.where(isStoryChapterUnlocked).length;
+      StoryChapter.values.where(isStoryChapterUnlocked).length;
 
   void completeIntroStory() {
     final shouldSave =

@@ -949,7 +949,7 @@ void main() {
       find.byKey(const ValueKey('royal_castle_notification_badge')),
       findsOneWidget,
     );
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+    expect(find.text("Prologue: The Metal Wizard's Plot"), findsNothing);
   });
 
   testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {
@@ -1038,15 +1038,18 @@ void main() {
     await tester.tap(storyMemoriesBtn);
     await tester.pumpAndSettle();
 
-    // 4 intro memories + Reset Button chapter are unlocked (5 / 12), while Predictability Score is still locked
-    expect(find.text('5 / 12'), findsOneWidget);
-    expect(find.byKey(const ValueKey('story_gallery_item_intro_1')), findsOneWidget);
+    // 1 unified intro memory + Reset Button chapter are unlocked (2 / 9), while Predictability Score is still locked
+    expect(find.text('2 / 9'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_intro_1')), findsNothing);
+    expect(find.byKey(const ValueKey('story_gallery_badge_intro')), findsOneWidget);
+    expect(find.text('4 Scenes'), findsOneWidget);
 
     // Verify Story Memories layout: chapter name is above thumbnail and read button,
     // and thumbnail and read button are in the same horizontal line
-    final introTitleFinder = find.text('Chapter I: The Metal Automaton');
-    final introThumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro_1'));
-    final introReadBtnFinder = find.byKey(const ValueKey('story_gallery_read_btn_intro_1'));
+    final introTitleFinder = find.text("Prologue: The Metal Wizard's Plot");
+    final introThumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro'));
+    final introReadBtnFinder = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
     expect(
       tester.getBottomLeft(introTitleFinder).dy,
       lessThan(tester.getTopLeft(introThumbFinder).dy),

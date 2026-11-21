@@ -152,9 +152,8 @@ class StoryMemoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = controller.localization;
-    final introCards = IntroStoryCardData.cards;
     final artifactChapters = controller.artifactStoryChapters;
-    final totalItems = introCards.length + artifactChapters.length;
+    final totalItems = 1 + artifactChapters.length;
 
     final lockedTitle = loc.t('story_locked_title', fallback: 'Locked Chapter');
     final lockedHint = loc.t(
@@ -162,6 +161,10 @@ class StoryMemoriesSection extends StatelessWidget {
       fallback: 'Unlock this item in the Shop to reveal its story!',
     );
     final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
+    final introBadgeLabel = loc.t(
+      'story_intro_pages_badge',
+      fallback: '4 Scenes',
+    );
 
     return ListView.separated(
       shrinkWrap: shrinkWrap,
@@ -169,39 +172,36 @@ class StoryMemoriesSection extends StatelessWidget {
       itemCount: totalItems,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        if (index < introCards.length) {
-          final card = introCards[index];
-          final chapterLabel = loc.t(
-            card.chapterKey,
-            fallback: card.fallbackChapter,
+        if (index == 0) {
+          const introChapter = StoryChapter.intro;
+          final introTitle = loc.t(
+            introChapter.titleKey,
+            fallback: introChapter.fallbackTitle,
           );
-          final cardTitle = loc.t(
-            card.titleKey,
-            fallback: card.fallbackTitle,
-          );
-          final caption = loc.t(
-            card.captionKey,
-            fallback: card.fallbackCaption,
+          final introSummary = loc.t(
+            introChapter.itemNameKey,
+            fallback: introChapter.fallbackItemName,
           );
 
           return StoryChapterCard(
-            key: ValueKey('story_gallery_item_${card.id}'),
-            memoryId: card.id,
-            assetPath: card.assetPath,
-            icon: card.icon,
-            chapterNumber: index + 1,
+            key: ValueKey('story_gallery_item_${introChapter.id}'),
+            memoryId: introChapter.id,
+            assetPath: introChapter.assetPath,
+            icon: introChapter.icon,
+            chapterNumber: 1,
             isUnlocked: true,
-            chapterTitle: '$chapterLabel: $cardTitle',
-            subtitle: caption,
+            chapterTitle: introTitle,
+            subtitle: introSummary,
+            badgeLabel: introBadgeLabel,
             replayLabel: replayLabel,
             onTap: () {
               controller.audio.playTapVibrate();
-              IntroStoryScreen.showReplay(context, initialPage: card.index);
+              IntroStoryScreen.showReplay(context);
             },
           );
         }
 
-        final chapter = artifactChapters[index - introCards.length];
+        final chapter = artifactChapters[index - 1];
         final isUnlocked = controller.isStoryChapterUnlocked(chapter);
         final chapterTitle = loc.t(
           chapter.titleKey,
@@ -257,6 +257,7 @@ class StoryChapterCard extends StatelessWidget {
   final bool isUnlocked;
   final String chapterTitle;
   final String subtitle;
+  final String? badgeLabel;
   final String replayLabel;
   final VoidCallback onTap;
 
@@ -269,6 +270,7 @@ class StoryChapterCard extends StatelessWidget {
     required this.isUnlocked,
     required this.chapterTitle,
     required this.subtitle,
+    this.badgeLabel,
     required this.replayLabel,
     required this.onTap,
   });
@@ -448,41 +450,95 @@ class StoryChapterCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
 
-                    // Action Icon / Button
+                    // Optional sequence badge + Action Icon / Button
                     if (isUnlocked)
-                      Container(
-                        key: ValueKey('story_gallery_read_btn_$memoryId'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.isDark
-                              ? Colors.amber.withValues(alpha: 0.16)
-                              : palette.rewardedAdCardSurface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: palette.isDark
-                              ? null
-                              : Border.all(
-                                  color: palette.rewardedAdCardBorder
-                                      .withValues(alpha: 0.65),
-                                ),
-                        ),
+                      Flexible(
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.menu_book_rounded,
-                              size: 16,
-                              color: palette.amberText,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              replayLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: palette.amberText,
+                            if (badgeLabel != null) ...[
+                              Flexible(
+                                child: Container(
+                                  key: ValueKey('story_gallery_badge_$memoryId'),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: palette.isDark
+                                        ? Colors.amber.withValues(alpha: 0.12)
+                                        : palette.sandCardSurface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: palette.amberBorder.withValues(
+                                        alpha: palette.isDark ? 0.40 : 0.65,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.auto_stories_outlined,
+                                        size: 13,
+                                        color: palette.amberText,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          badgeLabel!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: palette.amberText,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Container(
+                              key: ValueKey('story_gallery_read_btn_$memoryId'),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.isDark
+                                    ? Colors.amber.withValues(alpha: 0.16)
+                                    : palette.rewardedAdCardSurface,
+                                borderRadius: BorderRadius.circular(10),
+                                border: palette.isDark
+                                    ? null
+                                    : Border.all(
+                                        color: palette.rewardedAdCardBorder
+                                            .withValues(alpha: 0.65),
+                                      ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.menu_book_rounded,
+                                    size: 16,
+                                    color: palette.amberText,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    replayLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: palette.amberText,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
