@@ -1,0 +1,318 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
+
+/// Renders the animated Watch Tower Dungeon Cell + captive Princess scene
+/// via `shaders/watchtower_prisoner.frag`, with a safe static [Stack] fallback
+/// when fragment shaders are unavailable (e.g. headless CI `flutter test`).
+class WatchtowerCellShaderView extends StatefulWidget {
+  final bool animationsEnabled;
+  final bool forceStaticFallback;
+
+  const WatchtowerCellShaderView({
+    super.key,
+    this.animationsEnabled = true,
+    this.forceStaticFallback = false,
+  });
+
+  @override
+  State<WatchtowerCellShaderView> createState() =>
+      _WatchtowerCellShaderViewState();
+}
+
+class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
+    with SingleTickerProviderStateMixin {
+  static const String _shaderAsset = 'shaders/watchtower_prisoner.frag';
+  static const String _bgAsset = 'assets/images/watchtower_dungeon_cell.jpeg';
+  static const String _princessAsset = 'assets/images/princess_captive.png';
+
+  final ValueNotifier<double> _timeSeconds = ValueNotifier<double>(0.0);
+  late final Ticker _ticker;
+
+  ui.FragmentProgram? _program;
+  ui.FragmentShader? _shader;
+  ui.Image? _bgImage;
+  ui.Image? _princessImage;
+  bool _shaderFailed = false;
+  bool _disposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((elapsed) {
+      if (_disposed) return;
+      _timeSeconds.value = elapsed.inMicroseconds / 1000000.0;
+    });
+    if (widget.forceStaticFallback) {
+      _shaderFailed = true;
+    } else {
+      unawaited(_loadAssets());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WatchtowerCellShaderView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animationsEnabled != widget.animationsEnabled) {
+      _syncTicker();
+    }
+    if (oldWidget.forceStaticFallback != widget.forceStaticFallback) {
+      if (widget.forceStaticFallback) {
+        _ticker.stop();
+        setState(() {
+          _shaderFailed = true;
+        });
+      } else if (_program == null) {
+        _shaderFailed = false;
+        unawaited(_loadAssets());
+      }
+    }
+  }
+
+  Future<void> _loadAssets() async {
+    try {
+      final results = await Future.wait<Object>([
+        ui.FragmentProgram.fromAsset(_shaderAsset),
+        _decodeAssetImage(_bgAsset),
+        _decodeAssetImage(_princessAsset),
+      ]);
+
+      final program = results[0] as ui.FragmentProgram;
+      final bgImage = results[1] as ui.Image;
+      final princessImage = results[2] as ui.Image;
+
+      if (_disposed) {
+        bgImage.dispose();
+        princessImage.dispose();
+        return;
+      }
+
+      final shader = program.fragmentShader();
+      setState(() {
+        _program = program;
+        _shader = shader;
+        _bgImage = bgImage;
+        _princessImage = princessImage;
+        _shaderFailed = false;
+      });
+      _syncTicker();
+    } catch (_) {
+      if (_disposed) return;
+      setState(() {
+        _shaderFailed = true;
+      });
+    }
+  }
+
+  Future<ui.Image> _decodeAssetImage(String assetPath) async {
+    final byteData = await rootBundle.load(assetPath);
+    final codec = await ui.instantiateImageCodec(
+      Uint8List.sublistView(byteData),
+    );
+    try {
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    } finally {
+      codec.dispose();
+    }
+  }
+
+  void _syncTicker() {
+    if (_disposed) return;
+    final canAnimate =
+        widget.animationsEnabled &&
+        !_shaderFailed &&
+        _shader != null &&
+        _bgImage != null &&
+        _princessImage != null;
+    if (canAnimate && !_ticker.isActive) {
+      _ticker.start();
+    } else if (!canAnimate && _ticker.isActive) {
+      _ticker.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _ticker.dispose();
+    _timeSeconds.dispose();
+    _shader?.dispose();
+    _bgImage?.dispose();
+    _princessImage?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shader = _shader;
+    final bgImage = _bgImage;
+    final princessImage = _princessImage;
+
+    if (!_shaderFailed &&
+        shader != null &&
+        bgImage != null &&
+        princessImage != null) {
+      return RepaintBoundary(
+        child: CustomPaint(
+          key: const ValueKey('watchtower_spyglass_shader_paint'),
+          painter: _WatchtowerCellShaderPainter(
+            shader: shader,
+            bgImage: bgImage,
+            princessImage: princessImage,
+            timeSeconds: _timeSeconds,
+          ),
+          child: const SizedBox.expand(),
+        ),
+      );
+    }
+
+    return const _StaticDungeonFallback();
+  }
+}
+
+class _WatchtowerCellShaderPainter extends CustomPainter {
+  final ui.FragmentShader shader;
+  final ui.Image bgImage;
+  final ui.Image princessImage;
+  final ValueNotifier<double> timeSeconds;
+
+  _WatchtowerCellShaderPainter({
+    required this.shader,
+    required this.bgImage,
+    required this.princessImage,
+    required this.timeSeconds,
+  }) : super(repaint: timeSeconds);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    shader.setFloat(0, size.width);
+    shader.setFloat(1, size.height);
+    shader.setFloat(2, timeSeconds.value);
+    shader.setImageSampler(0, bgImage);
+    shader.setImageSampler(1, princessImage);
+
+    final paint = Paint()..shader = shader;
+    canvas.drawRect(Offset.zero & size, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WatchtowerCellShaderPainter oldDelegate) {
+    return oldDelegate.shader != shader ||
+        oldDelegate.bgImage != bgImage ||
+        oldDelegate.princessImage != princessImage;
+  }
+}
+
+/// Clean static fallback rendered while the shader is loading or when running
+/// in headless CI test environments without GPU shader support.
+class _StaticDungeonFallback extends StatelessWidget {
+  const _StaticDungeonFallback();
+
+  static const double _texAspect = 576.0 / 1024.0;
+  static const double _fgScale = 0.425;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      key: const ValueKey('watchtower_spyglass_fallback_stack'),
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        final viewAspect = h > 0 ? w / h : 1.0;
+
+        // Match the shader's BoxFit.cover scene coordinate transform
+        final double sceneWidth;
+        final double sceneHeight;
+        final double offsetX;
+        final double offsetY;
+
+        if (viewAspect > _texAspect) {
+          sceneWidth = w;
+          sceneHeight = w / _texAspect;
+          offsetX = 0.0;
+          offsetY = h * 0.5 - sceneHeight * 0.535;
+        } else {
+          sceneHeight = h;
+          sceneWidth = h * _texAspect;
+          offsetX = w * 0.5 - sceneWidth * 0.5;
+          offsetY = 0.0;
+        }
+
+        final fgSizeW = sceneWidth * _fgScale;
+        final fgSizeH = sceneHeight * _fgScale;
+        final fgLeft = offsetX + sceneWidth * (0.485 - 0.5 * _fgScale);
+        final fgTop = offsetY + sceneHeight * (0.745 - 0.955 * _fgScale);
+
+        final shadowW = sceneWidth * 0.11;
+        final shadowH = sceneHeight * 0.028;
+        final shadowLeft = offsetX + sceneWidth * 0.478 - shadowW * 0.5;
+        final shadowTop = offsetY + sceneHeight * 0.744 - shadowH * 0.5;
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              left: offsetX,
+              top: offsetY,
+              width: sceneWidth,
+              height: sceneHeight,
+              child: Image.asset(
+                _WatchtowerCellShaderViewState._bgAsset,
+                fit: BoxFit.fill,
+              ),
+            ),
+            Positioned(
+              left: shadowLeft,
+              top: shadowTop,
+              width: shadowW,
+              height: shadowH,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.62),
+                      Colors.black.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: fgLeft,
+              top: fgTop,
+              width: fgSizeW,
+              height: fgSizeH,
+              child: Image.asset(
+                _WatchtowerCellShaderViewState._princessAsset,
+                fit: BoxFit.fill,
+              ),
+            ),
+            // Spyglass optical vignette overlay
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 0.92,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      const Color(0xFF04141C).withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.85),
+                    ],
+                    stops: const [0.0, 0.62, 0.86, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

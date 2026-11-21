@@ -591,10 +591,19 @@ void main() {
           of: find.byType(ObservatoryDialog),
           matching: find.byType(WatchTowerIcon),
         );
-        expect(dialogWatchIconFinder, findsOneWidget);
+        expect(dialogWatchIconFinder, findsNWidgets(2));
         expect(
-          tester.getSize(dialogWatchIconFinder),
+          tester.getSize(dialogWatchIconFinder.first),
           equals(const Size(26.0, 26.0)),
+        );
+        expect(
+          tester.getSize(
+            find.descendant(
+              of: find.byKey(const ValueKey('observatory_spy_dungeon_button')),
+              matching: find.byType(WatchTowerIcon),
+            ),
+          ),
+          equals(const Size(20.0, 20.0)),
         );
         expect(find.text("Star-Gazer's Strategy Hints"), findsOneWidget);
         expect(find.text('Markov Insight'), findsOneWidget);

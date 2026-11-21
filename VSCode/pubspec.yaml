@@ -70,9 +70,14 @@ flutter:
   assets:
     - assets/images/
     - assets/images/kingdom_map.jpeg
+    - assets/images/watchtower_dungeon_cell.jpeg
+    - assets/images/princess_captive.png
     - assets/images/story/
     - assets/data/
     - assets/audio/
+
+  shaders:
+    - shaders/watchtower_prisoner.frag
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../widgets/watch_tower_icon.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
+import 'watchtower_spyglass_dialog.dart';
 
 /// Watch Tower landmark dialog: displays Star-Gazer strategy hints,
 /// Markov Chain insights, and direct access to the Story Log & Help.
@@ -202,6 +203,51 @@ class ObservatoryDialog extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Spy on Dungeon Button (RPG dark/cyan/gold theme)
+                      ElevatedButton.icon(
+                        key: const ValueKey('observatory_spy_dungeon_button'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: palette.isDark
+                              ? const Color(0xFF102432)
+                              : const Color(0xFF173142),
+                          foregroundColor: const Color(0xFFFFE082),
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
+                          ),
+                          side: BorderSide(
+                            color: const Color(0xFF00E5FF).withValues(
+                              alpha: palette.isDark ? 0.65 : 0.78,
+                            ),
+                            width: 1.3,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () {
+                          controller.audio.playTapVibrate();
+                          showDialog(
+                            context: context,
+                            builder: (_) =>
+                                WatchtowerSpyglassDialog(controller: controller),
+                          );
+                        },
+                        icon: const WatchTowerIcon(size: 20),
+                        label: Text(
+                          loc.t(
+                            'observatory_spy_dungeon_btn',
+                            fallback: 'Spy on Dungeon',
+                          ),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFFE082),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
 
                       // Story Log Button
                       ElevatedButton.icon(
