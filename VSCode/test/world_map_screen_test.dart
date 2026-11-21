@@ -19,6 +19,7 @@ import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
 import 'package:how_predictable/views/dialogs/throne_room_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
 import 'package:how_predictable/views/widgets/sacred_temple_icon.dart';
 import 'package:how_predictable/views/widgets/watch_tower_icon.dart';
@@ -409,10 +410,32 @@ void main() {
         expect(controller.currentWeek, 1);
         expect(find.text('Week 1 / 40'), findsOneWidget);
 
-        // 1. Tap Metal Wizard's Lair -> launches fresh 100-round battle (100 Mana)
-        await tester.tap(
-          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        // 1. Tap Metal Wizard's Lair -> bespoke MetalWizardLairIcon pin & fresh 100-round battle (100 Mana)
+        final wizardLairPin = find.byKey(
+          const ValueKey('landmark_metal_wizard_lair'),
         );
+        expect(
+          find.descendant(
+            of: wizardLairPin,
+            matching: find.byIcon(Icons.local_fire_department_rounded),
+          ),
+          findsNothing,
+        );
+        final mapLairIconFinder = find.descendant(
+          of: wizardLairPin,
+          matching: find.byType(MetalWizardLairIcon),
+        );
+        expect(mapLairIconFinder, findsOneWidget);
+        expect(
+          tester.getSize(mapLairIconFinder),
+          equals(const Size(25.0, 25.0)),
+        );
+        expect(
+          tester.widget<MetalWizardLairIcon>(mapLairIconFinder).isOnGoldBackground,
+          isFalse,
+        );
+
+        await tester.tap(wizardLairPin);
         await tester.pumpAndSettle();
 
         expect(find.byType(GameScreen), findsOneWidget);
@@ -723,6 +746,32 @@ void main() {
               ),
             );
             final finder = find.byType(WatchTowerIcon);
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(Size(iconSize, iconSize)));
+            expect(tester.takeException(), isNull);
+          }
+        }
+      },
+    );
+
+    testWidgets(
+      'MetalWizardLairIcon renders standard and on-gold variants cleanly across sizes',
+      (WidgetTester tester) async {
+        for (final onGold in [false, true]) {
+          for (final iconSize in [16.0, 22.0, 25.0, 42.0, 48.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: Center(
+                    child: MetalWizardLairIcon(
+                      size: iconSize,
+                      isOnGoldBackground: onGold,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final finder = find.byType(MetalWizardLairIcon);
             expect(finder, findsOneWidget);
             expect(tester.getSize(finder), equals(Size(iconSize, iconSize)));
             expect(tester.takeException(), isNull);

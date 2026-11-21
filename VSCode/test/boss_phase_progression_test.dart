@@ -15,6 +15,7 @@ import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
+import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_hp_bar.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
@@ -168,6 +169,13 @@ void main() {
           isTrue,
         );
         expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('boss_phase_pill_3')),
+            matching: find.byType(MetalWizardLairIcon),
+          ),
+          findsOneWidget,
+        );
         expect(find.text('HP 300'), findsOneWidget);
 
         // Verify Metal Wizard hints: PC Next Move & Crystal Ball = Metal, Crystal Ball+ = Fire & Water

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 
 enum VictoryCutsceneType {
   secretWeek1,
@@ -9,6 +10,7 @@ enum VictoryCutsceneType {
 
 class _VictoryPanelData {
   final IconData icon;
+  final Widget? iconWidget;
   final Color accentColor;
   final String speakerKey;
   final String fallbackSpeaker;
@@ -19,6 +21,7 @@ class _VictoryPanelData {
 
   const _VictoryPanelData({
     required this.icon,
+    this.iconWidget,
     required this.accentColor,
     required this.speakerKey,
     required this.fallbackSpeaker,
@@ -137,6 +140,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
           ),
           _VictoryPanelData(
             icon: Icons.fort_rounded,
+            iconWidget: MetalWizardLairIcon(size: 42),
             accentColor: Color(0xFFFFCA28),
             speakerKey: 'victory_cutscene_princess',
             fallbackSpeaker: 'Princess Aria',
@@ -292,11 +296,12 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
                                   width: 2,
                                 ),
                               ),
-                              child: Icon(
-                                panel.icon,
-                                size: 42,
-                                color: panel.accentColor,
-                              ),
+                              child: panel.iconWidget ??
+                                  Icon(
+                                    panel.icon,
+                                    size: 42,
+                                    color: panel.accentColor,
+                                  ),
                             ),
                             const SizedBox(height: 14),
                             Text(

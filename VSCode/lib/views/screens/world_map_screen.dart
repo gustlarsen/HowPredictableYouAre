@@ -12,6 +12,7 @@ import '../dialogs/observatory_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/sacred_temple_icon.dart';
@@ -323,7 +324,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             mapWidth: mapWidth,
                             mapHeight: mapHeight,
                             normalizedPos: WorldMapScreen.metalWizardLairPos,
-                            icon: Icons.local_fire_department_rounded,
+                            iconWidget: const MetalWizardLairIcon(size: 25),
                             label: loc.t(
                               'map_landmark_wizard_lair',
                               fallback: "Metal Wizard's Lair",

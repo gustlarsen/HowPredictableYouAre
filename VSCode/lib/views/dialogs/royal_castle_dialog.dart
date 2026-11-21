@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../screens/intro_story_screen.dart';
 import '../widgets/castle_wing_icons.dart';
 import '../widgets/elemental_energy_sphere.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/royal_castle_icon.dart';
 import 'story_gallery_dialog.dart';
 
@@ -2223,11 +2224,14 @@ class _BestiaryCard extends StatelessWidget {
                   .withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              encountered ? creature.icon : Icons.help_outline_rounded,
-              size: 20,
-              color: encountered ? creature.accentColor : palette.mutedText,
-            ),
+            child: (encountered && creature == BestiaryCreature.metalWizard)
+                ? const MetalWizardLairIcon(size: 22)
+                : Icon(
+                    encountered ? creature.icon : Icons.help_outline_rounded,
+                    size: 20,
+                    color:
+                        encountered ? creature.accentColor : palette.mutedText,
+                  ),
           ),
           const SizedBox(width: 10),
           Expanded(

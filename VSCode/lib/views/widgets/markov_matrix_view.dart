@@ -3,6 +3,7 @@ import '../../services/markov_engine.dart';
 import '../../services/localization_service.dart';
 import '../../models/move.dart';
 import '../../theme/app_theme.dart';
+import 'metal_wizard_lair_icon.dart';
 
 class MarkovMatrixView extends StatelessWidget {
   final MarkovEngine engine;
@@ -153,7 +154,7 @@ class MarkovMatrixView extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.hardware_rounded, size: 17, color: accent),
+            const MetalWizardLairIcon(size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

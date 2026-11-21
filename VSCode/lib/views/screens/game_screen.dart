@@ -17,6 +17,7 @@ import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
@@ -824,7 +825,9 @@ class _GameScreenState extends State<GameScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: accent),
+          stage == 3
+              ? const MetalWizardLairIcon(size: 16)
+              : Icon(icon, size: 14, color: accent),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
