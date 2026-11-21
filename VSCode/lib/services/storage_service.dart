@@ -208,27 +208,39 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
-  // Boss Phase Progression (1 = Guardian Robot, 2 = Robot Archmage, 3 = Baby Mage Robot)
+  // Boss Stage Progression (1 = Guardian Robot, 2 = Robot Archmage, 3 = Metal Wizard, 4 = Baby Mage Robot)
+  static const String enemyStageKey = 'enemy_stage';
   static const String enemyPhaseKey = 'enemy_phase';
   static const String enemyMaxHpKey = 'enemy_max_hp';
 
-  int get enemyPhase {
-    final raw = _prefs.getInt(enemyPhaseKey) ?? 1;
+  int get enemyStage {
+    final raw =
+        _prefs.getInt(enemyStageKey) ?? _prefs.getInt(enemyPhaseKey) ?? 1;
     if (raw < 1) return 1;
-    if (raw > 3) return 3;
+    if (raw > 4) return 4;
     return raw;
   }
 
-  Future<void> setEnemyPhase(int val) =>
-      _prefs.setInt(enemyPhaseKey, val.clamp(1, 3));
+  Future<void> setEnemyStage(int val) {
+    final clamped = val.clamp(1, 4);
+    return Future.wait([
+      _prefs.setInt(enemyStageKey, clamped),
+      _prefs.setInt(enemyPhaseKey, clamped),
+    ]);
+  }
+
+  int get enemyPhase => enemyStage;
+  Future<void> setEnemyPhase(int val) => setEnemyStage(val);
 
   int get enemyMaxHp {
     final raw = _prefs.getInt(enemyMaxHpKey);
     if (raw != null && raw > 0) return raw;
-    switch (enemyPhase) {
+    switch (enemyStage) {
       case 2:
         return 200;
       case 3:
+        return 300;
+      case 4:
         return 400;
       default:
         return 100;
@@ -967,7 +979,7 @@ class StorageService {
       setTotal(0),
       setUserHp(50),
       setPcHp(100),
-      setEnemyPhase(1),
+      setEnemyStage(1),
       setEnemyMaxHp(100),
       setHpUpgradeLevel(0),
       setManaUpgradeLevel(0),

@@ -97,7 +97,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'A Week-One Miracle!',
             bodyKey: 'secret_cutscene_p1_body',
             fallbackBody:
-                'On the very first week of the siege, your decisive counters shatter the Guardian Robot before the Metal Wizard can forge a single backup construct!',
+                'On the very first week of the siege, your decisive counters shatter the Guardian Robot and defeat the Metal Wizard himself before the Archmage or Baby Mage Robot could ever be created!',
           ),
           _VictoryPanelData(
             icon: Icons.favorite_rounded,
@@ -108,7 +108,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'Rescued Intact',
             bodyKey: 'secret_cutscene_p2_body',
             fallbackBody:
-                'With the citadel vault unsealed, you rescue the Princess completely unharmed. The Metal Wizard flees into the mist before his dark foundry can even awaken.',
+                'With the citadel vault unsealed in Week 1, you rescue the Princess completely untouched before the dark foundry\'s contingencies can awaken.',
           ),
           _VictoryPanelData(
             icon: Icons.emoji_events_rounded,

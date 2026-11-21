@@ -239,6 +239,21 @@ enum BestiaryCreature {
     icon: Icons.auto_fix_high_rounded,
     accentColor: Color(0xFFFF9800),
   ),
+  metalWizard(
+    id: 'metal_wizard',
+    nameKey: 'castle_bestiary_metal_wizard_name',
+    fallbackName: 'Metal Wizard',
+    mathModelKey: 'castle_bestiary_metal_wizard_model',
+    fallbackMathModel: 'Pure Metal Obsession (100%)',
+    loreKey: 'castle_bestiary_metal_wizard_lore',
+    fallbackLore:
+        '300 HP • Pure Metal Obsession: Conjures exclusively Metal spells, testing the Cleric\'s endurance and Mana reserves.',
+    hintKey: 'castle_bestiary_metal_wizard_hint',
+    fallbackHint:
+        'Defeat Guardian Robot in Weeks 1–9 or defeat Robot Archmage to confront the Metal Wizard.',
+    icon: Icons.hardware_rounded,
+    accentColor: Color(0xFF90A4AE),
+  ),
   babyRobot(
     id: 'baby_robot',
     nameKey: 'castle_bestiary_baby_name',
@@ -247,10 +262,10 @@ enum BestiaryCreature {
     fallbackMathModel: 'Pure Uniform Random (1/5)',
     loreKey: 'castle_bestiary_baby_lore',
     fallbackLore:
-        '400 HP • Conjugates all 5 elements. Completely ignores the Markov transition matrix and selects every move with pure uniform randomness (1/5 per element).',
+        '400 HP • Pure Random Chaos: Ignores all Markov logic and strikes with pure uniform randomness across all 5 elements.',
     hintKey: 'castle_bestiary_baby_hint',
     fallbackHint:
-        'Defeat Guardian Robot in Weeks 2–9 or defeat Robot Archmage to confront this chaotic prototype.',
+        'Defeat the Metal Wizard in Week 2 or later to unleash his final automated contingency.',
     icon: Icons.casino_outlined,
     accentColor: Color(0xFFBA68C8),
   );
@@ -290,9 +305,9 @@ enum NarrativeEnding {
     fallbackTitle: 'Swift Savior (Secret Week-1)',
     descKey: 'castle_ending_secret_w1_desc',
     fallbackDesc:
-        'Destroyed the Guardian Robot in Week 1 before backup constructs could be built, rescuing the princess intact!',
+        'Defeated both the Guardian Robot and the Metal Wizard in Week 1 before backup constructs could be built, rescuing the princess untouched!',
     hintKey: 'castle_ending_secret_w1_hint',
-    fallbackHint: 'Defeat the Phase 1 Guardian Robot in Week 1.',
+    fallbackHint: 'Defeat the Guardian Robot and Metal Wizard in Week 1.',
     icon: Icons.auto_awesome_rounded,
     accentColor: Color(0xFF00E5FF),
   ),
@@ -302,9 +317,9 @@ enum NarrativeEnding {
     fallbackTitle: 'Metal Lair Liberated',
     descKey: 'castle_ending_standard_victory_desc',
     fallbackDesc:
-        'Destroyed the Phase 3 Baby Mage Robot and vanquished the Metal Wizard\'s lair!',
+        'Destroyed the Stage 4 Baby Mage Robot (400 HP) and vanquished the Metal Wizard\'s lair!',
     hintKey: 'castle_ending_standard_victory_hint',
-    fallbackHint: 'Defeat the Phase 3 Baby Mage Robot (400 HP).',
+    fallbackHint: 'Defeat the Stage 4 Baby Mage Robot (400 HP).',
     icon: Icons.emoji_events_rounded,
     accentColor: Color(0xFFFFD54F),
   ),

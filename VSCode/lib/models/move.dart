@@ -59,6 +59,12 @@ enum HandMove {
     Color(0xFF80D8FF),
   );
 
+  static const HandMove fire = rock;
+  static const HandMove water = paper;
+  static const HandMove wood = scissors;
+  static const HandMove earth = lizard;
+  static const HandMove metal = spock;
+
   final int id;
   final String label;
   final String elementalLabel;

@@ -791,14 +791,17 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _buildBossPhasePill(BuildContext context, GameController controller) {
     final palette = AppPalette.of(context);
-    final phase = controller.enemyPhase;
+    final stage = controller.enemyStage;
     final bossName = controller.currentEnemyName;
     final Color accent;
     final IconData icon;
-    if (phase == 2) {
+    if (stage == 2) {
       accent = const Color(0xFFCE93D8);
       icon = Icons.auto_fix_high_rounded;
-    } else if (phase == 3) {
+    } else if (stage == 3) {
+      accent = const Color(0xFF90A4AE);
+      icon = Icons.hardware_rounded;
+    } else if (stage == 4) {
       accent = const Color(0xFFFF8A65);
       icon = Icons.bolt_rounded;
     } else {
@@ -806,7 +809,7 @@ class _GameScreenState extends State<GameScreen>
       icon = Icons.shield_outlined;
     }
     return Container(
-      key: ValueKey('boss_phase_pill_$phase'),
+      key: ValueKey('boss_phase_pill_$stage'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: palette.isDark
@@ -825,7 +828,7 @@ class _GameScreenState extends State<GameScreen>
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              'Phase $phase • $bossName (${controller.enemyMaxHp} HP)',
+              'Stage $stage • $bossName (${controller.enemyMaxHp} HP)',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -937,17 +940,18 @@ class _GameScreenState extends State<GameScreen>
 
   Future<void> _showBossVictoryModal(GameController controller) async {
     final loc = controller.localization;
-    final defeatedPhase =
-        controller.pendingBossVictoryPhase ?? controller.enemyPhase;
+    final defeatedStage =
+        controller.pendingBossVictoryStage ?? controller.enemyStage;
     final week = controller.pendingBossVictoryWeek ?? controller.currentWeek;
 
-    final bool isSecretWeek1 = defeatedPhase == 1 && week == 1;
-    final bool isEarlyRush =
-        defeatedPhase == 1 && week >= 2 && week < GameController.phase2StartWeek;
-    final bool isLatePhase1 =
-        defeatedPhase == 1 && week >= GameController.phase2StartWeek;
-    final bool isPhase2Defeat = defeatedPhase == 2;
-    final bool isPhase3Defeat = defeatedPhase == 3;
+    final bool isStage1ToMetalWizard =
+        defeatedStage == 1 && week < GameController.phase2StartWeek;
+    final bool isStage1ToArchmage =
+        defeatedStage == 1 && week >= GameController.phase2StartWeek;
+    final bool isStage2Defeat = defeatedStage == 2;
+    final bool isSecretWeek1 = defeatedStage == 3 && week == 1;
+    final bool isStage3ToBabyMage = defeatedStage == 3 && week >= 2;
+    final bool isStage4Defeat = defeatedStage == 4;
 
     late final String emoji;
     late final Color accent;
@@ -956,47 +960,27 @@ class _GameScreenState extends State<GameScreen>
     late final String body;
     late final String buttonLabel;
 
-    if (isSecretWeek1) {
-      emoji = '👑';
-      accent = const Color(0xFF00E5FF);
+    if (isStage1ToMetalWizard) {
+      emoji = '⚔️🧙';
+      accent = const Color(0xFF90A4AE);
       title = loc.t(
         'boss_victory_p1_title',
         fallback: 'Guardian Robot Destroyed!',
       );
       subtitle = loc.t(
-        'boss_victory_secret_w1_subtitle',
-        fallback: 'Week 1 Lightning Victory!',
+        'boss_victory_s1_to_s3_subtitle',
+        fallback: 'The Metal Wizard Enters Battle!',
       );
       body = loc.t(
-        'boss_victory_secret_w1_body',
+        'boss_victory_s1_to_s3_body',
         fallback:
-            'You shattered the Guardian Robot immediately in Week 1 before the Metal Wizard could build any backup constructs! The Princess is rescued intact.',
+            'The Guardian Robot is shattered! Before any backup construct is ready, the Metal Wizard (300 HP) himself steps onto the battlefield wielding pure Metal magic.',
       );
       buttonLabel = loc.t(
-        'boss_victory_watch_cutscene_btn',
-        fallback: 'Watch Ending Cutscene',
+        'boss_victory_face_metal_wizard_btn',
+        fallback: 'Face Metal Wizard',
       );
-    } else if (isEarlyRush) {
-      emoji = '⚡🤖';
-      accent = const Color(0xFFFF7043);
-      title = loc.t(
-        'boss_victory_p1_title',
-        fallback: 'Guardian Robot Destroyed!',
-      );
-      subtitle = loc.t(
-        'boss_victory_early_rush_subtitle',
-        fallback: 'Panicked Metal Wizard Unleashes Prototype!',
-      );
-      body = loc.t(
-        'boss_victory_early_rush_body',
-        fallback:
-            'Alert! Caught off-guard, the panicked Metal Wizard unleashes his chaotic prototype: Baby Mage Robot (400 HP, 5 elements, pure uniform random AI)!',
-      );
-      buttonLabel = loc.t(
-        'boss_victory_face_baby_mage_btn',
-        fallback: 'Face Baby Mage Robot',
-      );
-    } else if (isLatePhase1) {
+    } else if (isStage1ToArchmage) {
       emoji = '🔮🤖';
       accent = const Color(0xFFAB47BC);
       title = loc.t(
@@ -1005,7 +989,7 @@ class _GameScreenState extends State<GameScreen>
       );
       subtitle = loc.t(
         'boss_victory_p2_spawn_subtitle',
-        fallback: 'Phase 2: Robot Archmage Approaches!',
+        fallback: 'Stage 2: Robot Archmage Approaches!',
       );
       body = loc.t(
         'boss_victory_p2_spawn_body',
@@ -1016,21 +1000,61 @@ class _GameScreenState extends State<GameScreen>
         'boss_victory_face_archmage_btn',
         fallback: 'Challenge Robot Archmage',
       );
-    } else if (isPhase2Defeat) {
-      emoji = '⚡🤖';
-      accent = const Color(0xFFFF7043);
+    } else if (isStage2Defeat) {
+      emoji = '⚔️🧙';
+      accent = const Color(0xFF90A4AE);
       title = loc.t(
         'boss_victory_p2_defeated_title',
         fallback: 'Robot Archmage Destroyed!',
       );
       subtitle = loc.t(
-        'boss_victory_p2_defeated_subtitle',
-        fallback: 'Final Construct: Baby Mage Robot',
+        'boss_victory_s2_to_s3_subtitle',
+        fallback: 'Stage 3: The Metal Wizard Himself!',
       );
       body = loc.t(
-        'boss_victory_p2_defeated_body',
+        'boss_victory_s2_to_s3_body',
         fallback:
-            'The Robot Archmage is destroyed! Desperate, the Metal Wizard deploys his final chaotic prototype: Baby Mage Robot (400 HP, 5 elements, pure random AI).',
+            'The Robot Archmage is destroyed! Now the Metal Wizard (300 HP) steps onto the battlefield himself, conjuring exclusively Metal spells.',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_metal_wizard_btn',
+        fallback: 'Face Metal Wizard',
+      );
+    } else if (isSecretWeek1) {
+      emoji = '👑';
+      accent = const Color(0xFF00E5FF);
+      title = loc.t(
+        'boss_victory_s3_defeated_title',
+        fallback: 'Metal Wizard Defeated!',
+      );
+      subtitle = loc.t(
+        'boss_victory_secret_w1_subtitle',
+        fallback: 'Week 1 Lightning Victory!',
+      );
+      body = loc.t(
+        'boss_victory_secret_w1_body',
+        fallback:
+            'You defeated both the Guardian Robot and the Metal Wizard in Week 1 before the Archmage or Baby Mage Robot could ever be created! The Princess is rescued untouched.',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_watch_cutscene_btn',
+        fallback: 'Watch Ending Cutscene',
+      );
+    } else if (isStage3ToBabyMage) {
+      emoji = '⚡🤖';
+      accent = const Color(0xFFFF7043);
+      title = loc.t(
+        'boss_victory_s3_defeated_title',
+        fallback: 'Metal Wizard Defeated!',
+      );
+      subtitle = loc.t(
+        'boss_victory_s3_to_s4_subtitle',
+        fallback: 'Automated Contingency: Baby Mage Robot!',
+      );
+      body = loc.t(
+        'boss_victory_s3_to_s4_body',
+        fallback:
+            'The Metal Wizard falls, unleashing his final automated contingency: Baby Mage Robot (400 HP, 5 elements, pure uniform random AI)!',
       );
       buttonLabel = loc.t(
         'boss_victory_face_baby_mage_btn',
@@ -1164,7 +1188,7 @@ class _GameScreenState extends State<GameScreen>
       return;
     }
 
-    if (isPhase3Defeat) {
+    if (isStage4Defeat) {
       await VictoryCutsceneDialog.show(
         context,
         type: VictoryCutsceneType.standardVictory,
@@ -1624,6 +1648,8 @@ class _GameScreenState extends State<GameScreen>
                                         controller.isMarkovRecalibratorActive,
                                     isBabyMageRandomView:
                                         controller.isBabyMageBoss,
+                                    isMetalWizardView:
+                                        controller.isMetalWizardBoss,
                                   ),
                                 ],
                               ],

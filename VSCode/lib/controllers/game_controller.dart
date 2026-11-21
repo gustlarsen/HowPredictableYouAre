@@ -149,16 +149,20 @@ class GameController extends ChangeNotifier {
     metal: 1200,
   );
 
-  static int maxHpForEnemyPhase(int phase) {
-    switch (phase) {
+  static int maxHpForEnemyStage(int stage) {
+    switch (stage) {
       case 2:
         return 200;
       case 3:
+        return 300;
+      case 4:
         return 400;
       default:
         return pcMaxHp;
     }
   }
+
+  static int maxHpForEnemyPhase(int phase) => maxHpForEnemyStage(phase);
 
   final StorageService storage;
   final LocalizationService localization;
@@ -299,7 +303,9 @@ class GameController extends ChangeNotifier {
   int turnCount = 0;
   int userHp = baseMaxHp;
   int computerHp = pcMaxHp;
-  int enemyPhase = 1;
+  int enemyStage = 1;
+  int get enemyPhase => enemyStage;
+  set enemyPhase(int value) => enemyStage = value;
   int enemyMaxHp = pcMaxHp;
   int get enemyHp => computerHp;
   int currentWeek = 1;
@@ -403,13 +409,15 @@ class GameController extends ChangeNotifier {
       unlockedMarkovRecalibrator && showMarkovRecalibrator;
   bool get isMarkovRecalibratorVisibleInShop =>
       unlockedMarkovRecalibrator ||
-      enemyPhase == 2 ||
+      enemyStage == 2 ||
       encounteredBestiary.contains(BestiaryCreature.archmageRobot.id);
 
   bool is100RoundsAlertPending = false;
   bool isDeathAlertPending = false;
   bool isBossVictoryPending = false;
-  int? pendingBossVictoryPhase;
+  int? pendingBossVictoryStage;
+  int? get pendingBossVictoryPhase => pendingBossVictoryStage;
+  set pendingBossVictoryPhase(int? value) => pendingBossVictoryStage = value;
   int? pendingBossVictoryWeek;
   bool isGiftAvailable = true;
   Timer? _giftTimer;
@@ -720,22 +728,31 @@ class GameController extends ChangeNotifier {
 
   bool get isWeekPhase2 => currentWeek >= phase2StartWeek;
 
-  bool get isPhase2 => isWeekPhase2 || enemyPhase >= 2;
+  bool get isPhase2 => isWeekPhase2 || enemyStage >= 2;
 
-  bool get enemyUses5Elements => enemyPhase >= 2 || isWeekPhase2;
+  bool get enemyUses5Elements => enemyStage >= 2 || isWeekPhase2;
 
-  bool get isArchmageBoss => enemyPhase == 2;
+  bool get isGuardianBoss => enemyStage == 1;
 
-  bool get isBabyMageBoss => enemyPhase == 3;
+  bool get isArchmageBoss => enemyStage == 2;
 
-  String enemyNameForPhase(int phase) {
-    switch (phase) {
+  bool get isMetalWizardBoss => enemyStage == 3;
+
+  bool get isBabyMageBoss => enemyStage == 4;
+
+  String enemyNameForStage(int stage) {
+    switch (stage) {
       case 2:
         return localization.t(
           'boss_name_archmage',
           fallback: 'Robot Archmage',
         );
       case 3:
+        return localization.t(
+          'boss_name_metal_wizard',
+          fallback: 'Metal Wizard',
+        );
+      case 4:
         return localization.t(
           'boss_name_baby_mage',
           fallback: 'Baby Mage Robot',
@@ -748,7 +765,9 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  String get currentEnemyName => enemyNameForPhase(enemyPhase);
+  String enemyNameForPhase(int phase) => enemyNameForStage(phase);
+
+  String get currentEnemyName => enemyNameForStage(enemyStage);
 
   bool get isEarthAndMetalActive => unlockedNewHands && showNewHands;
 
@@ -813,9 +832,7 @@ class GameController extends ChangeNotifier {
           fallback: '🎁 +5 Fire, Water & Wood Orbs Claimed!',
         );
 
-  int get playerWinDamageToBoss => (enemyPhase >= 2 || isWeekPhase2)
-      ? (showNewHands ? phase2BonusBossDamage : phase2BaseBossDamage)
-      : damagePerLoss;
+  int get playerWinDamageToBoss => damagePerLoss;
 
   int get bossWinDamageToPlayer => damagePerLoss;
 
@@ -1805,7 +1822,7 @@ class GameController extends ChangeNotifier {
     if (computerHp <= 0 || isBossVictoryPending) {
       isBossVictoryPending = true;
       is100RoundsAlertPending = false;
-      pendingBossVictoryPhase ??= enemyPhase;
+      pendingBossVictoryStage ??= enemyStage;
       pendingBossVictoryWeek ??= currentWeek;
       audio.playVibrate();
       notifyListeners();
@@ -1822,11 +1839,13 @@ class GameController extends ChangeNotifier {
     final previousMove = lastUserMove;
     currentUserMove = userChoice;
 
-    if (enemyPhase == 1) {
+    if (enemyStage == 1) {
       _markBestiaryEncountered(BestiaryCreature.guardianRobot);
-    } else if (enemyPhase == 2) {
+    } else if (enemyStage == 2) {
       _markBestiaryEncountered(BestiaryCreature.archmageRobot);
-    } else if (enemyPhase == 3) {
+    } else if (enemyStage == 3) {
+      _markBestiaryEncountered(BestiaryCreature.metalWizard);
+    } else if (enemyStage == 4) {
       _markBestiaryEncountered(BestiaryCreature.babyRobot);
     }
 
@@ -1910,9 +1929,9 @@ class GameController extends ChangeNotifier {
     } else if (computerHp <= 0) {
       isBossVictoryPending = true;
       is100RoundsAlertPending = false;
-      pendingBossVictoryPhase = enemyPhase;
+      pendingBossVictoryStage = enemyStage;
       pendingBossVictoryWeek = currentWeek;
-      _applyImmediateBossDefeatMetadata(enemyPhase, currentWeek);
+      _applyImmediateBossDefeatMetadata(enemyStage, currentWeek);
       audio.playWinVibrate();
       audio.playStoryChime();
     } else if (totalRounds >= playerMaxMana) {
@@ -1937,61 +1956,69 @@ class GameController extends ChangeNotifier {
   }
 
   HandMove _chooseComputerMoveForCurrentPhase(HandMove? previousMove) {
-    if (enemyPhase == 3) {
-      // Phase 3 Baby Mage Robot: pure uniform random (1/5 per element).
+    if (enemyStage == 4) {
+      // Stage 4 Baby Mage Robot: pure uniform random (1/5 per element).
       return _engine.getRandomEnemyMove();
     }
-    if (enemyPhase == 2) {
-      // Phase 2 Robot Archmage: 1-step short-term memory counter if available.
+    if (enemyStage == 3) {
+      // Stage 3 Metal Wizard: 100% pure Metal magic (bypasses Markov matrix).
+      return HandMove.metal;
+    }
+    if (enemyStage == 2) {
+      // Stage 2 Robot Archmage: 1-step short-term memory counter if available.
       if (_engine.hasShortTermPrediction(previousMove)) {
         return _engine.computeShortTermSmartChoice(previousMove);
       }
       return _engine.getRandomEnemyMove();
     }
-    // Phase 1 Guardian Robot: standard cumulative Markov prediction.
+    // Stage 1 Guardian Robot: standard cumulative Markov prediction.
     if (_engine.hasPrediction(previousMove)) {
       return _engine.computeSmartChoice(previousMove);
     }
     return _engine.getRandomEnemyMove();
   }
 
-  void _applyImmediateBossDefeatMetadata(int defeatedPhase, int week) {
-    if (defeatedPhase == 1) {
+  void _applyImmediateBossDefeatMetadata(int defeatedStage, int week) {
+    if (defeatedStage == 1) {
+      if (week >= phase2StartWeek) {
+        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+      } else {
+        _markBestiaryEncountered(BestiaryCreature.metalWizard);
+      }
+    } else if (defeatedStage == 2) {
+      _markBestiaryEncountered(BestiaryCreature.metalWizard);
+    } else if (defeatedStage == 3) {
       if (week == 1) {
         _markEndingUnlocked(NarrativeEnding.secretWeek1);
-      } else if (week >= phase2StartWeek) {
-        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
       } else {
         _markBestiaryEncountered(BestiaryCreature.babyRobot);
       }
-    } else if (defeatedPhase == 2) {
-      _markBestiaryEncountered(BestiaryCreature.babyRobot);
-    } else if (defeatedPhase == 3) {
+    } else if (defeatedStage == 4) {
       _markEndingUnlocked(NarrativeEnding.standardVictory);
     }
   }
 
   /// Advances the campaign state after the user confirms the Boss Defeated modal
   /// (and any ending cutscene). Returns `true` if the campaign cycle concluded
-  /// (Secret Week-1 Ending or Phase-3 Standard Victory Ending) so the caller can
-  /// return to the World Map.
+  /// (Secret Week-1 Ending on Stage 3 in Week 1, or Stage 4 Standard Victory Ending)
+  /// so the caller can return to the World Map.
   bool advanceAfterBossVictory() {
-    final defeatedPhase = pendingBossVictoryPhase ?? enemyPhase;
+    final defeatedStage = pendingBossVictoryStage ?? enemyStage;
     final week = pendingBossVictoryWeek ?? currentWeek;
     isBossVictoryPending = false;
-    pendingBossVictoryPhase = null;
+    pendingBossVictoryStage = null;
     pendingBossVictoryWeek = null;
 
     final bool concludesCycle =
-        (defeatedPhase == 1 && week == 1) || defeatedPhase == 3;
+        (defeatedStage == 3 && week == 1) || defeatedStage == 4;
     if (concludesCycle) {
-      enemyPhase = 1;
+      enemyStage = 1;
       enemyMaxHp = pcMaxHp;
       currentWeek = 1;
       adConsagrationsThisWeek = 0;
       activeBattleBlessing = null;
       battleBonusTempHp = 0;
-      storage.setEnemyPhase(1);
+      storage.setEnemyStage(1);
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(1);
       storage.setAdConsagrationsThisWeek(0);
@@ -2005,15 +2032,23 @@ class GameController extends ChangeNotifier {
       return true;
     }
 
-    if (defeatedPhase == 1 && week >= phase2StartWeek) {
-      enemyPhase = 2;
-      _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    if (defeatedStage == 1) {
+      if (week >= phase2StartWeek) {
+        enemyStage = 2;
+        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+      } else {
+        enemyStage = 3;
+        _markBestiaryEncountered(BestiaryCreature.metalWizard);
+      }
+    } else if (defeatedStage == 2) {
+      enemyStage = 3;
+      _markBestiaryEncountered(BestiaryCreature.metalWizard);
     } else {
-      enemyPhase = 3;
+      enemyStage = 4;
       _markBestiaryEncountered(BestiaryCreature.babyRobot);
     }
-    enemyMaxHp = maxHpForEnemyPhase(enemyPhase);
-    storage.setEnemyPhase(enemyPhase);
+    enemyMaxHp = maxHpForEnemyStage(enemyStage);
+    storage.setEnemyStage(enemyStage);
     storage.setEnemyMaxHp(enemyMaxHp);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
@@ -2032,7 +2067,7 @@ class GameController extends ChangeNotifier {
     _engine.enableEnemyExtendedHands = enemyUses5Elements;
     crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
 
-    if (enemyPhase == 3) {
+    if (enemyStage == 4) {
       // Pure uniform random 1/5 AI: Markov prediction hints are meaningless.
       predictedUserMoves = const [];
       pcNextMoves = const [];
@@ -2043,7 +2078,19 @@ class GameController extends ChangeNotifier {
       return;
     }
 
-    if (enemyPhase == 2 && isMarkovRecalibratorActive) {
+    if (enemyStage == 3) {
+      // Stage 3 Metal Wizard: conjures ONLY Metal (100%) every turn.
+      predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
+      pcNextMoves = const [HandMove.metal];
+      suggestedMoves = _engine.computeSuggestions(pcNextMoves);
+      predictedUserMove =
+          predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+      pcNextMove = HandMove.metal;
+      suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
+      return;
+    }
+
+    if (enemyStage == 2 && isMarkovRecalibratorActive) {
       predictedUserMoves =
           _engine.predictShortTermNextUserMoves(lastUserMove);
       pcNextMoves = _engine.computeShortTermSmartChoices(lastUserMove);
@@ -2055,15 +2102,15 @@ class GameController extends ChangeNotifier {
       return;
     }
 
-    // Standard cumulative frequency hints (used for Phase 1 AND as the
-    // deceptive un-recalibrated view during Phase 2 Robot Archmage).
+    // Standard cumulative frequency hints (used for Stage 1 AND as the
+    // deceptive un-recalibrated view during Stage 2 Robot Archmage).
     predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
     pcNextMoves = _engine.computeSmartChoices(lastUserMove);
     suggestedMoves = _engine.computeSuggestions(pcNextMoves);
 
     predictedUserMove =
         predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-    pcNextMove = (enemyPhase == 2)
+    pcNextMove = (enemyStage == 2)
         ? (pcNextMoves.isNotEmpty ? pcNextMoves.first : null)
         : crystalBallMove;
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
@@ -2080,12 +2127,12 @@ class GameController extends ChangeNotifier {
     lastWinner = null;
     lastCollectedOrbMove = null;
     userHp = effectivePlayerMaxHp;
-    enemyMaxHp = maxHpForEnemyPhase(enemyPhase);
+    enemyMaxHp = maxHpForEnemyStage(enemyStage);
     computerHp = enemyMaxHp;
     is100RoundsAlertPending = false;
     isDeathAlertPending = false;
     isBossVictoryPending = false;
-    pendingBossVictoryPhase = null;
+    pendingBossVictoryStage = null;
     pendingBossVictoryWeek = null;
     _engine.enableEnemyExtendedHands = enemyUses5Elements;
     _engine.reset();
@@ -2094,7 +2141,7 @@ class GameController extends ChangeNotifier {
       userMaxHp: effectivePlayerMaxHp,
       pcMaxHp: enemyMaxHp,
     );
-    storage.setEnemyPhase(enemyPhase);
+    storage.setEnemyStage(enemyStage);
     storage.setEnemyMaxHp(enemyMaxHp);
     storage.setUserHp(effectivePlayerMaxHp);
     storage.setPcHp(enemyMaxHp);

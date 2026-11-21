@@ -98,7 +98,7 @@ void main() {
       }
     });
 
-    test('GameController Phase 2 fights 5-element enemy with 3-move deck, awards Earth/Metal orbs, and deals -2/-4 boss damage', () async {
+    test('GameController Phase 2 fights 5-element enemy with 3-move deck, awards Earth/Metal orbs, and deals uniform 1 HP damage', () async {
       SharedPreferences.setMockInitialValues({
         'musicEnabled': false,
         'animationsEnabled': false,
@@ -116,8 +116,8 @@ void main() {
       expect(controller.showNewHands, isFalse);
       expect(controller.engine.size, 3);
       expect(controller.engine.enemySize, 5);
-      expect(controller.playerWinDamageToBoss, GameController.phase2BaseBossDamage);
-      expect(controller.playerWinDamageToBoss, 2);
+      expect(controller.playerWinDamageToBoss, GameController.damagePerLoss);
+      expect(controller.playerWinDamageToBoss, 1);
 
       // Verify playRandom never picks Earth/Metal while showNewHands is false
       for (int i = 0; i < 20; i++) {
@@ -151,7 +151,7 @@ void main() {
         }
 
         if (controller.lastWinner == RoundWinner.user) {
-          expect(prevPcHp - controller.computerHp, 2);
+          expect(prevPcHp - controller.computerHp, 1);
           if (controller.currentComputerMove == HandMove.lizard) {
             earthDefeats++;
             expect(controller.earthOrbs, prevEarth + 1);
@@ -173,7 +173,7 @@ void main() {
       expect(controller.unlockNewHands(), isFalse);
     });
 
-    test('Unlocking "Unlock Earth & Metal" deducts 50 Earth + 50 Metal, preserves IAP/Cloud Save, and grants -4 boss damage', () async {
+    test('Unlocking "Unlock Earth & Metal" deducts 50 Earth + 50 Metal, preserves IAP/Cloud Save, and maintains uniform 1 HP damage', () async {
       SharedPreferences.setMockInitialValues({
         'musicEnabled': false,
         'animationsEnabled': false,
@@ -207,27 +207,27 @@ void main() {
       expect(controller.earthOrbs, 10);
       expect(controller.metalOrbs, 5);
       expect(controller.engine.size, 3);
-      expect(controller.playerWinDamageToBoss, GameController.phase2BaseBossDamage);
-      expect(controller.playerWinDamageToBoss, 2);
+      expect(controller.playerWinDamageToBoss, GameController.damagePerLoss);
+      expect(controller.playerWinDamageToBoss, 1);
 
-      // Toggling ON activates 5 elements and grants -4 bonus damage
+      // Toggling ON activates 5 elements and maintains uniform 1 HP damage
       controller.toggleShowNewHands(true);
       expect(controller.showNewHands, isTrue);
       expect(controller.engine.size, 5);
-      expect(controller.playerWinDamageToBoss, GameController.phase2BonusBossDamage);
-      expect(controller.playerWinDamageToBoss, 4);
+      expect(controller.playerWinDamageToBoss, GameController.damagePerLoss);
+      expect(controller.playerWinDamageToBoss, 1);
 
-      // Verify manual ON/OFF toggle restores 3 moves and -2 HP damage when OFF
+      // Verify manual ON/OFF toggle restores 3 moves and keeps 1 HP damage
       controller.toggleShowNewHands(false);
       expect(controller.showNewHands, isFalse);
       expect(controller.engine.size, 3);
       expect(controller.engine.enemySize, 5);
-      expect(controller.playerWinDamageToBoss, 2);
+      expect(controller.playerWinDamageToBoss, 1);
 
       controller.toggleShowNewHands(true);
       expect(controller.showNewHands, isTrue);
       expect(controller.engine.size, 5);
-      expect(controller.playerWinDamageToBoss, 4);
+      expect(controller.playerWinDamageToBoss, 1);
 
       // CloudSaveData weights still track unlockedNewHands
       final cloud = CloudSaveData(unlockedNewHands: true);
@@ -396,17 +396,17 @@ void main() {
       await tester.tap(unlockBtn);
       await tester.pumpAndSettle();
 
-      // Verify purchase deducted 50 Earth + 50 Metal and boss takes -4 HP when toggled ON
+      // Verify purchase deducted 50 Earth + 50 Metal and boss takes uniform 1 HP damage when toggled ON
       expect(controller.unlockedNewHands, isTrue);
       expect(controller.earthOrbs, 0);
       expect(controller.metalOrbs, 0);
       controller.toggleShowNewHands(true);
-      expect(controller.playerWinDamageToBoss, 4);
+      expect(controller.playerWinDamageToBoss, 1);
       final hpBeforeBonusHit = controller.computerHp;
       controller.crystalBallMove = HandMove.lizard;
       controller.playTurn(HandMove.scissors);
       expect(controller.lastWinner, RoundWinner.user);
-      expect(hpBeforeBonusHit - controller.computerHp, 4);
+      expect(hpBeforeBonusHit - controller.computerHp, 1);
     });
 
     testWidgets('Earth uses bronze-brown palette in Dark Mode and deep roasted brown in Light Mode', (WidgetTester tester) async {

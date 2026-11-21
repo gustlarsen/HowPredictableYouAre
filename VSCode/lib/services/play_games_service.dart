@@ -187,7 +187,8 @@ class CloudSaveData {
   final int total;
   final int userHp;
   final int pcHp;
-  final int enemyPhase;
+  final int enemyStage;
+  int get enemyPhase => enemyStage;
   final int enemyMaxHp;
   final int currentWeek;
 
@@ -302,7 +303,8 @@ class CloudSaveData {
     this.total = 0,
     this.userHp = 50,
     this.pcHp = 100,
-    this.enemyPhase = 1,
+    int? enemyStage,
+    int enemyPhase = 1,
     this.enemyMaxHp = 100,
     this.currentWeek = 1,
     this.unlockedReset = false,
@@ -383,7 +385,8 @@ class CloudSaveData {
     this.battleBonusTempHp = 0,
     this.lastFreeDailyPrayerDate,
     this.updatedAtMillis = 0,
-  }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
+  }) : enemyStage = enemyStage ?? enemyPhase,
+       removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -657,7 +660,7 @@ class CloudSaveData {
       total: storage.total,
       userHp: storage.userHp,
       pcHp: storage.pcHp,
-      enemyPhase: storage.enemyPhase,
+      enemyStage: storage.enemyStage,
       enemyMaxHp: storage.enemyMaxHp,
       currentWeek: storage.currentWeek,
       unlockedReset: storage.unlockedReset,
@@ -763,7 +766,7 @@ class CloudSaveData {
     await storage.setTotal(total);
     await storage.setUserHp(userHp);
     await storage.setPcHp(pcHp);
-    await storage.setEnemyPhase(enemyPhase);
+    await storage.setEnemyStage(enemyStage);
     await storage.setEnemyMaxHp(enemyMaxHp);
     await storage.setCurrentWeek(currentWeek);
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
@@ -950,7 +953,8 @@ class CloudSaveData {
       'total': total,
       'userHp': userHp,
       'pcHp': pcHp,
-      'enemyPhase': enemyPhase,
+      'enemyStage': enemyStage,
+      'enemyPhase': enemyStage,
       'enemyMaxHp': enemyMaxHp,
       'currentWeek': currentWeek,
       'unlockedReset': unlockedReset,
@@ -1138,13 +1142,20 @@ class CloudSaveData {
       total: (map['total'] as num?)?.toInt() ?? 0,
       userHp: (map['userHp'] as num?)?.toInt() ?? 50,
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
-      enemyPhase: ((map['enemyPhase'] as num?)?.toInt() ?? 1).clamp(1, 3),
+      enemyStage: ((map['enemyStage'] ?? map['enemyPhase']) as num?)
+              ?.toInt()
+              .clamp(1, 4) ??
+          1,
       enemyMaxHp: ((map['enemyMaxHp'] as num?)?.toInt() ??
               (() {
-                final phase =
-                    ((map['enemyPhase'] as num?)?.toInt() ?? 1).clamp(1, 3);
-                if (phase == 2) return 200;
-                if (phase == 3) return 400;
+                final stage =
+                    ((map['enemyStage'] ?? map['enemyPhase']) as num?)
+                            ?.toInt()
+                            .clamp(1, 4) ??
+                        1;
+                if (stage == 2) return 200;
+                if (stage == 3) return 300;
+                if (stage == 4) return 400;
                 return 100;
               })())
           .clamp(100, 9999),

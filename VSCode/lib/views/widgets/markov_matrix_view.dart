@@ -11,6 +11,7 @@ class MarkovMatrixView extends StatelessWidget {
   final LocalizationService? localization;
   final bool isArchmageShortTermView;
   final bool isBabyMageRandomView;
+  final bool isMetalWizardView;
 
   const MarkovMatrixView({
     super.key,
@@ -20,6 +21,7 @@ class MarkovMatrixView extends StatelessWidget {
     this.localization,
     this.isArchmageShortTermView = false,
     this.isBabyMageRandomView = false,
+    this.isMetalWizardView = false,
   });
 
   Widget _buildMoveHeader(
@@ -128,6 +130,45 @@ class MarkovMatrixView extends StatelessWidget {
         ),
       );
     }
+    if (isMetalWizardView) {
+      const accent = Color(0xFF90A4AE);
+      final body = loc?.t(
+            'markov_metal_wizard_banner',
+            fallback:
+                'Metal Wizard bypasses the Markov matrix and conjures exclusively Metal (100%) on every turn.',
+          ) ??
+          'Metal Wizard bypasses the Markov matrix and conjures exclusively Metal (100%) on every turn.';
+      return Container(
+        key: const ValueKey('markov_metal_wizard_banner'),
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: palette.isDark ? 0.16 : 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: accent.withValues(alpha: 0.65),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.hardware_rounded, size: 17, color: accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                body,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.3,
+                  color: palette.secondaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (isBabyMageRandomView) {
       final accent = palette.orangeAccent;
       final body = loc?.t(
@@ -215,7 +256,9 @@ class MarkovMatrixView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            if (isArchmageShortTermView || isBabyMageRandomView)
+            if (isArchmageShortTermView ||
+                isBabyMageRandomView ||
+                isMetalWizardView)
               _buildModeBanner(palette),
             Table(
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,

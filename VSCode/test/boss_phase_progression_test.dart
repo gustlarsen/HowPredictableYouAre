@@ -13,6 +13,7 @@ import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/rpg_hp_bar.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
@@ -52,17 +53,76 @@ Widget _wrapScreen(GameController controller, {Widget? child}) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Boss Phase Progression, Immediate 0 HP Victory & Markov Recalibrator', () {
+  group('Uniform 1 HP Damage, 4-Stage Boss Progression & Markov Recalibrator', () {
+    test(
+      'Every winning attack deals strictly 1 HP across all 4 stages and element modes',
+      () async {
+        for (final stage in [1, 2, 3, 4]) {
+          for (final unlockEarthMetal in [false, true]) {
+            for (final elementalMode in [true, false]) {
+              final maxHp = GameController.maxHpForEnemyStage(stage);
+              final controller = await _createController(
+                prefs: {
+                  'current_week': stage >= 2 ? 10 : 1,
+                  'enemy_stage': stage,
+                  'enemy_max_hp': maxHp,
+                  'pcHp': maxHp,
+                  'unlockedNewHands': unlockEarthMetal,
+                  'showNewHands': unlockEarthMetal,
+                  'unlockedNewSkin': !elementalMode,
+                  'showNewSkin': !elementalMode,
+                },
+              );
+
+              expect(controller.playerWinDamageToBoss, 1);
+              expect(controller.bossWinDamageToPlayer, 1);
+
+              // Player wins -> boss loses exactly 1 HP
+              final prevBossHp = controller.computerHp;
+              controller.crystalBallMove = HandMove.scissors; // Wood
+              controller.playTurn(HandMove.rock); // Fire beats Wood in both modes
+              expect(controller.lastWinner, RoundWinner.user);
+              expect(prevBossHp - controller.computerHp, 1);
+
+              // PC wins -> Hero loses exactly 1 HP
+              final prevHeroHp = controller.userHp;
+              controller.crystalBallMove = HandMove.paper; // Water
+              controller.playTurn(HandMove.rock); // Water beats Fire/Rock in both modes
+              expect(controller.lastWinner, RoundWinner.computer);
+              expect(prevHeroHp - controller.userHp, 1);
+
+              // Tie -> 0 HP damage to both
+              final bossHpBeforeTie = controller.computerHp;
+              final heroHpBeforeTie = controller.userHp;
+              controller.crystalBallMove = HandMove.rock;
+              controller.playTurn(HandMove.rock);
+              expect(controller.lastWinner, RoundWinner.draw);
+              expect(controller.computerHp, bossHpBeforeTie);
+              expect(controller.userHp, heroHpBeforeTie);
+
+              controller.dispose();
+            }
+          }
+        }
+      },
+    );
+
     testWidgets(
-      'Immediate 0 HP victory ends battle without depleting Mana Pool and Secret Week-1 Ending triggers cutscene',
+      'Week-1 Secret Route: Stage 1 (100 HP) -> Stage 3 Metal Wizard (300 HP, 100% Metal) -> Secret Week-1 Ending',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
             'current_week': 1,
-            'enemy_phase': 1,
+            'enemy_stage': 1,
             'enemy_max_hp': 100,
             'pcHp': 1,
-            'total_rounds': 0,
+            'mana_upgrade_level': 220, // 320 Mana so 300 HP Metal Wizard is beatable in 1 battle
+            'unlockedNextMove': true,
+            'showNextMove': true,
+            'unlockedCrystalBall': true,
+            'showCrystalBall': true,
+            'unlockedCrystalBallPlus': true,
+            'showCrystalBallPlus': true,
           },
         );
         addTearDown(controller.dispose);
@@ -75,12 +135,13 @@ void main() {
         controller.playTurn(HandMove.paper);
 
         expect(controller.computerHp, 0);
-        expect(controller.remainingMana, 99);
+        expect(controller.remainingMana, 319);
         expect(controller.isBossVictoryPending, isTrue);
         expect(controller.is100RoundsAlertPending, isFalse);
         expect(
           controller.isEndingUnlocked(NarrativeEnding.secretWeek1),
-          isTrue,
+          isFalse,
+          reason: 'Secret Week-1 ending must only unlock after defeating Metal Wizard in Week 1',
         );
 
         // Further inputs are blocked while victory is pending.
@@ -90,9 +151,57 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('boss_victory_modal')), findsOneWidget);
         expect(find.text('Guardian Robot Destroyed!'), findsOneWidget);
+        expect(find.text('The Metal Wizard Enters Battle!'), findsOneWidget);
+
+        // Confirm modal -> advances to Stage 3 Metal Wizard (300 HP, Metal-only)
+        await tester.tap(
+          find.byKey(const ValueKey('boss_victory_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.enemyStage, 3);
+        expect(controller.enemyMaxHp, 300);
+        expect(controller.computerHp, 300);
+        expect(controller.currentWeek, 1);
+        expect(
+          controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
+          isTrue,
+        );
+        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(find.text('HP 300'), findsOneWidget);
+
+        // Verify Metal Wizard hints: PC Next Move & Crystal Ball = Metal, Crystal Ball+ = Fire & Water
+        expect(controller.pcNextMoves, [HandMove.metal]);
+        expect(controller.crystalBallMoves, [HandMove.metal]);
+        expect(
+          controller.crystalBallPlusMoves,
+          containsAll([HandMove.rock, HandMove.paper]),
+        );
+
+        // Verify Metal Wizard chooses 100% Metal on every turn
+        for (int i = 0; i < 10; i++) {
+          controller.playTurn(HandMove.rock); // Fire melts Metal -> -1 HP, +1 Metal orb
+          expect(controller.currentComputerMove, HandMove.metal);
+          expect(controller.lastWinner, RoundWinner.user);
+        }
+        expect(controller.computerHp, 290);
+        expect(controller.metalOrbs, 10);
+
+        // Reduce Metal Wizard to 1 HP and finish him while still in Week 1
+        controller.computerHp = 1;
+        controller.playTurn(HandMove.paper); // Water rusts Metal -> 0 HP
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+        expect(
+          controller.isEndingUnlocked(NarrativeEnding.secretWeek1),
+          isTrue,
+        );
+
+        await tester.pumpAndSettle();
+        expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
         expect(find.text('Week 1 Lightning Victory!'), findsOneWidget);
 
-        // Confirm modal -> opens Secret Week-1 Victory Cutscene.
+        // Confirm modal -> opens Secret Week-1 Victory Cutscene (skipping Stage 4).
         await tester.tap(
           find.byKey(const ValueKey('boss_victory_confirm_button')),
         );
@@ -105,39 +214,41 @@ void main() {
         expect(find.text('SECRET WEEK-1 VICTORY'), findsOneWidget);
         expect(find.text('A Week-One Miracle!'), findsOneWidget);
 
-        // Advance through panels cleanly.
-        await tester.tap(
-          find.byKey(const ValueKey('victory_cutscene_next_button')),
+        final nextBtnFinder = find.byKey(
+          const ValueKey('victory_cutscene_next_button'),
         );
+        await tester.ensureVisible(nextBtnFinder);
+        await tester.tap(nextBtnFinder);
         await tester.pumpAndSettle();
         expect(find.text('Rescued Intact'), findsOneWidget);
 
-        await tester.tap(
-          find.byKey(const ValueKey('victory_cutscene_next_button')),
-        );
+        await tester.ensureVisible(nextBtnFinder);
+        await tester.tap(nextBtnFinder);
         await tester.pumpAndSettle();
         expect(find.text('Secret Ending Unlocked'), findsOneWidget);
 
-        await tester.tap(
-          find.byKey(const ValueKey('victory_cutscene_finish_button')),
+        final finishBtnFinder = find.byKey(
+          const ValueKey('victory_cutscene_finish_button'),
         );
+        await tester.ensureVisible(finishBtnFinder);
+        await tester.tap(finishBtnFinder);
         await tester.pumpAndSettle();
 
-        // Cycle concludes cleanly back to Week 1 Phase 1.
+        // Cycle concludes cleanly back to Week 1 Stage 1.
         expect(controller.isBossVictoryPending, isFalse);
-        expect(controller.enemyPhase, 1);
+        expect(controller.enemyStage, 1);
         expect(controller.enemyMaxHp, 100);
         expect(controller.currentWeek, 1);
       },
     );
 
     testWidgets(
-      'Defeating Phase 1 in Weeks 2..9 spawns Phase 3 Baby Mage Robot (400 HP, 5 elements, pure uniform random AI)',
+      'Weeks 2-9 Route (and Week-1 Stage-1 beat followed by Week 2+): Stage 1 -> Stage 3 Metal Wizard (300 HP) -> Stage 4 Baby Mage Robot (400 HP, pure random AI) -> Standard Victory',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
             'current_week': 5,
-            'enemy_phase': 1,
+            'enemy_stage': 1,
             'enemy_max_hp': 100,
             'pcHp': 1,
           },
@@ -154,8 +265,36 @@ void main() {
 
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('boss_victory_modal')), findsOneWidget);
+        expect(find.text('Guardian Robot Destroyed!'), findsOneWidget);
+        expect(find.text('The Metal Wizard Enters Battle!'), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('boss_victory_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.enemyStage, 3);
+        expect(controller.enemyMaxHp, 300);
+        expect(controller.computerHp, 300);
         expect(
-          find.text('Panicked Metal Wizard Unleashes Prototype!'),
+          controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
+          isTrue,
+        );
+
+        // Defeat Stage 3 Metal Wizard in Week 5 -> transitions to Stage 4 Baby Mage Robot (400 HP)
+        controller.computerHp = 1;
+        controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+        expect(
+          controller.isEndingUnlocked(NarrativeEnding.secretWeek1),
+          isFalse,
+        );
+
+        await tester.pumpAndSettle();
+        expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
+        expect(
+          find.text('Automated Contingency: Baby Mage Robot!'),
           findsOneWidget,
         );
 
@@ -164,7 +303,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(controller.enemyPhase, 3);
+        expect(controller.enemyStage, 4);
         expect(controller.enemyMaxHp, 400);
         expect(controller.computerHp, 400);
         expect(controller.engine.enemySize, 5);
@@ -172,7 +311,7 @@ void main() {
           controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
         expect(find.text('HP 400'), findsOneWidget);
 
         // Verify Baby Mage Robot ignores heavy cumulative history and chooses all 5 elements roughly uniformly.
@@ -189,7 +328,6 @@ void main() {
           seenMoves[controller.currentComputerMove!] =
               seenMoves[controller.currentComputerMove!]! + 1;
         }
-        // In pure uniform random 1/5 across 150 turns, all 5 elements appear (unlike Water-only counter).
         for (final m in HandMove.values) {
           expect(
             seenMoves[m]!,
@@ -197,18 +335,41 @@ void main() {
             reason: 'Baby Mage Robot should pick $m randomly regardless of bias',
           );
         }
+
+        // Defeat Stage 4 Baby Mage Robot -> unlocks Standard Victory Ending
+        controller.computerHp = 1;
+        controller.crystalBallMove = HandMove.scissors;
+        controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(
+          controller.isEndingUnlocked(NarrativeEnding.standardVictory),
+          isTrue,
+        );
+
+        await tester.pumpAndSettle();
+        expect(find.text('Baby Mage Robot Destroyed!'), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('boss_victory_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('victory_cutscene_dialog')),
+          findsOneWidget,
+        );
+        expect(find.text('CAMPAIGN VICTORY'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'Defeating Phase 1 at Week >= 10 spawns Phase 2 Robot Archmage (200 HP), unlocks Bestiary & Shop item, then advances to Phase 3 -> Standard Victory',
+      'Week 10+ Route: Stage 1 -> Stage 2 Robot Archmage (200 HP) -> Stage 3 Metal Wizard (300 HP) -> Stage 4 Baby Mage Robot (400 HP) -> Standard Victory',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
             'current_week': 10,
-            'enemy_phase': 1,
+            'enemy_stage': 1,
             'enemy_max_hp': 100,
-            'pcHp': 2,
+            'pcHp': 1,
           },
         );
         addTearDown(controller.dispose);
@@ -231,7 +392,7 @@ void main() {
 
         await tester.pumpAndSettle();
         expect(
-          find.text('Phase 2: Robot Archmage Approaches!'),
+          find.text('Stage 2: Robot Archmage Approaches!'),
           findsOneWidget,
         );
         await tester.tap(
@@ -239,16 +400,16 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Now fighting Phase 2 Robot Archmage (200 HP, 5 elements)
-        expect(controller.enemyPhase, 2);
+        // Now fighting Stage 2 Robot Archmage (200 HP, 5 elements)
+        expect(controller.enemyStage, 2);
         expect(controller.enemyMaxHp, 200);
         expect(controller.computerHp, 200);
         expect(controller.engine.enemySize, 5);
         expect(find.byKey(const ValueKey('boss_phase_pill_2')), findsOneWidget);
         expect(find.text('HP 200'), findsOneWidget);
 
-        // Defeat Phase 2 Robot Archmage -> strictly transitions to Phase 3 Baby Mage Robot (400 HP)
-        controller.computerHp = 2;
+        // Defeat Stage 2 Robot Archmage -> strictly transitions to Stage 3 Metal Wizard (300 HP)
+        controller.computerHp = 1;
         controller.crystalBallMove = HandMove.rock;
         controller.playTurn(HandMove.paper);
         expect(controller.computerHp, 0);
@@ -256,21 +417,47 @@ void main() {
 
         await tester.pumpAndSettle();
         expect(find.text('Robot Archmage Destroyed!'), findsOneWidget);
+        expect(find.text('Stage 3: The Metal Wizard Himself!'), findsOneWidget);
         await tester.tap(
           find.byKey(const ValueKey('boss_victory_confirm_button')),
         );
         await tester.pumpAndSettle();
 
-        expect(controller.enemyPhase, 3);
+        expect(controller.enemyStage, 3);
+        expect(controller.enemyMaxHp, 300);
+        expect(controller.computerHp, 300);
+        expect(
+          controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
+          isTrue,
+        );
+        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(find.text('HP 300'), findsOneWidget);
+
+        // Defeat Stage 3 Metal Wizard -> transitions to Stage 4 Baby Mage Robot (400 HP)
+        controller.computerHp = 1;
+        controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+
+        await tester.pumpAndSettle();
+        expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('boss_victory_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.enemyStage, 4);
         expect(controller.enemyMaxHp, 400);
         expect(controller.computerHp, 400);
         expect(
           controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
           isTrue,
         );
+        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
+        expect(find.text('HP 400'), findsOneWidget);
 
-        // Defeat Phase 3 Baby Mage Robot -> unlocks Standard Victory Ending & triggers campaign cutscene
-        controller.computerHp = 2;
+        // Defeat Stage 4 Baby Mage Robot -> unlocks Standard Victory Ending & triggers campaign cutscene
+        controller.computerHp = 1;
         controller.crystalBallMove = HandMove.scissors;
         controller.playTurn(HandMove.rock);
         expect(controller.computerHp, 0);
@@ -296,9 +483,40 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(controller.enemyPhase, 1);
+        expect(controller.enemyStage, 1);
         expect(controller.enemyMaxHp, 100);
         expect(controller.currentWeek, 1);
+      },
+    );
+
+    test(
+      'Stage 1 beaten in Week 1 followed by advancing to Week 2+ transitions Stage 3 Metal Wizard defeat into Stage 4 Baby Mage Robot (not Secret Ending)',
+      () async {
+        final controller = await _createController(
+          prefs: {
+            'current_week': 1,
+            'enemy_stage': 3,
+            'enemy_max_hp': 300,
+            'pcHp': 300,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        // Calendar advances to Week 2 before finishing the Metal Wizard
+        controller.completeBattleWeek();
+        expect(controller.currentWeek, 2);
+        expect(controller.enemyStage, 3);
+
+        controller.computerHp = 1;
+        controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+        expect(controller.isEndingUnlocked(NarrativeEnding.secretWeek1), isFalse);
+
+        final concluded = controller.advanceAfterBossVictory();
+        expect(concluded, isFalse);
+        expect(controller.enemyStage, 4);
+        expect(controller.enemyMaxHp, 400);
       },
     );
 
@@ -308,7 +526,7 @@ void main() {
         final controller = await _createController(
           prefs: {
             'current_week': 10,
-            'enemy_phase': 2,
+            'enemy_stage': 2,
             'enemy_max_hp': 200,
             'pcHp': 200,
             'unlockedYourPrediction': true,
@@ -402,7 +620,7 @@ void main() {
       'ShopDialog hides Markov Recalibrator before Archmage, reveals at 1,200x5 after Archmage, and MarkovMatrixView switches between cumulative and recalibrated modes',
       (WidgetTester tester) async {
         final preController = await _createController(
-          prefs: {'current_week': 10, 'enemy_phase': 1},
+          prefs: {'current_week': 10, 'enemy_stage': 1},
         );
         addTearDown(preController.dispose);
 
@@ -420,7 +638,7 @@ void main() {
         final archController = await _createController(
           prefs: {
             'current_week': 10,
-            'enemy_phase': 2,
+            'enemy_stage': 2,
             'enemy_max_hp': 200,
             'pcHp': 200,
             'orbs_fire': 1500,
@@ -517,7 +735,51 @@ void main() {
     );
 
     testWidgets(
-      'VersusArena opponent HP bar scales smoothly to 200 and 400 max HP with green -> amber -> red colors',
+      'Stage 3 Metal Wizard HintsBar shows Metal for PC Next Move & Crystal Ball, and Fire & Water for Crystal Ball+',
+      (WidgetTester tester) async {
+        final controller = await _createController(
+          prefs: {
+            'current_week': 3,
+            'enemy_stage': 3,
+            'enemy_max_hp': 300,
+            'pcHp': 300,
+            'unlockedNextMove': true,
+            'showNextMove': true,
+            'unlockedCrystalBall': true,
+            'showCrystalBall': true,
+            'unlockedCrystalBallPlus': true,
+            'showCrystalBallPlus': true,
+            'unlockedNewHands': true,
+            'showNewHands': true,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        expect(controller.pcNextMoves, [HandMove.metal]);
+        expect(controller.crystalBallMoves, [HandMove.metal]);
+        expect(
+          controller.crystalBallPlusMoves,
+          [HandMove.rock, HandMove.paper],
+        );
+
+        await tester.pumpWidget(
+          _wrapScreen(
+            controller,
+            child: Scaffold(
+              body: HintsBar(controller: controller),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(HandMove.metal.elementalIcon), findsOneWidget);
+        expect(find.byIcon(HandMove.rock.elementalIcon), findsOneWidget);
+        expect(find.byIcon(HandMove.paper.elementalIcon), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'VersusArena opponent HP bar scales smoothly to 100, 200, 300, and 400 max HP with green -> amber -> red colors',
       (WidgetTester tester) async {
         Future<Color> pumpEnemyHp(int hp, int maxHp) async {
           await tester.pumpWidget(
@@ -571,14 +833,22 @@ void main() {
           return gradient.colors.first;
         }
 
-        // Phase 2 Archmage (200 HP)
+        // Stage 2 Archmage (200 HP)
         final archGreen = await pumpEnemyHp(200, 200);
         final archAmber = await pumpEnemyHp(100, 200); // 50%
         final archRed = await pumpEnemyHp(40, 200); // 20%
         expect(archGreen, isNot(equals(archAmber)));
         expect(archAmber, isNot(equals(archRed)));
 
-        // Phase 3 Baby Mage (400 HP)
+        // Stage 3 Metal Wizard (300 HP)
+        final wizardGreen = await pumpEnemyHp(300, 300);
+        final wizardAmber = await pumpEnemyHp(150, 300); // 50%
+        final wizardRed = await pumpEnemyHp(60, 300); // 20%
+        expect(wizardGreen, archGreen);
+        expect(wizardAmber, archAmber);
+        expect(wizardRed, archRed);
+
+        // Stage 4 Baby Mage (400 HP)
         final babyGreen = await pumpEnemyHp(400, 400);
         final babyAmber = await pumpEnemyHp(160, 400); // 40%
         final babyRed = await pumpEnemyHp(80, 400); // 20%
@@ -589,14 +859,14 @@ void main() {
     );
 
     test(
-      'CloudSaveData round-trip and en/pt/es/de localizations are complete',
+      'CloudSaveData round-trip and en/pt/es/de localizations are complete for all 4 stages',
       () async {
         final controller = await _createController(
           prefs: {
             'current_week': 10,
-            'enemy_phase': 2,
-            'enemy_max_hp': 200,
-            'pcHp': 150,
+            'enemy_stage': 3,
+            'enemy_max_hp': 300,
+            'pcHp': 245,
             'unlockedMarkovRecalibrator': true,
             'showMarkovRecalibrator': true,
           },
@@ -610,9 +880,10 @@ void main() {
 
         final snapshot = CloudSaveData.fromStorage(controller.storage);
         final decoded = CloudSaveData.tryParse(json.encode(snapshot.toJson()))!;
-        expect(decoded.enemyPhase, 2);
-        expect(decoded.enemyMaxHp, 200);
-        expect(decoded.pcHp, 150);
+        expect(decoded.enemyStage, 3);
+        expect(decoded.enemyPhase, 3);
+        expect(decoded.enemyMaxHp, 300);
+        expect(decoded.pcHp, 245);
         expect(decoded.unlockedMarkovRecalibrator, isTrue);
         expect(decoded.showMarkovRecalibrator, isTrue);
         expect(decoded.shortTermTransitions, {HandMove.rock.id: HandMove.scissors.id});
@@ -620,15 +891,29 @@ void main() {
         const requiredKeys = [
           'boss_name_guardian',
           'boss_name_archmage',
+          'boss_name_metal_wizard',
           'boss_name_baby_mage',
+          'castle_bestiary_metal_wizard_name',
+          'castle_bestiary_metal_wizard_model',
+          'castle_bestiary_metal_wizard_lore',
+          'castle_bestiary_metal_wizard_hint',
           'castle_ending_secret_w1_title',
           'castle_ending_standard_victory_title',
           'markov_recalibrator_title',
           'markov_recalibrator_desc',
           'markov_recalibrator_archmage_banner',
+          'markov_metal_wizard_banner',
           'boss_victory_p1_title',
+          'boss_victory_s1_to_s3_subtitle',
+          'boss_victory_s1_to_s3_body',
           'boss_victory_p2_defeated_title',
+          'boss_victory_s2_to_s3_subtitle',
+          'boss_victory_s2_to_s3_body',
+          'boss_victory_s3_defeated_title',
+          'boss_victory_s3_to_s4_subtitle',
+          'boss_victory_s3_to_s4_body',
           'boss_victory_p3_defeated_title',
+          'boss_victory_face_metal_wizard_btn',
           'secret_cutscene_header',
           'standard_cutscene_header',
         ];

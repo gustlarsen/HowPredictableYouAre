@@ -1151,7 +1151,7 @@ class _ShopDialogState extends State<ShopDialog> {
           subtitle: loc.t(
             'new_hands_desc',
             fallback:
-                'Unlocks Earth & Metal in your move deck and deals bonus damage to the Phase 2 boss. Earn Earth & Metal orbs by defeating them in Phase 2.',
+                'Unlocks Earth & Metal in your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
           ),
           cost: GameController.costNewHands,
           productId: BillingService.productNewHands,
