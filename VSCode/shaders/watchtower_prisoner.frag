@@ -3,6 +3,7 @@
 
 uniform vec2 uResolution;
 uniform float uTime;
+uniform float uIsFullScreen;
 
 uniform sampler2D uBackground;
 uniform sampler2D uPrincess;
@@ -36,30 +37,38 @@ void main() {
   vec2 res = max(uResolution, vec2(1.0));
   vec2 uv = FlutterFragCoord().xy / res;
 
+  float isFull = clamp(uIsFullScreen, 0.0, 1.0);
   float viewAspect = res.x / res.y;
   vec2 centered = uv - 0.5;
 
-  // Radial distance inside spyglass lens (0 at center, 1 at inscribed circle edge)
+  // Radial distance inside lens (0 at center, 1 at inscribed circle edge)
   vec2 circleSpace = centered * 2.0;
   float r = length(circleSpace);
   float r2 = r * r;
 
-  // Mild edge optical barrel curvature for telescope lens feel
-  vec2 curvedUv = 0.5 + centered * (1.0 + 0.055 * r2);
+  // Optical barrel curvature (gentle in circular spyglass, ultra-subtle in full-screen)
+  float curveStrength = mix(0.055, 0.012, isFull);
+  vec2 curvedCentered = centered * (1.0 + curveStrength * r2);
 
-  // Aspect-cover mapping onto the 9:16 (576x1024) dungeon scene
+  // Aspect-cover / full-frame mapping onto the 9:16 (576x1024) dungeon scene
+  // Circular modal preview applies ~1.45x optical lens zoom centered on the Princess;
+  // full-screen mode frames the entire 9:16 cell edge-to-edge at 1.0x.
   const float texAspect = 0.5625;
-  vec2 sceneUv = curvedUv;
+  float lensZoom = mix(1.45, 1.0, isFull);
+  vec2 lensTarget = mix(vec2(0.49, 0.465), vec2(0.50, 0.50), isFull);
+
+  vec2 sceneUv;
   if (viewAspect > texAspect) {
     float scaleY = texAspect / viewAspect;
-    sceneUv.y = (curvedUv.y - 0.5) * scaleY + 0.535;
+    sceneUv = lensTarget + vec2(curvedCentered.x, curvedCentered.y * scaleY) / lensZoom;
   } else {
     float scaleX = viewAspect / texAspect;
-    sceneUv.x = (curvedUv.x - 0.5) * scaleX + 0.5;
+    sceneUv = lensTarget + vec2(curvedCentered.x * scaleX, curvedCentered.y) / lensZoom;
   }
 
   // Subtle edge chromatic dispersion on the background near lens rim
-  vec2 caShift = centered * (0.0042 * smoothstep(0.32, 1.0, r2));
+  float caStrength = mix(0.0042, 0.0018, isFull);
+  vec2 caShift = centered * (caStrength * smoothstep(0.32, 1.0, r2));
   vec3 bgCol;
   bgCol.r = texture(uBackground, clamp(sceneUv + caShift, 0.001, 0.999)).r;
   bgCol.g = texture(uBackground, clamp(sceneUv, 0.001, 0.999)).g;
@@ -77,25 +86,26 @@ void main() {
   bgCol += vec3(1.0, 0.56, 0.18) * (torchGlow * 0.28 + corridorBounce * 0.065) * (flicker - 0.76);
 
   // Window volumetric sunbeam cone mask (originating at 0.485, 0.34)
-  float rayCone = smoothstep(0.30, 0.37, sceneUv.y) * smoothstep(0.77, 0.48, sceneUv.y);
-  float coneHalfW = 0.075 + max(0.0, sceneUv.y - 0.34) * 0.42;
+  float rayCone = smoothstep(0.30, 0.37, sceneUv.y) * smoothstep(0.84, 0.48, sceneUv.y);
+  float coneHalfW = 0.075 + max(0.0, sceneUv.y - 0.34) * 0.44;
   float rayHoriz = 1.0 - smoothstep(coneHalfW * 0.45, coneHalfW, abs(sceneUv.x - 0.485));
   float beamMask = rayCone * rayHoriz;
   float beamShimmer = 0.96 + 0.04 * sin(uTime * 0.9 + sceneUv.x * 12.0);
   bgCol += vec3(0.78, 0.90, 1.0) * beamMask * 0.035 * beamShimmer;
 
-  // Grounded contact shadow beneath the Princess's boots on stone floor
-  vec2 shMain = (sceneUv - vec2(0.478, 0.744)) / vec2(0.052, 0.014);
+  // Grounded contact shadow beneath the Princess's boots on foreground stone floor
+  vec2 shMain = (sceneUv - vec2(0.478, 0.814)) / vec2(0.078, 0.022);
   float contactShadow = exp(-dot(shMain, shMain) * 1.4);
-  vec2 shBack = (sceneUv - vec2(0.512, 0.728)) / vec2(0.030, 0.010);
+  vec2 shBack = (sceneUv - vec2(0.526, 0.790)) / vec2(0.042, 0.015);
   contactShadow = max(contactShadow, exp(-dot(shBack, shBack) * 1.6) * 0.75);
-  vec2 shCast = (sceneUv - vec2(0.452, 0.750)) / vec2(0.075, 0.022);
+  vec2 shCast = (sceneUv - vec2(0.440, 0.822)) / vec2(0.105, 0.030);
   float castShadow = exp(-dot(shCast, shCast) * 1.3) * 0.35;
   bgCol *= (1.0 - clamp(contactShadow * 0.62 + castShadow, 0.0, 0.72));
 
-  // Composite animated Princess standing beneath the barred window sunbeams
-  const float fgScale = 0.425;
-  vec2 fgOrigin = vec2(0.485 - 0.5 * fgScale, 0.745 - 0.955 * fgScale);
+  // Composite animated Princess (~1.45x larger base scale = 0.62) standing closer
+  // to the foreground on the stone floor beneath the barred window sunbeams
+  const float fgScale = 0.62;
+  vec2 fgOrigin = vec2(0.490 - 0.5 * fgScale, 0.815 - 0.955 * fgScale);
   vec2 fgUv = (sceneUv - fgOrigin) / fgScale;
 
   vec3 compCol = bgCol;
@@ -195,11 +205,15 @@ void main() {
   float dustTotal = (dust1 * 0.85 + dust2 * 0.55) * beamMask;
   compCol += vec3(0.88, 0.95, 1.0) * dustTotal * 0.42;
 
-  // Telescope / Spyglass circular vignette & subtle optical glass rim tint
-  float vignette = 1.0 - smoothstep(0.62, 1.03, r) * 0.85;
-  compCol *= vignette;
+  // Circular telescope vignette when in modal lens mode; subtle corner optical vignette in full-screen
+  float circularVignette = 1.0 - smoothstep(0.62, 1.03, r) * 0.85;
   float lensRimGlow = smoothstep(0.76, 0.93, r) * (1.0 - smoothstep(0.93, 1.02, r));
-  compCol += vec3(0.05, 0.22, 0.30) * lensRimGlow * 0.32;
+
+  float cornerR = length(centered * vec2(1.15, 1.05));
+  float cornerVignette = 1.0 - smoothstep(0.52, 0.95, cornerR) * 0.38;
+
+  compCol *= mix(circularVignette, cornerVignette, isFull);
+  compCol += vec3(0.05, 0.22, 0.30) * lensRimGlow * 0.32 * (1.0 - isFull);
 
   fragColor = vec4(clamp(compCol, 0.0, 1.0), 1.0);
 }

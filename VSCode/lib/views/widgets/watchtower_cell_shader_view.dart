@@ -11,11 +11,13 @@ import 'package:flutter/services.dart';
 class WatchtowerCellShaderView extends StatefulWidget {
   final bool animationsEnabled;
   final bool forceStaticFallback;
+  final bool isFullScreen;
 
   const WatchtowerCellShaderView({
     super.key,
     this.animationsEnabled = true,
     this.forceStaticFallback = false,
+    this.isFullScreen = false,
   });
 
   @override
@@ -164,13 +166,14 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
             bgImage: bgImage,
             princessImage: princessImage,
             timeSeconds: _timeSeconds,
+            isFullScreen: widget.isFullScreen,
           ),
           child: const SizedBox.expand(),
         ),
       );
     }
 
-    return const _StaticDungeonFallback();
+    return _StaticDungeonFallback(isFullScreen: widget.isFullScreen);
   }
 }
 
@@ -179,12 +182,14 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
   final ui.Image bgImage;
   final ui.Image princessImage;
   final ValueNotifier<double> timeSeconds;
+  final bool isFullScreen;
 
   _WatchtowerCellShaderPainter({
     required this.shader,
     required this.bgImage,
     required this.princessImage,
     required this.timeSeconds,
+    required this.isFullScreen,
   }) : super(repaint: timeSeconds);
 
   @override
@@ -194,6 +199,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
     shader.setFloat(2, timeSeconds.value);
+    shader.setFloat(3, isFullScreen ? 1.0 : 0.0);
     shader.setImageSampler(0, bgImage);
     shader.setImageSampler(1, princessImage);
 
@@ -205,17 +211,20 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
   bool shouldRepaint(covariant _WatchtowerCellShaderPainter oldDelegate) {
     return oldDelegate.shader != shader ||
         oldDelegate.bgImage != bgImage ||
-        oldDelegate.princessImage != princessImage;
+        oldDelegate.princessImage != princessImage ||
+        oldDelegate.isFullScreen != isFullScreen;
   }
 }
 
 /// Clean static fallback rendered while the shader is loading or when running
 /// in headless CI test environments without GPU shader support.
 class _StaticDungeonFallback extends StatelessWidget {
-  const _StaticDungeonFallback();
+  final bool isFullScreen;
+
+  const _StaticDungeonFallback({required this.isFullScreen});
 
   static const double _texAspect = 576.0 / 1024.0;
-  static const double _fgScale = 0.425;
+  static const double _fgScale = 0.62;
 
   @override
   Widget build(BuildContext context) {
@@ -226,91 +235,102 @@ class _StaticDungeonFallback extends StatelessWidget {
         final h = constraints.maxHeight;
         final viewAspect = h > 0 ? w / h : 1.0;
 
-        // Match the shader's BoxFit.cover scene coordinate transform
+        final lensZoom = isFullScreen ? 1.0 : 1.45;
+        final targetX = isFullScreen ? 0.50 : 0.49;
+        final targetY = isFullScreen ? 0.50 : 0.465;
+
+        // Match the shader's scene coordinate & optical lens zoom transform
         final double sceneWidth;
         final double sceneHeight;
-        final double offsetX;
-        final double offsetY;
-
         if (viewAspect > _texAspect) {
-          sceneWidth = w;
-          sceneHeight = w / _texAspect;
-          offsetX = 0.0;
-          offsetY = h * 0.5 - sceneHeight * 0.535;
+          sceneWidth = w * lensZoom;
+          sceneHeight = (w / _texAspect) * lensZoom;
         } else {
-          sceneHeight = h;
-          sceneWidth = h * _texAspect;
-          offsetX = w * 0.5 - sceneWidth * 0.5;
-          offsetY = 0.0;
+          sceneHeight = h * lensZoom;
+          sceneWidth = (h * _texAspect) * lensZoom;
         }
+        final offsetX = w * 0.5 - sceneWidth * targetX;
+        final offsetY = h * 0.5 - sceneHeight * targetY;
 
         final fgSizeW = sceneWidth * _fgScale;
         final fgSizeH = sceneHeight * _fgScale;
-        final fgLeft = offsetX + sceneWidth * (0.485 - 0.5 * _fgScale);
-        final fgTop = offsetY + sceneHeight * (0.745 - 0.955 * _fgScale);
+        final fgLeft = offsetX + sceneWidth * (0.490 - 0.5 * _fgScale);
+        final fgTop = offsetY + sceneHeight * (0.815 - 0.955 * _fgScale);
 
-        final shadowW = sceneWidth * 0.11;
-        final shadowH = sceneHeight * 0.028;
+        final shadowW = sceneWidth * 0.16;
+        final shadowH = sceneHeight * 0.042;
         final shadowLeft = offsetX + sceneWidth * 0.478 - shadowW * 0.5;
-        final shadowTop = offsetY + sceneHeight * 0.744 - shadowH * 0.5;
+        final shadowTop = offsetY + sceneHeight * 0.814 - shadowH * 0.5;
 
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned(
-              left: offsetX,
-              top: offsetY,
-              width: sceneWidth,
-              height: sceneHeight,
-              child: Image.asset(
-                _WatchtowerCellShaderViewState._bgAsset,
-                fit: BoxFit.fill,
+        return ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned(
+                left: offsetX,
+                top: offsetY,
+                width: sceneWidth,
+                height: sceneHeight,
+                child: Image.asset(
+                  _WatchtowerCellShaderViewState._bgAsset,
+                  fit: BoxFit.fill,
+                ),
               ),
-            ),
-            Positioned(
-              left: shadowLeft,
-              top: shadowTop,
-              width: shadowW,
-              height: shadowH,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.black.withValues(alpha: 0.62),
-                      Colors.black.withValues(alpha: 0.0),
-                    ],
+              Positioned(
+                left: shadowLeft,
+                top: shadowTop,
+                width: shadowW,
+                height: shadowH,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.62),
+                        Colors.black.withValues(alpha: 0.0),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: fgLeft,
-              top: fgTop,
-              width: fgSizeW,
-              height: fgSizeH,
-              child: Image.asset(
-                _WatchtowerCellShaderViewState._princessAsset,
-                fit: BoxFit.fill,
+              Positioned(
+                left: fgLeft,
+                top: fgTop,
+                width: fgSizeW,
+                height: fgSizeH,
+                child: Image.asset(
+                  _WatchtowerCellShaderViewState._princessAsset,
+                  fit: BoxFit.fill,
+                ),
               ),
-            ),
-            // Spyglass optical vignette overlay
-            IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    radius: 0.92,
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      const Color(0xFF04141C).withValues(alpha: 0.45),
-                      Colors.black.withValues(alpha: 0.85),
-                    ],
-                    stops: const [0.0, 0.62, 0.86, 1.0],
+              // Spyglass optical vignette overlay (circular in modal, subtle corner in full screen)
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: isFullScreen
+                        ? RadialGradient(
+                            radius: 1.15,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.36),
+                            ],
+                            stops: const [0.0, 0.62, 1.0],
+                          )
+                        : RadialGradient(
+                            radius: 0.92,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              const Color(0xFF04141C).withValues(alpha: 0.45),
+                              Colors.black.withValues(alpha: 0.85),
+                            ],
+                            stops: const [0.0, 0.62, 0.86, 1.0],
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

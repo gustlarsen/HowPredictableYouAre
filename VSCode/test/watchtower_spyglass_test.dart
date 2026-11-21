@@ -5,6 +5,7 @@ import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/full_screen_spyglass_view.dart';
 import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
 import 'package:how_predictable/views/dialogs/watchtower_spyglass_dialog.dart';
 import 'package:how_predictable/views/widgets/watch_tower_icon.dart';
@@ -117,6 +118,11 @@ void main() {
         expect(find.byType(WatchtowerCellShaderView), findsOneWidget);
         expect(find.text('Dungeon Spyglass'), findsOneWidget);
         expect(
+          find.byKey(const ValueKey('watchtower_spyglass_expand_badge')),
+          findsOneWidget,
+        );
+        expect(find.text('Tap lens to inspect full screen'), findsOneWidget);
+        expect(
           find.text(
             'Through the Watch Tower lens, the captive Princess awaits rescue...',
           ),
@@ -137,16 +143,112 @@ void main() {
     );
 
     testWidgets(
-      'Spy on Dungeon button displays correct translations for en, pt, es, de',
+      'Tapping circular spyglass lens opens FullScreenSpyglassView with InteractiveViewer, double-tap zoom, reset button, and closes cleanly',
       (WidgetTester tester) async {
-        const expected = {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          language: 'en',
+          animationsEnabled: false,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: WatchtowerSpyglassDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final lensTap = find.byKey(
+          const ValueKey('watchtower_spyglass_lens_tap'),
+        );
+        expect(lensTap, findsOneWidget);
+
+        await tester.tap(lensTap);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FullScreenSpyglassView), findsOneWidget);
+        final viewerFinder = find.byKey(
+          const ValueKey('full_screen_spyglass_interactive_viewer'),
+        );
+        expect(viewerFinder, findsOneWidget);
+
+        final viewer = tester.widget<InteractiveViewer>(viewerFinder);
+        expect(viewer.minScale, 1.0);
+        expect(viewer.maxScale, 4.0);
+        expect(viewer.panEnabled, isTrue);
+        expect(viewer.scaleEnabled, isTrue);
+
+        // Full-screen shader view uses isFullScreen: true
+        final fullShaderFinder = find.descendant(
+          of: viewerFinder,
+          matching: find.byType(WatchtowerCellShaderView),
+        );
+        expect(fullShaderFinder, findsOneWidget);
+        expect(
+          tester.widget<WatchtowerCellShaderView>(fullShaderFinder).isFullScreen,
+          isTrue,
+        );
+
+        // Reset Zoom button is hidden at 1.0x
+        final resetBtnFinder = find.byKey(
+          const ValueKey('full_screen_spyglass_reset_zoom_button'),
+        );
+        expect(resetBtnFinder, findsNothing);
+
+        // Double-tap center of InteractiveViewer -> zooms in to 2.2x and reveals Reset Zoom
+        final center = tester.getCenter(viewerFinder);
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+
+        expect(resetBtnFinder, findsOneWidget);
+
+        // Tap Reset Zoom -> animates back to 1.0x and hides Reset Zoom button
+        await tester.tap(resetBtnFinder);
+        await tester.pumpAndSettle();
+        expect(resetBtnFinder, findsNothing);
+
+        // Close full-screen view -> returns cleanly to WatchtowerSpyglassDialog
+        final fullCloseBtn = find.byKey(
+          const ValueKey('full_screen_spyglass_close_button'),
+        );
+        expect(fullCloseBtn, findsOneWidget);
+        await tester.tap(fullCloseBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FullScreenSpyglassView), findsNothing);
+        expect(find.byType(WatchtowerSpyglassDialog), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Spy on Dungeon button and tap hint display correct translations for en, pt, es, de',
+      (WidgetTester tester) async {
+        const expectedButtons = {
           'en': 'Spy on Dungeon',
           'pt': 'Espiar Masmorra',
           'es': 'Espiar Mazmorra',
           'de': 'Verlies ausspähen',
         };
+        const expectedHints = {
+          'en': 'Tap lens to inspect full screen',
+          'pt': 'Toque na lente para explorar em tela cheia',
+          'es': 'Toca la lente para explorar en pantalla completa',
+          'de': 'Linse antippen für Vollbild-Ansicht',
+        };
 
-        for (final entry in expected.entries) {
+        for (final entry in expectedButtons.entries) {
           final controller = await _createController(
             language: entry.key,
             animationsEnabled: false,
@@ -159,35 +261,47 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(find.text(entry.value), findsOneWidget);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: WatchtowerSpyglassDialog(controller: controller),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text(expectedHints[entry.key]!), findsOneWidget);
         }
       },
     );
 
     testWidgets(
-      'WatchtowerCellShaderView static CI fallback and animated mode render and dispose cleanly',
+      'WatchtowerCellShaderView static CI fallback (modal & full-screen) and animated mode render and dispose cleanly',
       (WidgetTester tester) async {
-        await tester.pumpWidget(
-          const MaterialApp(
-            home: Scaffold(
-              body: SizedBox(
-                width: 320,
-                height: 320,
-                child: WatchtowerCellShaderView(
-                  animationsEnabled: false,
-                  forceStaticFallback: true,
+        for (final fullScreen in [false, true]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 320,
+                  height: 320,
+                  child: WatchtowerCellShaderView(
+                    animationsEnabled: false,
+                    forceStaticFallback: true,
+                    isFullScreen: fullScreen,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
-          findsOneWidget,
-        );
-        expect(find.byType(Image), findsNWidgets(2));
-        expect(tester.takeException(), isNull);
+          expect(
+            find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
+            findsOneWidget,
+          );
+          expect(find.byType(Image), findsNWidgets(2));
+          expect(tester.takeException(), isNull);
+        }
 
         // Also test normal animated construction & disposal without crashing
         await tester.pumpWidget(

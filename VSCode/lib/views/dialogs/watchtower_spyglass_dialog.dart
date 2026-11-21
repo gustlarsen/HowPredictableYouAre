@@ -5,6 +5,7 @@ import '../../controllers/game_controller.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/watch_tower_icon.dart';
 import '../widgets/watchtower_cell_shader_view.dart';
+import 'full_screen_spyglass_view.dart';
 
 /// Focused telescope/spyglass observation modal displaying the live animated
 /// GLSL shader view of the captive Princess inside the dungeon cell.
@@ -36,7 +37,7 @@ class WatchtowerSpyglassDialog extends StatelessWidget {
         ),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 640),
+        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 660),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
@@ -75,7 +76,7 @@ class WatchtowerSpyglassDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Circular Brass-Framed Spyglass Viewport
+              // Interactive Circular Brass-Framed Spyglass Viewport
               Flexible(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -88,17 +89,112 @@ class WatchtowerSpyglassDialog extends StatelessWidget {
                       child: SizedBox(
                         width: diameter,
                         height: diameter,
-                        child: _SpyglassLensFrame(
-                          child: WatchtowerCellShaderView(
-                            animationsEnabled: controller.animationsEnabled,
-                          ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.transparent,
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  key: const ValueKey(
+                                    'watchtower_spyglass_lens_tap',
+                                  ),
+                                  customBorder: const CircleBorder(),
+                                  onTap: () {
+                                    controller.audio.playTapVibrate();
+                                    Navigator.of(context).push(
+                                      FullScreenSpyglassView.route(
+                                        controller: controller,
+                                      ),
+                                    );
+                                  },
+                                  child: _SpyglassLensFrame(
+                                    child: WatchtowerCellShaderView(
+                                      isFullScreen: false,
+                                      animationsEnabled:
+                                          controller.animationsEnabled,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Subtle gold/dark translucent expand/zoom badge on bottom-right rim
+                            Positioned(
+                              right: diameter * 0.06,
+                              bottom: diameter * 0.06,
+                              child: IgnorePointer(
+                                child: Container(
+                                  key: const ValueKey(
+                                    'watchtower_spyglass_expand_badge',
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0B1018)
+                                        .withValues(alpha: 0.84),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFFFFE082)
+                                          .withValues(alpha: 0.85),
+                                      width: 1.3,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.45),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.zoom_in_rounded,
+                                    size: 18,
+                                    color: Color(0xFFFFE082),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+
+              // Brief localized full-screen tap hint
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.touch_app_rounded,
+                    size: 13.5,
+                    color: palette.isDark
+                        ? const Color(0xFF00E5FF).withValues(alpha: 0.85)
+                        : palette.blueAccent,
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      loc.t(
+                        'observatory_spyglass_tap_hint',
+                        fallback: 'Tap lens to inspect full screen',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: palette.isDark
+                            ? const Color(0xFF00E5FF).withValues(alpha: 0.90)
+                            : palette.blueAccent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
 
               // Subtle lore caption
               Padding(
