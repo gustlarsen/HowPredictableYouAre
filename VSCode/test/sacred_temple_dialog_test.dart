@@ -325,10 +325,10 @@ void main() {
 
         // Verify all 4 localizations render tabs and titles without key fallbacks
         const expectedTabNames = {
-          'en': 'Transformation',
-          'pt': 'Transformação',
-          'es': 'Transformación',
-          'de': 'Verwandlung',
+          'en': 'Transform',
+          'pt': 'Transformar',
+          'es': 'Transformar',
+          'de': 'Wandeln',
         };
         const expectedTitles = {
           'en': 'Holy Transformation',
@@ -520,7 +520,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Transformation labels & non-truncated 3 -> 1 Exchange header on 360dp
-        expect(find.text('Transformation'), findsOneWidget);
+        expect(find.text('Transform'), findsOneWidget);
         expect(find.text('Holy Transformation'), findsOneWidget);
         expect(
           find.text(

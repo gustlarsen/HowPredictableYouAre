@@ -755,7 +755,7 @@ class _ShopDialogState extends State<ShopDialog> {
           size: 28,
           isOnGoldBackground: isSelected,
         ),
-        label: loc.t('temple_tab_transmute', fallback: 'Transformation'),
+        label: loc.t('temple_tab_transmute', fallback: 'Transform'),
       ),
       (
         wing: TempleWing.adoration,
