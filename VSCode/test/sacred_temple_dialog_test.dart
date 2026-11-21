@@ -16,6 +16,7 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/widgets/temple_wing_icons.dart';
 
 class _TempleAdMobClient implements AdMobClient {
   bool shouldEarnRewardOnShow;
@@ -838,6 +839,164 @@ void main() {
         controller.playTurn(HandMove.rock);
         expect(controller.lastWinner, RoundWinner.user);
         expect(controller.woodOrbs - woodBefore, 2);
+      },
+    );
+
+    testWidgets(
+      'All 5 Sacred Temple tabs, header emblem, and internal section headers render bespoke CustomPainter RPG icons cleanly in both Dark Mode and Light Mode',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Standalone smoke checks across all 14 Sacred Temple vector painters
+        final allPainters = <Widget>[
+          const ConsagrationChaliceIcon(size: 20, isOnGoldBackground: false),
+          const ConsagrationChaliceIcon(size: 20, isOnGoldBackground: true),
+          const OfferingsAltarIcon(size: 20, isOnGoldBackground: false),
+          const OfferingsAltarIcon(size: 20, isOnGoldBackground: true),
+          const HolyTransmuteIcon(size: 20, isOnGoldBackground: false),
+          const HolyTransmuteIcon(size: 20, isOnGoldBackground: true),
+          const AdorationHarpIcon(size: 20, isOnGoldBackground: false),
+          const AdorationHarpIcon(size: 20, isOnGoldBackground: true),
+          const PrayerHandsIcon(size: 20, isOnGoldBackground: false),
+          const PrayerHandsIcon(size: 20, isOnGoldBackground: true),
+          const SacredTempleEmblemIcon(size: 24),
+          const VitalityHeartIcon(size: 22),
+          const ManaDropIcon(size: 22),
+          const SacredRelicIcon(size: 24),
+          const TransmuteCircleIcon(size: 22),
+          const ReliquaryBundleIcon(size: 22),
+          const ElementalCrystalIcon(size: 22),
+          const MeditationHaloIcon(size: 24),
+          const SacredBlessingIcon(size: 24),
+        ];
+        for (final icon in allPainters) {
+          await tester.pumpWidget(
+            MaterialApp(home: Scaffold(body: Center(child: icon))),
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        // 2. Full SacredTempleDialog verification across Dark Mode and Light Mode
+        final harness = await _createTempleHarness(
+          prefs: {'unlockedAds': false},
+        );
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: ValueKey('temple_icons_theme_$isDark'),
+                  controller: controller,
+                  fromTemple: true,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byType(SacredTempleEmblemIcon), findsOneWidget);
+          expect(
+            tester.getSize(find.byType(SacredTempleEmblemIcon)),
+            equals(const Size(24.0, 24.0)),
+          );
+
+          final consagrationTab =
+              find.byKey(const ValueKey('temple_tab_consagration'));
+          final offeringsTab =
+              find.byKey(const ValueKey('temple_tab_offerings'));
+          final transmuteTab =
+              find.byKey(const ValueKey('temple_tab_transmute'));
+          final adorationTab =
+              find.byKey(const ValueKey('temple_tab_adoration'));
+          final prayerTab = find.byKey(const ValueKey('temple_tab_prayer'));
+
+          final chaliceFinder = find.descendant(
+            of: consagrationTab,
+            matching: find.byType(ConsagrationChaliceIcon),
+          );
+          final altarFinder = find.descendant(
+            of: offeringsTab,
+            matching: find.byType(OfferingsAltarIcon),
+          );
+          final prismFinder = find.descendant(
+            of: transmuteTab,
+            matching: find.byType(HolyTransmuteIcon),
+          );
+          final harpFinder = find.descendant(
+            of: adorationTab,
+            matching: find.byType(AdorationHarpIcon),
+          );
+          final handsFinder = find.descendant(
+            of: prayerTab,
+            matching: find.byType(PrayerHandsIcon),
+          );
+
+          for (final finder in [
+            chaliceFinder,
+            altarFinder,
+            prismFinder,
+            harpFinder,
+            handsFinder,
+          ]) {
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(const Size(20.0, 20.0)));
+          }
+
+          // Wing 1 (Consagration) active by default
+          expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isFalse);
+          expect(find.byType(VitalityHeartIcon), findsOneWidget);
+          expect(find.byType(ManaDropIcon), findsOneWidget);
+
+          // Wing 2 (Offerings)
+          await tester.tap(offeringsTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(SacredRelicIcon), findsOneWidget);
+
+          // Wing 3 (Transmute)
+          await tester.tap(transmuteTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(TransmuteCircleIcon), findsOneWidget);
+
+          // Wing 4 (Adoration)
+          await tester.tap(adorationTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(ReliquaryBundleIcon), findsOneWidget);
+          expect(find.byType(ElementalCrystalIcon), findsOneWidget);
+
+          // Wing 5 (Prayer)
+          await tester.tap(prayerTab);
+          await tester.pumpAndSettle();
+          expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(MeditationHaloIcon), findsOneWidget);
+          expect(find.byType(SacredBlessingIcon), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
       },
     );
   });

@@ -7,8 +7,8 @@ import '../../services/ad_service.dart';
 import '../../services/billing_service.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
-import '../widgets/castle_wing_icons.dart';
 import '../widgets/elemental_energy_sphere.dart';
+import '../widgets/temple_wing_icons.dart';
 import 'story_dialog.dart';
 
 /// Identifies the 5 wings inside the Sacred Temple ([ShopDialog] / [SacredTempleDialog]) hub.
@@ -578,11 +578,7 @@ class _ShopDialogState extends State<ShopDialog> {
                         color: palette.amberBorder.withValues(alpha: 0.55),
                       ),
                     ),
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 22,
-                      color: palette.amberIcon,
-                    ),
+                    child: const SacredTempleEmblemIcon(size: 24),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -731,37 +727,52 @@ class _ShopDialogState extends State<ShopDialog> {
     final List<({
       TempleWing wing,
       ValueKey<String> key,
-      IconData icon,
+      Widget Function(bool isSelected) iconBuilder,
       String label,
     })> tabs = [
       (
         wing: TempleWing.consagration,
         key: const ValueKey('temple_tab_consagration'),
-        icon: Icons.favorite_rounded,
+        iconBuilder: (isSelected) => ConsagrationChaliceIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('temple_tab_consagration', fallback: 'Consagration'),
       ),
       (
         wing: TempleWing.offerings,
         key: const ValueKey('temple_tab_offerings'),
-        icon: Icons.auto_awesome_rounded,
+        iconBuilder: (isSelected) => OfferingsAltarIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('temple_tab_offerings', fallback: 'Offerings'),
       ),
       (
         wing: TempleWing.transmute,
         key: const ValueKey('temple_tab_transmute'),
-        icon: Icons.swap_horiz_rounded,
+        iconBuilder: (isSelected) => HolyTransmuteIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('temple_tab_transmute', fallback: 'Transmute'),
       ),
       (
         wing: TempleWing.adoration,
         key: const ValueKey('temple_tab_adoration'),
-        icon: Icons.diamond_rounded,
+        iconBuilder: (isSelected) => AdorationHarpIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('temple_tab_adoration', fallback: 'Adoration'),
       ),
       (
         wing: TempleWing.prayer,
         key: const ValueKey('temple_tab_prayer'),
-        icon: Icons.self_improvement_rounded,
+        iconBuilder: (isSelected) => PrayerHandsIcon(
+          size: 20,
+          isOnGoldBackground: isSelected,
+        ),
         label: loc.t('temple_tab_prayer', fallback: 'Prayer'),
       ),
     ];
@@ -774,7 +785,7 @@ class _ShopDialogState extends State<ShopDialog> {
           Expanded(
             child: _TempleCompactVerticalTabPill(
               key: tabs[i].key,
-              icon: tabs[i].icon,
+              iconBuilder: tabs[i].iconBuilder,
               label: tabs[i].label,
               selected: _selectedWing == tabs[i].wing,
               palette: palette,
@@ -875,8 +886,7 @@ class _ShopDialogState extends State<ShopDialog> {
           cardKey: const ValueKey('shop_upgrade_max_hp_card'),
           buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
           adButtonKey: const ValueKey('consagration_hp_watch_ad_button'),
-          icon: Icons.favorite_rounded,
-          iconColor: palette.dangerText,
+          iconWidget: const VitalityHeartIcon(size: 22),
           title: loc.t('upgrade_max_hp_title', fallback: '+1 Max HP'),
           subtitle: loc.t(
             'upgrade_max_hp_desc',
@@ -939,8 +949,7 @@ class _ShopDialogState extends State<ShopDialog> {
           cardKey: const ValueKey('shop_upgrade_max_mana_card'),
           buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
           adButtonKey: const ValueKey('consagration_mana_watch_ad_button'),
-          icon: Icons.water_drop_rounded,
-          iconColor: const Color(0xFF00B0FF),
+          iconWidget: const ManaDropIcon(size: 22),
           title: loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool'),
           subtitle: loc.t(
             'upgrade_max_mana_desc',
@@ -1057,13 +1066,21 @@ class _ShopDialogState extends State<ShopDialog> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 4),
-          child: Text(
-            loc.t('sacred_temple_altar_title', fallback: 'Altar of Offerings'),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: palette.primaryText,
-            ),
+          child: Row(
+            children: [
+              const SacredRelicIcon(size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.t('sacred_temple_altar_title', fallback: 'Altar of Offerings'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         _buildShopItem(
@@ -1575,7 +1592,7 @@ class _ShopDialogState extends State<ShopDialog> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const AlchemyFlaskIcon(size: 22),
+                          const TransmuteCircleIcon(size: 22),
                           const SizedBox(width: 7),
                           Flexible(
                             child: Text(
@@ -2058,16 +2075,24 @@ class _ShopDialogState extends State<ShopDialog> {
         ],
         const SizedBox(height: 10),
 
-        Text(
-          loc.t(
-            'temple_adoration_bundles_header',
-            fallback: 'All-Element Orb Bundles',
-          ),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12.5,
-            color: palette.amberText,
-          ),
+        Row(
+          children: [
+            const ReliquaryBundleIcon(size: 22),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'temple_adoration_bundles_header',
+                  fallback: 'All-Element Orb Bundles',
+                ),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                  color: palette.amberText,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         for (final bundle in ConsumableOrbBundle.values)
@@ -2090,16 +2115,24 @@ class _ShopDialogState extends State<ShopDialog> {
           ),
 
         const SizedBox(height: 12),
-        Text(
-          loc.t(
-            'temple_adoration_single_header',
-            fallback: 'Single-Element Bulk Pack (+1,500)',
-          ),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12.5,
-            color: palette.amberText,
-          ),
+        Row(
+          children: [
+            const ElementalCrystalIcon(size: 22),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'temple_adoration_single_header',
+                  fallback: 'Single-Element Bulk Pack (+1,500)',
+                ),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                  color: palette.amberText,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
 
@@ -2226,13 +2259,21 @@ class _ShopDialogState extends State<ShopDialog> {
         ),
 
         // Pre-Battle Sacred Blessings Section
-        Text(
-          loc.t('temple_blessings_section_title', fallback: 'Sacred Blessings'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13.5,
-            color: palette.amberText,
-          ),
+        Row(
+          children: [
+            const SacredBlessingIcon(size: 24),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                loc.t('temple_blessings_section_title', fallback: 'Sacred Blessings'),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: palette.amberText,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Container(
@@ -2407,21 +2448,30 @@ class _ShopDialogState extends State<ShopDialog> {
             final textColumn = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    loc.t(
-                      'string45',
-                      fallback: 'Free Elemental Orbs',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const MeditationHaloIcon(size: 24),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          loc.t(
+                            'string45',
+                            fallback: 'Free Elemental Orbs',
+                          ),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: palette.primaryText,
+                          ),
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: palette.primaryText,
-                    ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -2532,7 +2582,7 @@ class _ShopDialogState extends State<ShopDialog> {
 }
 
 class _TempleCompactVerticalTabPill extends StatelessWidget {
-  final IconData icon;
+  final Widget Function(bool isSelected) iconBuilder;
   final String label;
   final bool selected;
   final AppPalette palette;
@@ -2540,7 +2590,7 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
 
   const _TempleCompactVerticalTabPill({
     super.key,
-    required this.icon,
+    required this.iconBuilder,
     required this.label,
     required this.selected,
     required this.palette,
@@ -2560,9 +2610,6 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
     final borderColor = selected
         ? goldFill
         : palette.amberBorder.withValues(alpha: palette.isDark ? 0.45 : 0.6);
-    final fgColor = selected
-        ? goldDarkInk
-        : (palette.isDark ? goldFill : palette.amberIcon);
     final textColor = selected
         ? goldDarkInk
         : (palette.isDark
@@ -2588,7 +2635,7 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 17, color: fgColor),
+              iconBuilder(selected),
               const SizedBox(height: 3),
               SizedBox(
                 height: 13,
@@ -2897,8 +2944,7 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
   final Key cardKey;
   final Key buttonKey;
   final Key adButtonKey;
-  final IconData icon;
-  final Color iconColor;
+  final Widget iconWidget;
   final String title;
   final String subtitle;
   final String statusText;
@@ -2914,8 +2960,7 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
     required this.cardKey,
     required this.buttonKey,
     required this.adButtonKey,
-    required this.icon,
-    required this.iconColor,
+    required this.iconWidget,
     required this.title,
     required this.subtitle,
     required this.statusText,
@@ -2969,7 +3014,7 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(icon, size: 16, color: iconColor),
+                        iconWidget,
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
