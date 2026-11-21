@@ -10,7 +10,6 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
-import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 
 class FakeAdMobClient implements AdMobClient {
@@ -426,9 +425,12 @@ void main() {
           findsNothing,
         );
 
-        // Toggle Remove Ads OFF in the shop -> pinned rewarded ad card in shop and top AppBar pill reappear immediately without scrolling
+        // Toggle Remove Ads OFF -> switch to Prayer Room and verify rewarded ad card appears immediately
         controller.toggleRemoveAds(false);
         expect(controller.isRemoveAdsActive, isFalse);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
         await tester.pumpAndSettle();
 
         final shopAdCardFinder = find.byKey(
@@ -437,13 +439,10 @@ void main() {
         expect(shopAdCardFinder, findsOneWidget);
         expect(
           find.descendant(
-            of: find.descendant(
-              of: find.byType(ShopDialog),
-              matching: find.byType(ListView),
-            ),
+            of: find.byKey(const ValueKey('temple_wing_prayer')),
             matching: shopAdCardFinder,
           ),
-          findsNothing,
+          findsOneWidget,
         );
 
         await tester.tap(find.byKey(const ValueKey('shop_close_button')));
@@ -638,11 +637,13 @@ void main() {
         );
         await tester.pump();
 
-        // Open ShopDialog via Sacred Temple (Altar of Offerings) on WorldMapScreen
+        // Open ShopDialog via Sacred Temple -> switch to Prayer Room
         await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
 
-        // Pinned Rewarded Ad card & button are immediately visible without scrolling
+        // Rewarded Ad card & button are visible in Prayer Room
         final shopAdBtnFinder = find.byKey(
           const ValueKey('shop_watch_rewarded_ad_button'),
         );

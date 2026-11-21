@@ -22,8 +22,10 @@ class FakeInAppPurchaseClient implements InAppPurchaseClient {
   Map<String, String> storePrices;
   int queryProductDetailsCallCount = 0;
   int buyNonConsumableCallCount = 0;
+  int buyConsumableCallCount = 0;
   int restorePurchasesCallCount = 0;
   final List<PurchaseDetails> completedPurchases = [];
+  final List<PurchaseDetails> consumedPurchases = [];
   final List<String> boughtProductIds = [];
 
   FakeInAppPurchaseClient({
@@ -42,6 +44,14 @@ class FakeInAppPurchaseClient implements InAppPurchaseClient {
               BillingService.productSuggestion: r'$3.49',
               BillingService.productRemoveAds: r'$4.99',
               BillingService.productCrystalBall: 'R\$ 9,90',
+              BillingService.productConsumableSmall: r'$1.99',
+              BillingService.productConsumableMedium: r'$4.99',
+              BillingService.productConsumableLarge: r'$9.99',
+              BillingService.productConsumableFire1500: r'$1.99',
+              BillingService.productConsumableWater1500: r'$1.99',
+              BillingService.productConsumableWood1500: r'$1.99',
+              BillingService.productConsumableEarth1500: r'$1.99',
+              BillingService.productConsumableMetal1500: r'$1.99',
             };
 
   @override
@@ -66,7 +76,7 @@ class FakeInAppPurchaseClient implements InAppPurchaseClient {
           ProductDetails(
             id: id,
             title: id,
-            description: 'Non-consumable unlock $id',
+            description: 'Store product $id',
             price: price,
             rawPrice: 0.99,
             currencyCode: price.startsWith('R') ? 'BRL' : 'USD',
@@ -91,8 +101,23 @@ class FakeInAppPurchaseClient implements InAppPurchaseClient {
   }
 
   @override
+  Future<bool> buyConsumable({
+    required PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  }) async {
+    buyConsumableCallCount++;
+    boughtProductIds.add(purchaseParam.productDetails.id);
+    return buyShouldSucceed;
+  }
+
+  @override
   Future<void> completePurchase(PurchaseDetails purchase) async {
     completedPurchases.add(purchase);
+  }
+
+  @override
+  Future<void> consumePurchase(PurchaseDetails purchase) async {
+    consumedPurchases.add(purchase);
   }
 
   @override
@@ -406,8 +431,10 @@ void main() {
         );
         await tester.pump();
 
-        // Open ShopDialog via Sacred Temple (Altar of Offerings) on WorldMapScreen
+        // Open ShopDialog via Sacred Temple on WorldMapScreen, then select Offerings tab
         await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
         await tester.pumpAndSettle();
 
         final shopScrollable = find.descendant(
@@ -513,6 +540,76 @@ void main() {
           find.text('Unlock Earth & Metal: Restored!'),
           findsOneWidget,
         );
+      },
+    );
+
+    test(
+      'Consumable orb packs call buyConsumable + consumePurchase, grant orbs, and allow repeat purchases',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final storage = StorageService();
+        await storage.init();
+        final fakeClient = FakeInAppPurchaseClient();
+        final billing = BillingService(client: fakeClient);
+        addTearDown(() {
+          billing.dispose();
+          fakeClient.dispose();
+        });
+        await billing.initialize();
+
+        final controller = GameController(
+          storage: storage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: AdService(),
+          billingService: billing,
+        );
+        addTearDown(controller.dispose);
+
+        expect(BillingService.allConsumableProductIds.length, 8);
+        expect(BillingService.allStoreProductIds.length, 18);
+
+        // Purchase small pack twice -> +500 of all 5 elements twice (+1000 each)
+        for (int i = 0; i < 2; i++) {
+          final started = await controller.buyWithRealMoney(
+            BillingService.productConsumableSmall,
+          );
+          expect(started, isTrue);
+          fakeClient.emitPurchaseUpdate(
+            BillingService.productConsumableSmall,
+            PurchaseStatus.purchased,
+          );
+          await Future<void>.delayed(Duration.zero);
+        }
+
+        expect(fakeClient.buyConsumableCallCount, 2);
+        expect(fakeClient.consumedPurchases.length, 2);
+        expect(fakeClient.completedPurchases, isEmpty);
+        expect(
+          billing.isVerifiedPurchased(BillingService.productConsumableSmall),
+          isFalse,
+        );
+        expect(controller.fireOrbs, 1000);
+        expect(controller.waterOrbs, 1000);
+        expect(controller.woodOrbs, 1000);
+        expect(controller.earthOrbs, 1000);
+        expect(controller.metalOrbs, 1000);
+
+        // Purchase single-element Fire +1,500 pack -> adds +1500 Fire only
+        final startedFire = await controller.buyWithRealMoney(
+          BillingService.productConsumableFire1500,
+        );
+        expect(startedFire, isTrue);
+        fakeClient.emitPurchaseUpdate(
+          BillingService.productConsumableFire1500,
+          PurchaseStatus.purchased,
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(fakeClient.buyConsumableCallCount, 3);
+        expect(fakeClient.consumedPurchases.length, 3);
+        expect(controller.fireOrbs, 2500);
+        expect(controller.waterOrbs, 1000);
       },
     );
   });

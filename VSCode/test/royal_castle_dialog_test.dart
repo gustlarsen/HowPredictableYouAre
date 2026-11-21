@@ -579,7 +579,7 @@ void main() {
           expect(find.text('Guardian Robot'), findsOneWidget);
           expect(find.text('Story Memories'), findsOneWidget);
 
-          // Wing 3: Treasury (Piggy Bank 3D Orbs + Visual 3-to-1 Alchemy)
+          // Wing 3: Treasury (Piggy Bank 3D Orbs Vault only; Alchemy moved to Sacred Temple)
           await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
           await tester.pumpAndSettle();
           expect(
@@ -600,36 +600,28 @@ void main() {
           );
           expect(find.text('60 / 250'), findsOneWidget);
           expect(find.text('FULL'), findsOneWidget);
-          expect(find.byType(ElementalEnergySphere), findsAtLeastNWidgets(7));
+          expect(find.byType(ElementalEnergySphere), findsAtLeastNWidgets(5));
           expect(
             find.byKey(const ValueKey('treasury_claim_ad_button')),
             findsOneWidget,
           );
           expect(
             find.byKey(const ValueKey('royal_alchemy_card')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('alchemy_source_selector')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('alchemy_target_selector')),
-            findsOneWidget,
+            findsNothing,
           );
           expect(
             find.byKey(const ValueKey('alchemy_transmute_button')),
-            findsOneWidget,
+            findsNothing,
           );
 
-          // Verify Treasury + Royal Alchemy + Ok button fit within 390x844 viewport
-          final alchemyBottom = tester
-              .getBottomRight(find.byKey(const ValueKey('royal_alchemy_card')))
+          // Verify Treasury Vault + Ok button fit within 390x844 viewport
+          final vaultBottom = tester
+              .getBottomRight(find.byKey(const ValueKey('treasury_vault_card')))
               .dy;
           final okFinder = find.text('Ok');
           expect(okFinder, findsOneWidget);
           final okBottom = tester.getBottomRight(okFinder).dy;
-          expect(alchemyBottom, lessThanOrEqualTo(844));
+          expect(vaultBottom, lessThanOrEqualTo(844));
           expect(okBottom, lessThanOrEqualTo(844));
 
           // Wing 4: Relic Chamber
@@ -671,24 +663,15 @@ void main() {
           );
         }
 
-        // Now test interactive Alchemy orb cycling + Exchange + Claiming inside UI
+        // Now test interactive Treasury Claiming inside UI
         await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
         await tester.pumpAndSettle();
-
-        // Tap target selector to verify orb cycling (default Water -> Wood), then back around
-        await tester.tap(find.byKey(const ValueKey('alchemy_target_selector')));
-        await tester.pumpAndSettle();
-        // Transmute 3 Fire -> 1 Wood
-        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
-        await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 6);
-        expect(controller.woodOrbs, 1);
 
         // Claim Treasury via Rewarded Ad (no scrolling needed)
         await tester.tap(find.byKey(const ValueKey('treasury_claim_ad_button')));
         await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 56);
-        expect(controller.woodOrbs, 11);
+        expect(controller.fireOrbs, 59);
+        expect(controller.woodOrbs, 10);
         expect(controller.totalTreasuryOrbs, 0);
       },
     );
@@ -857,7 +840,7 @@ void main() {
     );
 
     testWidgets(
-      'Royal Alchemy batch selector updates live previews for 1x/10x/100x/1000x/MAX, executes exact atomic transfers, and fits 360dp screen without overflow in Dark & Light modes',
+      'Royal Castle Treasury focuses strictly on Piggy Bank Orb Vault without Alchemy in Dark & Light modes on 360dp',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(360, 760);
         tester.view.devicePixelRatio = 1.0;
@@ -869,11 +852,11 @@ void main() {
         final controller = await _createController(
           loadJsonStrings: true,
           prefs: {
-            'orbs_fire': 3450,
-            'orbs_water': 12,
-            'orbs_wood': 40,
-            'orbs_earth': 2,
-            'orbs_metal': 0,
+            'treasury_orbs_fire': 25,
+            'treasury_orbs_water': 15,
+            'treasury_orbs_wood': 10,
+            'treasury_orbs_earth': 5,
+            'treasury_orbs_metal': 5,
           },
         );
         addTearDown(controller.dispose);
@@ -896,181 +879,26 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
 
-          // All 5 multiplier pills render on a single horizontal row within 360dp
-          final pillKeys = [
-            const ValueKey('alchemy_multiplier_1x'),
-            const ValueKey('alchemy_multiplier_10x'),
-            const ValueKey('alchemy_multiplier_100x'),
-            const ValueKey('alchemy_multiplier_1000x'),
-            const ValueKey('alchemy_multiplier_max'),
-          ];
-          final firstPillY = tester.getTopLeft(find.byKey(pillKeys.first)).dy;
-          for (final key in pillKeys) {
-            expect(find.byKey(key), findsOneWidget);
-            expect(
-              tester.getTopLeft(find.byKey(key)).dy,
-              closeTo(firstPillY, 1.0),
-            );
-            expect(
-              tester.getBottomRight(find.byKey(key)).dx,
-              lessThanOrEqualTo(360),
-            );
-          }
+          expect(
+            find.byKey(const ValueKey('treasury_vault_card')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('royal_alchemy_card')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('alchemy_transmute_button')),
+            findsNothing,
+          );
 
-          // Zero-scroll viewport check on 360x760
-          final alchemyBottom = tester
-              .getBottomRight(find.byKey(const ValueKey('royal_alchemy_card')))
+          final vaultBottom = tester
+              .getBottomRight(find.byKey(const ValueKey('treasury_vault_card')))
               .dy;
           final okBottom = tester.getBottomRight(find.text('Ok')).dy;
-          expect(alchemyBottom, lessThanOrEqualTo(760));
+          expect(vaultBottom, lessThanOrEqualTo(760));
           expect(okBottom, lessThanOrEqualTo(760));
         }
-
-        // Default 1x preview
-        expect(find.text('3x Fire (3450)'), findsOneWidget);
-        expect(find.text('1x Water (12)'), findsOneWidget);
-
-        // Select 10x -> 30x Fire -> 10x Water
-        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_10x')));
-        await tester.pumpAndSettle();
-        expect(find.text('30x Fire (3450)'), findsOneWidget);
-        expect(find.text('10x Water (12)'), findsOneWidget);
-
-        // Select 100x -> 300x Fire -> 100x Water
-        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_100x')));
-        await tester.pumpAndSettle();
-        expect(find.text('300x Fire (3450)'), findsOneWidget);
-        expect(find.text('100x Water (12)'), findsOneWidget);
-
-        // Select 1000x -> 3000x Fire -> 1000x Water
-        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_1000x')));
-        await tester.pumpAndSettle();
-        expect(find.text('3000x Fire (3450)'), findsOneWidget);
-        expect(find.text('1000x Water (12)'), findsOneWidget);
-
-        // Execute 1000x trade: 3450 Fire -> 450 Fire, 12 Water -> 1012 Water
-        // Remaining 450 Fire cannot afford 1000x, so it auto-steps down to 100x!
-        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
-        await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 450);
-        expect(controller.waterOrbs, 1012);
-        expect(
-          find.byKey(const ValueKey('alchemy_confirmation_badge')),
-          findsOneWidget,
-        );
-        expect(find.text('-3000 Fire ➔ +1000 Water'), findsOneWidget);
-
-        // Auto-step-down moved selection from 1000x to 100x (450 >= 300)
-        expect(find.text('300x Fire (450)'), findsOneWidget);
-        expect(find.text('100x Water (1012)'), findsOneWidget);
-
-        // 1000x pill is now disabled
-        final pill1000 = tester.widget<InkWell>(
-          find.byKey(const ValueKey('alchemy_multiplier_1000x')),
-        );
-        expect(pill1000.onTap, isNull);
-
-        // Execute 100x trade: 450 Fire -> 150 Fire, 1012 Water -> 1112 Water
-        // Auto-steps down from 100x to 10x (150 >= 30)
-        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
-        await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 150);
-        expect(controller.waterOrbs, 1112);
-        expect(find.text('-300 Fire ➔ +100 Water'), findsOneWidget);
-        expect(find.text('30x Fire (150)'), findsOneWidget);
-        expect(find.text('10x Water (1112)'), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'Royal Alchemy MAX calculates floor(balance / 3) accurately, handles < 3 orbs, skips opposite element, and steps down on source switch',
-      (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-        });
-
-        final controller = await _createController(
-          loadJsonStrings: true,
-          prefs: {
-            'orbs_fire': 3002,
-            'orbs_water': 12,
-            'orbs_wood': 40,
-            'orbs_earth': 2,
-            'orbs_metal': 0,
-          },
-        );
-        addTearDown(controller.dispose);
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: RoyalCastleDialog(
-                controller: controller,
-                initialWing: CastleWing.treasury,
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        // Tap MAX with 3002 Fire -> previews 3000x Fire (3002) -> 1000x Water (12)
-        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_max')));
-        await tester.pumpAndSettle();
-        expect(find.text('3000x Fire (3002)'), findsOneWidget);
-        expect(find.text('1000x Water (12)'), findsOneWidget);
-
-        // Execute MAX trade -> leaves 2 Fire, adds 1000 Water
-        await tester.tap(find.byKey(const ValueKey('alchemy_transmute_button')));
-        await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 2);
-        expect(controller.waterOrbs, 1012);
-        expect(find.text('-3000 Fire ➔ +1000 Water'), findsOneWidget);
-
-        // With 2 Fire remaining (< 3), MAX preview keeps 3x -> 1x ratio clear,
-        // while Exchange button and MAX pill are disabled
-        expect(find.text('3x Fire (2)'), findsOneWidget);
-        expect(find.text('1x Water (1012)'), findsOneWidget);
-        final exchangeBtn = tester.widget<ElevatedButton>(
-          find.byKey(const ValueKey('alchemy_transmute_button')),
-        );
-        expect(exchangeBtn.onPressed, isNull);
-        final maxPill = tester.widget<InkWell>(
-          find.byKey(const ValueKey('alchemy_multiplier_max')),
-        );
-        expect(maxPill.onTap, isNull);
-
-        // Cycle source orb from Fire -> skips Water (target) -> lands on Wood (40)!
-        await tester.tap(find.byKey(const ValueKey('alchemy_source_selector')));
-        await tester.pumpAndSettle();
-        expect(find.text('39x Wood (40)'), findsOneWidget);
-        expect(find.text('13x Water (1012)'), findsOneWidget);
-
-        // Select 10x on Wood (40 >= 30), then cycle source to Earth (2 < 30) -> auto-steps down to 1x
-        await tester.tap(find.byKey(const ValueKey('alchemy_multiplier_10x')));
-        await tester.pumpAndSettle();
-        expect(find.text('30x Wood (40)'), findsOneWidget);
-
-        await tester.tap(find.byKey(const ValueKey('alchemy_source_selector')));
-        await tester.pumpAndSettle();
-        expect(find.text('3x Earth (2)'), findsOneWidget);
-        expect(find.text('1x Water (1012)'), findsOneWidget);
-
-        // Unaffordable 10x / 100x / 1000x pills are disabled on Earth (2)
-        for (final key in const [
-          ValueKey('alchemy_multiplier_10x'),
-          ValueKey('alchemy_multiplier_100x'),
-          ValueKey('alchemy_multiplier_1000x'),
-        ]) {
-          expect(tester.widget<InkWell>(find.byKey(key)).onTap, isNull);
-        }
-
-        // Verify localized MAX label in Portuguese ('MÁX')
-        controller.setLanguage('pt');
-        await tester.pumpAndSettle();
-        expect(find.text('MÁX'), findsOneWidget);
       },
     );
   });

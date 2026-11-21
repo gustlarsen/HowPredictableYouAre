@@ -1981,10 +1981,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. "Predictability" in "Predictability Score" must never split mid-word on narrow mobile screens
-    final listViewFinder = find.descendant(
-      of: find.byType(ShopDialog),
-      matching: find.byType(ListView),
-    );
     final shopScrollable = find.descendant(
       of: find.byType(ShopDialog),
       matching: find.byType(Scrollable),
@@ -2013,23 +2009,17 @@ void main() {
     tester.state<ScrollableState>(shopScrollable).position.jumpTo(0);
     await tester.pumpAndSettle();
 
-    // 2. Pinned Rewarded Ad card is immediately visible below the balance bar and above the ListView without scrolling
+    // 2. Switch to Prayer Room: Rewarded Ad card is immediately visible below balance bar with horizontal text layout
+    await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+    await tester.pumpAndSettle();
+
     final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
     final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
     expect(balanceBarFinder, findsOneWidget);
     expect(adCardFinder, findsOneWidget);
-    expect(listViewFinder, findsOneWidget);
-    expect(
-      find.descendant(of: listViewFinder, matching: adCardFinder),
-      findsNothing,
-    );
     expect(
       tester.getRect(adCardFinder).top,
       greaterThan(tester.getRect(balanceBarFinder).bottom),
-    );
-    expect(
-      tester.getRect(adCardFinder).bottom,
-      lessThanOrEqualTo(tester.getRect(listViewFinder).top),
     );
 
     final freeOrbsFinder = find.text('Free Elemental Orbs');
@@ -2055,7 +2045,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ShopDialog pins Free Elemental Orbs card below balance bar while scrolling and collapses smoothly when Remove Ads is enabled', (WidgetTester tester) async {
+  testWidgets('ShopDialog renders Free Elemental Orbs in Prayer Room and collapses cleanly when Remove Ads is enabled', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'orbs_fire': 5000,
@@ -2088,25 +2078,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
-    final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
+    // Scroll Altar of Offerings down to Crystal Ball
     final listViewFinder = find.descendant(
       of: find.byType(ShopDialog),
       matching: find.byType(ListView),
     );
-
-    expect(adCardFinder, findsOneWidget);
-    final initialAdRect = tester.getRect(adCardFinder);
-    expect(
-      initialAdRect.top,
-      greaterThan(tester.getRect(balanceBarFinder).bottom),
-    );
-    expect(
-      initialAdRect.bottom,
-      lessThanOrEqualTo(tester.getRect(listViewFinder).top),
-    );
-
-    // Scroll upgrades list down to Crystal Ball -> pinned ad card remains stationary
     await tester.scrollUntilVisible(
       find.text('Crystal Ball'),
       250,
@@ -2116,17 +2092,27 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-
     expect(find.text('Crystal Ball'), findsOneWidget);
+
+    // Switch to Prayer Room for Free Elemental Orbs card
+    await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+    await tester.pumpAndSettle();
+
+    final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
+    final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
     expect(adCardFinder, findsOneWidget);
-    expect(tester.getRect(adCardFinder), equals(initialAdRect));
+    final initialAdRect = tester.getRect(adCardFinder);
+    expect(
+      initialAdRect.top,
+      greaterThan(tester.getRect(balanceBarFinder).bottom),
+    );
 
     // Unlock Remove Ads while inside ShopDialog -> card smoothly collapses and hides
     expect(controller.unlockAds(), isTrue);
     await tester.pumpAndSettle();
     expect(adCardFinder, findsNothing);
 
-    // Toggle Remove Ads OFF -> card expands back into pinned top position
+    // Toggle Remove Ads OFF -> card expands back into Prayer Room top position
     controller.toggleRemoveAds(false);
     await tester.pumpAndSettle();
     expect(adCardFinder, findsOneWidget);

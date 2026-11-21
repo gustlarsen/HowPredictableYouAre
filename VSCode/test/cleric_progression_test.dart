@@ -414,6 +414,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await tester.tap(find.byKey(const ValueKey('temple_tab_consagration')));
+        await tester.pumpAndSettle();
+
         final hpCard = find.byKey(const ValueKey('shop_upgrade_max_hp_card'));
         final hpBtn = find.byKey(const ValueKey('shop_upgrade_max_hp_button'));
         final manaBtn = find.byKey(const ValueKey('shop_upgrade_max_mana_button'));

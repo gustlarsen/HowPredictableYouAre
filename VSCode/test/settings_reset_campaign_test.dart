@@ -149,7 +149,17 @@ class _TestBillingClient implements InAppPurchaseClient {
       true;
 
   @override
+  Future<bool> buyConsumable({
+    required PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  }) async =>
+      true;
+
+  @override
   Future<void> completePurchase(PurchaseDetails purchase) async {}
+
+  @override
+  Future<void> consumePurchase(PurchaseDetails purchase) async {}
 
   @override
   Future<void> restorePurchases({String? applicationUserName}) async {}

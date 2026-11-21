@@ -268,19 +268,6 @@ void main() {
         );
         expect(fireCountText.style?.color, lightPalette.primaryText);
 
-        // Free Elemental Orbs rewarded ad card
-        final adCard = tester.widget<Card>(
-          find.byKey(const ValueKey('shop_rewarded_ad_card')),
-        );
-        expect(adCard.color, lightPalette.rewardedAdCardSurface);
-        final adShape = adCard.shape! as RoundedRectangleBorder;
-        expect(adShape.side.color, lightPalette.rewardedAdCardBorder);
-
-        final adSubtitle = tester.widget<Text>(
-          find.text('Watch a video ad for +50 Fire, Water & Wood Orbs'),
-        );
-        expect(adSubtitle.style?.color, lightPalette.amberText);
-
         final scrollable = find.descendant(
           of: find.byType(Dialog),
           matching: find.byType(Scrollable),
@@ -344,6 +331,22 @@ void main() {
           find.descendant(of: algoBtn, matching: find.text('50')).last,
         );
         expect(metalCostText.style?.color, const Color(0xFF435660));
+
+        // Switch to Prayer Room for Free Elemental Orbs rewarded ad card
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
+
+        final adCard = tester.widget<Card>(
+          find.byKey(const ValueKey('shop_rewarded_ad_card')),
+        );
+        expect(adCard.color, lightPalette.rewardedAdCardSurface);
+        final adShape = adCard.shape! as RoundedRectangleBorder;
+        expect(adShape.side.color, lightPalette.rewardedAdCardBorder);
+
+        final adSubtitle = tester.widget<Text>(
+          find.text('Watch a video ad for +50 Fire, Water & Wood Orbs'),
+        );
+        expect(adSubtitle.style?.color, lightPalette.amberText);
       },
     );
 

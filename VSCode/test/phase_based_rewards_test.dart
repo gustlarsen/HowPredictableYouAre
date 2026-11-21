@@ -288,6 +288,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+      await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('shop_ad_orb_icon_rock')), findsOneWidget);
       expect(find.byKey(const ValueKey('shop_ad_orb_icon_paper')), findsOneWidget);
@@ -355,6 +357,8 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('shop_ad_orb_icon_rock')), findsOneWidget);

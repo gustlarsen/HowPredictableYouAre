@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
 import '../models/royal_castle.dart';
+import '../models/sacred_blessing.dart';
 import '../models/story_chapter.dart';
 import '../services/markov_engine.dart';
 import '../services/storage_service.dart';
@@ -39,6 +40,13 @@ class GameController extends ChangeNotifier {
   static const int phase2BonusBossDamage = 4;
   static const int maxTreasuryPerElement = 50;
   static const int maxTreasuryTotal = 250;
+  static const int maxWeeklyAdConsagrations = 3;
+  static const int vitalityBlessingBonusHp = 15;
+  static const int clairvoyanceBlessingMoves = 3;
+  static const int allElementPackSmallBonus = 500;
+  static const int allElementPackMediumBonus = 2500;
+  static const int allElementPackLargeBonus = 10000;
+  static const int singleElementBulkPackBonus = 1500;
 
   static ElementalCost maxHpUpgradeCostForLevel(int level) {
     final perOrb = 2 + (level ~/ 2);
@@ -295,6 +303,50 @@ class GameController extends ChangeNotifier {
   int enemyMaxHp = pcMaxHp;
   int get enemyHp => computerHp;
   int currentWeek = 1;
+
+  // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
+  int adConsagrationsThisWeek = 0;
+  SacredBlessing? pendingBattleBlessing;
+  SacredBlessing? activeBattleBlessing;
+  int battleBonusTempHp = 0;
+  String? lastFreeDailyPrayerDate;
+
+  int get effectivePlayerMaxHp => playerMaxHp + battleBonusTempHp;
+  int get remainingWeeklyAdConsagrations =>
+      (maxWeeklyAdConsagrations - adConsagrationsThisWeek)
+          .clamp(0, maxWeeklyAdConsagrations);
+  bool get canWatchAdConsagration =>
+      !isRemoveAdsActive &&
+      adService.isRewardedAdReady &&
+      remainingWeeklyAdConsagrations > 0;
+  bool get isVitalityBlessingActive =>
+      activeBattleBlessing == SacredBlessing.vitality && battleBonusTempHp > 0;
+  bool get isClairvoyanceActive =>
+      activeBattleBlessing == SacredBlessing.clairvoyance &&
+      totalRounds < clairvoyanceBlessingMoves &&
+      crystalBallMove != null;
+  int get clairvoyanceMovesRemaining =>
+      activeBattleBlessing == SacredBlessing.clairvoyance
+          ? (clairvoyanceBlessingMoves - totalRounds)
+              .clamp(0, clairvoyanceBlessingMoves)
+          : 0;
+  bool get isHarvestBlessingActive =>
+      activeBattleBlessing == SacredBlessing.harvest;
+
+  static String dateKeyFor(DateTime dt) =>
+      '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+
+  bool hasFreeDailyPrayerAvailable([DateTime? now]) =>
+      lastFreeDailyPrayerDate != dateKeyFor(now ?? DateTime.now());
+
+  bool canActivateSacredBlessingFree([DateTime? now]) =>
+      pendingBattleBlessing == null &&
+      (isRemoveAdsActive || hasFreeDailyPrayerAvailable(now));
+
+  bool canActivateSacredBlessingWithAd() =>
+      pendingBattleBlessing == null &&
+      !isRemoveAdsActive &&
+      adService.isRewardedAdReady;
 
   bool darkMode = true;
   bool soundEnabled = true;
@@ -777,14 +829,23 @@ class GameController extends ChangeNotifier {
     hasClaimedQaBonus = storage.hasClaimedQaBonus;
     hpUpgradeLevel = storage.hpUpgradeLevel;
     manaUpgradeLevel = storage.manaUpgradeLevel;
+    adConsagrationsThisWeek = storage.adConsagrationsThisWeek;
+    pendingBattleBlessing = SacredBlessing.fromId(storage.pendingBattleBlessing);
+    activeBattleBlessing = SacredBlessing.fromId(storage.activeBattleBlessing);
+    battleBonusTempHp = activeBattleBlessing == SacredBlessing.vitality
+        ? (storage.battleBonusTempHp > 0
+              ? storage.battleBonusTempHp
+              : vitalityBlessingBonusHp)
+        : 0;
+    lastFreeDailyPrayerDate = storage.lastFreeDailyPrayerDate;
     userScore = storage.userScore;
     pcScore = storage.pcScore;
     totalRounds = storage.total;
     currentWeek = storage.currentWeek;
     if (storage.userHpRaw != null) {
-      userHp = storage.userHp.clamp(0, playerMaxHp);
+      userHp = storage.userHp.clamp(0, effectivePlayerMaxHp);
     } else {
-      userHp = math.max(0, playerMaxHp - pcScore * damagePerLoss);
+      userHp = math.max(0, effectivePlayerMaxHp - pcScore * damagePerLoss);
     }
 
     darkMode = storage.darkMode;
@@ -1790,8 +1851,9 @@ class GameController extends ChangeNotifier {
     } else if (roundOutcome == RoundWinner.user) {
       lastWinner = RoundWinner.user;
       userScore += 1;
-      // Grant +1 Elemental Orb of the defeated AI/PC element
-      _incrementOrbForMove(currentComputerMove!, 1);
+      // Grant +1 (or 2x with Harvest blessing) Elemental Orb of the defeated AI/PC element
+      final orbGain = isHarvestBlessingActive ? 2 : 1;
+      _incrementOrbForMove(currentComputerMove!, orbGain);
       // Mirror +1 Elemental Orb into Royal Treasury Piggy Bank (capped at 50/element)
       _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
@@ -1816,7 +1878,7 @@ class GameController extends ChangeNotifier {
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
-      userHp = (userHp - bossWinDamageToPlayer).clamp(0, playerMaxHp);
+      userHp = (userHp - bossWinDamageToPlayer).clamp(0, effectivePlayerMaxHp);
       storage.setPcScore(pcScore);
       storage.setUserHp(userHp);
       decreeWinStreak = 0;
@@ -1926,9 +1988,15 @@ class GameController extends ChangeNotifier {
       enemyPhase = 1;
       enemyMaxHp = pcMaxHp;
       currentWeek = 1;
+      adConsagrationsThisWeek = 0;
+      activeBattleBlessing = null;
+      battleBonusTempHp = 0;
       storage.setEnemyPhase(1);
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(1);
+      storage.setAdConsagrationsThisWeek(0);
+      storage.setActiveBattleBlessing(null);
+      storage.setBattleBonusTempHp(0);
       _refreshCompletedDecreesAndResetBattleTrackers();
       _resetBattleState();
       recordTurn0OrbSnapshot();
@@ -2011,7 +2079,7 @@ class GameController extends ChangeNotifier {
     lastUserMove = null;
     lastWinner = null;
     lastCollectedOrbMove = null;
-    userHp = playerMaxHp;
+    userHp = effectivePlayerMaxHp;
     enemyMaxHp = maxHpForEnemyPhase(enemyPhase);
     computerHp = enemyMaxHp;
     is100RoundsAlertPending = false;
@@ -2022,15 +2090,18 @@ class GameController extends ChangeNotifier {
     _engine.enableEnemyExtendedHands = enemyUses5Elements;
     _engine.reset();
 
-    storage.clearGameStats(userMaxHp: playerMaxHp, pcMaxHp: enemyMaxHp);
+    storage.clearGameStats(
+      userMaxHp: effectivePlayerMaxHp,
+      pcMaxHp: enemyMaxHp,
+    );
     storage.setEnemyPhase(enemyPhase);
     storage.setEnemyMaxHp(enemyMaxHp);
-    storage.setUserHp(playerMaxHp);
+    storage.setUserHp(effectivePlayerMaxHp);
     storage.setPcHp(enemyMaxHp);
     _computeNextHints();
   }
 
-  /// Rewinds the active battle back to Turn 0: restores HP (`playerMaxHp`), Mana (`playerMaxMana`),
+  /// Rewinds the active battle back to Turn 0: restores HP (`effectivePlayerMaxHp`), Mana (`playerMaxMana`),
   /// scores (`0`), clears the Markov matrix and last-played hands, reverts
   /// Elemental Orbs back to the Turn 0 Orb Snapshot (recording the lost
   /// battle/gift orbs into Spoils of War while preserving Rewarded Ad `+50` orbs),
@@ -2064,10 +2135,19 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts a fresh battle ([playerMaxMana] Mana, [playerMaxHp] HP) from the World Map while
+  /// Starts a fresh battle ([playerMaxMana] Mana, [effectivePlayerMaxHp] HP) from the World Map while
+  /// promoting any pending Sacred Blessing into the active expedition buff,
   /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
   /// and recording the Turn 0 Orb Snapshot for the new battle.
   void startNewBattle() {
+    activeBattleBlessing = pendingBattleBlessing;
+    pendingBattleBlessing = null;
+    battleBonusTempHp = activeBattleBlessing == SacredBlessing.vitality
+        ? vitalityBlessingBonusHp
+        : 0;
+    storage.setActiveBattleBlessing(activeBattleBlessing?.id);
+    storage.setPendingBattleBlessing(null);
+    storage.setBattleBonusTempHp(battleBonusTempHp);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     recordTurn0OrbSnapshot();
@@ -2076,12 +2156,18 @@ class GameController extends ChangeNotifier {
   }
 
   /// Advances the campaign calendar by +1 Week upon exiting a battle via
-  /// battle completion or Teleport, persists locally, resets the battle
-  /// arena for the next encounter while keeping collected Elemental Orbs,
-  /// and syncs with Cloud Save if signed in.
+  /// battle completion or Teleport, persists locally, resets weekly ad
+  /// consagrations and active battle blessings, resets the battle arena for
+  /// the next encounter while keeping collected Elemental Orbs, and syncs Cloud Save.
   void completeBattleWeek() {
     currentWeek += 1;
+    adConsagrationsThisWeek = 0;
+    activeBattleBlessing = null;
+    battleBonusTempHp = 0;
     storage.setCurrentWeek(currentWeek);
+    storage.setAdConsagrationsThisWeek(0);
+    storage.setActiveBattleBlessing(null);
+    storage.setBattleBonusTempHp(0);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     recordTurn0OrbSnapshot();
@@ -2100,6 +2186,10 @@ class GameController extends ChangeNotifier {
   /// restores HP and battle Mana to [playerMaxHp] / [playerMaxMana], keeps all Elemental Orbs collected,
   /// preserves unlocks and current campaign week, persists & syncs to Cloud Save.
   void reviveAndRetreatToMap() {
+    activeBattleBlessing = null;
+    battleBonusTempHp = 0;
+    storage.setActiveBattleBlessing(null);
+    storage.setBattleBonusTempHp(0);
     _resetBattleState();
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
@@ -2478,24 +2568,35 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  void _applyMaxHpLevelGain() {
+    hpUpgradeLevel += 1;
+    storage.setHpUpgradeLevel(hpUpgradeLevel);
+    if (hpUpgradeLevel > peakHpUpgradeLevel) {
+      peakHpUpgradeLevel = hpUpgradeLevel;
+      storage.setPeakHpUpgradeLevel(peakHpUpgradeLevel);
+    }
+    if (!hasGameStarted) {
+      userHp = effectivePlayerMaxHp;
+      storage.setUserHp(userHp);
+    }
+  }
+
+  void _applyMaxManaLevelGain() {
+    manaUpgradeLevel += 1;
+    storage.setManaUpgradeLevel(manaUpgradeLevel);
+    if (manaUpgradeLevel > peakManaUpgradeLevel) {
+      peakManaUpgradeLevel = manaUpgradeLevel;
+      storage.setPeakManaUpgradeLevel(peakManaUpgradeLevel);
+    }
+  }
+
   /// Infinitely upgrades the Cleric's Max HP by +1 using only Fire, Water, and
   /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat
   /// and tracking the all-time historical peak.
   bool upgradeMaxHp() {
     return purchaseWithOrbs(
       cost: nextMaxHpUpgradeCost,
-      onUnlock: () {
-        hpUpgradeLevel += 1;
-        storage.setHpUpgradeLevel(hpUpgradeLevel);
-        if (hpUpgradeLevel > peakHpUpgradeLevel) {
-          peakHpUpgradeLevel = hpUpgradeLevel;
-          storage.setPeakHpUpgradeLevel(peakHpUpgradeLevel);
-        }
-        if (!hasGameStarted) {
-          userHp = playerMaxHp;
-          storage.setUserHp(userHp);
-        }
-      },
+      onUnlock: _applyMaxHpLevelGain,
     );
   }
 
@@ -2504,15 +2605,90 @@ class GameController extends ChangeNotifier {
   bool upgradeMaxMana() {
     return purchaseWithOrbs(
       cost: nextMaxManaUpgradeCost,
-      onUnlock: () {
-        manaUpgradeLevel += 1;
-        storage.setManaUpgradeLevel(manaUpgradeLevel);
-        if (manaUpgradeLevel > peakManaUpgradeLevel) {
-          peakManaUpgradeLevel = manaUpgradeLevel;
-          storage.setPeakManaUpgradeLevel(peakManaUpgradeLevel);
-        }
+      onUnlock: _applyMaxManaLevelGain,
+    );
+  }
+
+  /// Displays a rewarded video ad to grant +1 permanent Max HP level for this
+  /// campaign (capped at [maxWeeklyAdConsagrations] per campaign week).
+  Future<bool> watchAdToUpgradeMaxHp({VoidCallback? onUpgraded}) async {
+    if (!canWatchAdConsagration) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        adConsagrationsThisWeek += 1;
+        storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
+        _applyMaxHpLevelGain();
+        audio.playWinVibrate();
+        _triggerCloudSave();
+        notifyListeners();
+        onUpgraded?.call();
       },
     );
+    return shown && earned;
+  }
+
+  /// Displays a rewarded video ad to grant +1 permanent Max Mana Pool level for
+  /// this campaign (capped at [maxWeeklyAdConsagrations] per campaign week).
+  Future<bool> watchAdToUpgradeMaxMana({VoidCallback? onUpgraded}) async {
+    if (!canWatchAdConsagration) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        adConsagrationsThisWeek += 1;
+        storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
+        _applyMaxManaLevelGain();
+        audio.playWinVibrate();
+        _triggerCloudSave();
+        notifyListeners();
+        onUpgraded?.call();
+      },
+    );
+    return shown && earned;
+  }
+
+  /// Activates a pre-battle [SacredBlessing] for the next battle expedition
+  /// using either the player's 1 free daily prayer or the Remove Ads perk.
+  bool activateSacredBlessingFree(SacredBlessing blessing, {DateTime? now}) {
+    if (!canActivateSacredBlessingFree(now)) {
+      audio.playVibrate();
+      return false;
+    }
+    if (!isRemoveAdsActive) {
+      final today = dateKeyFor(now ?? DateTime.now());
+      lastFreeDailyPrayerDate = today;
+      storage.setLastFreeDailyPrayerDate(today);
+    }
+    pendingBattleBlessing = blessing;
+    storage.setPendingBattleBlessing(blessing.id);
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Displays a rewarded video ad to activate a temporary [SacredBlessing] for
+  /// the Cleric's next battle expedition exclusively inside `onUserEarnedReward`.
+  Future<bool> watchAdToActivateSacredBlessing(
+    SacredBlessing blessing, {
+    VoidCallback? onActivated,
+  }) async {
+    if (!canActivateSacredBlessingWithAd()) return false;
+    bool earned = false;
+    final shown = await adService.showRewardedAd(
+      onUserEarnedReward: () {
+        earned = true;
+        pendingBattleBlessing = blessing;
+        storage.setPendingBattleBlessing(blessing.id);
+        audio.playWinVibrate();
+        _triggerCloudSave();
+        notifyListeners();
+        onActivated?.call();
+      },
+    );
+    return shown && earned;
   }
 
   bool unlockReset() {
@@ -2870,6 +3046,30 @@ class GameController extends ChangeNotifier {
           _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
         }
         break;
+      case BillingService.productConsumableSmall:
+        addAllOrbs(allElementPackSmallBonus);
+        return true;
+      case BillingService.productConsumableMedium:
+        addAllOrbs(allElementPackMediumBonus);
+        return true;
+      case BillingService.productConsumableLarge:
+        addAllOrbs(allElementPackLargeBonus);
+        return true;
+      case BillingService.productConsumableFire1500:
+        addOrbForMove(HandMove.rock, singleElementBulkPackBonus);
+        return true;
+      case BillingService.productConsumableWater1500:
+        addOrbForMove(HandMove.paper, singleElementBulkPackBonus);
+        return true;
+      case BillingService.productConsumableWood1500:
+        addOrbForMove(HandMove.scissors, singleElementBulkPackBonus);
+        return true;
+      case BillingService.productConsumableEarth1500:
+        addOrbForMove(HandMove.lizard, singleElementBulkPackBonus);
+        return true;
+      case BillingService.productConsumableMetal1500:
+        addOrbForMove(HandMove.spock, singleElementBulkPackBonus);
+        return true;
       default:
         return false;
     }
@@ -2912,8 +3112,12 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  /// Initiates a Google Play Billing purchase for the non-consumable [productId].
+  /// Initiates a Google Play Billing purchase for the non-consumable or
+  /// repeatable consumable [productId].
   Future<bool> buyWithRealMoney(String productId) {
+    if (BillingService.isConsumableProduct(productId)) {
+      return billingService.buyConsumable(productId);
+    }
     return billingService.buyNonConsumable(productId);
   }
 

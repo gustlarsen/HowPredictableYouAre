@@ -565,12 +565,24 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(RoyalCastleDialog), findsNothing);
 
-        // 3. Sacred Temple -> Altar of Offerings (ShopDialog + Rewarded Ad prayer +50 Orbs)
+        // 3. Sacred Temple -> 5-Tab Sanctuary (Consagration default, Offerings & Prayer)
         await tester.tap(find.byKey(const ValueKey('landmark_sacred_temple')));
         await tester.pumpAndSettle();
 
         expect(find.byType(ShopDialog), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(ShopDialog),
+            matching: find.text('Sacred Temple'),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+        await tester.pumpAndSettle();
         expect(find.text('Altar of Offerings'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('shop_watch_rewarded_ad_button')),
           findsOneWidget,

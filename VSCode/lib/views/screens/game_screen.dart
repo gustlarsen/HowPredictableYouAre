@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
+import '../../models/sacred_blessing.dart';
 import '../../models/story_chapter.dart';
 import '../../services/ad_service.dart';
 import '../../services/localization_service.dart';
@@ -839,6 +840,84 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  Widget _buildSacredBlessingPill(
+    BuildContext context,
+    GameController controller,
+  ) {
+    final loc = controller.localization;
+    final palette = AppPalette.of(context);
+    final SacredBlessing? blessing;
+    final String label;
+
+    if (controller.isVitalityBlessingActive) {
+      blessing = SacredBlessing.vitality;
+      label = loc
+          .t(
+            'temple_blessing_battle_vitality',
+            fallback: 'Vitality: +{hp} Temp HP',
+          )
+          .replaceAll('{hp}', '${controller.battleBonusTempHp}');
+    } else if (controller.isClairvoyanceActive) {
+      blessing = SacredBlessing.clairvoyance;
+      final predictedMove = controller.crystalBallMove!.displayLabel(
+        elemental: controller.isElementalMode,
+        localization: loc,
+      );
+      label = loc
+          .t(
+            'temple_blessing_battle_clairvoyance',
+            fallback: 'Clairvoyance ({left}/3): {move}',
+          )
+          .replaceAll('{left}', '${controller.clairvoyanceMovesRemaining}')
+          .replaceAll('{move}', predictedMove);
+    } else if (controller.isHarvestBlessingActive) {
+      blessing = SacredBlessing.harvest;
+      label = loc.t(
+        'temple_blessing_battle_harvest',
+        fallback: 'Harvest: 2x Orbs',
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Container(
+        key: ValueKey('battle_sacred_blessing_pill_${blessing.id}'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: palette.isDark
+              ? blessing.accentColor.withValues(alpha: 0.16)
+              : blessing.accentColor.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: blessing.accentColor.withValues(alpha: 0.72),
+            width: 1.1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(blessing.icon, size: 13, color: blessing.accentColor),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: palette.isDark ? Colors.white : palette.primaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _checkBossVictoryAlert(BuildContext context, GameController controller) {
     if (!controller.isBossVictoryPending ||
         _isBossVictoryDialogOpen ||
@@ -1501,6 +1580,7 @@ class _GameScreenState extends State<GameScreen>
 
                                 // Compact Boss Phase Indicator Pill
                                 _buildBossPhasePill(context, controller),
+                                _buildSacredBlessingPill(context, controller),
                                 const SizedBox(height: 6),
 
                                 // Versus Arena: Classic Hand-Lunge (New Skin OFF) or Stationary Orbs + Projectile Clash VFX (New Skin ON)
@@ -1513,7 +1593,7 @@ class _GameScreenState extends State<GameScreen>
                                       controller.animationsEnabled,
                                   roundId: controller.turnCount,
                                   userHp: controller.userHp,
-                                  playerMaxHp: controller.playerMaxHp,
+                                  playerMaxHp: controller.effectivePlayerMaxHp,
                                   computerHp: controller.computerHp,
                                   computerMaxHp: controller.enemyMaxHp,
                                   remainingMana: controller.remainingMana,

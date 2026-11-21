@@ -309,6 +309,70 @@ class StorageService {
   Future<void> setCurrentWeek(int val) =>
       _prefs.setInt(currentWeekKey, val < 0 ? 0 : val);
 
+  // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Sacred Blessings
+  static const String _adConsagrationsThisWeekKey =
+      'ad_consagrations_this_week';
+  static const String _pendingBattleBlessingKey = 'pending_battle_blessing';
+  static const String _activeBattleBlessingKey = 'active_battle_blessing';
+  static const String _battleBonusTempHpKey = 'battle_bonus_temp_hp';
+  static const String _lastFreeDailyPrayerDateKey =
+      'last_free_daily_prayer_date';
+
+  int get adConsagrationsThisWeek {
+    final val = _prefs.getInt(_adConsagrationsThisWeekKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setAdConsagrationsThisWeek(int val) =>
+      _prefs.setInt(_adConsagrationsThisWeekKey, val < 0 ? 0 : val);
+
+  String? get pendingBattleBlessing {
+    final raw = _prefs.getString(_pendingBattleBlessingKey)?.trim();
+    return (raw == null || raw.isEmpty) ? null : raw;
+  }
+
+  Future<void> setPendingBattleBlessing(String? id) {
+    final clean = id?.trim();
+    if (clean == null || clean.isEmpty) {
+      return _prefs.remove(_pendingBattleBlessingKey);
+    }
+    return _prefs.setString(_pendingBattleBlessingKey, clean);
+  }
+
+  String? get activeBattleBlessing {
+    final raw = _prefs.getString(_activeBattleBlessingKey)?.trim();
+    return (raw == null || raw.isEmpty) ? null : raw;
+  }
+
+  Future<void> setActiveBattleBlessing(String? id) {
+    final clean = id?.trim();
+    if (clean == null || clean.isEmpty) {
+      return _prefs.remove(_activeBattleBlessingKey);
+    }
+    return _prefs.setString(_activeBattleBlessingKey, clean);
+  }
+
+  int get battleBonusTempHp {
+    final val = _prefs.getInt(_battleBonusTempHpKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setBattleBonusTempHp(int val) =>
+      _prefs.setInt(_battleBonusTempHpKey, val < 0 ? 0 : val);
+
+  String? get lastFreeDailyPrayerDate {
+    final raw = _prefs.getString(_lastFreeDailyPrayerDateKey)?.trim();
+    return (raw == null || raw.isEmpty) ? null : raw;
+  }
+
+  Future<void> setLastFreeDailyPrayerDate(String? dateKey) {
+    final clean = dateKey?.trim();
+    if (clean == null || clean.isEmpty) {
+      return _prefs.remove(_lastFreeDailyPrayerDateKey);
+    }
+    return _prefs.setString(_lastFreeDailyPrayerDateKey, clean);
+  }
+
   // Persisted Real-Money Google Play IAP Product IDs (survives Permadeath Reset)
   static const String purchasedIapProductIdsKey = 'iap_purchased_product_ids';
 
@@ -905,6 +969,10 @@ class StorageService {
       setHpUpgradeLevel(0),
       setManaUpgradeLevel(0),
       setCurrentWeek(1),
+      setAdConsagrationsThisWeek(0),
+      setPendingBattleBlessing(null),
+      setActiveBattleBlessing(null),
+      setBattleBonusTempHp(0),
       setUnlockedReset(false),
       setUnlockedPredictability(false),
       setUnlockedRandom(false),

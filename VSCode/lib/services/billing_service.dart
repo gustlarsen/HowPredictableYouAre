@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import '../models/move.dart';
 
 /// Types of purchase lifecycle events emitted by [BillingService].
 enum BillingEventType {
@@ -32,6 +34,11 @@ abstract class InAppPurchaseClient {
   Future<bool> isAvailable();
   Future<ProductDetailsResponse> queryProductDetails(Set<String> identifiers);
   Future<bool> buyNonConsumable({required PurchaseParam purchaseParam});
+  Future<bool> buyConsumable({
+    required PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  });
+  Future<void> consumePurchase(PurchaseDetails purchase);
   Future<void> completePurchase(PurchaseDetails purchase);
   Future<void> restorePurchases({String? applicationUserName});
 }
@@ -60,6 +67,27 @@ class DefaultInAppPurchaseClient implements InAppPurchaseClient {
       _instance.buyNonConsumable(purchaseParam: purchaseParam);
 
   @override
+  Future<bool> buyConsumable({
+    required PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  }) =>
+      _instance.buyConsumable(
+        purchaseParam: purchaseParam,
+        autoConsume: autoConsume,
+      );
+
+  @override
+  Future<void> consumePurchase(PurchaseDetails purchase) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidAddition =
+          _instance.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+      await androidAddition.consumePurchase(purchase);
+    } else if (purchase.pendingCompletePurchase) {
+      await _instance.completePurchase(purchase);
+    }
+  }
+
+  @override
   Future<void> completePurchase(PurchaseDetails purchase) =>
       _instance.completePurchase(purchase);
 
@@ -69,8 +97,9 @@ class DefaultInAppPurchaseClient implements InAppPurchaseClient {
 }
 
 /// Manages Google Play Billing (In-App Purchases) for all 10 non-consumable
-/// shop upgrades, including localized price queries, purchase stream handling,
-/// immediate entitlement unlocking + purchase acknowledgment, and purchase restoration.
+/// shop upgrades and 8 consumable Elemental Orb packs, including localized price
+/// queries, purchase stream handling, immediate entitlement granting,
+/// consumption/acknowledgment, and purchase restoration.
 class BillingService extends ChangeNotifier {
   static const String productResetButton = 'unlock_reset_button';
   static const String productPredictabilityScore =
@@ -83,6 +112,21 @@ class BillingService extends ChangeNotifier {
   static const String productSuggestion = 'unlock_suggestion';
   static const String productRemoveAds = 'unlock_remove_ads';
   static const String productCrystalBall = 'unlock_crystal_ball';
+
+  // Consumable All-Element Orb Bundles
+  static const String productConsumableSmall = 'consumable_orbs_pack_small';
+  static const String productConsumableMedium = 'consumable_orbs_pack_medium';
+  static const String productConsumableLarge = 'consumable_orbs_pack_large';
+
+  // Consumable Single-Element Bulk Packs (+1,500)
+  static const String productConsumableFire1500 = 'consumable_orbs_fire_1500';
+  static const String productConsumableWater1500 =
+      'consumable_orbs_water_1500';
+  static const String productConsumableWood1500 = 'consumable_orbs_wood_1500';
+  static const String productConsumableEarth1500 =
+      'consumable_orbs_earth_1500';
+  static const String productConsumableMetal1500 =
+      'consumable_orbs_metal_1500';
 
   /// Exact set of all 10 non-consumable Google Play Product IDs.
   static const Set<String> allProductIds = {
@@ -97,6 +141,58 @@ class BillingService extends ChangeNotifier {
     productRemoveAds,
     productCrystalBall,
   };
+
+  /// Exact set of all 8 consumable Elemental Orb pack Google Play Product IDs.
+  static const Set<String> allConsumableProductIds = {
+    productConsumableSmall,
+    productConsumableMedium,
+    productConsumableLarge,
+    productConsumableFire1500,
+    productConsumableWater1500,
+    productConsumableWood1500,
+    productConsumableEarth1500,
+    productConsumableMetal1500,
+  };
+
+  /// Combined set of all 18 store Product IDs (non-consumables + consumables).
+  static const Set<String> allStoreProductIds = {
+    productResetButton,
+    productPredictabilityScore,
+    productRandomButton,
+    productShowAlgorithm,
+    productNewHands,
+    productYourPrediction,
+    productPcNextMove,
+    productSuggestion,
+    productRemoveAds,
+    productCrystalBall,
+    productConsumableSmall,
+    productConsumableMedium,
+    productConsumableLarge,
+    productConsumableFire1500,
+    productConsumableWater1500,
+    productConsumableWood1500,
+    productConsumableEarth1500,
+    productConsumableMetal1500,
+  };
+
+  static bool isConsumableProduct(String productId) =>
+      allConsumableProductIds.contains(productId);
+
+  static String consumableProductIdForMove(HandMove move) {
+    switch (move) {
+      case HandMove.rock:
+        return productConsumableFire1500;
+      case HandMove.paper:
+        return productConsumableWater1500;
+      case HandMove.scissors:
+        return productConsumableWood1500;
+      case HandMove.lizard:
+        return productConsumableEarth1500;
+      case HandMove.spock:
+        return productConsumableMetal1500;
+    }
+  }
 
   /// Canonical mapping of the 10 shop item names to their Google Play Product IDs.
   static const Map<String, String> shopItemProductIds = {
@@ -234,10 +330,10 @@ class BillingService extends ChangeNotifier {
     }
   }
 
-  /// Queries Google Play Billing for all 10 non-consumable shop product details
-  /// and caches their localized store prices.
+  /// Queries Google Play Billing for all store product details
+  /// (non-consumables + consumable orb packs) and caches their localized store prices.
   Future<ProductDetailsResponse?> queryProductDetails([
-    Set<String> productIds = allProductIds,
+    Set<String> productIds = allStoreProductIds,
   ]) async {
     if (!_isAvailable) {
       return null;
@@ -265,6 +361,19 @@ class BillingService extends ChangeNotifier {
 
   /// Initiates a Google Play Billing non-consumable purchase flow for [productId].
   Future<bool> buyNonConsumable(String productId) async {
+    return _startPurchaseFlow(productId, isConsumable: false);
+  }
+
+  /// Initiates a Google Play Billing consumable purchase flow for [productId]
+  /// (used for repeatable Elemental Orb bundles in the Adoration Room).
+  Future<bool> buyConsumable(String productId) async {
+    return _startPurchaseFlow(productId, isConsumable: true);
+  }
+
+  Future<bool> _startPurchaseFlow(
+    String productId, {
+    required bool isConsumable,
+  }) async {
     if (!_isAvailable) {
       _emitEvent(
         BillingPurchaseEvent(
@@ -295,9 +404,12 @@ class BillingService extends ChangeNotifier {
 
     try {
       final purchaseParam = PurchaseParam(productDetails: productDetails);
-      final started = await _client.buyNonConsumable(
-        purchaseParam: purchaseParam,
-      );
+      final started = isConsumable
+          ? await _client.buyConsumable(
+              purchaseParam: purchaseParam,
+              autoConsume: false,
+            )
+          : await _client.buyNonConsumable(purchaseParam: purchaseParam);
       if (!started) {
         _pendingProductIds.remove(productId);
         _emitEvent(
@@ -383,17 +495,27 @@ class BillingService extends ChangeNotifier {
         case PurchaseStatus.restored:
           _pendingProductIds.remove(productId);
           _isRestoring = false;
-          _verifiedPurchasedProductIds.add(productId);
+          final isConsumable = isConsumableProduct(productId);
+          if (!isConsumable) {
+            _verifiedPurchasedProductIds.add(productId);
+          }
 
           // Immediately grant entitlement in GameController (persisting to
           // SharedPreferences and triggering PlayGamesService cloud save).
           await onEntitlementGranted?.call(productId, purchase.status);
 
-          // CRITICAL: Acknowledge/complete the purchase with Google Play so the
-          // transaction is not automatically refunded after 3 days.
-          try {
-            await _client.completePurchase(purchase);
-          } catch (_) {}
+          // CRITICAL: Consume repeatable orb packs (which also acknowledges them
+          // and allows repurchasing) or acknowledge/complete non-consumables so
+          // Google Play does not refund the transaction after 3 days.
+          if (isConsumable) {
+            try {
+              await _client.consumePurchase(purchase);
+            } catch (_) {}
+          } else {
+            try {
+              await _client.completePurchase(purchase);
+            } catch (_) {}
+          }
 
           _emitEvent(
             BillingPurchaseEvent(

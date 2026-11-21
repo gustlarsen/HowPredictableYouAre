@@ -67,7 +67,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Altar of Offerings'), findsOneWidget);
+        expect(find.text('Sacred Temple'), findsOneWidget);
 
         // 1. No flat combat elemental icons anywhere inside ShopDialog
         for (final move in HandMove.values) {
@@ -95,20 +95,8 @@ void main() {
           expect(sphere.size, inInclusiveRange(16.0, 18.0));
         }
 
-        // 3. Free Elemental Orbs Rewarded Ad Card uses 3D ElementalEnergySpheres (~18-20px)
-        for (final move in HandMove.values) {
-          final adOrbFinder = find.byKey(
-            ValueKey('shop_ad_orb_icon_${move.name}'),
-          );
-          expect(adOrbFinder, findsOneWidget);
-          final sphere = tester.widget<ElementalEnergySphere>(adOrbFinder);
-          expect(sphere.primaryColor, move.elementalPrimaryColor);
-          expect(sphere.secondaryColor, move.elementalSecondaryColor);
-          expect(sphere.isDark, isDark);
-          expect(sphere.size, inInclusiveRange(18.0, 20.0));
-        }
-
-        // 4. Stat Upgrade Cost Pills (+1 Max HP, +1 Max Mana Pool) use 3D spheres (~13-15px) on one row
+        // 3. Wing 1 (Consagration): Stat Upgrade Cost Pills (+1 Max HP, +1 Max Mana Pool)
+        // use 3D spheres (~13-15px) on one row
         for (final btnKey in const [
           ValueKey('shop_upgrade_max_hp_button'),
           ValueKey('shop_upgrade_max_mana_button'),
@@ -150,7 +138,25 @@ void main() {
           expect(yCenters.length, 1);
         }
 
-        // 5. Scroll to 5-orb Crystal Ball+ cost pill and verify single-row alignment
+        // 4. Wing 5 (Prayer Room): Free Elemental Orbs Rewarded Ad Card uses 3D ElementalEnergySpheres (~18-20px)
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
+        for (final move in HandMove.values) {
+          final adOrbFinder = find.byKey(
+            ValueKey('shop_ad_orb_icon_${move.name}'),
+          );
+          expect(adOrbFinder, findsOneWidget);
+          final sphere = tester.widget<ElementalEnergySphere>(adOrbFinder);
+          expect(sphere.primaryColor, move.elementalPrimaryColor);
+          expect(sphere.secondaryColor, move.elementalSecondaryColor);
+          expect(sphere.isDark, isDark);
+          expect(sphere.size, inInclusiveRange(18.0, 20.0));
+        }
+
+        // 5. Wing 2 (Altar of Offerings): Scroll to 5-orb Crystal Ball+ cost pill and verify single-row alignment
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+        await tester.pumpAndSettle();
+        expect(find.text('Altar of Offerings'), findsOneWidget);
         final scrollable = find.descendant(
           of: find.byType(ShopDialog),
           matching: find.byType(Scrollable),

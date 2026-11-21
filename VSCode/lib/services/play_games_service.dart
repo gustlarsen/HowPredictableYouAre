@@ -276,6 +276,13 @@ class CloudSaveData {
   final List<String> completedCycleDecreeIds;
   final int totalDecreesCompleted;
 
+  // Sacred Temple Consagration & Blessings State
+  final int adConsagrationsThisWeek;
+  final String? pendingBattleBlessing;
+  final String? activeBattleBlessing;
+  final int battleBonusTempHp;
+  final String? lastFreeDailyPrayerDate;
+
   final int updatedAtMillis;
 
   const CloudSaveData({
@@ -370,6 +377,11 @@ class CloudSaveData {
     this.activeDecreeIds,
     this.completedCycleDecreeIds = const [],
     this.totalDecreesCompleted = 0,
+    this.adConsagrationsThisWeek = 0,
+    this.pendingBattleBlessing,
+    this.activeBattleBlessing,
+    this.battleBonusTempHp = 0,
+    this.lastFreeDailyPrayerDate,
     this.updatedAtMillis = 0,
   }) : removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
 
@@ -612,6 +624,12 @@ class CloudSaveData {
           totalDecreesCompleted > local.totalDecreesCompleted
               ? totalDecreesCompleted
               : local.totalDecreesCompleted,
+      adConsagrationsThisWeek: adConsagrationsThisWeek,
+      pendingBattleBlessing: pendingBattleBlessing ?? local.pendingBattleBlessing,
+      activeBattleBlessing: activeBattleBlessing,
+      battleBonusTempHp: battleBonusTempHp,
+      lastFreeDailyPrayerDate:
+          lastFreeDailyPrayerDate ?? local.lastFreeDailyPrayerDate,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -714,6 +732,11 @@ class CloudSaveData {
       activeDecreeIds: storage.activeDecreeIds,
       completedCycleDecreeIds: storage.completedCycleDecreeIds,
       totalDecreesCompleted: storage.totalDecreesCompleted,
+      adConsagrationsThisWeek: storage.adConsagrationsThisWeek,
+      pendingBattleBlessing: storage.pendingBattleBlessing,
+      activeBattleBlessing: storage.activeBattleBlessing,
+      battleBonusTempHp: storage.battleBonusTempHp,
+      lastFreeDailyPrayerDate: storage.lastFreeDailyPrayerDate,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -743,6 +766,11 @@ class CloudSaveData {
     await storage.setEnemyPhase(enemyPhase);
     await storage.setEnemyMaxHp(enemyMaxHp);
     await storage.setCurrentWeek(currentWeek);
+    await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
+    await storage.setPendingBattleBlessing(pendingBattleBlessing);
+    await storage.setActiveBattleBlessing(activeBattleBlessing);
+    await storage.setBattleBonusTempHp(battleBonusTempHp);
+    await storage.setLastFreeDailyPrayerDate(lastFreeDailyPrayerDate);
     if (purchasedIapProductIds.isNotEmpty) {
       await storage.setPurchasedIapProductIds({
         ...storage.purchasedIapProductIds,
@@ -908,6 +936,14 @@ class CloudSaveData {
       if (activeDecreeIds != null) 'activeDecreeIds': activeDecreeIds,
       'completedCycleDecreeIds': completedCycleDecreeIds,
       'totalDecreesCompleted': totalDecreesCompleted,
+      'adConsagrationsThisWeek': adConsagrationsThisWeek,
+      if (pendingBattleBlessing != null)
+        'pendingBattleBlessing': pendingBattleBlessing,
+      if (activeBattleBlessing != null)
+        'activeBattleBlessing': activeBattleBlessing,
+      'battleBonusTempHp': battleBonusTempHp,
+      if (lastFreeDailyPrayerDate != null)
+        'lastFreeDailyPrayerDate': lastFreeDailyPrayerDate,
       'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
@@ -1084,6 +1120,18 @@ class CloudSaveData {
       completedCycleDecreeIds: _parseStringList(map['completedCycleDecreeIds']),
       totalDecreesCompleted:
           (map['totalDecreesCompleted'] as num?)?.toInt() ?? 0,
+      adConsagrationsThisWeek:
+          ((map['adConsagrationsThisWeek'] as num?)?.toInt() ?? 0) < 0
+              ? 0
+              : ((map['adConsagrationsThisWeek'] as num?)?.toInt() ?? 0),
+      pendingBattleBlessing: (map['pendingBattleBlessing'] as String?)?.trim(),
+      activeBattleBlessing: (map['activeBattleBlessing'] as String?)?.trim(),
+      battleBonusTempHp:
+          ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0) < 0
+              ? 0
+              : ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0),
+      lastFreeDailyPrayerDate:
+          (map['lastFreeDailyPrayerDate'] as String?)?.trim(),
       hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,
