@@ -909,16 +909,25 @@ void main() {
       const ValueKey('settings_reset_progress_button'),
     );
     await tester.ensureVisible(resetBtn);
+    expect(find.text('Forfeit Run'), findsOneWidget);
+    expect(find.byIcon(Icons.delete_forever_outlined), findsNothing);
     await tester.tap(resetBtn);
     await tester.pumpAndSettle();
 
-    // Confirmation dialog appears with updated Castle recovery explanation
-    expect(find.text('Reset All Progress?'), findsOneWidget);
+    // Confirmation dialog appears with Forfeit Run title and Castle/permanent progress reassurance
+    expect(find.text('Forfeit Run?'), findsOneWidget);
     expect(find.textContaining('Week 0'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(AlertDialog),
         matching: find.textContaining('Royal Castle'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('Story Memories'),
       ),
       findsOneWidget,
     );

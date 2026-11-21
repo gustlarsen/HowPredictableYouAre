@@ -6,6 +6,7 @@ import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/forfeit_flag_icon.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
@@ -302,7 +303,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           title: Text(
             loc.t(
               'reset_all_progress_title',
-              fallback: 'Reset All Progress?',
+              fallback: 'Forfeit Run?',
             ),
             style: TextStyle(color: palette.primaryText),
           ),
@@ -310,7 +311,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             loc.t(
               'reset_all_progress_message',
               fallback:
-                  'Resetting starts a new cycle as if defeated: your hero will lose all current items and Elemental Orbs and return to Week 0 on the Main Map. Any acquired artifacts, power-ups, and orbs will be archived at the Royal Castle, where you can recover them by watching a rewarded video ad.',
+                  'Ending this run counts as a defeat and returns the calendar to Week 0.\n\n• Collected Elemental Orbs and artifacts will be sent to the Royal Castle (Spoils & Relics).\n• Permanent account progress (Story Memories, Hall of Heroes, and purchased upgrades like Remove Ads) will NOT be deleted.',
             ),
             style: TextStyle(color: palette.primaryText),
           ),
@@ -333,7 +334,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
               child: Text(
-                loc.t('reset_all_progress', fallback: 'Reset All Progress'),
+                loc.t('reset_all_progress', fallback: 'Forfeit Run'),
               ),
             ),
           ],
@@ -354,7 +355,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             loc.t(
               'reset_all_progress_done',
               fallback:
-                  'Returned to Week 0! Visit the Royal Castle to recover lost items and orbs.',
+                  'Run forfeited! Returned to Week 0 — visit the Royal Castle to recover Spoils & Relics.',
             );
         messenger.showSnackBar(
           SnackBar(
@@ -735,7 +736,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         },
                       ),
 
-                      // Reset All Progress button
+                      // Forfeit Run button
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
@@ -759,14 +760,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                             ),
                           ),
                           onPressed: () => _confirmResetAllProgress(context),
-                          icon: const Icon(
-                            Icons.delete_forever_outlined,
-                            size: 18,
-                          ),
+                          icon: const ForfeitFlagIcon(size: 19),
                           label: Text(
                             loc.t(
                               'reset_all_progress',
-                              fallback: 'Reset All Progress',
+                              fallback: 'Forfeit Run',
                             ),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),

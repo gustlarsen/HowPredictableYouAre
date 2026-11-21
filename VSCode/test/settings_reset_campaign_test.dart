@@ -21,6 +21,7 @@ import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/forfeit_flag_icon.dart';
 
 class _TestAdMobClient implements AdMobClient {
   bool rewardedAvailable;
@@ -402,7 +403,7 @@ void main() {
     );
 
     testWidgets(
-      'Confirming Reset All Progress from WorldMapScreen archives items/orbs to Castle, displays badge, and allows Castle recovery via Rewarded Ad',
+      'Confirming Forfeit Run from WorldMapScreen archives items/orbs to Castle, displays badge, and allows Castle recovery via Rewarded Ad',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -456,7 +457,7 @@ void main() {
           findsNothing,
         );
 
-        // Open SettingsDialog -> Reset All Progress
+        // Open SettingsDialog -> Forfeit Run
         await tester.tap(
           find.byKey(const ValueKey('world_map_settings_button')),
         );
@@ -466,10 +467,13 @@ void main() {
           const ValueKey('settings_reset_progress_button'),
         );
         await tester.ensureVisible(resetBtn);
+        expect(find.text('Forfeit Run'), findsOneWidget);
+        expect(find.byType(ForfeitFlagIcon), findsOneWidget);
+        expect(find.byIcon(Icons.delete_forever_outlined), findsNothing);
         await tester.tap(resetBtn);
         await tester.pumpAndSettle();
 
-        expect(find.text('Reset All Progress?'), findsOneWidget);
+        expect(find.text('Forfeit Run?'), findsOneWidget);
         expect(find.textContaining('Week 0'), findsOneWidget);
         expect(
           find.descendant(
@@ -478,7 +482,27 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.textContaining('rewarded video ad'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('Story Memories'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('Hall of Heroes'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('Remove Ads'),
+          ),
+          findsOneWidget,
+        );
 
         await tester.tap(
           find.byKey(const ValueKey('confirm_reset_progress_button')),
@@ -542,7 +566,7 @@ void main() {
     );
 
     testWidgets(
-      'Triggering Reset All Progress from inside GameScreen (Arena Settings) exits GameScreen and lands on WorldMapScreen at Week 0 with Castle badge',
+      'Triggering Forfeit Run from inside GameScreen (Arena Settings) exits GameScreen and lands on WorldMapScreen at Week 0 with Castle badge',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -607,7 +631,7 @@ void main() {
         await tester.tap(resetBtn);
         await tester.pumpAndSettle();
 
-        // Confirm Reset All Progress
+        // Confirm Forfeit Run
         await tester.tap(
           find.byKey(const ValueKey('confirm_reset_progress_button')),
         );
@@ -637,15 +661,32 @@ void main() {
     );
 
     test(
-      'Updated Reset All Progress confirmation and completion messages are localized in en, pt, es, and de',
+      'Forfeit Run labels, confirmation, and completion messages are localized in en, pt, es, and de',
       () async {
         final rawJson =
             await rootBundle.loadString('assets/data/stringsHowPredict.json');
         final map = json.decode(rawJson) as Map<String, dynamic>;
 
+        const expectedLabels = {
+          'en': 'Forfeit Run',
+          'pt': 'Desistir da Jornada',
+          'es': 'Abandonar Jornada',
+          'de': 'Durchlauf aufgeben',
+        };
+        const expectedTitles = {
+          'en': 'Forfeit Run?',
+          'pt': 'Desistir da Jornada?',
+          'es': '¿Abandonar Jornada?',
+          'de': 'Durchlauf aufgeben?',
+        };
+
         for (final lang in ['en', 'pt', 'es', 'de']) {
+          final label = map['${lang}_reset_all_progress'] as String?;
+          final title = map['${lang}_reset_all_progress_title'] as String?;
           final msg = map['${lang}_reset_all_progress_message'] as String?;
           final done = map['${lang}_reset_all_progress_done'] as String?;
+          expect(label, expectedLabels[lang]);
+          expect(title, expectedTitles[lang]);
           expect(msg, isNotNull, reason: 'Missing ${lang}_reset_all_progress_message');
           expect(msg!.trim(), isNotEmpty);
           expect(msg, contains('0'));

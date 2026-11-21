@@ -738,7 +738,7 @@ void main() {
     );
 
     testWidgets(
-      'Reset All Progress button in SettingsDialog asks for confirmation, archives to Castle, resets to Week 0, and syncs to Cloud Save',
+      'Forfeit Run button in SettingsDialog asks for confirmation, archives to Castle, resets to Week 0, and syncs to Cloud Save',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
@@ -798,12 +798,13 @@ void main() {
         );
         await tester.ensureVisible(resetBtn);
         expect(resetBtn, findsOneWidget);
-        expect(find.text('Reset All Progress'), findsOneWidget);
+        expect(find.text('Forfeit Run'), findsOneWidget);
+        expect(find.byIcon(Icons.delete_forever_outlined), findsNothing);
 
-        // Tap Reset All Progress -> opens confirmation dialog; tap Cancel first
+        // Tap Forfeit Run -> opens confirmation dialog; tap Cancel first
         await tester.tap(resetBtn);
         await tester.pumpAndSettle();
-        expect(find.text('Reset All Progress?'), findsOneWidget);
+        expect(find.text('Forfeit Run?'), findsOneWidget);
 
         await tester.tap(
           find.byKey(const ValueKey('cancel_reset_progress_button')),
@@ -812,7 +813,7 @@ void main() {
         expect(controller.fireOrbs, 800);
         expect(controller.unlockedReset, isTrue);
 
-        // Tap Reset All Progress again and confirm
+        // Tap Forfeit Run again and confirm
         await tester.tap(resetBtn);
         await tester.pumpAndSettle();
         await tester.tap(
