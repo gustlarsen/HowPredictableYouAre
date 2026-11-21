@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
-import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
@@ -17,9 +16,8 @@ class ObservatoryDialog extends StatelessWidget {
     final loc = controller.localization;
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
-    final unlockedStories = StoryChapter.values
-        .where((c) => controller.isStoryChapterUnlocked(c))
-        .length;
+    final unlockedStories = controller.unlockedStoryMemoriesCount;
+    final totalStories = controller.totalStoryMemoriesCount;
 
     return Dialog(
       key: const ValueKey('observatory_dialog'),
@@ -232,7 +230,7 @@ class ObservatoryDialog extends StatelessWidget {
                         },
                         icon: const Icon(Icons.auto_stories_outlined, size: 18),
                         label: Text(
-                          '${loc.t('observatory_story_log_btn', fallback: 'Open Story Log')} ($unlockedStories/${StoryChapter.values.length})',
+                          '${loc.t('observatory_story_log_btn', fallback: 'Open Story Log')} ($unlockedStories/$totalStories)',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),

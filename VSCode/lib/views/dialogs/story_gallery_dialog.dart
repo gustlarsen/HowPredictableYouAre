@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
+import '../screens/intro_story_screen.dart';
 import 'story_dialog.dart';
 
 class StoryGalleryDialog extends StatelessWidget {
@@ -21,9 +22,8 @@ class StoryGalleryDialog extends StatelessWidget {
     final loc = controller.localization;
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
-    final chapters = StoryChapter.values;
-    final unlockedCount =
-        chapters.where((c) => controller.isStoryChapterUnlocked(c)).length;
+    final totalCount = controller.totalStoryMemoriesCount;
+    final unlockedCount = controller.unlockedStoryMemoriesCount;
 
     final title = loc.t('story_gallery_title', fallback: 'Story Memories');
     final subtitle = loc.t(
@@ -96,7 +96,7 @@ class StoryGalleryDialog extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '$unlockedCount / ${chapters.length}',
+                      '$unlockedCount / $totalCount',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -152,7 +152,10 @@ class StoryMemoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = controller.localization;
-    final chapters = StoryChapter.values;
+    final introCards = IntroStoryCardData.cards;
+    final artifactChapters = controller.artifactStoryChapters;
+    final totalItems = introCards.length + artifactChapters.length;
+
     final lockedTitle = loc.t('story_locked_title', fallback: 'Locked Chapter');
     final lockedHint = loc.t(
       'story_locked_hint',
@@ -163,10 +166,42 @@ class StoryMemoriesSection extends StatelessWidget {
     return ListView.separated(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-      itemCount: chapters.length,
+      itemCount: totalItems,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final chapter = chapters[index];
+        if (index < introCards.length) {
+          final card = introCards[index];
+          final chapterLabel = loc.t(
+            card.chapterKey,
+            fallback: card.fallbackChapter,
+          );
+          final cardTitle = loc.t(
+            card.titleKey,
+            fallback: card.fallbackTitle,
+          );
+          final caption = loc.t(
+            card.captionKey,
+            fallback: card.fallbackCaption,
+          );
+
+          return StoryChapterCard(
+            key: ValueKey('story_gallery_item_${card.id}'),
+            memoryId: card.id,
+            assetPath: card.assetPath,
+            icon: card.icon,
+            chapterNumber: index + 1,
+            isUnlocked: true,
+            chapterTitle: '$chapterLabel: $cardTitle',
+            subtitle: caption,
+            replayLabel: replayLabel,
+            onTap: () {
+              controller.audio.playTapVibrate();
+              IntroStoryScreen.showReplay(context, initialPage: card.index);
+            },
+          );
+        }
+
+        final chapter = artifactChapters[index - introCards.length];
         final isUnlocked = controller.isStoryChapterUnlocked(chapter);
         final chapterTitle = loc.t(
           chapter.titleKey,
@@ -183,7 +218,9 @@ class StoryMemoriesSection extends StatelessWidget {
                 ? 'story_gallery_item_${chapter.id}'
                 : 'story_gallery_locked_${chapter.id}',
           ),
-          chapter: chapter,
+          memoryId: chapter.id,
+          assetPath: chapter.assetPath,
+          icon: chapter.icon,
           chapterNumber: index + 1,
           isUnlocked: isUnlocked,
           chapterTitle: isUnlocked ? chapterTitle : lockedTitle,
@@ -213,7 +250,9 @@ class StoryMemoriesSection extends StatelessWidget {
 }
 
 class StoryChapterCard extends StatelessWidget {
-  final StoryChapter chapter;
+  final String memoryId;
+  final String assetPath;
+  final IconData icon;
   final int chapterNumber;
   final bool isUnlocked;
   final String chapterTitle;
@@ -223,7 +262,9 @@ class StoryChapterCard extends StatelessWidget {
 
   const StoryChapterCard({
     super.key,
-    required this.chapter,
+    required this.memoryId,
+    required this.assetPath,
+    required this.icon,
     required this.chapterNumber,
     required this.isUnlocked,
     required this.chapterTitle,
@@ -311,7 +352,7 @@ class StoryChapterCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Icon(
-                      isUnlocked ? chapter.icon : Icons.help_outline,
+                      isUnlocked ? icon : Icons.help_outline,
                       size: 15,
                       color: isUnlocked ? palette.amberIcon : palette.mutedText,
                     ),
@@ -359,7 +400,7 @@ class StoryChapterCard extends StatelessWidget {
                   children: [
                     // Thumbnail or Mysterious Silhouette
                     ClipRRect(
-                      key: ValueKey('story_gallery_thumb_${chapter.id}'),
+                      key: ValueKey('story_gallery_thumb_$memoryId'),
                       borderRadius: BorderRadius.circular(12),
                       child: SizedBox(
                         width: 64,
@@ -375,14 +416,14 @@ class StoryChapterCard extends StatelessWidget {
                                     )
                                   : _silhouetteFilter,
                               child: Image.asset(
-                                chapter.assetPath,
+                                assetPath,
                                 fit: BoxFit.cover,
                                 alignment: Alignment.topCenter,
                                 errorBuilder: (context, error, stackTrace) =>
                                     Container(
                                   color: const Color(0xFF1A1D26),
                                   child: Icon(
-                                    chapter.icon,
+                                    icon,
                                     color: isUnlocked
                                         ? Colors.amber
                                         : Colors.white24,
@@ -410,7 +451,7 @@ class StoryChapterCard extends StatelessWidget {
                     // Action Icon / Button
                     if (isUnlocked)
                       Container(
-                        key: ValueKey('story_gallery_read_btn_${chapter.id}'),
+                        key: ValueKey('story_gallery_read_btn_$memoryId'),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 8,
@@ -449,7 +490,7 @@ class StoryChapterCard extends StatelessWidget {
                       )
                     else
                       Padding(
-                        key: ValueKey('story_gallery_lock_icon_${chapter.id}'),
+                        key: ValueKey('story_gallery_lock_icon_$memoryId'),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Icon(
                           Icons.lock_rounded,

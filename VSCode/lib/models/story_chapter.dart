@@ -20,6 +20,87 @@ class StoryPanelData {
   });
 }
 
+class IntroStoryCardData {
+  final int index;
+  final String id;
+  final String assetPath;
+  final String chapterKey;
+  final String fallbackChapter;
+  final String titleKey;
+  final String fallbackTitle;
+  final String captionKey;
+  final String fallbackCaption;
+  final IconData icon;
+
+  const IntroStoryCardData({
+    required this.index,
+    required this.id,
+    required this.assetPath,
+    required this.chapterKey,
+    required this.fallbackChapter,
+    required this.titleKey,
+    required this.fallbackTitle,
+    required this.captionKey,
+    required this.fallbackCaption,
+    required this.icon,
+  });
+
+  static const List<IntroStoryCardData> cards = [
+    IntroStoryCardData(
+      index: 0,
+      id: 'intro_1',
+      assetPath: 'assets/images/story/intro_1.jpeg',
+      chapterKey: 'story_intro_c1_chapter',
+      fallbackChapter: 'Chapter I',
+      titleKey: 'story_intro_c1_title',
+      fallbackTitle: 'The Metal Automaton',
+      captionKey: 'story_intro_c1_caption',
+      fallbackCaption:
+          'A Wizard obsessed with Metal studied human behavior and forged an automaton capable of predicting patterns and conjuring Fire, Water, and Wood.',
+      icon: Icons.precision_manufacturing_outlined,
+    ),
+    IntroStoryCardData(
+      index: 1,
+      id: 'intro_2',
+      assetPath: 'assets/images/story/intro_2.jpeg',
+      chapterKey: 'story_intro_c2_chapter',
+      fallbackChapter: 'Chapter II',
+      titleKey: 'story_intro_c2_title',
+      fallbackTitle: 'Ambush in the Royal Garden',
+      captionKey: 'story_intro_c2_caption',
+      fallbackCaption:
+          "In the royal garden, the automaton defeated the three guardian mages and kidnapped the Princess to the Metal Wizard's dark fortress.",
+      icon: Icons.park_outlined,
+    ),
+    IntroStoryCardData(
+      index: 2,
+      id: 'intro_3',
+      assetPath: 'assets/images/story/intro_3.jpeg',
+      chapterKey: 'story_intro_c3_chapter',
+      fallbackChapter: 'Chapter III',
+      titleKey: 'story_intro_c3_title',
+      fallbackTitle: "The King's Summons",
+      captionKey: 'story_intro_c3_caption',
+      fallbackCaption:
+          'With no other hope, the King turned to the Sacred Temple and summoned the only young Cleric capable of channeling all three elements.',
+      icon: Icons.castle_outlined,
+    ),
+    IntroStoryCardData(
+      index: 3,
+      id: 'intro_4',
+      assetPath: 'assets/images/story/intro_4.jpeg',
+      chapterKey: 'story_intro_c4_chapter',
+      fallbackChapter: 'Chapter IV',
+      titleKey: 'story_intro_c4_title',
+      fallbackTitle: 'The Quest Begins',
+      captionKey: 'story_intro_c4_caption',
+      fallbackCaption:
+          'Armed with your blessed Staff and orb satchel, you march toward the lair—defeat the automaton before time runs out.',
+      icon: Icons.explore_outlined,
+    ),
+  ];
+}
+
 enum StoryChapter {
   intro,
   resetButton,

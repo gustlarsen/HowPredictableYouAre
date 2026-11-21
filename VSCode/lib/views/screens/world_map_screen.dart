@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
-import '../../models/story_chapter.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
@@ -12,7 +11,6 @@ import '../dialogs/inventory_dialog.dart';
 import '../dialogs/observatory_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
-import '../dialogs/story_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
@@ -45,7 +43,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late final AnimationController _pulseController;
   GameController? _controller;
-  bool _isIntroDialogScheduled = false;
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
   bool _metricsRebuildScheduled = false;
@@ -120,27 +117,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     if (!mounted) return;
     if (ModalRoute.of(context)?.isCurrent == false) return;
     context.read<GameController>().didChangeAppLifecycleState(state);
-  }
-
-  void _checkIntroStory(BuildContext context, GameController controller) {
-    if (controller.pendingStoryChapter != StoryChapter.intro) {
-      _isIntroDialogScheduled = false;
-      return;
-    }
-    if (!_isIntroDialogScheduled && !controller.hasSeenStoryIntro) {
-      _isIntroDialogScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final introChapter = controller.consumePendingStory(StoryChapter.intro);
-        if (introChapter != null) {
-          StoryDialog.show(
-            context,
-            chapter: introChapter,
-            controller: controller,
-          );
-        }
-      });
-    }
   }
 
   void _checkQaBonusSnackBar(BuildContext context, GameController controller) {
@@ -284,7 +260,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     final loc = controller.localization;
     _syncPulseAnimation(controller.animationsEnabled);
 
-    _checkIntroStory(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
 

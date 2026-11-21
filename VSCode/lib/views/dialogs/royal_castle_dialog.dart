@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../models/royal_castle.dart';
-import '../../models/story_chapter.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import '../screens/intro_story_screen.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/royal_castle_icon.dart';
 import 'story_gallery_dialog.dart';
@@ -545,9 +545,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     AppPalette palette,
     LocalizationService loc,
   ) {
-    final chapters = StoryChapter.values;
-    final unlockedStories =
-        chapters.where((c) => controller.isStoryChapterUnlocked(c)).length;
+    final totalStories = controller.totalStoryMemoriesCount;
+    final unlockedStories = controller.unlockedStoryMemoriesCount;
 
     return Column(
       key: const ValueKey('castle_wing_library'),
@@ -642,6 +641,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
               ),
             ),
             Container(
+              key: const ValueKey('library_story_memories_counter'),
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
                 color: palette.rewardedAdCardSurface,
@@ -651,7 +651,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                 ),
               ),
               child: Text(
-                '$unlockedStories / ${chapters.length}',
+                '$unlockedStories / $totalStories',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 11.5,
@@ -662,6 +662,31 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           ],
         ),
         const SizedBox(height: 8),
+        ElevatedButton.icon(
+          key: const ValueKey('library_replay_intro_button'),
+          onPressed: () {
+            controller.audio.playTapVibrate();
+            IntroStoryScreen.showReplay(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _goldFill,
+            foregroundColor: _goldDarkInk,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: palette.amberBorder,
+                width: 1.2,
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+          label: Text(
+            loc.t('story_replay_intro', fallback: 'Replay Intro'),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 10),
         StoryMemoriesSection(controller: controller, shrinkWrap: true),
       ],
     );

@@ -2460,6 +2460,33 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
+  bool get hasSeenIntro => hasSeenStoryIntro;
+
+  List<StoryChapter> get artifactStoryChapters => StoryChapter.values
+      .where((c) => c != StoryChapter.intro)
+      .toList(growable: false);
+
+  int get totalStoryMemoriesCount =>
+      IntroStoryCardData.cards.length + artifactStoryChapters.length;
+
+  int get unlockedStoryMemoriesCount =>
+      IntroStoryCardData.cards.length +
+      artifactStoryChapters.where(isStoryChapterUnlocked).length;
+
+  void completeIntroStory() {
+    final shouldSave =
+        !hasSeenStoryIntro || pendingStoryChapter == StoryChapter.intro;
+    hasSeenStoryIntro = true;
+    storage.setHasSeenStoryIntro(true);
+    if (pendingStoryChapter == StoryChapter.intro) {
+      pendingStoryChapter = null;
+    }
+    if (shouldSave) {
+      _triggerCloudSave();
+      notifyListeners();
+    }
+  }
+
   bool hasSeenStory(StoryChapter chapter) {
     switch (chapter) {
       case StoryChapter.intro:
@@ -2511,6 +2538,7 @@ class GameController extends ChangeNotifier {
       case StoryChapter.intro:
         hasSeenStoryIntro = true;
         storage.setHasSeenStoryIntro(true);
+        _triggerCloudSave();
         break;
       case StoryChapter.resetButton:
         hasSeenStoryReset = true;

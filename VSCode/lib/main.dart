@@ -12,6 +12,7 @@ import 'services/ad_service.dart';
 import 'services/billing_service.dart';
 import 'services/update_service.dart';
 import 'controllers/game_controller.dart';
+import 'views/screens/intro_story_screen.dart';
 import 'views/screens/world_map_screen.dart';
 
 void main() async {
@@ -197,7 +198,27 @@ class _HowPredictableAppState extends State<HowPredictableApp>
         ),
         scaffoldBackgroundColor: const Color(0xFF0D0E12),
       ),
-      home: widget.home ?? const WorldMapScreen(),
+      home: widget.home ?? const _AppEntryGate(),
+    );
+  }
+}
+
+class _AppEntryGate extends StatelessWidget {
+  const _AppEntryGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<GameController>();
+    return AnimatedSwitcher(
+      duration: controller.animationsEnabled
+          ? const Duration(milliseconds: 320)
+          : Duration.zero,
+      child: controller.hasSeenIntro
+          ? const WorldMapScreen(key: ValueKey('entry_world_map'))
+          : IntroStoryScreen(
+              key: const ValueKey('entry_intro_story'),
+              onFinished: controller.completeIntroStory,
+            ),
     );
   }
 }

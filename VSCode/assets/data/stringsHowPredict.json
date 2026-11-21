@@ -1091,7 +1091,6 @@
     "pt_kingdom_fall_confirm_btn": "Voltar à Semana 0",
     "es_kingdom_fall_confirm_btn": "Volver a la Semana 0",
     "de_kingdom_fall_confirm_btn": "Zurück zu Woche 0",
-
     "en_castle_tab_throne": "Throne Room",
     "pt_castle_tab_throne": "Sala do Trono",
     "es_castle_tab_throne": "Salón del Trono",
@@ -1112,7 +1111,6 @@
     "pt_castle_tab_spoils": "Espólios de Guerra",
     "es_castle_tab_spoils": "Botín de Guerra",
     "de_castle_tab_spoils": "Kriegsbeute",
-
     "en_castle_wing_throne_subtitle": "King's Throne Room & Royal Decrees",
     "pt_castle_wing_throne_subtitle": "Sala do Trono e Decretos Reais",
     "es_castle_wing_throne_subtitle": "Salón del Trono y Decretos Reales",
@@ -1133,7 +1131,6 @@
     "pt_castle_wing_spoils_subtitle": "Recuperar Orbes Elementais Perdidos",
     "es_castle_wing_spoils_subtitle": "Recuperar Orbes Elementales Perdidos",
     "de_castle_wing_spoils_subtitle": "Verlorene Elementar-Sphären bergen",
-
     "en_castle_decrees_title": "Royal Decrees",
     "pt_castle_decrees_title": "Decretos Reais",
     "es_castle_decrees_title": "Decretos Reales",
@@ -1154,7 +1151,6 @@
     "pt_castle_decree_completed": "Concluído!",
     "es_castle_decree_completed": "¡Completado!",
     "de_castle_decree_completed": "Erfüllt!",
-
     "en_castle_decree_no_repeat_title": "Unbroken Variety",
     "pt_castle_decree_no_repeat_title": "Variedade Inquebrável",
     "es_castle_decree_no_repeat_title": "Variedad Inquebrantable",
@@ -1203,7 +1199,6 @@
     "pt_castle_decree_diverse_3_desc": "Vença rodadas derrotando 3 elementos inimigos diferentes em uma batalha",
     "es_castle_decree_diverse_3_desc": "Gana rondas derrotando 3 elementos enemigos distintos en una batalla",
     "de_castle_decree_diverse_3_desc": "Gewinne Runden gegen 3 verschiedene gegnerische Elemente in einem Kampf",
-
     "en_castle_endings_title": "Narrative Endings",
     "pt_castle_endings_title": "Finais Narrativos",
     "es_castle_endings_title": "Finales Narrativos",
@@ -1216,7 +1211,6 @@
     "pt_castle_locked_mystery": "??? (Bloqueado)",
     "es_castle_locked_mystery": "??? (Bloqueado)",
     "de_castle_locked_mystery": "??? (Gesperrt)",
-
     "en_castle_ending_perfect_title": "Master of Chaos (100%)",
     "pt_castle_ending_perfect_title": "Mestre do Caos (100%)",
     "es_castle_ending_perfect_title": "Maestro del Caos (100%)",
@@ -1229,7 +1223,6 @@
     "pt_castle_ending_perfect_hint": "Vença 100% das rodadas decisivas em uma batalha de 100 rodadas.",
     "es_castle_ending_perfect_hint": "Gana el 100% de rondas decisivas en una batalla de 100 rondas.",
     "de_castle_ending_perfect_hint": "Gewinne 100 % aller entschiedenen Runden in einem 100-Runden-Kampf.",
-
     "en_castle_ending_victor_title": "Kingdom Defender (>50%)",
     "pt_castle_ending_victor_title": "Defensor do Reino (>50%)",
     "es_castle_ending_victor_title": "Defensor del Reino (>50%)",
@@ -1242,7 +1235,6 @@
     "pt_castle_ending_victor_hint": "Termine 100 rodadas com pontuação entre 50% e 100%.",
     "es_castle_ending_victor_hint": "Termina 100 rondas con puntuación mayor a 50% y menor a 100%.",
     "de_castle_ending_victor_hint": "Beende 100 Runden mit >50 % und <100 % Wertung.",
-
     "en_castle_ending_outsmarted_title": "Read Like a Scroll (≤50%)",
     "pt_castle_ending_outsmarted_title": "Lido Como Pergaminho (≤50%)",
     "es_castle_ending_outsmarted_title": "Leído Como Pergamino (≤50%)",
@@ -1255,7 +1247,6 @@
     "pt_castle_ending_outsmarted_hint": "Termine 100 rodadas com 50% ou menos de pontuação.",
     "es_castle_ending_outsmarted_hint": "Termina 100 rondas con 50% o menos de puntuación.",
     "de_castle_ending_outsmarted_hint": "Beende 100 Runden mit höchstens 50 % Wertung.",
-
     "en_castle_ending_fall_title": "The Kingdom Has Fallen",
     "pt_castle_ending_fall_title": "O Reino Caiu",
     "es_castle_ending_fall_title": "El Reino Ha Caído",
@@ -1268,7 +1259,6 @@
     "pt_castle_ending_fall_hint": "Sofra derrota com 0 HP ou ultrapasse o prazo da Semana 40.",
     "es_castle_ending_fall_hint": "Sufre una derrota con 0 HP o supera el límite de la Semana 40.",
     "de_castle_ending_fall_hint": "Erleide eine Niederlage mit 0 LP oder überschreite Woche 40.",
-
     "en_castle_bestiary_title": "Arcane Bestiary",
     "pt_castle_bestiary_title": "Bestiário Arcano",
     "es_castle_bestiary_title": "Bestiario Arcano",
@@ -1281,7 +1271,6 @@
     "pt_castle_bestiary_unknown": "Construto Desconhecido",
     "es_castle_bestiary_unknown": "Constructo Desconocido",
     "de_castle_bestiary_unknown": "Unbekanntes Konstrukt",
-
     "en_castle_bestiary_guardian_name": "Guardian Robot",
     "pt_castle_bestiary_guardian_name": "Robô Guardião",
     "es_castle_bestiary_guardian_name": "Robot Guardián",
@@ -1298,7 +1287,6 @@
     "pt_castle_bestiary_guardian_hint": "Jogue rodadas em batalha para o construto aprender uma transição.",
     "es_castle_bestiary_guardian_hint": "Juega rondas en batalla para que el constructo aprenda una transición.",
     "de_castle_bestiary_guardian_hint": "Spiele Kampfrunden, damit das Konstrukt einen Übergang lernt.",
-
     "en_castle_bestiary_archmage_name": "Robot Archmage",
     "pt_castle_bestiary_archmage_name": "Robô Arquimago",
     "es_castle_bestiary_archmage_name": "Robot Archimago",
@@ -1315,7 +1303,6 @@
     "pt_castle_bestiary_archmage_hint": "Derrote o Robô Guardião na Semana 10 ou depois.",
     "es_castle_bestiary_archmage_hint": "Derrota al Robot Guardián en la Semana 10 o posterior.",
     "de_castle_bestiary_archmage_hint": "Besiege den Wächter-Roboter ab Woche 10.",
-
     "en_castle_bestiary_baby_name": "Baby Mage Robot",
     "pt_castle_bestiary_baby_name": "Robô Bebê Mago",
     "es_castle_bestiary_baby_name": "Robot Bebé Mago",
@@ -1332,7 +1319,6 @@
     "pt_castle_bestiary_baby_hint": "Derrote o Robô Guardião nas Semanas 2–9 ou derrote o Robô Arquimago.",
     "es_castle_bestiary_baby_hint": "Derrota al Robot Guardián en las Semanas 2–9 o derrota al Robot Archimago.",
     "de_castle_bestiary_baby_hint": "Besiege den Wächter-Roboter in Woche 2–9 oder den Roboter-Erzmagier.",
-
     "en_castle_treasury_vault_title": "Royal Treasury Vault",
     "pt_castle_treasury_vault_title": "Cofre do Tesouro Real",
     "es_castle_treasury_vault_title": "Bóveda del Tesoro Real",
@@ -1361,7 +1347,6 @@
     "pt_castle_treasury_claimed_msg": "Orbes do Tesouro transferidos para sua mochila!",
     "es_castle_treasury_claimed_msg": "¡Orbes del Tesoro transferidos a tu mochila!",
     "de_castle_treasury_claimed_msg": "Schatz-Sphären in deinen Rucksack übertragen!",
-
     "en_castle_alchemy_title": "Royal Alchemy (3 → 1 Exchange)",
     "pt_castle_alchemy_title": "Alquimia Real (Troca 3 → 1)",
     "es_castle_alchemy_title": "Alquimia Real (Intercambio 3 → 1)",
@@ -1390,7 +1375,6 @@
     "pt_castle_alchemy_transmute_btn": "Transmutar (3 → 1)",
     "es_castle_alchemy_transmute_btn": "Transmutar (3 → 1)",
     "de_castle_alchemy_transmute_btn": "Umwandeln (3 → 1)",
-
     "en_castle_relics_desc": "Upgrades lost when a previous campaign fell are preserved here. Restore them once into your current run.",
     "pt_castle_relics_desc": "Melhorias perdidas quando uma campanha anterior caiu ficam preservadas aqui. Restaure-as uma vez nesta jornada.",
     "es_castle_relics_desc": "Las mejoras perdidas al caer una campaña anterior se conservan aquí. Restáuralas una vez en tu partida actual.",
@@ -1415,7 +1399,6 @@
     "pt_castle_relics_restored_msg": "Relíquias perdidas restauradas à sua campanha!",
     "es_castle_relics_restored_msg": "¡Reliquias perdidas restauradas en tu campaña!",
     "de_castle_relics_restored_msg": "Verlorene Relikte im Feldzug wiederhergestellt!",
-
     "en_castle_spoils_desc": "Elemental Orbs lost from Turn 0 Battle Resets or Campaign Defeats are held here for one-time recovery.",
     "pt_castle_spoils_desc": "Orbes Elementais perdidos em Resets de Batalha ou Derrotas da Campanha ficam guardados aqui para recuperação única.",
     "es_castle_spoils_desc": "Los Orbes Elementales perdidos en Reinicios al Turno 0 o Derrotas de Campaña se guardan aquí para recuperarlos una vez.",
@@ -1440,7 +1423,6 @@
     "pt_castle_spoils_reclaimed_msg": "Orbes perdidos recuperados para sua mochila!",
     "es_castle_spoils_reclaimed_msg": "¡Orbes perdidos recuperados en tu mochila!",
     "de_castle_spoils_reclaimed_msg": "Verlorene Sphären in deinen Rucksack geborgen!",
-
     "en_upgrade_max_hp_title": "+1 Max HP",
     "pt_upgrade_max_hp_title": "+1 HP Máximo",
     "es_upgrade_max_hp_title": "+1 PS Máximo",
@@ -1449,7 +1431,6 @@
     "pt_upgrade_max_hp_desc": "Aumenta permanentemente o HP máximo do seu Clérigo em +1 nesta campanha.",
     "es_upgrade_max_hp_desc": "Aumenta permanentemente los PS máximos de tu Clérigo en +1 durante esta campaña.",
     "de_upgrade_max_hp_desc": "Erhöht die maximalen LP deines Klerikers in diesem Feldzug dauerhaft um +1.",
-
     "en_upgrade_max_mana_title": "+1 Max Mana Pool",
     "pt_upgrade_max_mana_title": "+1 Reserva de Mana Máxima",
     "es_upgrade_max_mana_title": "+1 Reserva de Maná Máxima",
@@ -1458,12 +1439,10 @@
     "pt_upgrade_max_mana_desc": "Expande permanentemente o Mana máximo do seu Clérigo em +1 turno por batalha.",
     "es_upgrade_max_mana_desc": "Amplía permanentemente el Maná máximo de tu Clérigo en +1 turno por batalla.",
     "de_upgrade_max_mana_desc": "Erweitert den maximalen Manavorrat deines Klerikers dauerhaft um +1 Zug pro Kampf.",
-
     "en_stat_upgrade_action_label": "Upgrade",
     "pt_stat_upgrade_action_label": "Aprimorar",
     "es_stat_upgrade_action_label": "Mejorar",
     "de_stat_upgrade_action_label": "Aufwerten",
-
     "en_castle_tab_hall_of_heroes": "Hall of Heroes",
     "pt_castle_tab_hall_of_heroes": "Salão dos Heróis",
     "es_castle_tab_hall_of_heroes": "Salón de Héroes",
@@ -1508,12 +1487,10 @@
     "pt_castle_heroes_restored_msg": "Bênçãos do herói caído restauradas ao seu Clérigo!",
     "es_castle_heroes_restored_msg": "¡Bendiciones del héroe caído restauradas a tu Clérigo!",
     "de_castle_heroes_restored_msg": "Segen des gefallenen Helden wurden wiederhergestellt!",
-
     "en_castle_hub_subtitle": "Kingdom Hub & Royal Wings",
     "pt_castle_hub_subtitle": "Centro do Reino e Alas Reais",
     "es_castle_hub_subtitle": "Centro del Reino y Alas Reales",
     "de_castle_hub_subtitle": "Königszentrum & Schlossflügel",
-
     "en_castle_tab_throne_short": "Throne",
     "pt_castle_tab_throne_short": "Trono",
     "es_castle_tab_throne_short": "Trono",
@@ -1538,7 +1515,6 @@
     "pt_castle_tab_heroes_short": "Heróis",
     "es_castle_tab_heroes_short": "Héroes",
     "de_castle_tab_heroes_short": "Helden",
-
     "en_castle_treasury_claim_ad_short": "Watch Ad to Claim",
     "pt_castle_treasury_claim_ad_short": "Ver Anúncio e Resgatar",
     "es_castle_treasury_claim_ad_short": "Ver Anuncio y Reclamar",
@@ -1551,7 +1527,6 @@
     "pt_castle_treasury_ad_disclosure_short": "Assista a um anúncio premiado para transferir os orbes à mochila.",
     "es_castle_treasury_ad_disclosure_short": "Mira un anuncio con recompensa para transferir los orbes a tu mochila.",
     "de_castle_treasury_ad_disclosure_short": "Sieh ein Belohnungsvideo, um alle Sphären zu erhalten.",
-
     "en_castle_alchemy_short_title": "Royal Alchemy",
     "pt_castle_alchemy_short_title": "Alquimia Real",
     "es_castle_alchemy_short_title": "Alquimia Real",
@@ -1568,7 +1543,6 @@
     "pt_castle_alchemy_max": "MÁX",
     "es_castle_alchemy_max": "MÁX",
     "de_castle_alchemy_max": "MAX",
-
     "en_castle_heroes_title": "Hall of Heroes",
     "pt_castle_heroes_title": "Salão dos Heróis",
     "es_castle_heroes_title": "Salón de los Héroes",
@@ -1613,7 +1587,6 @@
     "pt_castle_heroes_mastery_title": "Ressonância Elemental",
     "es_castle_heroes_mastery_title": "Resonancia Elemental",
     "de_castle_heroes_mastery_title": "Elementar-Resonanz",
-
     "en_boss_name_guardian": "Guardian Robot",
     "pt_boss_name_guardian": "Robô Guardião",
     "es_boss_name_guardian": "Robot Guardián",
@@ -1626,7 +1599,6 @@
     "pt_boss_name_baby_mage": "Robô Bebê Mago",
     "es_boss_name_baby_mage": "Robot Bebé Mago",
     "de_boss_name_baby_mage": "Baby-Magier-Roboter",
-
     "en_castle_ending_secret_w1_title": "Secret Ending: Week-1 Savior",
     "pt_castle_ending_secret_w1_title": "Final Secreto: Salvador da Semana 1",
     "es_castle_ending_secret_w1_title": "Final Secreto: Salvador de Semana 1",
@@ -1639,7 +1611,6 @@
     "pt_castle_ending_secret_w1_hint": "Reduza o Robô Guardião da Fase 1 a 0 HP durante a Semana 1.",
     "es_castle_ending_secret_w1_hint": "Reduce al Robot Guardián de Fase 1 a 0 HP durante la Semana 1.",
     "de_castle_ending_secret_w1_hint": "Senke die LP des Phase-1-Wächter-Roboters in Woche 1 auf 0.",
-
     "en_castle_ending_standard_victory_title": "Standard Victory: Lair Defeated",
     "pt_castle_ending_standard_victory_title": "Vitória Padrão: Covil Derrotado",
     "es_castle_ending_standard_victory_title": "Victoria Estándar: Guarida Derrotada",
@@ -1652,7 +1623,6 @@
     "pt_castle_ending_standard_victory_hint": "Derrote o Robô Bebê Mago da Fase 3 (400 HP).",
     "es_castle_ending_standard_victory_hint": "Derrota al Robot Bebé Mago de Fase 3 (400 HP).",
     "de_castle_ending_standard_victory_hint": "Besiege den Phase-3-Baby-Magier-Roboter (400 LP).",
-
     "en_markov_recalibrator_title": "Markov Recalibrator",
     "pt_markov_recalibrator_title": "Recalibrador de Markov",
     "es_markov_recalibrator_title": "Recalibrador de Markov",
@@ -1661,7 +1631,6 @@
     "pt_markov_recalibrator_desc": "Reconfigura a matriz do Algoritmo e dicas para revelar a verdadeira memória curta de 1 passo do Robô Arquimago",
     "es_markov_recalibrator_desc": "Reconfigura la matriz del Algoritmo y pistas para revelar la verdadera memoria corta de 1 paso del Robot Archimago",
     "de_markov_recalibrator_desc": "Rekalibriert Algorithmus-Matrix und Hinweise, um das echte 1-Schritt-Kurzzeitgedächtnis des Roboter-Erzmagiers offenzulegen",
-
     "en_markov_matrix_title": "Markov Transition Matrix",
     "pt_markov_matrix_title": "Matriz de Transição de Markov",
     "es_markov_matrix_title": "Matriz de Transición de Markov",
@@ -1682,7 +1651,6 @@
     "pt_markov_baby_mage_banner": "O Robô Bebê Mago ignora todo o histórico e escolhe aleatoriamente de forma uniforme (1/5 por elemento).",
     "es_markov_baby_mage_banner": "El Robot Bebé Mago ignora todo el historial y elige al azar de forma uniforme (1/5 por elemento).",
     "de_markov_baby_mage_banner": "Der Baby-Magier-Roboter ignoriert jeden Verlauf und wählt rein zufällig (1/5 pro Element).",
-
     "en_boss_victory_p1_title": "Guardian Robot Destroyed!",
     "pt_boss_victory_p1_title": "Robô Guardião Destruído!",
     "es_boss_victory_p1_title": "¡Robot Guardián Destruido!",
@@ -1747,7 +1715,6 @@
     "pt_boss_victory_face_archmage_btn": "Desafiar Robô Arquimago",
     "es_boss_victory_face_archmage_btn": "Desafiar Robot Archimago",
     "de_boss_victory_face_archmage_btn": "Roboter-Erzmagier fordern",
-
     "en_victory_cutscene_narrator": "Royal Chronicler",
     "pt_victory_cutscene_narrator": "Cronista Real",
     "es_victory_cutscene_narrator": "Cronista Real",
@@ -2019,5 +1986,61 @@
     "en_temple_blessing_battle_harvest": "Harvest: 2x Orbs",
     "pt_temple_blessing_battle_harvest": "Colheita: 2x Orbes",
     "es_temple_blessing_battle_harvest": "Cosecha: 2x Orbes",
-    "de_temple_blessing_battle_harvest": "Ernte: 2x Orbs"
+    "de_temple_blessing_battle_harvest": "Ernte: 2x Orbs",
+    "en_story_begin_quest": "Begin Quest",
+    "pt_story_begin_quest": "Iniciar Missão",
+    "es_story_begin_quest": "Comenzar Misión",
+    "de_story_begin_quest": "Mission beginnen",
+    "en_story_replay_intro": "Replay Intro",
+    "pt_story_replay_intro": "Rever Introdução",
+    "es_story_replay_intro": "Ver Intro de Nuevo",
+    "de_story_replay_intro": "Intro wiederholen",
+    "en_story_intro_c1_chapter": "Chapter I",
+    "pt_story_intro_c1_chapter": "Capítulo I",
+    "es_story_intro_c1_chapter": "Capítulo I",
+    "de_story_intro_c1_chapter": "Kapitel I",
+    "en_story_intro_c1_title": "The Metal Automaton",
+    "pt_story_intro_c1_title": "O Autômato de Metal",
+    "es_story_intro_c1_title": "El Autómata de Metal",
+    "de_story_intro_c1_title": "Der Metall-Automat",
+    "en_story_intro_c1_caption": "A Wizard obsessed with Metal studied human behavior and forged an automaton capable of predicting patterns and conjuring Fire, Water, and Wood.",
+    "pt_story_intro_c1_caption": "Um Mago obcecado pelo elemento Metal estudou o comportamento humano e forjou um autômato capaz de prever padrões e conjurar Fogo, Água e Madeira.",
+    "es_story_intro_c1_caption": "Un Mago obsesionado con el Metal estudió el comportamiento humano y forjó un autómata capaz de predecir patrones y conjurar Fuego, Agua y Madera.",
+    "de_story_intro_c1_caption": "Ein vom Metall besessener Zauberer studierte das menschliche Verhalten und schmiedete einen Automaten, der Muster vorhersagt und Feuer, Wasser sowie Holz beschwört.",
+    "en_story_intro_c2_chapter": "Chapter II",
+    "pt_story_intro_c2_chapter": "Capítulo II",
+    "es_story_intro_c2_chapter": "Capítulo II",
+    "de_story_intro_c2_chapter": "Kapitel II",
+    "en_story_intro_c2_title": "Ambush in the Royal Garden",
+    "pt_story_intro_c2_title": "Emboscada no Jardim Real",
+    "es_story_intro_c2_title": "Emboscada en el Jardín Real",
+    "de_story_intro_c2_title": "Hinterhalt im Königlichen Garten",
+    "en_story_intro_c2_caption": "In the royal garden, the automaton defeated the three guardian mages and kidnapped the Princess to the Metal Wizard's dark fortress.",
+    "pt_story_intro_c2_caption": "No jardim real, o autômato derrotou os três magos guardiões e raptou a Princesa para a fortaleza sombria do Mago de Metal.",
+    "es_story_intro_c2_caption": "En el jardín real, el autómata derrotó a los tres magos guardianes y secuestró a la Princesa hacia la oscura fortaleza del Mago de Metal.",
+    "de_story_intro_c2_caption": "Im königlichen Garten besiegte der Automat die drei Wächter-Magier und entführte die Prinzessin in die dunkle Festung des Metall-Zauberers.",
+    "en_story_intro_c3_chapter": "Chapter III",
+    "pt_story_intro_c3_chapter": "Capítulo III",
+    "es_story_intro_c3_chapter": "Capítulo III",
+    "de_story_intro_c3_chapter": "Kapitel III",
+    "en_story_intro_c3_title": "The King's Summons",
+    "pt_story_intro_c3_title": "O Chamado do Rei",
+    "es_story_intro_c3_title": "El Llamado del Rey",
+    "de_story_intro_c3_title": "Der Ruf des Königs",
+    "en_story_intro_c3_caption": "With no other hope, the King turned to the Sacred Temple and summoned the only young Cleric capable of channeling all three elements.",
+    "pt_story_intro_c3_caption": "Sem saída, o Rei recorreu ao Templo Sagrado e convocou o único jovem Clérigo capaz de canalizar os três elementos.",
+    "es_story_intro_c3_caption": "Sin otra salida, el Rey acudió al Templo Sagrado y convocó al único joven Clérigo capaz de canalizar los tres elementos.",
+    "de_story_intro_c3_caption": "Ohne anderen Ausweg wandte sich der König an den Heiligen Tempel und rief den einzigen jungen Kleriker, der alle drei Elemente meistert.",
+    "en_story_intro_c4_chapter": "Chapter IV",
+    "pt_story_intro_c4_chapter": "Capítulo IV",
+    "es_story_intro_c4_chapter": "Capítulo IV",
+    "de_story_intro_c4_chapter": "Kapitel IV",
+    "en_story_intro_c4_title": "The Quest Begins",
+    "pt_story_intro_c4_title": "A Jornada Começa",
+    "es_story_intro_c4_title": "Comienza la Misión",
+    "de_story_intro_c4_title": "Die Reise beginnt",
+    "en_story_intro_c4_caption": "Armed with your blessed Staff and orb satchel, you march toward the lair—defeat the automaton before time runs out.",
+    "pt_story_intro_c4_caption": "Com seu Cajado abençoado e sua mochila de orbes, você parte rumo ao covil — vença o autômato antes que o tempo acabe.",
+    "es_story_intro_c4_caption": "Con tu Báculo bendito y tu mochila de orbes, marchas hacia la guarida: derrota al autómata antes de que se acabe el tiempo.",
+    "de_story_intro_c4_caption": "Mit deinem gesegneten Stab und deinem Orb-Rucksack ziehst du zur Festung – besiege den Automaten, bevor die Zeit abläuft."
 }

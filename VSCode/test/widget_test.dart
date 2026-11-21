@@ -18,6 +18,7 @@ import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
+import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
@@ -805,7 +806,7 @@ void main() {
     expect(controller.unlockedPredictability, isFalse);
   });
 
-  testWidgets('Intro comic cutscene opens automatically on first launch, advances panels, and persists has_seen_story_intro', (WidgetTester tester) async {
+  testWidgets('IntroStoryScreen 4-card carousel opens automatically on first launch, advances cards, persists has_seen_story_intro, and transitions to WorldMapScreen', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'animationsEnabled': false,
     });
@@ -828,65 +829,46 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Intro comic cutscene should be open automatically
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsOneWidget);
-    expect(find.text('Panel 1 / 4'), findsOneWidget);
-    expect(storage.hasSeenStoryIntro, isTrue);
+    // IntroStoryScreen should open automatically before WorldMapScreen
+    expect(find.byKey(const ValueKey('intro_story_screen')), findsOneWidget);
+    expect(find.text('Chapter I'), findsOneWidget);
+    expect(find.text('The Metal Automaton'), findsOneWidget);
+    expect(find.text('1 / 4'), findsOneWidget);
+    expect(storage.hasSeenStoryIntro, isFalse);
 
-    // No speech bubbles over the comic image; only the dialogue text box below
-    expect(find.byKey(const ValueKey('comic_bubble_0')), findsNothing);
-    expect(find.byKey(const ValueKey('story_active_dialogue_text')), findsOneWidget);
-
-    // Back button with left arrow is at the left side of the Next button
-    final backBtnFinder = find.byKey(const ValueKey('story_back_button'));
-    final nextBtnFinder = find.byKey(const ValueKey('story_next_button'));
-    expect(backBtnFinder, findsOneWidget);
+    final nextBtnFinder = find.byKey(const ValueKey('intro_action_button'));
     expect(nextBtnFinder, findsOneWidget);
-    expect(
-      find.descendant(of: backBtnFinder, matching: find.byIcon(Icons.arrow_back_rounded)),
-      findsOneWidget,
-    );
-    expect(
-      tester.getCenter(backBtnFinder).dx,
-      lessThan(tester.getCenter(nextBtnFinder).dx),
-    );
 
-    // Slide finger to the left on dialogue box -> moves forward to Panel 2
-    await tester.drag(find.byKey(const ValueKey('story_dialogue_box')), const Offset(-120, 0));
+    // Swipe left on PageView -> moves forward to Card 2
+    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(-300, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Panel 2 / 4'), findsOneWidget);
+    expect(find.text('2 / 4'), findsOneWidget);
 
-    // Slide finger to the right on dialogue box -> rewinds to Panel 1
-    await tester.drag(find.byKey(const ValueKey('story_dialogue_box')), const Offset(120, 0));
+    // Swipe right on PageView -> rewinds to Card 1
+    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(300, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Panel 1 / 4'), findsOneWidget);
+    expect(find.text('1 / 4'), findsOneWidget);
 
-    // Tap Next to Panel 2, then tap Back button -> rewinds to Panel 1
+    // Tap Next through cards 2, 3, 4
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text('Panel 2 / 4'), findsOneWidget);
-
-    await tester.tap(backBtnFinder);
-    await tester.pumpAndSettle();
-    expect(find.text('Panel 1 / 4'), findsOneWidget);
-
-    // Tap Next through panels 2, 3, 4
-    await tester.tap(nextBtnFinder);
-    await tester.pumpAndSettle();
-    expect(find.text('Panel 2 / 4'), findsOneWidget);
+    expect(find.text('2 / 4'), findsOneWidget);
 
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text('Panel 3 / 4'), findsOneWidget);
+    expect(find.text('3 / 4'), findsOneWidget);
 
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text('Panel 4 / 4'), findsOneWidget);
+    expect(find.text('4 / 4'), findsOneWidget);
+    expect(find.text('Begin Quest'), findsOneWidget);
 
-    // Final tap on Continue closes the cutscene
+    // Final tap on Begin Quest persists hasSeenIntro and enters WorldMapScreen
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text("Prologue: The Master Hand's Shadow"), findsNothing);
+    expect(storage.hasSeenStoryIntro, isTrue);
+    expect(find.byKey(const ValueKey('intro_story_screen')), findsNothing);
+    expect(find.byKey(const ValueKey('world_map_screen')), findsOneWidget);
   });
 
   testWidgets('Resetting all progress from SettingsDialog closes settings, archives orbs to Spoils of War, resets to Week 0, and triggers Castle badge', (WidgetTester tester) async {
@@ -1047,17 +1029,15 @@ void main() {
     await tester.tap(storyMemoriesBtn);
     await tester.pumpAndSettle();
 
-    // Prologue and Reset Button chapters are unlocked (2 / 9), while Predictability Score is still locked
-    expect(find.text('2 / 9'), findsOneWidget);
-    expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
-    expect(find.byKey(const ValueKey('story_gallery_item_reset')), findsOneWidget);
-    expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsOneWidget);
+    // 4 intro memories + Reset Button chapter are unlocked (5 / 12), while Predictability Score is still locked
+    expect(find.text('5 / 12'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_intro_1')), findsOneWidget);
 
     // Verify Story Memories layout: chapter name is above thumbnail and read button,
     // and thumbnail and read button are in the same horizontal line
-    final introTitleFinder = find.text("Prologue: The Master Hand's Shadow");
-    final introThumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro'));
-    final introReadBtnFinder = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
+    final introTitleFinder = find.text('Chapter I: The Metal Automaton');
+    final introThumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro_1'));
+    final introReadBtnFinder = find.byKey(const ValueKey('story_gallery_read_btn_intro_1'));
     expect(
       tester.getBottomLeft(introTitleFinder).dy,
       lessThan(tester.getTopLeft(introThumbFinder).dy),
@@ -1067,8 +1047,22 @@ void main() {
       equals(tester.getCenter(introReadBtnFinder).dy),
     );
 
+    final galleryScrollable = find.descendant(
+      of: find.byType(StoryMemoriesSection),
+      matching: find.byType(Scrollable),
+    );
+    final resetItemFinder = find.byKey(const ValueKey('story_gallery_item_reset'));
+    await tester.scrollUntilVisible(
+      resetItemFinder,
+      180,
+      scrollable: galleryScrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(resetItemFinder, findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsOneWidget);
+
     // Tap the unlocked Reset chapter in Story Gallery to replay its comic
-    await tester.tap(find.byKey(const ValueKey('story_gallery_item_reset')));
+    await tester.tap(resetItemFinder);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('story_skip_button')), findsOneWidget);
     expect(find.text('Panel 1 / 4'), findsOneWidget);

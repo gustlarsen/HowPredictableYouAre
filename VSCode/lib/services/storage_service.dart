@@ -561,6 +561,9 @@ class StorageService {
   Future<void> setHasSeenStoryIntro(bool val) =>
       _prefs.setBool('has_seen_story_intro', val);
 
+  bool get hasSeenIntro => hasSeenStoryIntro;
+  Future<void> setHasSeenIntro(bool val) => setHasSeenStoryIntro(val);
+
   bool get hasSeenStoryReset =>
       _prefs.getBool('has_seen_story_reset') ?? false;
   Future<void> setHasSeenStoryReset(bool val) =>
