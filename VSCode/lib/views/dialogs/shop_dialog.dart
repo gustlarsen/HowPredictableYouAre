@@ -751,11 +751,11 @@ class _ShopDialogState extends State<ShopDialog> {
       (
         wing: TempleWing.transmute,
         key: const ValueKey('temple_tab_transmute'),
-        iconBuilder: (isSelected) => HolyTransmuteIcon(
+        iconBuilder: (isSelected) => HolyTransformationIcon(
           size: 28,
           isOnGoldBackground: isSelected,
         ),
-        label: loc.t('temple_tab_transmute', fallback: 'Transmute'),
+        label: loc.t('temple_tab_transmute', fallback: 'Transformation'),
       ),
       (
         wing: TempleWing.adoration,
@@ -1554,7 +1554,7 @@ class _ShopDialogState extends State<ShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            loc.t('temple_transmute_title', fallback: 'Holy Transmutation'),
+            loc.t('temple_transmute_title', fallback: 'Holy Transformation'),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 15,
@@ -1566,7 +1566,7 @@ class _ShopDialogState extends State<ShopDialog> {
             loc.t(
               'castle_alchemy_desc',
               fallback:
-                  'Transmute 3 surplus Elemental Orbs of one element into 1 Elemental Orb of another.',
+                  'Transform 3 surplus Elemental Orbs of one element into 1 Elemental Orb of another.',
             ),
             style: TextStyle(
               fontSize: 11.5,
@@ -1589,31 +1589,36 @@ class _ShopDialogState extends State<ShopDialog> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
+                      flex: 3,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const TransmuteCircleIcon(size: 22),
-                          const SizedBox(width: 7),
+                          const TransformationMiracleIcon(size: 22),
+                          const SizedBox(width: 6),
                           Flexible(
-                            child: Text(
-                              loc.t(
-                                'temple_transmute_rate_label',
-                                fallback: '3 → 1 Exchange',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                color: palette.primaryText,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                loc.t(
+                                  'temple_transmute_rate_label',
+                                  fallback: '3 → 1 Exchange',
+                                ),
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                  color: palette.primaryText,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Flexible(
+                      flex: 2,
                       child: _transmuteConfirmationText != null
                           ? Container(
                               key: const ValueKey('alchemy_confirmation_badge'),
@@ -1646,17 +1651,20 @@ class _ShopDialogState extends State<ShopDialog> {
                                 ),
                               ),
                             )
-                          : Text(
-                              loc.t(
-                                'castle_alchemy_tap_hint',
-                                fallback: 'Tap orbs to switch',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.end,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: palette.mutedText,
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                loc.t(
+                                  'castle_alchemy_tap_hint',
+                                  fallback: 'Tap orbs to switch',
+                                ),
+                                maxLines: 1,
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: palette.mutedText,
+                                ),
                               ),
                             ),
                     ),
@@ -1861,7 +1869,7 @@ class _ShopDialogState extends State<ShopDialog> {
                 Text(
                   loc.t(
                     'temple_transmute_hold_hint',
-                    fallback: 'Tip: Press & hold Exchange for rapid transmutation.',
+                    fallback: 'Tip: Press & hold Exchange for rapid transformation.',
                   ),
                   textAlign: TextAlign.center,
                   style: TextStyle(

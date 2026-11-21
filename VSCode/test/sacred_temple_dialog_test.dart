@@ -324,6 +324,18 @@ void main() {
         }
 
         // Verify all 4 localizations render tabs and titles without key fallbacks
+        const expectedTabNames = {
+          'en': 'Transformation',
+          'pt': 'Transformação',
+          'es': 'Transformación',
+          'de': 'Verwandlung',
+        };
+        const expectedTitles = {
+          'en': 'Holy Transformation',
+          'pt': 'Transformação Sagrada',
+          'es': 'Transformación Sagrada',
+          'de': 'Heilige Verwandlung',
+        };
         for (final lang in LocalizationService.supportedLanguages) {
           controller.setLanguage(lang);
           await tester.pumpAndSettle();
@@ -341,6 +353,15 @@ void main() {
           ]) {
             expect(controller.localization.t(tabKey), isNot(tabKey));
           }
+          expect(
+            controller.localization.t('temple_tab_transmute'),
+            expectedTabNames[lang],
+          );
+          expect(
+            controller.localization.t('temple_transmute_title'),
+            expectedTitles[lang],
+          );
+          expect(find.text(expectedTabNames[lang]!), findsOneWidget);
         }
       },
     );
@@ -461,7 +482,7 @@ void main() {
     );
 
     testWidgets(
-      'Wing 3 Holy Transmutation supports 1x/10x/100x/MAX batch exchange and press-and-hold rapid exchange on 360dp',
+      'Wing 3 Holy Transformation supports 1x/10x/100x/MAX batch exchange, press-and-hold rapid exchange, and zero label truncation on 360dp',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(360, 740);
         tester.view.devicePixelRatio = 1.0;
@@ -497,6 +518,31 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+
+        // Transformation labels & non-truncated 3 -> 1 Exchange header on 360dp
+        expect(find.text('Transformation'), findsOneWidget);
+        expect(find.text('Holy Transformation'), findsOneWidget);
+        expect(
+          find.text(
+            'Transform 3 surplus Elemental Orbs of one element into 1 Elemental Orb of another.',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Tip: Press & hold Exchange for rapid transformation.'),
+          findsOneWidget,
+        );
+        final exchangeRateFinder = find.text('3 → 1 Exchange');
+        final tapHintFinder = find.text('Tap orbs to switch');
+        expect(exchangeRateFinder, findsOneWidget);
+        expect(tapHintFinder, findsOneWidget);
+        final exchangeTextWidget = tester.widget<Text>(exchangeRateFinder);
+        expect(exchangeTextWidget.overflow, isNot(TextOverflow.ellipsis));
+        expect(
+          tester.getTopRight(exchangeRateFinder).dx,
+          lessThan(tester.getTopLeft(tapHintFinder).dx),
+        );
+        expect(tester.takeException(), isNull);
 
         // All 4 batch pills fit on a single row inside 360dp
         for (final keyName in const [
@@ -858,8 +904,8 @@ void main() {
           const ConsagrationChaliceIcon(size: 28, isOnGoldBackground: true),
           const OfferingsAltarIcon(size: 28, isOnGoldBackground: false),
           const OfferingsAltarIcon(size: 28, isOnGoldBackground: true),
-          const HolyTransmuteIcon(size: 28, isOnGoldBackground: false),
-          const HolyTransmuteIcon(size: 28, isOnGoldBackground: true),
+          const HolyTransformationIcon(size: 28, isOnGoldBackground: false),
+          const HolyTransformationIcon(size: 28, isOnGoldBackground: true),
           const AdorationHarpIcon(size: 28, isOnGoldBackground: false),
           const AdorationHarpIcon(size: 28, isOnGoldBackground: true),
           const PrayerHandsIcon(size: 28, isOnGoldBackground: false),
@@ -868,7 +914,7 @@ void main() {
           const VitalityHeartIcon(size: 46),
           const ManaDropIcon(size: 46),
           const SacredRelicIcon(size: 24),
-          const TransmuteCircleIcon(size: 22),
+          const TransformationMiracleIcon(size: 22),
           const ReliquaryBundleIcon(size: 22),
           const ElementalCrystalIcon(size: 22),
           const MeditationHaloIcon(size: 24),
@@ -933,9 +979,9 @@ void main() {
             of: offeringsTab,
             matching: find.byType(OfferingsAltarIcon),
           );
-          final prismFinder = find.descendant(
+          final transformationFinder = find.descendant(
             of: transmuteTab,
-            matching: find.byType(HolyTransmuteIcon),
+            matching: find.byType(HolyTransformationIcon),
           );
           final harpFinder = find.descendant(
             of: adorationTab,
@@ -949,7 +995,7 @@ void main() {
           for (final finder in [
             chaliceFinder,
             altarFinder,
-            prismFinder,
+            transformationFinder,
             harpFinder,
             handsFinder,
           ]) {
@@ -960,7 +1006,7 @@ void main() {
           // Wing 1 (Consagration) active by default
           expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isTrue);
           expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isFalse);
           expect(find.byType(VitalityHeartIcon), findsOneWidget);
@@ -981,17 +1027,17 @@ void main() {
           expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isTrue);
           expect(find.byType(SacredRelicIcon), findsOneWidget);
 
-          // Wing 3 (Transmute)
+          // Wing 3 (Transformation)
           await tester.tap(transmuteTab);
           await tester.pumpAndSettle();
           expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isTrue);
-          expect(find.byType(TransmuteCircleIcon), findsOneWidget);
+          expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(TransformationMiracleIcon), findsOneWidget);
 
           // Wing 4 (Adoration)
           await tester.tap(adorationTab);
           await tester.pumpAndSettle();
-          expect(tester.widget<HolyTransmuteIcon>(prismFinder).isOnGoldBackground, isFalse);
+          expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isTrue);
           expect(find.byType(ReliquaryBundleIcon), findsOneWidget);
           expect(find.byType(ElementalCrystalIcon), findsOneWidget);

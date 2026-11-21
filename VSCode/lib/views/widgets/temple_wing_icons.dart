@@ -492,14 +492,14 @@ class _OfferingsAltarPainter extends CustomPainter {
       oldDelegate.isOnGoldBackground != isOnGoldBackground;
 }
 
-/// Tab 3 — Transmute: Bold Six-Pointed Interlocking Star / Hexagram Crystal
-/// Prism formed by two thick overlapping faceted triangles in luminous
-/// cyan-blue and warm gold with crisp dark outlines.
-class HolyTransmuteIcon extends StatelessWidget {
+/// Tab 3 — Transformation: Radiant 4-pointed divine miracle star/cross framed
+/// by two graceful curved golden transformation arcs symbolizing divine grace
+/// converting one substance into another.
+class HolyTransformationIcon extends StatelessWidget {
   final double size;
   final bool isOnGoldBackground;
 
-  const HolyTransmuteIcon({
+  const HolyTransformationIcon({
     super.key,
     this.size = 28.0,
     this.isOnGoldBackground = false,
@@ -509,15 +509,17 @@ class HolyTransmuteIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return _TempleVectorIcon(
       size: size,
-      painter: _HolyTransmutePainter(isOnGoldBackground: isOnGoldBackground),
+      painter: _HolyTransformationPainter(
+        isOnGoldBackground: isOnGoldBackground,
+      ),
     );
   }
 }
 
-class _HolyTransmutePainter extends CustomPainter {
+class _HolyTransformationPainter extends CustomPainter {
   final bool isOnGoldBackground;
 
-  const _HolyTransmutePainter({required this.isOnGoldBackground});
+  const _HolyTransformationPainter({required this.isOnGoldBackground});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -528,147 +530,196 @@ class _HolyTransmutePainter extends CustomPainter {
     final outline = _outlinePaint(
       scale,
       isOnGoldBackground: isOnGoldBackground,
-      baseWidth: 1.35,
+      baseWidth: 1.25,
+    );
+    final detail = _detailPaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      alpha: 0.72,
+      baseWidth: 0.80,
     );
 
-    final cyanLight = const Color(0xFF80F3FF);
-    final cyanMid = const Color(0xFF00E5FF);
-    final cyanDark = const Color(0xFF0288D1);
+    // On active gold pill (#F5C22B), switch cleanly to deep charcoal-slate
+    // tones for crisp contrast; when inactive, use rich gold & radiant ivory/cyan.
+    final arcLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFF3B0);
+    final arcMid =
+        isOnGoldBackground ? const Color(0xFF263238) : const Color(0xFFFFCA28);
+    final arcDark =
+        isOnGoldBackground ? const Color(0xFF1A2226) : const Color(0xFFB27800);
 
-    final goldLight =
-        isOnGoldBackground ? const Color(0xFFFFCC80) : const Color(0xFFFFF59D);
-    final goldMid =
-        isOnGoldBackground ? const Color(0xFFE68A00) : const Color(0xFFFFD54F);
-    final goldDark =
-        isOnGoldBackground ? const Color(0xFF8D4E00) : const Color(0xFFF57F17);
+    final starCenter =
+        isOnGoldBackground ? const Color(0xFF546E7A) : const Color(0xFFFFFFFF);
+    final starMid =
+        isOnGoldBackground ? const Color(0xFF2E3B42) : const Color(0xFFE0F7FA);
+    final starEdge =
+        isOnGoldBackground ? const Color(0xFF1A2226) : const Color(0xFF4DD0E1);
+
+    final sparkleColor = isOnGoldBackground
+        ? const Color(0xFF263238)
+        : const Color(0xFFFFF8E1);
+    final glintColor = isOnGoldBackground
+        ? const Color(0xFF90A4AE).withValues(alpha: 0.65)
+        : Colors.white.withValues(alpha: 0.80);
 
     canvas.save();
     canvas.translate(ox, oy);
 
-    final center = Offset(s * 0.50, s * 0.50);
-    final rOuter = s * 0.42;
-    final rInner = s * 0.24;
+    final c = Offset(s * 0.50, s * 0.50);
 
-    Path buildHollowTriangle(double startAngle) {
-      final path = Path()..fillType = PathFillType.evenOdd;
-      for (int i = 0; i < 3; i++) {
-        final a = startAngle + i * (2 * math.pi / 3);
-        final pt = center + Offset(math.cos(a), math.sin(a)) * rOuter;
-        if (i == 0) {
-          path.moveTo(pt.dx, pt.dy);
-        } else {
-          path.lineTo(pt.dx, pt.dy);
-        }
+    // 1. Two graceful curved transformation arcs orbiting the miracle star
+    Path buildTransformationArc(double rotationOffset) {
+      final path = Path();
+      const steps = 16;
+      const startAngle = math.pi * 1.08;
+      const endAngle = math.pi * 1.84; // sweeps across top to upper-right
+      final rIn = s * 0.315;
+      final rOut = s * 0.43;
+      final rMid = (rIn + rOut) * 0.5;
+
+      Offset polar(double angle, double radius) =>
+          c + Offset(math.cos(angle + rotationOffset), math.sin(angle + rotationOffset)) * radius;
+
+      // Start at tapered tail
+      final tail = polar(startAngle, rMid);
+      path.moveTo(tail.dx, tail.dy);
+
+      // Outer sweeping curve swelling toward the arrow head
+      for (int i = 1; i <= steps; i++) {
+        final t = i / steps;
+        final a = startAngle + (endAngle - startAngle) * t;
+        final thickness = math.sin(t * math.pi * 0.68);
+        final r = rMid + (rOut - rMid) * (0.25 + 0.75 * thickness);
+        final pt = polar(a, r);
+        path.lineTo(pt.dx, pt.dy);
       }
-      path.close();
-      for (int i = 0; i < 3; i++) {
-        final a = startAngle + i * (2 * math.pi / 3);
-        final pt = center + Offset(math.cos(a), math.sin(a)) * rInner;
-        if (i == 0) {
-          path.moveTo(pt.dx, pt.dy);
-        } else {
-          path.lineTo(pt.dx, pt.dy);
-        }
+
+      // Flared light-beam arrowhead pointing clockwise
+      final headOuter = polar(endAngle - 0.03, s * 0.465);
+      final headTip = polar(endAngle + 0.14, rMid);
+      final headInner = polar(endAngle - 0.03, s * 0.27);
+      path.lineTo(headOuter.dx, headOuter.dy);
+      path.lineTo(headTip.dx, headTip.dy);
+      path.lineTo(headInner.dx, headInner.dy);
+
+      // Inner sweeping curve returning to tapered tail
+      for (int i = steps; i >= 1; i--) {
+        final t = i / steps;
+        final a = startAngle + (endAngle - startAngle) * t;
+        final thickness = math.sin(t * math.pi * 0.68);
+        final r = rMid - (rMid - rIn) * (0.25 + 0.75 * thickness);
+        final pt = polar(a, r);
+        path.lineTo(pt.dx, pt.dy);
       }
       path.close();
       return path;
     }
 
-    void drawFacetedTriangle(
-      double startAngle,
-      Color light,
-      Color mid,
-      Color dark,
-    ) {
-      final outerPts = [
-        for (int i = 0; i < 3; i++)
-          center +
-              Offset(
-                math.cos(startAngle + i * (2 * math.pi / 3)),
-                math.sin(startAngle + i * (2 * math.pi / 3)),
-              ) *
-                  rOuter,
-      ];
-      final innerPts = [
-        for (int i = 0; i < 3; i++)
-          center +
-              Offset(
-                math.cos(startAngle + i * (2 * math.pi / 3)),
-                math.sin(startAngle + i * (2 * math.pi / 3)),
-              ) *
-                  rInner,
-      ];
-
-      final hollow = buildHollowTriangle(startAngle);
+    for (final rot in [0.0, math.pi]) {
+      final arcPath = buildTransformationArc(rot);
       canvas.drawPath(
-        hollow,
+        arcPath,
         Paint()
           ..shader = LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [light, mid, dark],
-            stops: const [0.0, 0.48, 1.0],
-          ).createShader(Rect.fromCircle(center: center, radius: rOuter)),
+            colors: [arcLight, arcMid, arcDark],
+            stops: const [0.0, 0.50, 1.0],
+          ).createShader(Rect.fromCircle(center: c, radius: s * 0.46)),
       );
-
-      // Subtle inner bevel highlight along one edge for faceted 3D prism look
-      final ridgePts = [
-        for (int i = 0; i < 3; i++)
-          Offset.lerp(outerPts[i], innerPts[i], 0.48)!,
-      ];
-      final outerBevel = Path()
-        ..moveTo(outerPts[0].dx, outerPts[0].dy)
-        ..lineTo(outerPts[2].dx, outerPts[2].dy)
-        ..lineTo(ridgePts[2].dx, ridgePts[2].dy)
-        ..lineTo(ridgePts[0].dx, ridgePts[0].dy)
-        ..close();
-      canvas.drawPath(
-        outerBevel,
-        Paint()..color = Colors.white.withValues(alpha: 0.24),
-      );
-
-      // Crisp dark outlines on both outer and inner triangle borders
-      final outerBorder = Path()
-        ..moveTo(outerPts[0].dx, outerPts[0].dy)
-        ..lineTo(outerPts[1].dx, outerPts[1].dy)
-        ..lineTo(outerPts[2].dx, outerPts[2].dy)
-        ..close();
-      final innerBorder = Path()
-        ..moveTo(innerPts[0].dx, innerPts[0].dy)
-        ..lineTo(innerPts[1].dx, innerPts[1].dy)
-        ..lineTo(innerPts[2].dx, innerPts[2].dy)
-        ..close();
-      canvas.drawPath(outerBorder, outline);
-      canvas.drawPath(innerBorder, outline);
+      canvas.drawPath(arcPath, outline);
     }
 
-    // 1. Draw downward Gold triangle base
-    drawFacetedTriangle(math.pi / 2, goldLight, goldMid, goldDark);
+    // Subtle specular glint along upper arc crest
+    final upperGlint = Path()
+      ..addArc(
+        Rect.fromCircle(center: c, radius: s * 0.39),
+        -math.pi * 0.72,
+        math.pi * 0.34,
+      );
+    canvas.drawPath(
+      upperGlint,
+      Paint()
+        ..color = glintColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.75, 0.9 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
 
-    // 2. Draw upward Cyan triangle
-    drawFacetedTriangle(-math.pi / 2, cyanLight, cyanMid, cyanDark);
+    // 2. Radiant 4-pointed divine miracle star/cross in the center
+    final rTip = s * 0.275;
+    final starPath = Path()
+      ..moveTo(c.dx, c.dy - rTip)
+      ..cubicTo(
+        c.dx + s * 0.014,
+        c.dy - s * 0.068,
+        c.dx + s * 0.068,
+        c.dy - s * 0.014,
+        c.dx + rTip,
+        c.dy,
+      )
+      ..cubicTo(
+        c.dx + s * 0.068,
+        c.dy + s * 0.014,
+        c.dx + s * 0.014,
+        c.dy + s * 0.068,
+        c.dx,
+        c.dy + rTip,
+      )
+      ..cubicTo(
+        c.dx - s * 0.014,
+        c.dy + s * 0.068,
+        c.dx - s * 0.068,
+        c.dy + s * 0.014,
+        c.dx - rTip,
+        c.dy,
+      )
+      ..cubicTo(
+        c.dx - s * 0.068,
+        c.dy - s * 0.014,
+        c.dx - s * 0.014,
+        c.dy - s * 0.068,
+        c.dx,
+        c.dy - rTip,
+      )
+      ..close();
 
-    // 3. True interlocking weave: clip to 3 alternating crossings and redraw
-    // the Gold triangle on top so each triangle weaves over & under cleanly.
-    final rMid = (rOuter + rInner) * 0.5;
-    final crossingR = rMid / math.sqrt(3);
-    final patchRadius = s * 0.13;
-    final weaveClip = Path();
-    for (final deg in [0.0, 120.0, 240.0]) {
-      final rad = deg * math.pi / 180.0;
-      final pt = center + Offset(math.cos(rad), math.sin(rad)) * crossingR;
-      weaveClip.addOval(Rect.fromCircle(center: pt, radius: patchRadius));
+    canvas.drawPath(
+      starPath,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [starCenter, starMid, starEdge],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: c, radius: rTip)),
+    );
+    canvas.drawPath(starPath, outline);
+
+    // Fine internal cross-flare ribs inside the 4-pointed miracle star
+    canvas.drawLine(
+      Offset(c.dx, c.dy - s * 0.14),
+      Offset(c.dx, c.dy + s * 0.14),
+      detail,
+    );
+    canvas.drawLine(
+      Offset(c.dx - s * 0.14, c.dy),
+      Offset(c.dx + s * 0.14, c.dy),
+      detail,
+    );
+
+    // 3. Delicate diagonal miracle sparkle accents in the open quadrants
+    for (final pt in [
+      Offset(s * 0.25, s * 0.25),
+      Offset(s * 0.75, s * 0.75),
+    ]) {
+      canvas.drawCircle(pt, s * 0.026, Paint()..color = sparkleColor);
+      canvas.drawCircle(pt, s * 0.026, detail);
     }
-    canvas.save();
-    canvas.clipPath(weaveClip);
-    drawFacetedTriangle(math.pi / 2, goldLight, goldMid, goldDark);
-    canvas.restore();
 
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_HolyTransmutePainter oldDelegate) =>
+  bool shouldRepaint(_HolyTransformationPainter oldDelegate) =>
       oldDelegate.isOnGoldBackground != isOnGoldBackground;
 }
 
@@ -1767,24 +1818,25 @@ class _SacredRelicPainter extends CustomPainter {
   bool shouldRepaint(_SacredRelicPainter oldDelegate) => false;
 }
 
-/// Wing 3 — `Holy Transmutation (3 → 1)`: Bold beveled geometric runic
-/// conversion medallion with glowing cyan triangle and faceted elemental orbs.
-class TransmuteCircleIcon extends StatelessWidget {
+/// Wing 3 — `Holy Transformation (3 → 1)`: Compact divine miracle emblem
+/// featuring a radiant golden halo/orb with a 4-pointed star sparkle and
+/// a graceful curved golden conversion arc.
+class TransformationMiracleIcon extends StatelessWidget {
   final double size;
 
-  const TransmuteCircleIcon({super.key, this.size = 24.0});
+  const TransformationMiracleIcon({super.key, this.size = 24.0});
 
   @override
   Widget build(BuildContext context) {
     return _TempleVectorIcon(
       size: size,
-      painter: const _TransmuteCirclePainter(),
+      painter: const _TransformationMiraclePainter(),
     );
   }
 }
 
-class _TransmuteCirclePainter extends CustomPainter {
-  const _TransmuteCirclePainter();
+class _TransformationMiraclePainter extends CustomPainter {
+  const _TransformationMiraclePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1792,7 +1844,8 @@ class _TransmuteCirclePainter extends CustomPainter {
     final ox = (size.width - s) * 0.5;
     final oy = (size.height - s) * 0.5;
     final scale = s / 24.0;
-    final outline = _outlinePaint(scale, baseWidth: 1.25);
+    final outline = _outlinePaint(scale, baseWidth: 1.2);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.9);
 
     canvas.save();
     canvas.translate(ox, oy);
@@ -1801,82 +1854,144 @@ class _TransmuteCirclePainter extends CustomPainter {
     final outerR = s * 0.44;
     final innerR = s * 0.34;
 
-    // 1. Arcane indigo recessed disc
+    // 1. Deep celestial sanctuary orb core for crisp contrast
     canvas.drawCircle(
       c,
       innerR,
       Paint()
         ..shader = const RadialGradient(
-          colors: [Color(0xFF311B6B), Color(0xFF141824)],
+          center: Alignment(-0.25, -0.25),
+          colors: [Color(0xFF2C5282), Color(0xFF1A365D), Color(0xFF0F172A)],
         ).createShader(Rect.fromCircle(center: c, radius: innerR)),
     );
 
-    // 2. Thick beveled golden medallion rim
-    final ringPath = Path()
+    // 2. Radiant beveled golden halo rim
+    final haloPath = Path()
       ..fillType = PathFillType.evenOdd
       ..addOval(Rect.fromCircle(center: c, radius: outerR))
       ..addOval(Rect.fromCircle(center: c, radius: innerR));
     canvas.drawPath(
-      ringPath,
+      haloPath,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF3B0), Color(0xFFFFB300), Color(0xFF9A6500)],
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFB27800)],
         ).createShader(Rect.fromCircle(center: c, radius: outerR)),
     );
     canvas.drawCircle(c, outerR, outline);
     canvas.drawCircle(c, innerR, outline);
 
-    // 3. Inscribed glowing cyan conversion triangle
-    final triR = s * 0.255;
-    final tri = Path();
-    for (int i = 0; i < 3; i++) {
-      final a = -math.pi / 2 + i * (2 * math.pi / 3);
-      final pt = c + Offset(math.cos(a), math.sin(a)) * triR;
-      if (i == 0) {
-        tri.moveTo(pt.dx, pt.dy);
-      } else {
-        tri.lineTo(pt.dx, pt.dy);
-      }
-    }
-    tri.close();
-    canvas.drawPath(
-      tri,
-      Paint()
-        ..color = const Color(0xFF00E5FF)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.2, 1.55 * scale)
-        ..strokeJoin = StrokeJoin.round,
-    );
+    // 3. Curved golden conversion arc sweeping along the lower-right rim
+    final arcPath = Path();
+    const steps = 14;
+    const startAngle = math.pi * 0.78;
+    const endAngle = -math.pi * 0.14; // sweeps counter-clockwise up to right
+    final arcRIn = s * 0.205;
+    final arcROut = s * 0.295;
+    final arcRMid = (arcRIn + arcROut) * 0.5;
 
-    // 4. Three shaded elemental gem nodes on triangle vertices
-    const nodePalettes = [
-      (Color(0xFFFFAB91), Color(0xFFFF5722), Color(0xFFBF360C)),
-      (Color(0xFFB2F5FF), Color(0xFF00E5FF), Color(0xFF0277BD)),
-      (Color(0xFFC8E6C9), Color(0xFF4CAF50), Color(0xFF1B5E20)),
-    ];
-    for (int i = 0; i < 3; i++) {
-      final a = -math.pi / 2 + i * (2 * math.pi / 3);
-      final pt = c + Offset(math.cos(a), math.sin(a)) * triR;
-      final nr = s * 0.08;
-      canvas.drawCircle(
-        pt,
-        nr,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-0.35, -0.35),
-            colors: [nodePalettes[i].$1, nodePalettes[i].$2, nodePalettes[i].$3],
-          ).createShader(Rect.fromCircle(center: pt, radius: nr)),
-      );
-      canvas.drawCircle(pt, nr, outline);
+    Offset polar(double a, double r) =>
+        c + Offset(math.cos(a), math.sin(a)) * r;
+
+    final tail = polar(startAngle, arcRMid);
+    arcPath.moveTo(tail.dx, tail.dy);
+    for (int i = 1; i <= steps; i++) {
+      final t = i / steps;
+      final a = startAngle + (endAngle - startAngle) * t;
+      final swell = math.sin(t * math.pi * 0.72);
+      final r = arcRMid + (arcROut - arcRMid) * (0.25 + 0.75 * swell);
+      final pt = polar(a, r);
+      arcPath.lineTo(pt.dx, pt.dy);
     }
+    final headOuter = polar(endAngle + 0.04, s * 0.315);
+    final headTip = polar(endAngle - 0.16, arcRMid);
+    final headInner = polar(endAngle + 0.04, s * 0.175);
+    arcPath.lineTo(headOuter.dx, headOuter.dy);
+    arcPath.lineTo(headTip.dx, headTip.dy);
+    arcPath.lineTo(headInner.dx, headInner.dy);
+    for (int i = steps; i >= 1; i--) {
+      final t = i / steps;
+      final a = startAngle + (endAngle - startAngle) * t;
+      final swell = math.sin(t * math.pi * 0.72);
+      final r = arcRMid - (arcRMid - arcRIn) * (0.25 + 0.75 * swell);
+      final pt = polar(a, r);
+      arcPath.lineTo(pt.dx, pt.dy);
+    }
+    arcPath.close();
+
+    canvas.drawPath(
+      arcPath,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.bottomLeft,
+          end: Alignment.topRight,
+          colors: [Color(0xFFFFCA28), Color(0xFFFFF8E1)],
+        ).createShader(Rect.fromCircle(center: c, radius: arcROut)),
+    );
+    canvas.drawPath(arcPath, thinOutline);
+
+    // 4. Radiant 4-pointed divine miracle star sparkle inside the orb
+    final sc = Offset(s * 0.435, s * 0.42);
+    final rStar = s * 0.21;
+    final star = Path()
+      ..moveTo(sc.dx, sc.dy - rStar)
+      ..cubicTo(
+        sc.dx + s * 0.011,
+        sc.dy - s * 0.052,
+        sc.dx + s * 0.052,
+        sc.dy - s * 0.011,
+        sc.dx + rStar,
+        sc.dy,
+      )
+      ..cubicTo(
+        sc.dx + s * 0.052,
+        sc.dy + s * 0.011,
+        sc.dx + s * 0.011,
+        sc.dy + s * 0.052,
+        sc.dx,
+        sc.dy + rStar,
+      )
+      ..cubicTo(
+        sc.dx - s * 0.011,
+        sc.dy + s * 0.052,
+        sc.dx - s * 0.052,
+        sc.dy + s * 0.011,
+        sc.dx - rStar,
+        sc.dy,
+      )
+      ..cubicTo(
+        sc.dx - s * 0.052,
+        sc.dy - s * 0.011,
+        sc.dx - s * 0.011,
+        sc.dy - s * 0.052,
+        sc.dx,
+        sc.dy - rStar,
+      )
+      ..close();
+
+    canvas.drawPath(
+      star,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFF8E1), Color(0xFF80F3FF)],
+          stops: [0.0, 0.55, 1.0],
+        ).createShader(Rect.fromCircle(center: sc, radius: rStar)),
+    );
+    canvas.drawPath(star, thinOutline);
+
+    // Tiny companion miracle gleam
+    canvas.drawCircle(
+      Offset(s * 0.65, s * 0.28),
+      s * 0.028,
+      Paint()..color = const Color(0xFFFFF8E1),
+    );
 
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_TransmuteCirclePainter oldDelegate) => false;
+  bool shouldRepaint(_TransformationMiraclePainter oldDelegate) => false;
 }
 
 /// Wing 4 — `All-Element Orb Bundles`: Bold golden-trimmed sacred reliquary
