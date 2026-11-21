@@ -21,6 +21,7 @@ import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
 import 'package:how_predictable/views/widgets/sacred_temple_icon.dart';
+import 'package:how_predictable/views/widgets/watch_tower_icon.dart';
 
 class _TestAdMobClient implements AdMobClient {
   @override
@@ -323,7 +324,7 @@ void main() {
           if (size == const Size(390, 844)) {
             expect(find.text("Metal Wizard's Lair"), findsOneWidget);
             expect(find.text('100-Round Battle'), findsNothing);
-            expect(find.text('Telescope Tower'), findsOneWidget);
+            expect(find.text('Watch Tower'), findsOneWidget);
             expect(find.text('Royal Castle'), findsOneWidget);
             expect(find.text('Sacred Temple'), findsOneWidget);
 
@@ -331,7 +332,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.text('Covil do Mago de Metal'), findsOneWidget);
             expect(find.text('Batalha de 100 Rodadas'), findsNothing);
-            expect(find.text('Torre do Telescópio'), findsOneWidget);
+            expect(find.text('Torre de Vigia'), findsOneWidget);
             expect(find.text('Castelo Real'), findsOneWidget);
             expect(find.text('Templo Sagrado'), findsOneWidget);
 
@@ -339,7 +340,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.text('Guarida del Mago de Metal'), findsOneWidget);
             expect(find.text('Batalla de 100 Rondas'), findsNothing);
-            expect(find.text('Torre del Telescopio'), findsOneWidget);
+            expect(find.text('Torre de Vigilancia'), findsOneWidget);
             expect(find.text('Castillo Real'), findsOneWidget);
             expect(find.text('Templo Sagrado'), findsOneWidget);
 
@@ -347,7 +348,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.text('Versteck des Metallmagiers'), findsOneWidget);
             expect(find.text('100-Runden-Kampf'), findsNothing);
-            expect(find.text('Teleskopturm'), findsOneWidget);
+            expect(find.text('Wachturm'), findsOneWidget);
             expect(find.text('Königsschloss'), findsOneWidget);
             expect(find.text('Heiliger Tempel'), findsOneWidget);
           }
@@ -480,7 +481,7 @@ void main() {
     );
 
     testWidgets(
-      'Tapping Telescope Tower, Royal Castle, and Sacred Temple opens their respective dialogs',
+      'Tapping Watch Tower, Royal Castle, and Sacred Temple opens their respective dialogs',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -520,14 +521,58 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // 1. Telescope Tower -> ObservatoryDialog + Story Log
-        await tester.tap(
-          find.byKey(const ValueKey('landmark_telescope_tower')),
+        // 1. Watch Tower -> bespoke WatchTowerIcon pin & ObservatoryDialog + Story Log
+        final watchTowerPin = find.byKey(
+          const ValueKey('landmark_telescope_tower'),
         );
+        expect(
+          find.descendant(
+            of: watchTowerPin,
+            matching: find.byIcon(Icons.visibility_rounded),
+          ),
+          findsNothing,
+        );
+        final mapWatchIconFinder = find.descendant(
+          of: watchTowerPin,
+          matching: find.byType(WatchTowerIcon),
+        );
+        expect(mapWatchIconFinder, findsOneWidget);
+        expect(
+          tester.getSize(mapWatchIconFinder),
+          equals(const Size(25.0, 25.0)),
+        );
+        expect(
+          tester.widget<WatchTowerIcon>(mapWatchIconFinder).isOnGoldBackground,
+          isFalse,
+        );
+
+        await tester.tap(watchTowerPin);
         await tester.pumpAndSettle();
 
         expect(find.byType(ObservatoryDialog), findsOneWidget);
-        expect(find.text('Telescope Observatory'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(ObservatoryDialog),
+            matching: find.text('Watch Tower'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(ObservatoryDialog),
+            matching: find.byIcon(Icons.visibility_rounded),
+          ),
+          findsNothing,
+        );
+        final dialogWatchIconFinder = find.descendant(
+          of: find.byType(ObservatoryDialog),
+          matching: find.byType(WatchTowerIcon),
+        );
+        expect(dialogWatchIconFinder, findsOneWidget);
+        expect(
+          tester.getSize(dialogWatchIconFinder),
+          equals(const Size(26.0, 26.0)),
+        );
         expect(find.text("Star-Gazer's Strategy Hints"), findsOneWidget);
         expect(find.text('Markov Insight'), findsOneWidget);
 
@@ -657,6 +702,32 @@ void main() {
         await controller.resetAllProgress();
         expect(controller.currentWeek, 0);
         expect(storage.currentWeek, 0);
+      },
+    );
+
+    testWidgets(
+      'WatchTowerIcon renders standard and on-gold variants cleanly across sizes',
+      (WidgetTester tester) async {
+        for (final onGold in [false, true]) {
+          for (final iconSize in [22.0, 25.0, 26.0, 48.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: Center(
+                    child: WatchTowerIcon(
+                      size: iconSize,
+                      isOnGoldBackground: onGold,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final finder = find.byType(WatchTowerIcon);
+            expect(finder, findsOneWidget);
+            expect(tester.getSize(finder), equals(Size(iconSize, iconSize)));
+            expect(tester.takeException(), isNull);
+          }
+        }
       },
     );
   });

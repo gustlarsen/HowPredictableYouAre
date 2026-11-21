@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/watch_tower_icon.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 
-/// Telescope Tower landmark dialog: displays Star-Gazer strategy hints,
+/// Watch Tower landmark dialog: displays Star-Gazer strategy hints,
 /// Markov Chain insights, and direct access to the Story Log & Help.
 class ObservatoryDialog extends StatelessWidget {
   final GameController controller;
@@ -37,7 +38,7 @@ class ObservatoryDialog extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: palette.blueAccent.withValues(
                         alpha: palette.isDark ? 0.18 : 0.12,
@@ -47,11 +48,7 @@ class ObservatoryDialog extends StatelessWidget {
                         color: palette.blueAccent.withValues(alpha: 0.45),
                       ),
                     ),
-                    child: Icon(
-                      Icons.visibility_rounded,
-                      color: palette.blueAccent,
-                      size: 22,
-                    ),
+                    child: const WatchTowerIcon(size: 26),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -61,7 +58,7 @@ class ObservatoryDialog extends StatelessWidget {
                         Text(
                           loc.t(
                             'observatory_title',
-                            fallback: 'Telescope Observatory',
+                            fallback: 'Watch Tower',
                           ),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,

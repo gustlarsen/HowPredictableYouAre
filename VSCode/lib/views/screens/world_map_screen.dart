@@ -15,13 +15,14 @@ import '../dialogs/royal_castle_dialog.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/sacred_temple_icon.dart';
+import '../widgets/watch_tower_icon.dart';
 import 'game_screen.dart';
 
 /// Interactive 9:16 Kingdom World Map hub screen.
 ///
 /// Serves as the primary campaign hub where the player chooses between:
 /// - **Metal Wizard's Lair** (`x: 0.76, y: 0.15`): Launches the 100-round battle.
-/// - **Telescope Tower** (`x: 0.24, y: 0.17`): Opens the Observatory dialog.
+/// - **Watch Tower** (`x: 0.24, y: 0.17`): Opens the Watch Tower dialog.
 /// - **Royal Castle** (`x: 0.30, y: 0.47`): Opens the King's Throne Room dialog.
 /// - **Sacred Temple** (`x: 0.75, y: 0.75`): Opens the Altar of Offerings (Shop).
 class WorldMapScreen extends StatefulWidget {
@@ -334,16 +335,16 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                                 _enterMetalWizardLair(context, controller),
                           ),
 
-                          // 2. Telescope Tower (top-left cliff observatory)
+                          // 2. Watch Tower (top-left cliff watchtower)
                           _buildLandmarkPin(
                             key: const ValueKey('landmark_telescope_tower'),
                             mapWidth: mapWidth,
                             mapHeight: mapHeight,
                             normalizedPos: WorldMapScreen.telescopeTowerPos,
-                            icon: Icons.visibility_rounded,
+                            iconWidget: const WatchTowerIcon(size: 25),
                             label: loc.t(
                               'map_landmark_telescope',
-                              fallback: 'Telescope Tower',
+                              fallback: 'Watch Tower',
                             ),
                             accentColor: const Color(0xFF4FC3F7),
                             phaseOffset: 0.25,
