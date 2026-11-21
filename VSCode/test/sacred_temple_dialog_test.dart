@@ -854,19 +854,19 @@ void main() {
 
         // 1. Standalone smoke checks across all 14 Sacred Temple vector painters
         final allPainters = <Widget>[
-          const ConsagrationChaliceIcon(size: 20, isOnGoldBackground: false),
-          const ConsagrationChaliceIcon(size: 20, isOnGoldBackground: true),
-          const OfferingsAltarIcon(size: 20, isOnGoldBackground: false),
-          const OfferingsAltarIcon(size: 20, isOnGoldBackground: true),
-          const HolyTransmuteIcon(size: 20, isOnGoldBackground: false),
-          const HolyTransmuteIcon(size: 20, isOnGoldBackground: true),
-          const AdorationHarpIcon(size: 20, isOnGoldBackground: false),
-          const AdorationHarpIcon(size: 20, isOnGoldBackground: true),
-          const PrayerHandsIcon(size: 20, isOnGoldBackground: false),
-          const PrayerHandsIcon(size: 20, isOnGoldBackground: true),
-          const SacredTempleEmblemIcon(size: 24),
-          const VitalityHeartIcon(size: 22),
-          const ManaDropIcon(size: 22),
+          const ConsagrationChaliceIcon(size: 28, isOnGoldBackground: false),
+          const ConsagrationChaliceIcon(size: 28, isOnGoldBackground: true),
+          const OfferingsAltarIcon(size: 28, isOnGoldBackground: false),
+          const OfferingsAltarIcon(size: 28, isOnGoldBackground: true),
+          const HolyTransmuteIcon(size: 28, isOnGoldBackground: false),
+          const HolyTransmuteIcon(size: 28, isOnGoldBackground: true),
+          const AdorationHarpIcon(size: 28, isOnGoldBackground: false),
+          const AdorationHarpIcon(size: 28, isOnGoldBackground: true),
+          const PrayerHandsIcon(size: 28, isOnGoldBackground: false),
+          const PrayerHandsIcon(size: 28, isOnGoldBackground: true),
+          const SacredTempleEmblemIcon(size: 32),
+          const VitalityHeartIcon(size: 46),
+          const ManaDropIcon(size: 46),
           const SacredRelicIcon(size: 24),
           const TransmuteCircleIcon(size: 22),
           const ReliquaryBundleIcon(size: 22),
@@ -912,7 +912,7 @@ void main() {
           expect(find.byType(SacredTempleEmblemIcon), findsOneWidget);
           expect(
             tester.getSize(find.byType(SacredTempleEmblemIcon)),
-            equals(const Size(24.0, 24.0)),
+            equals(const Size(32.0, 32.0)),
           );
 
           final consagrationTab =
@@ -954,7 +954,7 @@ void main() {
             handsFinder,
           ]) {
             expect(finder, findsOneWidget);
-            expect(tester.getSize(finder), equals(const Size(20.0, 20.0)));
+            expect(tester.getSize(finder), equals(const Size(28.0, 28.0)));
           }
 
           // Wing 1 (Consagration) active by default
@@ -965,6 +965,14 @@ void main() {
           expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isFalse);
           expect(find.byType(VitalityHeartIcon), findsOneWidget);
           expect(find.byType(ManaDropIcon), findsOneWidget);
+          expect(
+            tester.getSize(find.byType(VitalityHeartIcon)),
+            equals(const Size(46.0, 46.0)),
+          );
+          expect(
+            tester.getSize(find.byType(ManaDropIcon)),
+            equals(const Size(46.0, 46.0)),
+          );
 
           // Wing 2 (Offerings)
           await tester.tap(offeringsTab);

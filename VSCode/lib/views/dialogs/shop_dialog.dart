@@ -568,17 +568,17 @@ class _ShopDialogState extends State<ShopDialog> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(7),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       color: palette.amberBorder.withValues(
                         alpha: palette.isDark ? 0.18 : 0.14,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      shape: BoxShape.circle,
                       border: Border.all(
                         color: palette.amberBorder.withValues(alpha: 0.55),
                       ),
                     ),
-                    child: const SacredTempleEmblemIcon(size: 24),
+                    child: const SacredTempleEmblemIcon(size: 32),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -734,7 +734,7 @@ class _ShopDialogState extends State<ShopDialog> {
         wing: TempleWing.consagration,
         key: const ValueKey('temple_tab_consagration'),
         iconBuilder: (isSelected) => ConsagrationChaliceIcon(
-          size: 20,
+          size: 28,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('temple_tab_consagration', fallback: 'Consagration'),
@@ -743,7 +743,7 @@ class _ShopDialogState extends State<ShopDialog> {
         wing: TempleWing.offerings,
         key: const ValueKey('temple_tab_offerings'),
         iconBuilder: (isSelected) => OfferingsAltarIcon(
-          size: 20,
+          size: 28,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('temple_tab_offerings', fallback: 'Offerings'),
@@ -752,7 +752,7 @@ class _ShopDialogState extends State<ShopDialog> {
         wing: TempleWing.transmute,
         key: const ValueKey('temple_tab_transmute'),
         iconBuilder: (isSelected) => HolyTransmuteIcon(
-          size: 20,
+          size: 28,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('temple_tab_transmute', fallback: 'Transmute'),
@@ -761,7 +761,7 @@ class _ShopDialogState extends State<ShopDialog> {
         wing: TempleWing.adoration,
         key: const ValueKey('temple_tab_adoration'),
         iconBuilder: (isSelected) => AdorationHarpIcon(
-          size: 20,
+          size: 28,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('temple_tab_adoration', fallback: 'Adoration'),
@@ -770,7 +770,7 @@ class _ShopDialogState extends State<ShopDialog> {
         wing: TempleWing.prayer,
         key: const ValueKey('temple_tab_prayer'),
         iconBuilder: (isSelected) => PrayerHandsIcon(
-          size: 20,
+          size: 28,
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('temple_tab_prayer', fallback: 'Prayer'),
@@ -886,7 +886,7 @@ class _ShopDialogState extends State<ShopDialog> {
           cardKey: const ValueKey('shop_upgrade_max_hp_card'),
           buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
           adButtonKey: const ValueKey('consagration_hp_watch_ad_button'),
-          iconWidget: const VitalityHeartIcon(size: 22),
+          iconWidget: const VitalityHeartIcon(size: 46),
           title: loc.t('upgrade_max_hp_title', fallback: '+1 Max HP'),
           subtitle: loc.t(
             'upgrade_max_hp_desc',
@@ -949,7 +949,7 @@ class _ShopDialogState extends State<ShopDialog> {
           cardKey: const ValueKey('shop_upgrade_max_mana_card'),
           buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
           adButtonKey: const ValueKey('consagration_mana_watch_ad_button'),
-          iconWidget: const ManaDropIcon(size: 22),
+          iconWidget: const ManaDropIcon(size: 46),
           title: loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool'),
           subtitle: loc.t(
             'upgrade_max_mana_desc',
@@ -2623,7 +2623,7 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
@@ -3005,66 +3005,82 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        iconWidget,
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: palette.primaryText,
-                            ),
+                    iconWidget,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 4,
+                                child: Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                flex: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: palette.rewardedAdCardSurface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: palette.amberBorder
+                                          .withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      statusText,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: palette.amberText,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: palette.rewardedAdCardSurface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: palette.amberBorder.withValues(alpha: 0.45),
-                        ),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: palette.amberText,
-                        ),
+                          if (subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              softWrap: true,
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.3,
+                                color: palette.amberSubtitle,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    softWrap: true,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: palette.amberSubtitle,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 9),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
