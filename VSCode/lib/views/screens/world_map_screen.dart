@@ -326,10 +326,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                               'map_landmark_wizard_lair',
                               fallback: "Metal Wizard's Lair",
                             ),
-                            subtitle: loc.t(
-                              'map_landmark_wizard_subtitle',
-                              fallback: '100-Round Battle',
-                            ),
                             accentColor: const Color(0xFFFF5722),
                             phaseOffset: 0.0,
                             animationsEnabled: controller.animationsEnabled,
@@ -445,7 +441,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     IconData? icon,
     Widget? iconWidget,
     required String label,
-    String? subtitle,
     required Color accentColor,
     required double phaseOffset,
     required bool animationsEnabled,
@@ -468,7 +463,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         icon: icon,
         iconWidget: iconWidget,
         label: label,
-        subtitle: subtitle,
         accentColor: accentColor,
         pulseAnimation: _pulseController,
         phaseOffset: phaseOffset,
@@ -634,7 +628,6 @@ class _LandmarkPinBadge extends StatelessWidget {
   final IconData? icon;
   final Widget? iconWidget;
   final String label;
-  final String? subtitle;
   final Color accentColor;
   final Animation<double> pulseAnimation;
   final double phaseOffset;
@@ -647,7 +640,6 @@ class _LandmarkPinBadge extends StatelessWidget {
     this.icon,
     this.iconWidget,
     required this.label,
-    this.subtitle,
     required this.accentColor,
     required this.pulseAnimation,
     required this.phaseOffset,
@@ -759,7 +751,7 @@ class _LandmarkPinBadge extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
-                      vertical: 3,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF14161D).withValues(alpha: 0.90),
@@ -776,35 +768,17 @@ class _LandmarkPinBadge extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10.5,
-                            height: 1.15,
-                          ),
-                        ),
-                        if (subtitle != null && subtitle!.isNotEmpty)
-                          Text(
-                            subtitle!,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: accentColor,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 9.0,
-                              height: 1.15,
-                            ),
-                          ),
-                      ],
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                        height: 1.15,
+                      ),
                     ),
                   ),
                 ],

@@ -318,9 +318,10 @@ void main() {
           expectPinAt('landmark_royal_castle', WorldMapScreen.royalCastlePos);
           expectPinAt('landmark_sacred_temple', WorldMapScreen.sacredTemplePos);
 
-          // Verify localized badges in en, pt, es, de
+          // Verify localized badges in en, pt, es, de (title-only, no subtitle)
           if (size == const Size(390, 844)) {
             expect(find.text("Metal Wizard's Lair"), findsOneWidget);
+            expect(find.text('100-Round Battle'), findsNothing);
             expect(find.text('Telescope Tower'), findsOneWidget);
             expect(find.text('Royal Castle'), findsOneWidget);
             expect(find.text('Sacred Temple'), findsOneWidget);
@@ -328,6 +329,7 @@ void main() {
             controller.setLanguage('pt');
             await tester.pumpAndSettle();
             expect(find.text('Covil do Mago de Metal'), findsOneWidget);
+            expect(find.text('Batalha de 100 Rodadas'), findsNothing);
             expect(find.text('Torre do Telescópio'), findsOneWidget);
             expect(find.text('Castelo Real'), findsOneWidget);
             expect(find.text('Templo Sagrado'), findsOneWidget);
@@ -335,6 +337,7 @@ void main() {
             controller.setLanguage('es');
             await tester.pumpAndSettle();
             expect(find.text('Guarida del Mago de Metal'), findsOneWidget);
+            expect(find.text('Batalla de 100 Rondas'), findsNothing);
             expect(find.text('Torre del Telescopio'), findsOneWidget);
             expect(find.text('Castillo Real'), findsOneWidget);
             expect(find.text('Templo Sagrado'), findsOneWidget);
@@ -342,6 +345,7 @@ void main() {
             controller.setLanguage('de');
             await tester.pumpAndSettle();
             expect(find.text('Versteck des Metallmagiers'), findsOneWidget);
+            expect(find.text('100-Runden-Kampf'), findsNothing);
             expect(find.text('Teleskopturm'), findsOneWidget);
             expect(find.text('Königsschloss'), findsOneWidget);
             expect(find.text('Heiliger Tempel'), findsOneWidget);
