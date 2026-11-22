@@ -1700,12 +1700,27 @@ void main() {
         of: find.byKey(const ValueKey('user_card')),
         matching: find.text('WATER'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('pc_card')),
         matching: find.text(playedPcMove.displayLabel(elemental: true).toUpperCase()),
+      ),
+      findsNothing,
+    );
+    expect(find.text('NONE'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('user_orb_container')),
+        matching: find.byIcon(HandMove.paper.elementalIcon),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('pc_orb_container')),
+        matching: find.byIcon(playedPcMove.elementalIcon),
       ),
       findsOneWidget,
     );

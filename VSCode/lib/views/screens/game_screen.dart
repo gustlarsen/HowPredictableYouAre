@@ -17,7 +17,6 @@ import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
-import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
@@ -1059,62 +1058,6 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  Widget _buildBossPhasePill(BuildContext context, GameController controller) {
-    final palette = AppPalette.of(context);
-    final stage = controller.enemyStage;
-    final bossName = controller.currentEnemyName;
-    final Color accent;
-    final IconData icon;
-    if (stage == 2) {
-      accent = const Color(0xFFCE93D8);
-      icon = Icons.auto_fix_high_rounded;
-    } else if (stage == 3) {
-      accent = const Color(0xFF90A4AE);
-      icon = Icons.hardware_rounded;
-    } else if (stage == 4) {
-      accent = const Color(0xFFFF8A65);
-      icon = Icons.bolt_rounded;
-    } else {
-      accent = const Color(0xFF4FC3F7);
-      icon = Icons.shield_outlined;
-    }
-    return Container(
-      key: ValueKey('boss_phase_pill_$stage'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.isDark
-            ? Colors.black.withValues(alpha: 0.45)
-            : palette.deckSurface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: accent.withValues(alpha: 0.72),
-          width: 1.2,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          stage == 3
-              ? const MetalWizardLairIcon(size: 16)
-              : Icon(icon, size: 14, color: accent),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              'Stage $stage • $bossName (${controller.enemyMaxHp} HP)',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: palette.isDark ? Colors.white : palette.primaryText,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSacredBlessingPill(
     BuildContext context,
     GameController controller,
@@ -1994,12 +1937,10 @@ class _GameScreenState extends State<GameScreen>
                                   // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
                                   HintsBar(controller: controller),
                                   if (hasVisibleHints)
-                                    const SizedBox(height: 3),
+                                    const SizedBox(height: 6),
 
-                                  // Compact Boss Phase Indicator Pill
-                                  _buildBossPhasePill(context, controller),
                                   _buildSacredBlessingPill(context, controller),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 6),
 
                                   // Central RPG Versus Arena
                                   VersusArena(

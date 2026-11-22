@@ -15,7 +15,6 @@ import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
-import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_hp_bar.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
@@ -168,14 +167,17 @@ void main() {
           controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsNothing);
         expect(
           find.descendant(
-            of: find.byKey(const ValueKey('boss_phase_pill_3')),
-            matching: find.byType(MetalWizardLairIcon),
+            of: find.byKey(const ValueKey('versus_boss_sprite_stage_3')),
+            matching: find.byKey(
+              const ValueKey('assets/images/enemies/metal_wizard_idle.png'),
+            ),
           ),
           findsOneWidget,
         );
+        expect(find.text('METAL WIZARD'), findsOneWidget);
         expect(find.text('300 / 300'), findsOneWidget);
 
         // Verify Metal Wizard hints: PC Next Move & Crystal Ball = Metal, Crystal Ball+ = Fire & Water
@@ -319,7 +321,8 @@ void main() {
           controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsNothing);
+        expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
         expect(find.text('400 / 400'), findsOneWidget);
 
         // Verify Baby Mage Robot ignores heavy cumulative history and chooses all 5 elements roughly uniformly.
@@ -413,7 +416,8 @@ void main() {
         expect(controller.enemyMaxHp, 200);
         expect(controller.computerHp, 200);
         expect(controller.engine.enemySize, 5);
-        expect(find.byKey(const ValueKey('boss_phase_pill_2')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_2')), findsNothing);
+        expect(find.text('ROBOT ARCHMAGE'), findsOneWidget);
         expect(find.text('200 / 200'), findsOneWidget);
 
         // Defeat Stage 2 Robot Archmage -> strictly transitions to Stage 3 Metal Wizard (300 HP)
@@ -438,7 +442,8 @@ void main() {
           controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsNothing);
+        expect(find.text('METAL WIZARD'), findsOneWidget);
         expect(find.text('300 / 300'), findsOneWidget);
 
         // Defeat Stage 3 Metal Wizard -> transitions to Stage 4 Baby Mage Robot (400 HP)
@@ -461,7 +466,8 @@ void main() {
           controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
+        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsNothing);
+        expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
         expect(find.text('400 / 400'), findsOneWidget);
 
         // Defeat Stage 4 Baby Mage Robot -> unlocks Standard Victory Ending & triggers campaign cutscene

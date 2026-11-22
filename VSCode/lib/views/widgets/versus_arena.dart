@@ -2701,45 +2701,6 @@ class _MoveCard extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(
-            width: 104,
-            height: 12,
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  move == null
-                      ? 'NONE'
-                      : (elementalMode
-                            ? move!
-                                  .displayLabel(
-                                    elemental: true,
-                                    localization: localization,
-                                  )
-                                  .toUpperCase()
-                            : move!.label.toUpperCase()),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 9.5,
-                    height: 1.1,
-                    letterSpacing: 0.4,
-                    color: (elementalMode && move != null)
-                        ? palette.elementalText(move!)
-                        : (palette.isDark
-                              ? const Color(0xFFB0B7C6)
-                              : palette.secondaryText),
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black87,
-                        blurRadius: 3,
-                      ),
-                    ],
-                  ),
-                  maxLines: 1,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -460,7 +460,8 @@ void main() {
         const Color(0xFFC47A38).withValues(alpha: 0.52),
       );
 
-      // Verify VersusArena & GameScreen EARTH label uses tan-bronze #D68C45 in Dark Mode
+      // Verify GameScreen EARTH deck label uses tan-bronze #D68C45 in Dark Mode
+      // and VersusArena omits the chosen-element text label while keeping the glowing staff icon
       controller.playTurn(HandMove.lizard);
       await tester.pumpWidget(
         MaterialApp(
@@ -474,10 +475,22 @@ void main() {
       await tester.pumpAndSettle();
 
       final earthLabels = tester.widgetList<Text>(find.text('EARTH')).toList();
-      expect(earthLabels.length, greaterThanOrEqualTo(2));
-      for (final label in earthLabels) {
-        expect(label.style?.color, const Color(0xFFD68C45));
-      }
+      expect(earthLabels, hasLength(1));
+      expect(earthLabels.single.style?.color, const Color(0xFFD68C45));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('user_card')),
+          matching: find.text('EARTH'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('user_orb_container')),
+          matching: find.byIcon(HandMove.lizard.elementalIcon),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }
