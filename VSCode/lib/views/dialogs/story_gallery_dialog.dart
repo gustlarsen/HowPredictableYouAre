@@ -4,6 +4,7 @@ import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
 import '../screens/intro_story_screen.dart';
 import 'story_dialog.dart';
+import 'world_map_war_dialog.dart';
 
 class StoryGalleryDialog extends StatelessWidget {
   final GameController controller;
@@ -78,6 +79,27 @@ class StoryGalleryDialog extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    key: const ValueKey('story_gallery_world_map_button'),
+                    tooltip: loc.t(
+                      'observatory_world_map_btn',
+                      fallback: 'World Map',
+                    ),
+                    icon: Icon(
+                      Icons.map_rounded,
+                      size: 20,
+                      color: palette.amberIcon,
+                    ),
+                    onPressed: () {
+                      controller.audio.playTapVibrate();
+                      showDialog<void>(
+                        context: context,
+                        builder: (_) => WorldMapWarDialog(
+                          controller: controller,
+                        ),
+                      );
+                    },
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(

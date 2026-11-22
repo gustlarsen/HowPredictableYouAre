@@ -1,0 +1,395 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/main.dart';
+import 'package:how_predictable/services/ad_service.dart';
+import 'package:how_predictable/services/audio_service.dart';
+import 'package:how_predictable/services/localization_service.dart';
+import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
+import 'package:how_predictable/views/dialogs/world_map_war_dialog.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Watch Tower -> WorldMapWarDialog (Weeks 1–41 Progressive Conquest) Tests', () {
+    test(
+      'WorldRealmRegion coordinates, fall weeks, and ConquestFrontGeometry clip coverage match specification across Weeks 1..41',
+      () {
+        expect(
+          WorldRealmRegion.metalWizardDominion.position,
+          const Offset(0.78, 0.20),
+        );
+        expect(
+          WorldRealmRegion.kingdomOfSolaria.position,
+          const Offset(0.62, 0.45),
+        );
+        expect(
+          WorldRealmRegion.stoneCitadel.position,
+          const Offset(0.27, 0.22),
+        );
+        expect(
+          WorldRealmRegion.verdantDuchy.position,
+          const Offset(0.25, 0.48),
+        );
+        expect(
+          WorldRealmRegion.crystalPort.position,
+          const Offset(0.72, 0.73),
+        );
+        expect(
+          WorldRealmRegion.clericSacredCapital.position,
+          const Offset(0.28, 0.78),
+        );
+
+        // Status transitions per week
+        expect(
+          WorldRealmRegion.metalWizardDominion.statusForWeek(1),
+          RealmWarStatus.originDominion,
+        );
+        expect(
+          WorldRealmRegion.kingdomOfSolaria.statusForWeek(9),
+          RealmWarStatus.free,
+        );
+        expect(
+          WorldRealmRegion.kingdomOfSolaria.statusForWeek(10),
+          RealmWarStatus.conquered,
+        );
+        expect(
+          WorldRealmRegion.stoneCitadel.statusForWeek(17),
+          RealmWarStatus.free,
+        );
+        expect(
+          WorldRealmRegion.stoneCitadel.statusForWeek(18),
+          RealmWarStatus.conquered,
+        );
+        expect(
+          WorldRealmRegion.verdantDuchy.statusForWeek(25),
+          RealmWarStatus.free,
+        );
+        expect(
+          WorldRealmRegion.verdantDuchy.statusForWeek(26),
+          RealmWarStatus.conquered,
+        );
+        expect(
+          WorldRealmRegion.crystalPort.statusForWeek(33),
+          RealmWarStatus.free,
+        );
+        expect(
+          WorldRealmRegion.crystalPort.statusForWeek(34),
+          RealmWarStatus.conquered,
+        );
+        expect(
+          WorldRealmRegion.clericSacredCapital.statusForWeek(34),
+          RealmWarStatus.free,
+        );
+        expect(
+          WorldRealmRegion.clericSacredCapital.statusForWeek(35),
+          RealmWarStatus.underThreat,
+        );
+        expect(
+          WorldRealmRegion.clericSacredCapital.statusForWeek(40),
+          RealmWarStatus.underThreat,
+        );
+        expect(
+          WorldRealmRegion.clericSacredCapital.statusForWeek(41),
+          RealmWarStatus.besieged,
+        );
+
+        // Clip path geometry checks on a 300x400 (3:4) canvas
+        const size = Size(300, 400);
+        final capitalPt = Offset(0.28 * size.width, 0.78 * size.height);
+        final solariaPt = Offset(0.62 * size.width, 0.45 * size.height);
+        final citadelPt = Offset(0.27 * size.width, 0.22 * size.height);
+        final duchyPt = Offset(0.25 * size.width, 0.48 * size.height);
+        final portPt = Offset(0.72 * size.width, 0.73 * size.height);
+
+        // Week 1: 0% conquered
+        final w1Path = ConquestFrontGeometry.buildClipPath(1, size);
+        expect(w1Path.getBounds().isEmpty, isTrue);
+
+        // Week 10: Solaria engulfed, Citadel/Duchy/Port/Capital still outside conquered clip
+        final w10Path = ConquestFrontGeometry.buildClipPath(10, size);
+        expect(w10Path.contains(solariaPt), isTrue);
+        expect(w10Path.contains(citadelPt), isFalse);
+        expect(w10Path.contains(capitalPt), isFalse);
+
+        // Week 18: Stone Citadel engulfed
+        final w18Path = ConquestFrontGeometry.buildClipPath(18, size);
+        expect(w18Path.contains(solariaPt), isTrue);
+        expect(w18Path.contains(citadelPt), isTrue);
+        expect(w18Path.contains(duchyPt), isFalse);
+        expect(w18Path.contains(capitalPt), isFalse);
+
+        // Week 26: Verdant Duchy engulfed
+        final w26Path = ConquestFrontGeometry.buildClipPath(26, size);
+        expect(w26Path.contains(duchyPt), isTrue);
+        expect(w26Path.contains(portPt), isFalse);
+        expect(w26Path.contains(capitalPt), isFalse);
+
+        // Week 34: Crystal Port engulfed, Capital sanctuary still unconquered
+        final w34Path = ConquestFrontGeometry.buildClipPath(34, size);
+        expect(w34Path.contains(portPt), isTrue);
+        expect(w34Path.contains(capitalPt), isFalse);
+
+        // Weeks 35..40: All outer regions conquered, circular sanctuary protects Cleric's Capital
+        final w37Path = ConquestFrontGeometry.buildClipPath(37, size);
+        expect(w37Path.contains(solariaPt), isTrue);
+        expect(w37Path.contains(citadelPt), isTrue);
+        expect(w37Path.contains(duchyPt), isTrue);
+        expect(w37Path.contains(portPt), isTrue);
+        expect(w37Path.contains(capitalPt), isFalse);
+
+        // Week 41: Sanctuary closes -> 100% conquered (including Cleric's Capital)
+        final w41Path = ConquestFrontGeometry.buildClipPath(41, size);
+        expect(w41Path.contains(capitalPt), isTrue);
+      },
+    );
+
+    testWidgets(
+      'Watch Tower displays localized World Map button across EN, PT, ES, DE and opens WorldMapWarDialog with 3:4 aspect ratio, interactive pins, and timeline slider',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(430, 932);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+          'current_week': 36,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await tester.runAsync(() => localization.load());
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          adService: AdService(),
+        );
+        addTearDown(controller.dispose);
+
+        // Verify localized button labels across all 4 languages
+        final expectedButtonLabels = {
+          'en': 'World Map',
+          'pt': 'Mapa Mundi',
+          'es': 'Mapa Mundial',
+          'de': 'Weltkarte',
+        };
+        for (final entry in expectedButtonLabels.entries) {
+          localization.setLanguage(entry.key);
+          expect(
+            localization.t('observatory_world_map_btn'),
+            equals(entry.value),
+          );
+        }
+        localization.setLanguage('en');
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap Watch Tower pin on WorldMapScreen
+        await tester.tap(find.byKey(const ValueKey('landmark_telescope_tower')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ObservatoryDialog), findsOneWidget);
+        final worldMapBtn = find.byKey(
+          const ValueKey('observatory_world_map_button'),
+        );
+        expect(worldMapBtn, findsOneWidget);
+        expect(find.text('World Map'), findsOneWidget);
+
+        // Open WorldMapWarDialog
+        await tester.ensureVisible(worldMapBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(worldMapBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(WorldMapWarDialog), findsOneWidget);
+        expect(find.text('World Map — War Chronicle'), findsOneWidget);
+        expect(find.text('Week 36 / 40'), findsWidgets);
+
+        // Verify locked 3:4 viewport aspect ratio
+        final viewportRect = tester.getRect(
+          find.byKey(const ValueKey('world_map_war_aspect_viewport')),
+        );
+        expect(
+          viewportRect.width / viewportRect.height,
+          closeTo(3.0 / 4.0, 0.01),
+        );
+
+        // Week 36 is in Weeks 35–40 -> Border Alert banner & Cleric's Capital Under Threat
+        expect(
+          find.byKey(const ValueKey('world_map_border_alert_banner')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Border Alert — Siege Imminent!'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Under Threat — Border Alert'),
+          findsOneWidget,
+        );
+
+        // Tap Kingdom of Solaria pin -> shows Conquered — Week 10
+        await tester.tap(find.byKey(const ValueKey('world_map_pin_solaria')));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('world_map_selected_realm_card')),
+            matching: find.text('Kingdom of Solaria'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Conquered — Week 10'), findsOneWidget);
+
+        // Tap Stone Citadel pin -> shows Conquered — Week 18
+        await tester.tap(find.byKey(const ValueKey('world_map_pin_citadel')));
+        await tester.pumpAndSettle();
+        expect(find.text('Conquered — Week 18'), findsOneWidget);
+
+        // Tap Verdant Duchy pin -> shows Conquered — Week 26
+        await tester.tap(find.byKey(const ValueKey('world_map_pin_duchy')));
+        await tester.pumpAndSettle();
+        expect(find.text('Conquered — Week 26'), findsOneWidget);
+
+        // Tap Crystal Port pin -> shows Conquered — Week 34
+        await tester.tap(find.byKey(const ValueKey('world_map_pin_port')));
+        await tester.pumpAndSettle();
+        expect(find.text('Conquered — Week 34'), findsOneWidget);
+
+        // Scrub timeline slider back to Week 1 (far left)
+        final sliderFinder = find.byKey(
+          const ValueKey('world_map_timeline_slider'),
+        );
+        expect(sliderFinder, findsOneWidget);
+        final sliderTopLeft = tester.getTopLeft(sliderFinder);
+        final sliderSize = tester.getSize(sliderFinder);
+        await tester.tapAt(
+          Offset(
+            sliderTopLeft.dx + 4,
+            sliderTopLeft.dy + sliderSize.height / 2,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // At Week 1: 0% conquered layer & Crystal Port is Free
+        expect(find.text('Week 1 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('world_map_conquered_clip_layer')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('world_map_border_alert_banner')),
+          findsNothing,
+        );
+        expect(find.text('Free'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Advancing past Week 40 triggers Week 41 Siege state, allows inspecting Week 41 in WorldMapWarDialog with Besieged status, and records Ending 2 (Invasion)',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(430, 932);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+          'current_week': 40,
+          'darkMode': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await tester.runAsync(() => localization.load());
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          adService: AdService(),
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Enter battle at Week 40 and teleport out to advance to Week 41
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
+        await tester.pumpAndSettle();
+
+        // Kingdom Fall / Week 41 Siege modal is shown and currentWeek advanced to 41
+        expect(
+          find.byKey(const ValueKey('week40_kingdom_fall_dialog')),
+          findsOneWidget,
+        );
+        expect(controller.currentWeek, GameController.siegeInvasionWeek);
+        expect(
+          find.byKey(const ValueKey('week41_siege_subtitle_badge')),
+          findsOneWidget,
+        );
+
+        // Tap "World Map" inside the Week 41 Siege dialog to inspect Week 41
+        await tester.tap(
+          find.byKey(const ValueKey('week41_inspect_world_map_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(WorldMapWarDialog), findsOneWidget);
+        expect(find.text('Week 41 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('world_map_siege_week41_banner')),
+          findsOneWidget,
+        );
+        expect(find.text('Besieged — Week 41'), findsWidgets);
+
+        // Close WorldMapWarDialog and confirm Kingdom Fall reset
+        await tester.tap(
+          find.byKey(const ValueKey('world_map_war_close_button')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey('week40_kingdom_fall_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.timeoutDefeatCount, 1);
+        expect(controller.maxInspectableWorldMapWeek, 41);
+      },
+    );
+  });
+}

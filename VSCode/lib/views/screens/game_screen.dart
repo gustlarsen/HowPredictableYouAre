@@ -27,6 +27,7 @@ import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
 import '../dialogs/victory_cutscene_dialog.dart';
+import '../dialogs/world_map_war_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   static const int orbSpawnDelayMs = VersusArena.clashTimeMs;
@@ -273,15 +274,17 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// Modular handler for campaign week > 40 defeat events.
-  /// Structured as a standalone entry point so a full multi-panel comic
-  /// cutscene can be plugged in before executing [applyPermadeathReset].
+  /// Modular handler for campaign week > 40 (Week 41 Siege / Ending 2: Invasion) defeat events.
+  /// Advances the calendar to Week 41 (where the Cleric's Sacred Capital is
+  /// completely besieged on all sides), allows inspecting the Week 41 World Map
+  /// state, and triggers Ending 2 (Invasion) via [applyPermadeathReset].
   Future<void> _triggerWeek40KingdomFall(
     BuildContext context,
     GameController controller,
   ) async {
     if (_isKingdomFallDialogOpen || !mounted) return;
     _isKingdomFallDialogOpen = true;
+    controller.enterSiegeInvasionWeek();
     controller.audio.playDefeat();
 
     await showDialog<void>(
@@ -337,8 +340,21 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const Text('🏰🔥', style: TextStyle(fontSize: 34)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${loc.t('map_week_label', fallback: 'Week')} ${GameController.siegeInvasionWeek} — ${loc.t('world_map_status_besieged', fallback: 'Besieged — Week 41')}',
+                      key: const ValueKey('week41_siege_subtitle_badge'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: palette.isDark
+                            ? const Color(0xFFFFAB40)
+                            : const Color(0xFFB84A00),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('🏰🔥', style: TextStyle(fontSize: 32)),
                     const SizedBox(height: 6),
                     Text(
                       loc.t(
@@ -356,18 +372,56 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   ],
                 ),
-                content: Text(
-                  loc.t(
-                    'kingdom_fall_body',
-                    fallback:
-                        'Time has run out. The Metal Wizard has taken over all neighboring kingdoms and destroyed the Cleric\'s kingdom!',
-                  ),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.45,
-                    color: palette.secondaryText,
-                  ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      loc.t(
+                        'kingdom_fall_body',
+                        fallback:
+                            'Time has run out. The Metal Wizard has taken over all neighboring kingdoms and destroyed the Cleric\'s kingdom!',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.4,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const ValueKey('week41_inspect_world_map_button'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.isDark
+                            ? const Color(0xFFF5C22B)
+                            : const Color(0xFF8A5A00),
+                        side: BorderSide(
+                          color: (palette.isDark
+                                  ? const Color(0xFFF5C22B)
+                                  : const Color(0xFFC8961E))
+                              .withValues(alpha: 0.75),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        controller.audio.playTapVibrate();
+                        showDialog<void>(
+                          context: innerCtx,
+                          builder: (_) => WorldMapWarDialog(
+                            controller: controller,
+                            initialWeek: GameController.siegeInvasionWeek,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.map_outlined, size: 17),
+                      label: Text(
+                        loc.t('observatory_world_map_btn', fallback: 'World Map'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
                 actionsAlignment: MainAxisAlignment.center,
                 actions: [
@@ -389,7 +443,9 @@ class _GameScreenState extends State<GameScreen>
                           ? null
                           : () async {
                               setDialogState(() => isResetting = true);
-                              await controller.applyPermadeathReset();
+                              await controller.applyPermadeathReset(
+                                cause: PermadeathCause.deadlineExceeded,
+                              );
                               _isKingdomFallDialogOpen = false;
                               if (dialogCtx.mounted) {
                                 Navigator.of(dialogCtx).pop();

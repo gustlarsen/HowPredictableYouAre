@@ -40,6 +40,7 @@ class GameController extends ChangeNotifier {
   static const int maxMana = baseMaxMana;
   static const int pcMaxHp = 100;
   static const int maxCampaignWeeks = 40;
+  static const int siegeInvasionWeek = 41;
   static const int phase2StartWeek = 10;
   static const int damagePerLoss = 1;
   static const int phase2BaseBossDamage = 2;
@@ -587,8 +588,19 @@ class GameController extends ChangeNotifier {
   /// (unaffected by the +50 Orbs anti-spam cooldown).
   bool get isReviveAdReady => adService.isRewardedAdReady;
 
-  /// True when advancing +1 Week from the current campaign week exceeds [maxCampaignWeeks] (40).
+  /// True when advancing +1 Week from the current campaign week exceeds [maxCampaignWeeks] (40)
+  /// and enters [siegeInvasionWeek] (Week 41).
   bool get willNextWeekExceedLimit => currentWeek + 1 > maxCampaignWeeks;
+
+  /// Highest week inspectable on the World Map timeline slider:
+  /// ranges from Week 1 up to [currentWeek] (or [siegeInvasionWeek] = 41 once
+  /// Ending 2 / Week 41 Siege has been experienced or reached).
+  int get maxInspectableWorldMapWeek {
+    if (currentWeek >= siegeInvasionWeek || timeoutDefeatCount > 0) {
+      return siegeInvasionWeek;
+    }
+    return currentWeek.clamp(1, siegeInvasionWeek);
+  }
 
   /// True when [productId] has been verified as a real-money Google Play IAP.
   bool isRealMoneyIapProduct(String productId) =>
@@ -2284,6 +2296,15 @@ class GameController extends ChangeNotifier {
   /// advancing +1 Week via [completeBattleWeek], and syncing local/cloud saves.
   void teleportToWorldMap() {
     completeBattleWeek();
+  }
+
+  /// Advances the campaign calendar into Week 41 ([siegeInvasionWeek]) when
+  /// Week 40 expires, revealing the besieged Sacred Capital state before
+  /// Ending 2 (Invasion) permadeath reset is confirmed.
+  void enterSiegeInvasionWeek() {
+    currentWeek = siegeInvasionWeek;
+    unawaited(storage.setCurrentWeek(siegeInvasionWeek));
+    notifyListeners();
   }
 
   /// Revives the Cleric after watching a rewarded video ad upon death:

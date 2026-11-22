@@ -5,6 +5,7 @@ import '../widgets/watch_tower_icon.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
 import 'watchtower_spyglass_dialog.dart';
+import 'world_map_war_dialog.dart';
 
 /// Watch Tower landmark dialog: displays Star-Gazer strategy hints,
 /// Markov Chain insights, and direct access to the Story Log & Help.
@@ -244,6 +245,61 @@ class ObservatoryDialog extends StatelessWidget {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFFE082),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // World Map Button (RPG dark slate / parchment & gold theme)
+                      ElevatedButton.icon(
+                        key: const ValueKey('observatory_world_map_button'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: palette.isDark
+                              ? const Color(0xFF1F2430)
+                              : const Color(0xFFEBE1CD),
+                          foregroundColor: palette.isDark
+                              ? const Color(0xFFF5C22B)
+                              : const Color(0xFF5A3E00),
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
+                          ),
+                          side: BorderSide(
+                            color: const Color(0xFFF5C22B).withValues(
+                              alpha: palette.isDark ? 0.72 : 0.85,
+                            ),
+                            width: 1.3,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () {
+                          controller.audio.playTapVibrate();
+                          showDialog(
+                            context: context,
+                            builder: (_) =>
+                                WorldMapWarDialog(controller: controller),
+                          );
+                        },
+                        icon: Icon(
+                          Icons.map_rounded,
+                          size: 19,
+                          color: palette.isDark
+                              ? const Color(0xFFF5C22B)
+                              : const Color(0xFF7A4E00),
+                        ),
+                        label: Text(
+                          loc.t(
+                            'observatory_world_map_btn',
+                            fallback: 'World Map',
+                          ),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: palette.isDark
+                                ? const Color(0xFFF5C22B)
+                                : const Color(0xFF5A3E00),
                           ),
                         ),
                       ),
