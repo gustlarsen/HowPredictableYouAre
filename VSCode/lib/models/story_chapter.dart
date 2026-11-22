@@ -161,7 +161,7 @@ enum StoryChapter {
   String get assetPath {
     switch (this) {
       case StoryChapter.intro:
-        return 'assets/images/story/intro_1.jpeg';
+        return 'assets/images/story/robot_mage_cliff.webp';
       case StoryChapter.resetButton:
         return 'assets/images/story/reset_button_comic.jpeg';
       case StoryChapter.predictabilityScore:
@@ -183,6 +183,8 @@ enum StoryChapter {
 
   double get imageAspectRatio {
     switch (this) {
+      case StoryChapter.intro:
+        return 571.0 / 1024.0;
       case StoryChapter.crystalBall:
         return 1792.0 / 2400.0;
       default:

@@ -5,6 +5,7 @@ import '../../models/move.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import 'mana_pool_orb.dart';
+import 'metal_wizard_lair_icon.dart';
 import 'rpg_hp_bar.dart';
 
 /// Phases of the 750ms VersusArena projectile clash & impact VFX sequence.
@@ -25,11 +26,18 @@ enum BattleVfxElement {
   metal,
 }
 
+enum _BossActionType {
+  none,
+  attack,
+  hit,
+}
+
 class VersusArena extends StatefulWidget {
   static const int vfxDurationMs = 750;
   static const int clashTimeMs = 300;
   static const int impactTimeMs = 550;
   static const int damageIndicatorDurationMs = 650;
+  static const int bossActionDurationMs = 450;
 
   final HandMove? userMove;
   final HandMove? computerMove;
@@ -47,6 +55,7 @@ class VersusArena extends StatefulWidget {
   final int userDamageAmount;
   final int computerDamageAmount;
   final bool isPhase2;
+  final int enemyStage;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
   final Key? clashCenterKey;
@@ -69,6 +78,7 @@ class VersusArena extends StatefulWidget {
     this.userDamageAmount = 1,
     this.computerDamageAmount = 1,
     this.isPhase2 = false,
+    this.enemyStage = 1,
     this.onImpactHaptic,
     this.pcSlotKey,
     this.clashCenterKey,
@@ -83,12 +93,15 @@ class _VersusArenaState extends State<VersusArena>
   late AnimationController _animController;
   late AnimationController _vfxController;
   late AnimationController _damageIndicatorController;
+  late AnimationController _bossIdleController;
+  late AnimationController _bossActionController;
   late Animation<double> _punchAnim;
   late Animation<double> _defeatRotationAnim;
   late Animation<double> _drawRotationAnim;
   late Animation<double> _damageIndicatorAnim;
   bool _didTriggerImpactHaptic = false;
   bool _didTriggerImpact = false;
+  _BossActionType _bossActionType = _BossActionType.none;
 
   late int displayedPlayerHp;
   late int displayedPcHp;
@@ -119,6 +132,21 @@ class _VersusArenaState extends State<VersusArena>
           });
         }
       });
+    _bossIdleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+    _bossActionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: VersusArena.bossActionDurationMs),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {
+            _bossActionType = _BossActionType.none;
+          });
+        }
+      });
+    _syncBossIdleAnimation();
 
     // Winning hand takes 500ms (0.0 -> 0.5) to move over to the losing hand,
     // and 500ms (0.5 -> 1.0) to move back to its starting position.
@@ -176,9 +204,36 @@ class _VersusArenaState extends State<VersusArena>
     }
   }
 
+  void _syncBossIdleAnimation() {
+    if (widget.animationsEnabled) {
+      if (!_bossIdleController.isAnimating) {
+        _bossIdleController.repeat(reverse: true);
+      }
+    } else {
+      if (_bossIdleController.isAnimating || _bossIdleController.value != 0.0) {
+        _bossIdleController.stop();
+        _bossIdleController.reset();
+      }
+    }
+  }
+
+  void _resetBossAction() {
+    _bossActionType = _BossActionType.none;
+    if (_bossActionController.isAnimating ||
+        _bossActionController.value != 0.0) {
+      _bossActionController.stop();
+      _bossActionController.reset();
+    }
+  }
+
   void _startRoundAnimations() {
     _didTriggerImpactHaptic = false;
     _didTriggerImpact = false;
+    _resetBossAction();
+    if (widget.winner == RoundWinner.computer && widget.animationsEnabled) {
+      _bossActionType = _BossActionType.attack;
+      _bossActionController.forward(from: 0.0);
+    }
     if (widget.elementalMode) {
       _vfxController.forward(from: 0.0);
     } else {
@@ -189,6 +244,7 @@ class _VersusArenaState extends State<VersusArena>
   void _stopRoundAnimations() {
     _didTriggerImpactHaptic = false;
     _didTriggerImpact = false;
+    _resetBossAction();
     if (_animController.isAnimating || _animController.value != 0.0) {
       _animController.stop();
       _animController.reset();
@@ -232,6 +288,10 @@ class _VersusArenaState extends State<VersusArena>
       } else if (widget.winner == RoundWinner.user) {
         _activeDamageIsUser = false;
         _damageIndicatorController.forward(from: 0.0);
+        if (widget.animationsEnabled) {
+          _bossActionType = _BossActionType.hit;
+          _bossActionController.forward(from: 0.0);
+        }
       }
     });
   }
@@ -285,6 +345,13 @@ class _VersusArenaState extends State<VersusArena>
   @override
   void didUpdateWidget(covariant VersusArena oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.animationsEnabled != oldWidget.animationsEnabled) {
+      _syncBossIdleAnimation();
+    }
+    if (widget.enemyStage != oldWidget.enemyStage) {
+      _resetBossAction();
+    }
 
     final bool isMatchReset = widget.roundId == 0 ||
         (widget.userHp == widget.playerMaxHp &&
@@ -347,6 +414,8 @@ class _VersusArenaState extends State<VersusArena>
   void dispose() {
     _animController.removeListener(_handleClassicTick);
     _vfxController.removeListener(_handleVfxTick);
+    _bossIdleController.dispose();
+    _bossActionController.dispose();
     _damageIndicatorController.dispose();
     _vfxController.dispose();
     _animController.dispose();
@@ -534,7 +603,7 @@ class _VersusArenaState extends State<VersusArena>
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       decoration: BoxDecoration(
         color: palette.isDark
             ? theme.colorScheme.surface.withValues(alpha: 0.85)
@@ -563,6 +632,8 @@ class _VersusArenaState extends State<VersusArena>
               const cardWidth = 86.0;
               const vsWidth = 56.0;
               const totalItemsWidth = cardWidth * 2 + vsWidth;
+              const bossSpriteSize = 54.0;
+              const bossStageHeight = 50.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
               final freeSpace = math.max(0.0, rowWidth - totalItemsWidth);
@@ -579,10 +650,41 @@ class _VersusArenaState extends State<VersusArena>
               final leftCenterX = leftX + cardWidth / 2.0;
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
-              const orbCenterY = 67.0;
+              const orbCenterY = bossStageHeight + 64.0;
+
+              final bossLeft = (rightCenterX - bossSpriteSize / 2.0)
+                  .clamp(0.0, math.max(0.0, rowWidth - bossSpriteSize))
+                  .toDouble();
+
+              final bossSprite = Positioned(
+                top: -2,
+                left: bossLeft,
+                width: bossSpriteSize,
+                height: bossSpriteSize,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([
+                    _bossIdleController,
+                    _bossActionController,
+                  ]),
+                  builder: (context, _) {
+                    return _BossArenaSprite(
+                      key: ValueKey('versus_boss_sprite_stage_${widget.enemyStage}'),
+                      enemyStage: widget.enemyStage,
+                      actionType: _bossActionType,
+                      idleProgress: widget.animationsEnabled
+                          ? _bossIdleController.value
+                          : 0.0,
+                      actionProgress: widget.animationsEnabled
+                          ? _bossActionController.value
+                          : 0.0,
+                      animationsEnabled: widget.animationsEnabled,
+                    );
+                  },
+                ),
+              );
 
               final centerColumn = Positioned(
-                top: 0,
+                top: bossStageHeight,
                 left: 0,
                 right: 0,
                 child: Center(
@@ -641,7 +743,7 @@ class _VersusArenaState extends State<VersusArena>
                 key: const ValueKey('user_card'),
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: EdgeInsets.only(left: leftX),
+                  padding: EdgeInsets.only(top: bossStageHeight, left: leftX),
                   child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
@@ -716,7 +818,7 @@ class _VersusArenaState extends State<VersusArena>
                 key: const ValueKey('pc_card'),
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: EdgeInsets.only(left: rightX),
+                  padding: EdgeInsets.only(top: bossStageHeight, left: rightX),
                   child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
@@ -829,8 +931,8 @@ class _VersusArenaState extends State<VersusArena>
               // and the opponent hand, with the alpha-transparent projectile & explosion VFX layer
               // rendered above all cards.
               final stackChildren = userWins
-                  ? <Widget>[centerColumn, pcCard, userCard, vfxOverlay]
-                  : <Widget>[centerColumn, userCard, pcCard, vfxOverlay];
+                  ? <Widget>[bossSprite, centerColumn, pcCard, userCard, vfxOverlay]
+                  : <Widget>[bossSprite, centerColumn, userCard, pcCard, vfxOverlay];
 
               return Stack(
                 alignment: Alignment.center,
@@ -839,9 +941,9 @@ class _VersusArenaState extends State<VersusArena>
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           SizedBox(
-            height: 34,
+            height: 28,
             child: Center(
               child: Text(
                 key: const ValueKey('battle_outcome_description'),
@@ -860,6 +962,173 @@ class _VersusArenaState extends State<VersusArena>
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BossArenaSprite extends StatelessWidget {
+  final int enemyStage;
+  final _BossActionType actionType;
+  final double idleProgress;
+  final double actionProgress;
+  final bool animationsEnabled;
+
+  const _BossArenaSprite({
+    super.key,
+    required this.enemyStage,
+    required this.actionType,
+    required this.idleProgress,
+    required this.actionProgress,
+    required this.animationsEnabled,
+  });
+
+  String? _resolveSpriteAsset() {
+    switch (enemyStage) {
+      case 2:
+        return 'assets/images/enemies/robot_archmage_idle.png';
+      case 3:
+        return null;
+      case 4:
+        return 'assets/images/enemies/baby_robot_mage_idle.png';
+      default:
+        switch (actionType) {
+          case _BossActionType.attack:
+            return 'assets/images/enemies/guardian_robot_attack.png';
+          case _BossActionType.hit:
+            return 'assets/images/enemies/guardian_robot_hit.png';
+          case _BossActionType.none:
+            return 'assets/images/enemies/guardian_robot_idle.png';
+        }
+    }
+  }
+
+  Color _stageAuraColor() {
+    switch (enemyStage) {
+      case 2:
+        return const Color(0xFFCE93D8);
+      case 3:
+        return const Color(0xFF90A4AE);
+      case 4:
+        return const Color(0xFFFF8A65);
+      default:
+        return const Color(0xFFAB47BC);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assetPath = _resolveSpriteAsset();
+    final auraBase = _stageAuraColor();
+
+    // Gentle idle breathing & floating motion
+    final floatDy = animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.5 : 0.0;
+    double scale = animationsEnabled ? (1.0 + 0.024 * idleProgress) : 1.0;
+    double dx = 0.0;
+    double dy = floatDy;
+    double tiltAngle = 0.0;
+    double glowAlpha = 0.20 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
+    Color glowColor = auraBase;
+
+    if (animationsEnabled && actionType != _BossActionType.none) {
+      final t = actionProgress.clamp(0.0, 1.0);
+      final arc = math.sin(t * math.pi);
+
+      if (enemyStage == 4) {
+        // Baby Mage Robot: playful bounce & tilt on attack and hit
+        if (actionType == _BossActionType.attack) {
+          dy += -arc * 7.5;
+          tiltAngle = math.sin(t * math.pi * 2) * 0.14;
+          scale += 0.07 * arc;
+          glowAlpha = 0.25 + 0.45 * arc;
+          glowColor = const Color(0xFFBA68C8);
+        } else {
+          dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
+          dy += -arc * 4.5;
+          tiltAngle = -arc * 0.12;
+          glowAlpha = 0.30 + 0.45 * (1.0 - t);
+          glowColor = Colors.redAccent;
+        }
+      } else if (enemyStage == 2) {
+        // Robot Archmage: subtle scale/glow pulse on attack and shake on hit
+        if (actionType == _BossActionType.attack) {
+          scale += 0.10 * arc;
+          glowAlpha = 0.30 + 0.55 * arc;
+          glowColor = const Color(0xFFFFB300);
+        } else {
+          dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
+          glowAlpha = 0.30 + 0.45 * (1.0 - t);
+          glowColor = Colors.redAccent;
+        }
+      } else if (enemyStage == 3) {
+        // Metal Wizard: metallic glow pulse on attack and shake on hit
+        if (actionType == _BossActionType.attack) {
+          scale += 0.09 * arc;
+          glowAlpha = 0.28 + 0.50 * arc;
+          glowColor = const Color(0xFF00E5FF);
+        } else {
+          dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
+          glowAlpha = 0.30 + 0.45 * (1.0 - t);
+          glowColor = Colors.redAccent;
+        }
+      } else {
+        // Phase 1 Guardian Robot: attack swap + subtle lunge pulse; hit swap + horizontal shake
+        if (actionType == _BossActionType.attack) {
+          scale += 0.07 * arc;
+          glowAlpha = 0.28 + 0.48 * arc;
+          glowColor = const Color(0xFFCE93D8);
+        } else {
+          dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
+          glowAlpha = 0.28 + 0.45 * (1.0 - t);
+          glowColor = Colors.redAccent;
+        }
+      }
+    }
+
+    final Widget spriteContent = assetPath != null
+        ? Image.asset(
+            assetPath,
+            key: ValueKey<String>(assetPath),
+            gaplessPlayback: true,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              Icons.smart_toy_rounded,
+              size: 40,
+              color: auraBase,
+            ),
+          )
+        : const MetalWizardLairIcon(size: 52);
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        // Subtle radial stage aura behind the boss sprite
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: glowColor.withValues(alpha: glowAlpha.clamp(0.0, 0.9)),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
+        Transform.translate(
+          offset: Offset(dx, dy),
+          child: Transform.rotate(
+            angle: tiltAngle,
+            child: Transform.scale(
+              scale: scale,
+              child: spriteContent,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2107,12 +2376,12 @@ class _MoveCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 5),
           Padding(
             padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
             child: handBuilder(context, handCircle),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
@@ -2182,7 +2451,7 @@ class _MoveCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             move == null
                 ? 'NONE'

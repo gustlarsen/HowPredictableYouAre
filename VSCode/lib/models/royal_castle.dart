@@ -223,6 +223,7 @@ enum BestiaryCreature {
     fallbackHint: 'Play rounds in battle so the construct learns a transition.',
     icon: Icons.memory_rounded,
     accentColor: Color(0xFF4FC3F7),
+    portraitAsset: 'assets/images/enemies/guardian_robot_idle.png',
   ),
   archmageRobot(
     id: 'archmage_robot',
@@ -238,6 +239,7 @@ enum BestiaryCreature {
         'Defeat Guardian Robot at Week 10 or later to confront this construct.',
     icon: Icons.auto_fix_high_rounded,
     accentColor: Color(0xFFFF9800),
+    portraitAsset: 'assets/images/enemies/robot_archmage_idle.png',
   ),
   metalWizard(
     id: 'metal_wizard',
@@ -268,6 +270,7 @@ enum BestiaryCreature {
         'Defeat the Metal Wizard in Week 2 or later to unleash his final automated contingency.',
     icon: Icons.casino_outlined,
     accentColor: Color(0xFFBA68C8),
+    portraitAsset: 'assets/images/enemies/baby_robot_mage_idle.png',
   );
 
   final String id;
@@ -281,6 +284,7 @@ enum BestiaryCreature {
   final String fallbackHint;
   final IconData icon;
   final Color accentColor;
+  final String? portraitAsset;
 
   const BestiaryCreature({
     required this.id,
@@ -294,6 +298,7 @@ enum BestiaryCreature {
     required this.fallbackHint,
     required this.icon,
     required this.accentColor,
+    this.portraitAsset,
   });
 }
 

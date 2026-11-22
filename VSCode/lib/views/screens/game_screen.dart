@@ -1633,6 +1633,7 @@ class _GameScreenState extends State<GameScreen>
                                   computerDamageAmount:
                                       controller.playerWinDamageToBoss,
                                   isPhase2: controller.enemyUses5Elements,
+                                  enemyStage: controller.enemyStage,
                                   pcSlotKey: _pcSlotKey,
                                   clashCenterKey: _clashCenterKey,
                                   onImpactHaptic: controller.isElementalMode

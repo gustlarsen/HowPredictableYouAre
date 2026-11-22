@@ -256,80 +256,119 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Illustrated Emblem Panel
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 26,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: palette.isDark
-                                ? [
-                                    panel.accentColor.withValues(alpha: 0.24),
-                                    const Color(0xFF151A24),
-                                  ]
-                                : [
-                                    panel.accentColor.withValues(alpha: 0.18),
-                                    palette.sandCardSurface,
-                                  ],
+                      // Illustrated Emblem Panel with 9:16 Robot Mage Cliff Cutscene Backdrop
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: panel.accentColor.withValues(alpha: 0.45),
+                            ),
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: panel.accentColor.withValues(alpha: 0.45),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: panel.accentColor.withValues(
-                                  alpha: palette.isDark ? 0.22 : 0.18,
-                                ),
-                                border: Border.all(
-                                  color: panel.accentColor,
-                                  width: 2,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Positioned.fill(
+                                child: Image.asset(
+                                  'assets/images/story/robot_mage_cliff.webp',
+                                  key: const ValueKey('victory_cutscene_bg_image'),
+                                  fit: BoxFit.cover,
+                                  alignment: const Alignment(0.0, -0.45),
+                                  filterQuality: FilterQuality.high,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const SizedBox.shrink(),
                                 ),
                               ),
-                              child: panel.iconWidget ??
-                                  Icon(
-                                    panel.icon,
-                                    size: 42,
-                                    color: panel.accentColor,
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: palette.isDark
+                                          ? [
+                                              panel.accentColor.withValues(
+                                                alpha: 0.22,
+                                              ),
+                                              const Color(0xFF151A24).withValues(
+                                                alpha: 0.72,
+                                              ),
+                                            ]
+                                          : [
+                                              panel.accentColor.withValues(
+                                                alpha: 0.18,
+                                              ),
+                                              palette.sandCardSurface.withValues(
+                                                alpha: 0.78,
+                                              ),
+                                            ],
+                                    ),
                                   ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              loc.t(
-                                panel.speakerKey,
-                                fallback: panel.fallbackSpeaker,
+                                ),
                               ),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.9,
-                                color: palette.amberText,
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 26,
+                                  horizontal: 16,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: palette.isDark
+                                            ? const Color(0xFF151A24).withValues(
+                                                alpha: 0.72,
+                                              )
+                                            : palette.dialogSurface.withValues(
+                                                alpha: 0.85,
+                                              ),
+                                        border: Border.all(
+                                          color: panel.accentColor,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: panel.iconWidget ??
+                                          Icon(
+                                            panel.icon,
+                                            size: 42,
+                                            color: panel.accentColor,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Text(
+                                      loc.t(
+                                        panel.speakerKey,
+                                        fallback: panel.fallbackSpeaker,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.9,
+                                        color: palette.amberText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      loc.t(
+                                        panel.titleKey,
+                                        fallback: panel.fallbackTitle,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 19,
+                                        fontWeight: FontWeight.w900,
+                                        color: palette.primaryText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              loc.t(
-                                panel.titleKey,
-                                fallback: panel.fallbackTitle,
-                              ),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w900,
-                                color: palette.primaryText,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

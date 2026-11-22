@@ -2710,21 +2710,10 @@ class _BestiaryCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: (encountered ? creature.accentColor : palette.mutedText)
-                  .withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: (encountered && creature == BestiaryCreature.metalWizard)
-                ? const MetalWizardLairIcon(size: 22)
-                : Icon(
-                    encountered ? creature.icon : Icons.help_outline_rounded,
-                    size: 20,
-                    color:
-                        encountered ? creature.accentColor : palette.mutedText,
-                  ),
+          _BestiaryPortraitBox(
+            creature: creature,
+            encountered: encountered,
+            palette: palette,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -2794,6 +2783,98 @@ class _BestiaryCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BestiaryPortraitBox extends StatelessWidget {
+  final BestiaryCreature creature;
+  final bool encountered;
+  final AppPalette palette;
+
+  const _BestiaryPortraitBox({
+    required this.creature,
+    required this.encountered,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final silhouetteColor = palette.isDark
+        ? const Color(0xFF0A0C12)
+        : const Color(0xFF2B2722);
+    final portraitAsset = creature.portraitAsset;
+
+    final Widget artwork;
+    if (portraitAsset != null) {
+      final image = Image.asset(
+        portraitAsset,
+        key: encountered
+            ? ValueKey('bestiary_portrait_${creature.id}')
+            : ValueKey('bestiary_silhouette_${creature.id}_img'),
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          encountered ? creature.icon : Icons.help_outline_rounded,
+          size: 26,
+          color: encountered ? creature.accentColor : palette.mutedText,
+        ),
+      );
+      artwork = encountered
+          ? image
+          : ColorFiltered(
+              key: ValueKey('bestiary_silhouette_${creature.id}'),
+              colorFilter: ColorFilter.mode(silhouetteColor, BlendMode.srcATop),
+              child: Opacity(opacity: 0.72, child: image),
+            );
+    } else {
+      const iconWidget = MetalWizardLairIcon(size: 32);
+      artwork = encountered
+          ? iconWidget
+          : ColorFiltered(
+              key: ValueKey('bestiary_silhouette_${creature.id}'),
+              colorFilter: ColorFilter.mode(silhouetteColor, BlendMode.srcATop),
+              child: const Opacity(opacity: 0.65, child: iconWidget),
+            );
+    }
+
+    return Container(
+      width: 56,
+      height: 56,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: (encountered ? creature.accentColor : palette.mutedText)
+            .withValues(alpha: palette.isDark ? 0.14 : 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: encountered
+              ? creature.accentColor.withValues(alpha: 0.48)
+              : palette.sandCardBorder,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(child: Center(child: artwork)),
+          if (!encountered)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: palette.dialogSurface.withValues(alpha: 0.85),
+                ),
+                child: Icon(
+                  Icons.lock_outline_rounded,
+                  size: 11,
+                  color: palette.mutedText,
+                ),
+              ),
+            ),
         ],
       ),
     );
