@@ -273,7 +273,7 @@ void main() {
     );
 
     testWidgets(
-      'ManaPoolOrb sits centrally directly above VS badge inside VersusArena and preserves exact fixed arena height',
+      'ManaPoolOrb sits centrally near the top of VersusArena without a VS badge and preserves exact fixed arena height',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
@@ -309,18 +309,20 @@ void main() {
         }
 
         final heightAt100 = await pumpArena(mana: 100);
+        final arenaRect = tester.getRect(find.byType(VersusArena));
         final manaOrbRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
-        final vsBadgeRect = tester.getRect(find.byKey(const ValueKey('vs_badge')));
-        final userLabelRect = tester.getRect(find.text('You Chose:'));
-        final pcLabelRect = tester.getRect(find.text('PC Chose:'));
+        final userOrbRect = tester.getRect(find.byKey(const ValueKey('user_orb_container')));
+        final pcOrbRect = tester.getRect(find.byKey(const ValueKey('pc_orb_container')));
 
-        // Centrally aligned horizontally with VS badge and directly above it
-        expect(manaOrbRect.center.dx, closeTo(vsBadgeRect.center.dx, 0.5));
-        expect(manaOrbRect.bottom, lessThanOrEqualTo(vsBadgeRect.top));
+        // Central VS badge, "You Chose:", and "PC Chose:" are completely removed; ManaPoolOrb is centered horizontally
+        expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
+        expect(find.text('VS'), findsNothing);
+        expect(find.text('You Chose:'), findsNothing);
+        expect(find.text('PC Chose:'), findsNothing);
+        expect(manaOrbRect.center.dx, closeTo(arenaRect.center.dx, 0.5));
 
-        // Top-aligned vertically with "You Chose:" and "PC Chose:"
-        expect(manaOrbRect.top, closeTo(userLabelRect.top, 0.5));
-        expect(manaOrbRect.top, closeTo(pcLabelRect.top, 0.5));
+        // Orb containers remain horizontally aligned on the same row
+        expect(userOrbRect.top, closeTo(pcOrbRect.top, 0.5));
         expect(find.text('100'), findsOneWidget);
 
         // Height remains strictly identical across remainingMana values and match states

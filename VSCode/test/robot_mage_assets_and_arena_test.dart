@@ -527,7 +527,7 @@ void main() {
         findsOneWidget,
       );
 
-      // 2. Top HUD Bar with open leather backpack & WEEK 1 / 40 badge
+      // 2. Top HUD Bar with open leather backpack (no WEEK X / 40 badge in battle HUD)
       expect(find.byKey(const ValueKey('battle_top_hud_bar')), findsOneWidget);
       final hudBackpack = tester.widget<RpgBackpackIcon>(
         find.descendant(
@@ -538,11 +538,19 @@ void main() {
       expect(hudBackpack.isOpen, isTrue);
       expect(hudBackpack.size, 52.0);
       expect(hudBackpack.ownedOrbs, containsAll([HandMove.rock, HandMove.paper]));
-      expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsOneWidget);
-      expect(find.text('WEEK 1 / 40'), findsOneWidget);
+      expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsNothing);
+      expect(find.text('WEEK 1 / 40'), findsNothing);
 
-      // 3. ScoreHeader with inline counters & gauge pill
-      expect(find.byKey(const ValueKey('score_header_gauge_pill')), findsOneWidget);
+      // 3. ScoreHeader renders all 4 metrics on a single horizontal row without Gauge pill box
+      expect(find.byKey(const ValueKey('score_header_gauge_pill')), findsNothing);
+      expect(find.text('Your Score:'), findsOneWidget);
+      expect(find.text('PC Score:'), findsOneWidget);
+      expect(find.text('Total:'), findsOneWidget);
+      expect(find.text('Gauge:'), findsOneWidget);
+      expect(find.text('You Chose:'), findsNothing);
+      expect(find.text('PC Chose:'), findsNothing);
+      expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
+      expect(find.text('VS'), findsNothing);
 
       // 4. HintsBar with CustomPainter mini-icons
       expect(find.byKey(const ValueKey('hint_mini_icon_brain')), findsOneWidget);

@@ -1514,62 +1514,21 @@ class _GameScreenState extends State<GameScreen>
                   )
                 : const SizedBox.shrink(),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
 
-          // 3. WEEK X / 40 Badge Pill
-          Container(
-            key: const ValueKey('battle_week_counter_badge'),
-            width: 74,
-            height: 28,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              color: beveledBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: beveledBorder,
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: palette.isDark ? 0.35 : 0.10,
-                  ),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1.5),
-                ),
-              ],
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'WEEK ${controller.currentWeek} / ${GameController.maxCampaignWeeks}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 10.5,
-                  letterSpacing: 0.4,
-                  color: palette.isDark
-                      ? const Color(0xFFF3E2B8)
-                      : palette.primaryText,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 2),
-
-          // 4. Conditional Periodic Gift Button
-          if (controller.shouldShowGiftBox)
+          // 3. Conditional Periodic Gift Button
+          if (controller.shouldShowGiftBox) ...[
             SizedBox(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               child: IconButton(
                 key: const ValueKey('gift_box_button'),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                 ),
-                icon: const Text('🎁', style: TextStyle(fontSize: 19)),
+                icon: const Text('🎁', style: TextStyle(fontSize: 20)),
                 tooltip: controller.giftTooltipMessage,
                 onPressed: () {
                   controller.claimGift();
@@ -1582,27 +1541,31 @@ class _GameScreenState extends State<GameScreen>
                 },
               ),
             ),
+            const SizedBox(width: 4),
+          ],
 
-          // 5. Conditional Reset Action Button
-          if (controller.showReset)
+          // 4. Conditional Reset Action Button
+          if (controller.showReset) ...[
             SizedBox(
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                 ),
                 icon: const Icon(
                   Icons.restart_alt,
-                  size: 20,
+                  size: 21,
                   color: Colors.redAccent,
                 ),
                 tooltip: loc.t('string53', fallback: 'RESET'),
                 onPressed: () => _confirmReset(context, controller, loc),
               ),
             ),
+            const SizedBox(width: 4),
+          ],
 
           // 6. Spiral Arcane Portal Button (Beveled Dark Square)
           SizedBox(

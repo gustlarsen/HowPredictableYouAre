@@ -671,8 +671,8 @@ class _VersusArenaState extends State<VersusArena>
               final leftCenterX = leftX + cardWidth / 2.0;
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
-              const orbCenterY = 62.0;
-              const floorRunesCenterY = 106.0;
+              const orbCenterY = 43.0;
+              const floorRunesCenterY = 92.0;
 
               final playerLeft = (leftCenterX - spriteWidth / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
@@ -711,7 +711,7 @@ class _VersusArenaState extends State<VersusArena>
               );
 
               final playerSprite = Positioned(
-                top: 10,
+                top: -2,
                 left: playerLeft,
                 width: spriteWidth,
                 height: spriteHeight,
@@ -739,7 +739,7 @@ class _VersusArenaState extends State<VersusArena>
               );
 
               final bossSprite = Positioned(
-                top: 10,
+                top: -2,
                 left: bossLeft,
                 width: spriteWidth,
                 height: spriteHeight,
@@ -774,55 +774,28 @@ class _VersusArenaState extends State<VersusArena>
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ManaPoolOrb(
-                        key: const ValueKey('mana_pool_orb'),
-                        size: 88.0,
-                        remainingMana: widget.remainingMana,
-                        maxMana: widget.maxMana,
-                        localization: widget.localization,
-                        animationsEnabled: widget.animationsEnabled,
-                      ),
-                      const SizedBox(height: 2),
-                      KeyedSubtree(
-                        key: const ValueKey('vs_badge'),
-                        child: SizedBox(
-                          key: widget.clashCenterKey,
-                          width: vsWidth,
-                          height: 18,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 1.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF151922)
-                                    .withValues(alpha: 0.78),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: const Color(0xFF8A6D3B)
-                                      .withValues(alpha: 0.65),
-                                  width: 0.9,
-                                ),
-                              ),
-                              child: const Text(
-                                'VS',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFD9C398),
-                                  fontSize: 9.5,
-                                  height: 1.0,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: ManaPoolOrb(
+                    key: const ValueKey('mana_pool_orb'),
+                    size: 88.0,
+                    remainingMana: widget.remainingMana,
+                    maxMana: widget.maxMana,
+                    localization: widget.localization,
+                    animationsEnabled: widget.animationsEnabled,
+                  ),
+                ),
+              );
+
+              // Anchor for mid-arena projectile clash and parabolic orb-collection flight arc
+              final clashCenterAnchor = Positioned(
+                top: orbCenterY - 18.0,
+                left: centerX - 18.0,
+                width: 36.0,
+                height: 36.0,
+                child: IgnorePointer(
+                  child: SizedBox(
+                    key: widget.clashCenterKey,
+                    width: 36.0,
+                    height: 36.0,
                   ),
                 ),
               );
@@ -848,10 +821,6 @@ class _VersusArenaState extends State<VersusArena>
                               : (userWins ? _punchAnim.value : 0.0))
                           : 0.0;
                       return _MoveCard(
-                        label: widget.localization.t(
-                          'string9',
-                          fallback: 'You Chose:',
-                        ),
                         combatantName: playerCombatantTitle,
                         combatantNameKey:
                             const ValueKey('arena_player_name_label'),
@@ -928,10 +897,6 @@ class _VersusArenaState extends State<VersusArena>
                       return KeyedSubtree(
                         key: widget.pcSlotKey,
                         child: _MoveCard(
-                          label: widget.localization.t(
-                            'string52',
-                            fallback: 'PC Chose:',
-                          ),
                           combatantName: bossCombatantTitle,
                           combatantNameKey:
                               const ValueKey('arena_boss_name_label'),
@@ -1027,6 +992,7 @@ class _VersusArenaState extends State<VersusArena>
                       playerSprite,
                       bossSprite,
                       centerColumn,
+                      clashCenterAnchor,
                       pcCard,
                       userCard,
                       vfxOverlay,
@@ -1036,6 +1002,7 @@ class _VersusArenaState extends State<VersusArena>
                       playerSprite,
                       bossSprite,
                       centerColumn,
+                      clashCenterAnchor,
                       userCard,
                       pcCard,
                       vfxOverlay,
@@ -2370,7 +2337,6 @@ class _ElementPalette {
 }
 
 class _MoveCard extends StatelessWidget {
-  final String label;
   final String combatantName;
   final Key? combatantNameKey;
   final HandMove? move;
@@ -2392,7 +2358,6 @@ class _MoveCard extends StatelessWidget {
   final Widget Function(BuildContext context, Widget handWidget) handBuilder;
 
   const _MoveCard({
-    required this.label,
     required this.combatantName,
     this.combatantNameKey,
     required this.move,
@@ -2631,26 +2596,6 @@ class _MoveCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              height: 1.1,
-              fontWeight: FontWeight.w600,
-              color: palette.isDark
-                  ? const Color(0xFFB5BAC6).withValues(alpha: 0.85)
-                  : palette.mutedText,
-              shadows: const [
-                Shadow(
-                  color: Colors.black87,
-                  blurRadius: 3,
-                ),
-              ],
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 3),
           Padding(
             padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
             child: handBuilder(context, handCircle),
@@ -2728,56 +2673,72 @@ class _MoveCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          Text(
-            combatantName,
-            key: combatantNameKey,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 10.5,
-              height: 1.1,
-              letterSpacing: 0.5,
-              color: palette.isDark ? Colors.white : palette.primaryText,
-              shadows: const [
-                Shadow(
-                  color: Colors.black,
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
+          SizedBox(
+            width: 104,
+            height: 14,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  combatantName,
+                  key: combatantNameKey,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10.5,
+                    height: 1.1,
+                    letterSpacing: 0.5,
+                    color: palette.isDark ? Colors.white : palette.primaryText,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  maxLines: 1,
                 ),
-              ],
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          Text(
-            move == null
-                ? 'NONE'
-                : (elementalMode
-                      ? move!
-                            .displayLabel(
-                              elemental: true,
-                              localization: localization,
-                            )
-                            .toUpperCase()
-                      : move!.label.toUpperCase()),
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 9.5,
-              height: 1.1,
-              letterSpacing: 0.4,
-              color: (elementalMode && move != null)
-                  ? palette.elementalText(move!)
-                  : (palette.isDark
-                        ? const Color(0xFFB0B7C6)
-                        : palette.secondaryText),
-              shadows: const [
-                Shadow(
-                  color: Colors.black87,
-                  blurRadius: 3,
+          SizedBox(
+            width: 104,
+            height: 12,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  move == null
+                      ? 'NONE'
+                      : (elementalMode
+                            ? move!
+                                  .displayLabel(
+                                    elemental: true,
+                                    localization: localization,
+                                  )
+                                  .toUpperCase()
+                            : move!.label.toUpperCase()),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 9.5,
+                    height: 1.1,
+                    letterSpacing: 0.4,
+                    color: (elementalMode && move != null)
+                        ? palette.elementalText(move!)
+                        : (palette.isDark
+                              ? const Color(0xFFB0B7C6)
+                              : palette.secondaryText),
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black87,
+                        blurRadius: 3,
+                      ),
+                    ],
+                  ),
+                  maxLines: 1,
                 ),
-              ],
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

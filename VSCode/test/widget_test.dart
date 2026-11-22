@@ -67,6 +67,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('How Predictable You Are'), findsNothing);
+    expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsNothing);
+    expect(find.byKey(const ValueKey('week_counter_badge')), findsNothing);
+    expect(find.text('WEEK 1 / 40'), findsNothing);
+    expect(find.text('Week 1 / 40'), findsNothing);
     expect(find.byKey(const ValueKey('game_retreat_button')), findsNothing);
     expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
     expect(find.byIcon(Icons.arrow_back), findsNothing);
@@ -481,8 +485,10 @@ void main() {
     expect(find.text('You will Chose:'), findsNothing);
     expect(find.text('PC will Chose:'), findsNothing);
     expect(find.text('Sugestion:'), findsNothing);
-    expect(find.text('PC Chose:'), findsOneWidget);
+    expect(find.text('You Chose:'), findsNothing);
+    expect(find.text('PC Chose:'), findsNothing);
     expect(find.text('PC Chose'), findsNothing);
+    expect(find.text('VS'), findsNothing);
     expect(find.text('The winner of this round:'), findsNothing);
     expect(find.text('The winner of this round::'), findsNothing);
     expect(find.byIcon(Icons.restart_alt), findsOneWidget);
@@ -1130,9 +1136,9 @@ void main() {
     expect(find.byType(ScoreHeader), findsNothing);
     expect(find.text('Your Score:'), findsNothing);
     expect(find.text('Total:'), findsNothing);
-    expect(find.text('Gauge'), findsNothing);
+    expect(find.text('Gauge:'), findsNothing);
 
-    // 3. Unlocked AND Enabled State: Entire ScoreHeader appears with all 4 metrics
+    // 3. Unlocked AND Enabled State: Entire ScoreHeader appears with all 4 metrics on a single horizontal row without a pill box
     controller.toggleShowPredictability(true);
     await tester.pump();
 
@@ -1141,12 +1147,27 @@ void main() {
       matching: find.byType(Card),
     );
     expect(scoreCardFinder, findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('Your Score:')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('PC Score:')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('Total:')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('Gauge')), findsOneWidget);
-    // Background-tracked stats (1 win, 0 losses, 1 total, 100.0%) are immediately shown
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('100.0%')), findsOneWidget);
+    expect(find.byKey(const ValueKey('score_header_gauge_pill')), findsNothing);
+    final yourScoreFinder = find.descendant(of: scoreCardFinder, matching: find.text('Your Score:'));
+    final pcScoreFinder = find.descendant(of: scoreCardFinder, matching: find.text('PC Score:'));
+    final totalFinder = find.descendant(of: scoreCardFinder, matching: find.text('Total:'));
+    final gaugeLabelFinder = find.descendant(of: scoreCardFinder, matching: find.text('Gauge:'));
+    final gaugeValueFinder = find.descendant(of: scoreCardFinder, matching: find.text('100.0%'));
+    expect(yourScoreFinder, findsOneWidget);
+    expect(pcScoreFinder, findsOneWidget);
+    expect(totalFinder, findsOneWidget);
+    expect(gaugeLabelFinder, findsOneWidget);
+    expect(gaugeValueFinder, findsOneWidget);
+
+    // Single horizontal row: equal Y across all 4 items and left-to-right ordering
+    final rowY = tester.getCenter(yourScoreFinder).dy;
+    expect(tester.getCenter(pcScoreFinder).dy, closeTo(rowY, 1.0));
+    expect(tester.getCenter(totalFinder).dy, closeTo(rowY, 1.0));
+    expect(tester.getCenter(gaugeLabelFinder).dy, closeTo(rowY, 1.0));
+    expect(tester.getCenter(gaugeValueFinder).dy, closeTo(rowY, 1.0));
+    expect(tester.getRect(yourScoreFinder).right, lessThan(tester.getRect(pcScoreFinder).left));
+    expect(tester.getRect(pcScoreFinder).right, lessThan(tester.getRect(totalFinder).left));
+    expect(tester.getRect(totalFinder).right, lessThan(tester.getRect(gaugeLabelFinder).left));
 
     // Verify dynamic semantic RPG gauge colors:
     // 1. Low percentages (< 30%, e.g. 0.0% and 25.0%) -> Crimson Red (0xFFE74C3C)
@@ -1251,11 +1272,22 @@ void main() {
     );
     expect(gaugeValueText.style?.color, equals(ScoreHeader.emeraldGreen));
 
+    // 3-digit scores fit cleanly on one single row via FittedBox without overlap or exception
+    controller.userScore = 123;
+    controller.pcScore = 100;
+    controller.totalRounds = 250;
+    controller.notifyListeners();
+    await tester.pump();
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('123')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('100')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('250')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
     // Toggling OFF hides the entire ScoreHeader again
     controller.toggleShowPredictability(false);
     await tester.pumpAndSettle();
     expect(find.byType(ScoreHeader), findsNothing);
-    expect(find.text('Gauge'), findsNothing);
+    expect(find.text('Gauge:'), findsNothing);
   });
 
   testWidgets('Predictability Score costs 15 Fire + 15 Water + 15 Wood, renders at #1 position in ShopDialog ahead of Reset Button and Unlock Earth & Metal, and displays localized description across en, pt, es, and de', (WidgetTester tester) async {
@@ -2233,8 +2265,12 @@ void main() {
     final flyingOrbFinder = find.byKey(const ValueKey('flying_orb_fire'));
     expect(flyingOrbFinder, findsOneWidget);
 
-    final clashCenter = tester.getCenter(find.byKey(const ValueKey('vs_badge')));
+    final userOrbCenter = tester.getCenter(find.byKey(const ValueKey('user_orb_container')));
     final pcOrbCenter = tester.getCenter(find.byKey(const ValueKey('pc_orb_container')));
+    final clashCenter = Offset(
+      (userOrbCenter.dx + pcOrbCenter.dx) * 0.5,
+      (userOrbCenter.dy + pcOrbCenter.dy) * 0.5,
+    );
     final backpackCenter = tester.getCenter(find.byType(RpgBackpackIcon));
     final spawnOrbCenter = tester.getCenter(flyingOrbFinder);
 
@@ -3326,16 +3362,17 @@ void main() {
       final initialMoveCardRect = tester.getRect(moveCardFinder);
       final initialRockRect = tester.getRect(rockBtnFinder);
 
-      // Mana Pool Orb sits inside VersusArena directly above VS badge, starting at 100
+      // Mana Pool Orb sits centered inside VersusArena without a VS badge, starting at 100
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
-      final vsBadgeFinder = find.byKey(const ValueKey('vs_badge'));
+      expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
+      expect(find.text('VS'), findsNothing);
       expect(
         find.descendant(of: arenaFinder, matching: manaOrbFinder),
         findsOneWidget,
       );
       expect(
-        tester.getRect(manaOrbFinder).bottom,
-        lessThanOrEqualTo(tester.getRect(vsBadgeFinder).top),
+        tester.getRect(manaOrbFinder).center.dx,
+        closeTo(tester.getRect(arenaFinder).center.dx, 0.5),
       );
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),

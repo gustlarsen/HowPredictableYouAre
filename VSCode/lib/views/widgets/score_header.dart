@@ -60,91 +60,50 @@ class ScoreHeader extends StatelessWidget {
         side: BorderSide(color: borderColor, width: 1.25),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _InlineScoreCounter(
-                    label: loc.t('string6', fallback: 'Your Score:'),
-                    value: '${controller.userScore}',
-                    valueColor: palette.isDark
-                        ? Colors.white
-                        : palette.primaryText,
-                  ),
-                  const SizedBox(width: 12),
-                  _InlineScoreCounter(
-                    label: loc.t('string7', fallback: 'PC Score:'),
-                    value: '${controller.pcScore}',
-                    valueColor: palette.isDark
-                        ? Colors.white
-                        : palette.primaryText,
-                  ),
-                  const SizedBox(width: 12),
-                  _InlineScoreCounter(
-                    label: loc.t('string8', fallback: 'Total:'),
-                    value: '${controller.totalRounds}',
-                    valueColor: palette.isDark
-                        ? Colors.white
-                        : palette.primaryText,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 5),
-            Container(
-              key: const ValueKey('score_header_gauge_pill'),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2.5),
-              decoration: BoxDecoration(
-                color: gColor.withValues(alpha: palette.isDark ? 0.22 : 0.14),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: gColor.withValues(alpha: palette.isDark ? 0.78 : 0.65),
-                  width: 1.15,
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
+        child: SizedBox(
+          width: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _InlineScoreCounter(
+                  label: loc.t('string6', fallback: 'Your Score:'),
+                  value: '${controller.userScore}',
+                  valueColor: palette.isDark
+                      ? Colors.white
+                      : palette.primaryText,
                 ),
-                boxShadow: [
-                  if (palette.isDark)
-                    BoxShadow(
-                      color: gColor.withValues(alpha: 0.20),
-                      blurRadius: 6,
-                    ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    loc.t('string5', fallback: 'Gauge'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: gColor,
-                    ),
-                  ),
-                  Text(
-                    ': ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: gColor,
-                    ),
-                  ),
-                  Text(
-                    '${controller.percentPredict.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: gColor,
-                    ),
-                  ),
-                ],
-              ),
+                const SizedBox(width: 10),
+                _InlineScoreCounter(
+                  label: loc.t('string7', fallback: 'PC Score:'),
+                  value: '${controller.pcScore}',
+                  valueColor: palette.isDark
+                      ? Colors.white
+                      : palette.primaryText,
+                ),
+                const SizedBox(width: 10),
+                _InlineScoreCounter(
+                  label: loc.t('string8', fallback: 'Total:'),
+                  value: '${controller.totalRounds}',
+                  valueColor: palette.isDark
+                      ? Colors.white
+                      : palette.primaryText,
+                ),
+                const SizedBox(width: 10),
+                _InlineScoreCounter(
+                  label: loc.t('string5', fallback: 'Gauge'),
+                  value: '${controller.percentPredict.toStringAsFixed(1)}%',
+                  labelColor: gColor,
+                  labelWeight: FontWeight.w700,
+                  valueColor: gColor,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -154,11 +113,15 @@ class ScoreHeader extends StatelessWidget {
 class _InlineScoreCounter extends StatelessWidget {
   final String label;
   final String value;
+  final Color? labelColor;
+  final FontWeight labelWeight;
   final Color valueColor;
 
   const _InlineScoreCounter({
     required this.label,
     required this.value,
+    this.labelColor,
+    this.labelWeight = FontWeight.w500,
     required this.valueColor,
   });
 
@@ -171,20 +134,23 @@ class _InlineScoreCounter extends StatelessWidget {
       children: [
         Text(
           normalizedLabel,
+          maxLines: 1,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: palette.isDark
-                ? const Color(0xFFB5BAC6)
-                : palette.secondaryText,
+            fontWeight: labelWeight,
+            color: labelColor ??
+                (palette.isDark
+                    ? const Color(0xFFB5BAC6)
+                    : palette.secondaryText),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 3),
         Text(
           value,
+          maxLines: 1,
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 13,
+            fontSize: 12.5,
             color: valueColor,
           ),
         ),
