@@ -14,6 +14,7 @@ jobs:
     name: Build & Release Flutter APK
     runs-on: ubuntu-latest
     outputs:
+      version_name: ${{ steps.version_info.outputs.version_name }}
       version_code: ${{ steps.version_info.outputs.version_code }}
       aab_name: ${{ steps.version_info.outputs.aab_name }}
       has_play_credentials: ${{ steps.version_info.outputs.has_play_credentials }}
@@ -293,6 +294,7 @@ jobs:
           path: artifacts
 
       - name: Upload AAB to Google Play Console (Internal Testing)
+        id: play_upload
         if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
         continue-on-error: true
         uses: r0adkll/upload-google-play@v1
@@ -303,3 +305,27 @@ jobs:
           tracks: internal
           status: completed
           inAppUpdatePriority: 2
+
+      - name: Notify Telegram - Play Store Internal Testing
+        if: steps.play_upload.outcome == 'success'
+        run: |
+          if [ -z "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] || [ -z "${{ secrets.TELEGRAM_CHAT_ID }}" ]; then
+            echo "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured. Skipping Telegram notification."
+            exit 0
+          fi
+          VERSION_NAME="${{ needs.build_and_notify.outputs.version_name }}"
+          VERSION_CODE="${{ needs.build_and_notify.outputs.version_code }}"
+          PLAY_STORE_URL="https://play.google.com/store/apps/details?id=com.gustlarsen.howpredictable"
+          MESSAGE=$(printf '%s\n' \
+            "🚀 <b>New Internal Testing Build Live on Google Play!</b>" \
+            "" \
+            "📱 <b>App:</b> How Predictable You Are" \
+            "🏷️ <b>Version:</b> <code>v${VERSION_NAME}</code> (Build <code>${VERSION_CODE}</code>)" \
+            "🧪 <b>Track:</b> Internal Testing (<code>internal</code>)" \
+            "" \
+            "The new Internal Testing build is now live on Google Play Store." \
+            "🔗 ${PLAY_STORE_URL}")
+          curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "parse_mode=HTML" \
+            --data-urlencode "text=${MESSAGE}"
