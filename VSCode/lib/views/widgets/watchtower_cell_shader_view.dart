@@ -224,7 +224,7 @@ class _StaticDungeonFallback extends StatelessWidget {
   const _StaticDungeonFallback({required this.isFullScreen});
 
   static const double _texAspect = 576.0 / 1024.0;
-  static const double _fgScale = 0.62;
+  static const double _fgScale = 0.425;
 
   @override
   Widget build(BuildContext context) {
@@ -235,32 +235,34 @@ class _StaticDungeonFallback extends StatelessWidget {
         final h = constraints.maxHeight;
         final viewAspect = h > 0 ? w / h : 1.0;
 
-        final lensZoom = isFullScreen ? 1.0 : 1.45;
-        final targetX = isFullScreen ? 0.50 : 0.49;
-        final targetY = isFullScreen ? 0.50 : 0.465;
+        final targetY = isFullScreen ? 0.50 : 0.535;
 
-        // Match the shader's scene coordinate & optical lens zoom transform
+        // Match the shader's full-body scene coordinate transform
         final double sceneWidth;
         final double sceneHeight;
+        final double offsetX;
+        final double offsetY;
         if (viewAspect > _texAspect) {
-          sceneWidth = w * lensZoom;
-          sceneHeight = (w / _texAspect) * lensZoom;
+          sceneWidth = w;
+          sceneHeight = w / _texAspect;
+          offsetX = 0.0;
+          offsetY = h * 0.5 - sceneHeight * targetY;
         } else {
-          sceneHeight = h * lensZoom;
-          sceneWidth = (h * _texAspect) * lensZoom;
+          sceneHeight = h;
+          sceneWidth = h * _texAspect;
+          offsetX = w * 0.5 - sceneWidth * 0.5;
+          offsetY = 0.0;
         }
-        final offsetX = w * 0.5 - sceneWidth * targetX;
-        final offsetY = h * 0.5 - sceneHeight * targetY;
 
         final fgSizeW = sceneWidth * _fgScale;
         final fgSizeH = sceneHeight * _fgScale;
-        final fgLeft = offsetX + sceneWidth * (0.490 - 0.5 * _fgScale);
-        final fgTop = offsetY + sceneHeight * (0.815 - 0.955 * _fgScale);
+        final fgLeft = offsetX + sceneWidth * (0.485 - 0.5 * _fgScale);
+        final fgTop = offsetY + sceneHeight * (0.745 - 0.955 * _fgScale);
 
-        final shadowW = sceneWidth * 0.16;
-        final shadowH = sceneHeight * 0.042;
+        final shadowW = sceneWidth * 0.11;
+        final shadowH = sceneHeight * 0.028;
         final shadowLeft = offsetX + sceneWidth * 0.478 - shadowW * 0.5;
-        final shadowTop = offsetY + sceneHeight * 0.814 - shadowH * 0.5;
+        final shadowTop = offsetY + sceneHeight * 0.744 - shadowH * 0.5;
 
         return ClipRect(
           child: Stack(
