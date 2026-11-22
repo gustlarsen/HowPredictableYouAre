@@ -86,6 +86,12 @@ enum ShopUpgradeArtifact {
     titleKey: 'markov_recalibrator_title',
     fallbackTitle: 'Markov Recalibrator',
     icon: Icons.tune_rounded,
+  ),
+  overchargedStaff(
+    id: 'overcharged_staff',
+    titleKey: 'overcharged_staff_title',
+    fallbackTitle: 'Overcharged Staff',
+    icon: Icons.bolt_rounded,
   );
 
   final String id;
@@ -100,9 +106,29 @@ enum ShopUpgradeArtifact {
     required this.icon,
   });
 
+  static String overchargedStaffRelicId(int level) =>
+      'overcharged_staff:${level.clamp(1, 4)}';
+
+  static int? parseOverchargedStaffLevel(String id) {
+    final trimmed = id.trim();
+    if (trimmed == overchargedStaff.id) return 1;
+    if (trimmed.startsWith('${overchargedStaff.id}:')) {
+      final rawLevel = trimmed.substring(overchargedStaff.id.length + 1);
+      final parsed = int.tryParse(rawLevel);
+      if (parsed == null) return 1;
+      return parsed.clamp(1, 4);
+    }
+    return null;
+  }
+
   static ShopUpgradeArtifact? fromId(String id) {
+    final trimmed = id.trim();
+    if (trimmed == overchargedStaff.id ||
+        trimmed.startsWith('${overchargedStaff.id}:')) {
+      return overchargedStaff;
+    }
     for (final item in ShopUpgradeArtifact.values) {
-      if (item.id == id) return item;
+      if (item.id == trimmed) return item;
     }
     return null;
   }

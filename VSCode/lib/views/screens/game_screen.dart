@@ -79,6 +79,16 @@ class _GameScreenState extends State<GameScreen>
   Timer? _deathDialogTimer;
   GameController? _controller;
 
+  // Overcharged Staff Hold-to-Fire state
+  Timer? _overchargedHoldStartTimer;
+  Timer? _overchargedHoldRepeatTimer;
+  String? _overchargedActiveTargetId;
+  int? _overchargedActivePointer;
+  bool _overchargedIsRapidFiring = false;
+  final Set<String> _suppressedTapTargetIds = <String>{};
+  late final AnimationController _overchargedChargeController;
+  late final AnimationController _overchargedPulseController;
+
   final GlobalKey _rootStackKey = GlobalKey();
   final GlobalKey _backpackKey = GlobalKey();
   final GlobalKey _pcSlotKey = GlobalKey();
@@ -102,6 +112,16 @@ class _GameScreenState extends State<GameScreen>
     _embersController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3600),
+    );
+    _overchargedChargeController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: GameController.overchargedStaffHoldThresholdMs,
+      ),
+    );
+    _overchargedPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _hasCheckedForUpdate) return;
@@ -138,6 +158,9 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    _cancelOverchargedTimersOnly();
+    _overchargedChargeController.dispose();
+    _overchargedPulseController.dispose();
     _deathDialogTimer?.cancel();
     _deathDialogTimer = null;
     _flyingOrbController.dispose();
@@ -145,6 +168,167 @@ class _GameScreenState extends State<GameScreen>
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  bool _areBattleInputsLocked(GameController controller) {
+    return controller.userHp <= 0 ||
+        controller.computerHp <= 0 ||
+        controller.isBossVictoryPending ||
+        controller.totalRounds >= controller.playerMaxMana ||
+        _isDeathSequenceActive ||
+        _isBossVictoryDialogOpen;
+  }
+
+  bool _isOverchargedSafetyBrakeActive(GameController controller) {
+    if (!mounted || !controller.isOverchargedStaffActive) return true;
+    if (controller.userHp <= GameController.overchargedStaffCriticalHpLimit) {
+      return true;
+    }
+    if (controller.computerHp <= 0 || controller.isBossVictoryPending) {
+      return true;
+    }
+    if (controller.remainingMana <= 0 ||
+        controller.totalRounds >= controller.playerMaxMana) {
+      return true;
+    }
+    if (_isDeathSequenceActive ||
+        _isDeathDialogOpen ||
+        _isBossVictoryDialogOpen ||
+        _isKingdomFallDialogOpen ||
+        _isInventoryDialogOpen) {
+      return true;
+    }
+    return false;
+  }
+
+  void _cancelOverchargedTimersOnly() {
+    _overchargedHoldStartTimer?.cancel();
+    _overchargedHoldStartTimer = null;
+    _overchargedHoldRepeatTimer?.cancel();
+    _overchargedHoldRepeatTimer = null;
+  }
+
+  void _stopOverchargedHold({
+    bool notifyUi = true,
+    int? onlyPointerId,
+    String? clearSuppressedTargetId,
+  }) {
+    if (onlyPointerId != null && _overchargedActivePointer != onlyPointerId) {
+      return;
+    }
+    _cancelOverchargedTimersOnly();
+    final hadActive = _overchargedActiveTargetId != null ||
+        _overchargedIsRapidFiring ||
+        _overchargedActivePointer != null;
+    final previousTargetId = _overchargedActiveTargetId;
+    _overchargedActiveTargetId = null;
+    _overchargedActivePointer = null;
+    _overchargedIsRapidFiring = false;
+    _overchargedChargeController.stop();
+    _overchargedChargeController.reset();
+    _overchargedPulseController.stop();
+    _overchargedPulseController.reset();
+
+    final targetToClear = clearSuppressedTargetId ?? previousTargetId;
+    if (targetToClear != null && _suppressedTapTargetIds.contains(targetToClear)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _suppressedTapTargetIds.remove(targetToClear);
+      });
+    }
+
+    if (notifyUi && hadActive && mounted) {
+      setState(() {});
+    }
+  }
+
+  bool _consumeSuppressedTap(String targetId) {
+    return _suppressedTapTargetIds.remove(targetId);
+  }
+
+  void _startOverchargedHold({
+    required String targetId,
+    required int pointerId,
+    required GameController controller,
+    required VoidCallback onFireSingle,
+    required VoidCallback onFireRapid,
+  }) {
+    if (!controller.isOverchargedStaffActive) return;
+    final isRouteCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    if (!isRouteCurrent || _areBattleInputsLocked(controller)) return;
+
+    _stopOverchargedHold(notifyUi: false);
+    _overchargedActivePointer = pointerId;
+    _suppressedTapTargetIds.add(targetId);
+
+    // Quick Tap / Initial Press: execute 1 single move immediately with zero delay
+    onFireSingle();
+
+    // Auto-stop safety brake: if critical HP (<= 5), victory, defeat, or 0 mana, do not charge rapid-fire
+    if (_isOverchargedSafetyBrakeActive(controller)) {
+      _overchargedActivePointer = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _suppressedTapTargetIds.remove(targetId);
+      });
+      if (mounted) setState(() {});
+      return;
+    }
+
+    _overchargedActiveTargetId = targetId;
+    _overchargedIsRapidFiring = false;
+    _overchargedChargeController.stop();
+    if (controller.animationsEnabled) {
+      _overchargedChargeController.forward(from: 0.0);
+    } else {
+      _overchargedChargeController.value = 1.0;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+
+    _overchargedHoldStartTimer = Timer(
+      const Duration(milliseconds: GameController.overchargedStaffHoldThresholdMs),
+      () {
+        if (!mounted || _overchargedActiveTargetId != targetId) return;
+        final routeCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+        if (!routeCurrent || _isOverchargedSafetyBrakeActive(controller)) {
+          _stopOverchargedHold();
+          return;
+        }
+
+        _overchargedIsRapidFiring = true;
+        if (controller.animationsEnabled && !_overchargedPulseController.isAnimating) {
+          _overchargedPulseController.repeat(reverse: true);
+        }
+        if (mounted) {
+          setState(() {});
+        }
+
+        onFireRapid();
+        if (_isOverchargedSafetyBrakeActive(controller)) {
+          _stopOverchargedHold();
+          return;
+        }
+
+        _overchargedHoldRepeatTimer = Timer.periodic(
+          controller.overchargedStaffInterval,
+          (_) {
+            if (!mounted || _overchargedActiveTargetId != targetId) {
+              _stopOverchargedHold();
+              return;
+            }
+            final stillCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+            if (!stillCurrent || _isOverchargedSafetyBrakeActive(controller)) {
+              _stopOverchargedHold();
+              return;
+            }
+            onFireRapid();
+            if (_isOverchargedSafetyBrakeActive(controller)) {
+              _stopOverchargedHold();
+            }
+          },
+        );
+      },
+    );
   }
 
   void _checkFlyingOrbVfx(GameController controller) {
@@ -173,6 +357,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _handleBackpackTap(BuildContext context, GameController controller) {
+    _stopOverchargedHold();
     controller.audio.playTapVibrate();
     final grantedQa = controller.registerBackpackQaTap();
     if (grantedQa && context.mounted) {
@@ -200,6 +385,7 @@ class _GameScreenState extends State<GameScreen>
     BuildContext context,
     GameController controller,
   ) async {
+    _stopOverchargedHold();
     controller.audio.playTapVibrate();
     if (controller.userHp <= 0 || _isDeathSequenceActive) return;
     if (controller.confirmBattleTeleport) {
@@ -234,6 +420,9 @@ class _GameScreenState extends State<GameScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
+    if (state != AppLifecycleState.resumed) {
+      _stopOverchargedHold();
+    }
     if (ModalRoute.of(context)?.isCurrent == false) return;
     final controller = context.read<GameController>();
     controller.didChangeAppLifecycleState(state);
@@ -246,6 +435,7 @@ class _GameScreenState extends State<GameScreen>
     }
     if (!_isIntroDialogScheduled && !controller.hasSeenStoryIntro) {
       _isIntroDialogScheduled = true;
+      _stopOverchargedHold(notifyUi: false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final introChapter = controller.consumePendingStory(StoryChapter.intro);
@@ -1650,6 +1840,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 tooltip: 'Settings',
                 onPressed: () {
+                  _stopOverchargedHold();
                   showDialog(
                     context: context,
                     builder: (_) => SettingsDialog(controller: controller),
@@ -1668,12 +1859,17 @@ class _GameScreenState extends State<GameScreen>
     final controller = context.watch<GameController>();
     final loc = controller.localization;
     final bgImage = _resolveBackgroundImage(controller);
-    final inputsLocked = controller.userHp <= 0 ||
-        controller.computerHp <= 0 ||
-        controller.isBossVictoryPending ||
-        controller.totalRounds >= controller.playerMaxMana ||
-        _isDeathSequenceActive ||
-        _isBossVictoryDialogOpen;
+    final inputsLocked = _areBattleInputsLocked(controller);
+    final isRouteCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    if (_overchargedActiveTargetId != null &&
+        (!isRouteCurrent ||
+            inputsLocked ||
+            _isOverchargedSafetyBrakeActive(controller))) {
+      _cancelOverchargedTimersOnly();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _stopOverchargedHold();
+      });
+    }
 
     _syncEmbersAnimation(controller.animationsEnabled);
     _checkIntroStory(context, controller);
@@ -1933,24 +2129,64 @@ class _GameScreenState extends State<GameScreen>
                                               HandMove.spock,
                                             ],
                                           ])
-                                            _HandActionButton(
-                                              key: ValueKey(
-                                                'hand_button_${move.name}',
-                                              ),
-                                              move: move,
-                                              compact: controller.showNewHands,
-                                              elementalMode:
-                                                  controller.isElementalMode,
-                                              isSelected:
-                                                  controller.currentUserMove ==
+                                            _OverchargedPointerRegion(
+                                              enabled: controller
+                                                      .isOverchargedStaffActive &&
+                                                  !inputsLocked,
+                                              onPointerDown: (event) =>
+                                                  _startOverchargedHold(
+                                                targetId: move.name,
+                                                pointerId: event.pointer,
+                                                controller: controller,
+                                                onFireSingle: () =>
+                                                    controller.playTurn(move),
+                                                onFireRapid: () =>
+                                                    controller.playTurn(
                                                   move,
-                                              localization: loc,
-                                              animationsEnabled:
-                                                  controller.animationsEnabled,
-                                              onPressed: inputsLocked
-                                                  ? null
-                                                  : () =>
-                                                      controller.playTurn(move),
+                                                  isRapidFire: true,
+                                                ),
+                                              ),
+                                              onPointerRelease: (pointerId) =>
+                                                  _stopOverchargedHold(
+                                                onlyPointerId: pointerId,
+                                                clearSuppressedTargetId:
+                                                    move.name,
+                                              ),
+                                              child: _HandActionButton(
+                                                key: ValueKey(
+                                                  'hand_button_${move.name}',
+                                                ),
+                                                move: move,
+                                                compact:
+                                                    controller.showNewHands,
+                                                elementalMode:
+                                                    controller.isElementalMode,
+                                                isSelected:
+                                                    controller.currentUserMove ==
+                                                    move,
+                                                localization: loc,
+                                                animationsEnabled: controller
+                                                    .animationsEnabled,
+                                                isOverchargedHolding:
+                                                    _overchargedActiveTargetId ==
+                                                    move.name,
+                                                isOverchargedRapidFiring:
+                                                    _overchargedActiveTargetId ==
+                                                        move.name &&
+                                                    _overchargedIsRapidFiring,
+                                                overchargedChargeAnimation:
+                                                    _overchargedChargeController,
+                                                overchargedPulseAnimation:
+                                                    _overchargedPulseController,
+                                                consumeSuppressedTap: () =>
+                                                    _consumeSuppressedTap(
+                                                      move.name,
+                                                    ),
+                                                onPressed: inputsLocked
+                                                    ? null
+                                                    : () => controller
+                                                        .playTurn(move),
+                                              ),
                                             ),
                                         ],
                                       ),
@@ -1958,62 +2194,176 @@ class _GameScreenState extends State<GameScreen>
                                       // Optional Random move button (if unlocked & enabled)
                                       if (controller.showRandom) ...[
                                         const SizedBox(height: 6),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: OutlinedButton.icon(
-                                            key: const ValueKey(
-                                              'random_move_button',
+                                        _OverchargedPointerRegion(
+                                          enabled: controller
+                                                  .isOverchargedStaffActive &&
+                                              !inputsLocked,
+                                          onPointerDown: (event) =>
+                                              _startOverchargedHold(
+                                            targetId: 'random',
+                                            pointerId: event.pointer,
+                                            controller: controller,
+                                            onFireSingle: () =>
+                                                controller.playRandom(),
+                                            onFireRapid: () =>
+                                                controller.playRandom(
+                                              isRapidFire: true,
                                             ),
-                                            onPressed: inputsLocked
-                                                  ? null
-                                                  : controller.playRandom,
-                                            icon: Icon(
-                                              Icons.shuffle_rounded,
-                                              size: 16,
-                                              color: palette.isDark
-                                                  ? const Color(0xFFD9C398)
-                                                  : palette.amberText,
-                                            ),
-                                            label: Text(
-                                              loc.t(
-                                                'string16',
-                                                fallback: 'RANDOM',
-                                              ),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 12,
-                                                letterSpacing: 0.8,
-                                              ),
-                                            ),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: palette.isDark
-                                                  ? const Color(0xFFE6D5B8)
-                                                  : palette.amberText,
-                                              backgroundColor: palette.isDark
-                                                  ? const Color(0xFF1F2430)
-                                                  : palette.dialogCardSurface,
-                                              side: BorderSide(
-                                                color: palette.isDark
-                                                    ? const Color(0xFF8A6D3B)
-                                                        .withValues(alpha: 0.72)
-                                                    : palette.amberBorder
-                                                        .withValues(alpha: 0.65),
-                                                width: 1.1,
-                                              ),
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize
-                                                      .shrinkWrap,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                vertical: 7,
-                                                horizontal: 12,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(14),
-                                              ),
+                                          ),
+                                          onPointerRelease: (pointerId) =>
+                                              _stopOverchargedHold(
+                                            onlyPointerId: pointerId,
+                                            clearSuppressedTargetId: 'random',
+                                          ),
+                                          child: SizedBox(
+                                            width: double.infinity,
+                                            child: AnimatedBuilder(
+                                              animation: Listenable.merge([
+                                                _overchargedChargeController,
+                                                _overchargedPulseController,
+                                              ]),
+                                              builder: (context, _) {
+                                                final isHoldingRandom =
+                                                    _overchargedActiveTargetId ==
+                                                    'random';
+                                                final isRapidRandom =
+                                                    isHoldingRandom &&
+                                                    _overchargedIsRapidFiring;
+                                                return OutlinedButton.icon(
+                                                  key: const ValueKey(
+                                                    'random_move_button',
+                                                  ),
+                                                  onPressed: inputsLocked
+                                                      ? null
+                                                      : () {
+                                                          if (_consumeSuppressedTap(
+                                                            'random',
+                                                          )) {
+                                                            return;
+                                                          }
+                                                          controller
+                                                              .playRandom();
+                                                        },
+                                                  icon: SizedBox(
+                                                    width: 24,
+                                                    height: 24,
+                                                    child: Stack(
+                                                      clipBehavior: Clip.none,
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        if (isHoldingRandom)
+                                                          Positioned.fill(
+                                                            child: IgnorePointer(
+                                                              child: CustomPaint(
+                                                                key: const ValueKey(
+                                                                  'overcharged_charge_ring_random',
+                                                                ),
+                                                                painter:
+                                                                    _OverchargedChargeRingPainter(
+                                                                  progress: isRapidRandom
+                                                                      ? 1.0
+                                                                      : _overchargedChargeController
+                                                                          .value,
+                                                                  pulse: isRapidRandom
+                                                                      ? _overchargedPulseController
+                                                                          .value
+                                                                      : 0.0,
+                                                                  isRapidFiring:
+                                                                      isRapidRandom,
+                                                                  primaryColor:
+                                                                      const Color(
+                                                                    0xFFF5C22B,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        Icon(
+                                                          Icons.shuffle_rounded,
+                                                          size: 16,
+                                                          color: isHoldingRandom
+                                                              ? const Color(
+                                                                  0xFFFFD54F,
+                                                                )
+                                                              : (palette.isDark
+                                                                  ? const Color(
+                                                                      0xFFD9C398,
+                                                                    )
+                                                                  : palette
+                                                                      .amberText),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  label: Text(
+                                                    loc.t(
+                                                      'string16',
+                                                      fallback: 'RANDOM',
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      fontSize: 12,
+                                                      letterSpacing: 0.8,
+                                                    ),
+                                                  ),
+                                                  style:
+                                                      OutlinedButton.styleFrom(
+                                                    foregroundColor:
+                                                        palette.isDark
+                                                            ? const Color(
+                                                                0xFFE6D5B8,
+                                                              )
+                                                            : palette.amberText,
+                                                    backgroundColor:
+                                                        palette.isDark
+                                                            ? const Color(
+                                                                0xFF1F2430,
+                                                              )
+                                                            : palette
+                                                                .dialogCardSurface,
+                                                    side: BorderSide(
+                                                      color: isHoldingRandom
+                                                          ? const Color(
+                                                              0xFFF5C22B,
+                                                            )
+                                                          : (palette.isDark
+                                                              ? const Color(
+                                                                  0xFF8A6D3B,
+                                                                ).withValues(
+                                                                  alpha: 0.72,
+                                                                )
+                                                              : palette
+                                                                  .amberBorder
+                                                                  .withValues(
+                                                                    alpha: 0.65,
+                                                                  )),
+                                                      width: isHoldingRandom
+                                                          ? 1.6
+                                                          : 1.1,
+                                                    ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    tapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    padding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                      vertical: 7,
+                                                      horizontal: 12,
+                                                    ),
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                         ),
@@ -2286,6 +2636,7 @@ class _GameScreenState extends State<GameScreen>
     GameController controller,
     LocalizationService localization,
   ) async {
+    _stopOverchargedHold();
     final lostEntries = <MapEntry<HandMove, int>>[
       for (final move in HandMove.values)
         if (controller.lostOrbsFor(move) > 0)
@@ -2497,6 +2848,11 @@ class _HandActionButton extends StatefulWidget {
   final bool isSelected;
   final LocalizationService localization;
   final bool animationsEnabled;
+  final bool isOverchargedHolding;
+  final bool isOverchargedRapidFiring;
+  final Animation<double>? overchargedChargeAnimation;
+  final Animation<double>? overchargedPulseAnimation;
+  final bool Function()? consumeSuppressedTap;
   final VoidCallback? onPressed;
 
   const _HandActionButton({
@@ -2507,6 +2863,11 @@ class _HandActionButton extends StatefulWidget {
     this.isSelected = false,
     required this.localization,
     required this.animationsEnabled,
+    this.isOverchargedHolding = false,
+    this.isOverchargedRapidFiring = false,
+    this.overchargedChargeAnimation,
+    this.overchargedPulseAnimation,
+    this.consumeSuppressedTap,
     required this.onPressed,
   });
 
@@ -2567,13 +2928,7 @@ class _HandActionButtonState extends State<_HandActionButton>
     super.dispose();
   }
 
-  void _handleTap() {
-    final onPressed = widget.onPressed;
-    if (onPressed == null) return;
-    // Execute the game turn immediately with zero delay
-    onPressed();
-
-    // Trigger visual scale animation asynchronously only if animations are enabled
+  void _playPressPulse() {
     if (widget.animationsEnabled) {
       _pressController.stop();
       _pressController.forward(from: 0.0).then((_) {
@@ -2582,6 +2937,17 @@ class _HandActionButtonState extends State<_HandActionButton>
         }
       }).catchError((_) {});
     }
+  }
+
+  void _handleTap() {
+    if (widget.consumeSuppressedTap?.call() ?? false) {
+      return;
+    }
+    final onPressed = widget.onPressed;
+    if (onPressed == null) return;
+    // Execute the game turn immediately with zero delay
+    onPressed();
+    _playPressPulse();
   }
 
   @override
@@ -2613,6 +2979,7 @@ class _HandActionButtonState extends State<_HandActionButton>
         : widget.move.label.toUpperCase();
 
     Widget buttonContent = InkWell(
+      onTapDown: widget.onPressed == null ? null : (_) => _playPressPulse(),
       onTap: widget.onPressed == null ? null : _handleTap,
       borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
@@ -2677,6 +3044,40 @@ class _HandActionButtonState extends State<_HandActionButton>
                                 : 0.35,
                             primaryColor: primaryColor,
                             secondaryColor: secondaryColor,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+              // Overcharged Staff Charge Ring (fills over 250ms and pulses during rapid-fire)
+              if (widget.isOverchargedHolding)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        if (widget.overchargedChargeAnimation != null)
+                          widget.overchargedChargeAnimation!,
+                        if (widget.overchargedPulseAnimation != null)
+                          widget.overchargedPulseAnimation!,
+                      ]),
+                      builder: (context, _) {
+                        return CustomPaint(
+                          key: ValueKey(
+                            'overcharged_charge_ring_${widget.move.name}',
+                          ),
+                          painter: _OverchargedChargeRingPainter(
+                            progress: widget.isOverchargedRapidFiring
+                                ? 1.0
+                                : (widget.overchargedChargeAnimation?.value ??
+                                    1.0),
+                            pulse: widget.isOverchargedRapidFiring
+                                ? (widget.overchargedPulseAnimation?.value ??
+                                    0.0)
+                                : 0.0,
+                            isRapidFiring: widget.isOverchargedRapidFiring,
+                            primaryColor: primaryColor,
                           ),
                         );
                       },
@@ -2935,5 +3336,137 @@ class _ForgeEmbersPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ForgeEmbersPainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.isDark != isDark;
+  }
+}
+
+class _OverchargedPointerRegion extends StatelessWidget {
+  final bool enabled;
+  final void Function(PointerDownEvent event) onPointerDown;
+  final void Function(int pointerId) onPointerRelease;
+  final Widget child;
+
+  const _OverchargedPointerRegion({
+    required this.enabled,
+    required this.onPointerDown,
+    required this.onPointerRelease,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: enabled ? onPointerDown : null,
+      onPointerMove: enabled
+          ? (event) {
+              final renderObject = context.findRenderObject();
+              if (renderObject is RenderBox && renderObject.hasSize) {
+                final bounds = Offset.zero & renderObject.size;
+                if (!bounds.contains(event.localPosition)) {
+                  onPointerRelease(event.pointer);
+                }
+              }
+            }
+          : null,
+      onPointerUp: (event) => onPointerRelease(event.pointer),
+      onPointerCancel: (event) => onPointerRelease(event.pointer),
+      child: child,
+    );
+  }
+}
+
+/// Renders a glowing golden/elemental circular charge ring that fills over the
+/// 250ms hold threshold and pulses smoothly while Overcharged Staff rapid-fires.
+class _OverchargedChargeRingPainter extends CustomPainter {
+  final double progress;
+  final double pulse;
+  final bool isRapidFiring;
+  final Color primaryColor;
+
+  const _OverchargedChargeRingPainter({
+    required this.progress,
+    required this.pulse,
+    required this.isRapidFiring,
+    required this.primaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final clamped = progress.clamp(0.0, 1.0);
+    if (clamped <= 0.0) return;
+
+    final center = Offset(size.width * 0.5, size.height * 0.5);
+    final radius = size.shortestSide * 0.49;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    const gold = Color(0xFFF5C22B);
+    final brightGold = Color.lerp(gold, Colors.white, isRapidFiring ? 0.25 + 0.25 * pulse : 0.15)!;
+    final blendedGlow = Color.lerp(gold, primaryColor, 0.35)!;
+
+    // Subtle background track ring
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = gold.withValues(alpha: 0.22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6,
+    );
+
+    const startAngle = -math.pi / 2.0;
+    final sweepAngle = 2.0 * math.pi * clamped;
+
+    // Outer radiant glow arc
+    canvas.drawArc(
+      rect,
+      startAngle,
+      sweepAngle,
+      false,
+      Paint()
+        ..color = blendedGlow.withValues(alpha: isRapidFiring ? 0.65 + 0.25 * pulse : 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (isRapidFiring ? 5.6 + 2.0 * pulse : 5.0)
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = MaskFilter.blur(
+          BlurStyle.normal,
+          isRapidFiring ? 4.5 + 2.5 * pulse : 3.5,
+        ),
+    );
+
+    // Crisp bright inner charge arc
+    canvas.drawArc(
+      rect,
+      startAngle,
+      sweepAngle,
+      false,
+      Paint()
+        ..color = brightGold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (isRapidFiring ? 3.2 + 0.8 * pulse : 2.8)
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Leading spark dot while filling up to 250ms
+    if (clamped < 0.999) {
+      final tipAngle = startAngle + sweepAngle;
+      final tipPos = Offset(
+        center.dx + math.cos(tipAngle) * radius,
+        center.dy + math.sin(tipAngle) * radius,
+      );
+      canvas.drawCircle(
+        tipPos,
+        3.2,
+        Paint()..color = Colors.white.withValues(alpha: 0.95),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OverchargedChargeRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.pulse != pulse ||
+        oldDelegate.isRapidFiring != isRapidFiring ||
+        oldDelegate.primaryColor != primaryColor;
   }
 }

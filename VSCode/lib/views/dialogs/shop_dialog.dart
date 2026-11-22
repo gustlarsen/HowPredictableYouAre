@@ -1193,6 +1193,78 @@ class _ShopDialogState extends State<ShopDialog> {
             );
           },
         ),
+        _OverchargedStaffShopTile(
+          key: const ValueKey('shop_overcharged_staff_card'),
+          title: loc.t('overcharged_staff_title', fallback: 'Overcharged Staff'),
+          subtitle: loc.t(
+            'overcharged_staff_desc',
+            fallback:
+                'Hold any element or Random to unleash rapid-fire attacks (1x–10x), with auto-stop safety at 5 HP or less.',
+          ),
+          level: controller.overchargedStaffLevel,
+          isActive: controller.overchargedStaffEnabled,
+          selectedSpeed: controller.overchargedStaffSelectedSpeed,
+          nextCost: controller.nextOverchargedStaffUpgradeCost,
+          enabledLabel: enabledStr,
+          disabledLabel: disabledStr,
+          unlockLabel: loc.t(
+            'overcharged_staff_unlock_action',
+            fallback: 'Unlock',
+          ),
+          levelPrefix: loc.t('overcharged_staff_level_prefix', fallback: 'Lv.'),
+          maxBadgeLabel: loc.t('overcharged_staff_max_badge', fallback: 'MAX'),
+          speedSectionLabel: loc.t(
+            'overcharged_staff_speed_label',
+            fallback: 'Fire Speed',
+          ),
+          onUnlockOrUpgrade: () {
+            final targetLv = controller.overchargedStaffLevel + 1;
+            final ok = controller.unlockOrUpgradeOverchargedStaff();
+            final staffTitle = loc.t(
+              'overcharged_staff_title',
+              fallback: 'Overcharged Staff',
+            );
+            if (ok) {
+              controller.audio.playWinVibrate();
+              final msg = targetLv == 1
+                  ? '$staffTitle: Unlocked!'
+                  : '$staffTitle (Lv. $targetLv): Upgraded!';
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(msg),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+            } else {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+            }
+          },
+          onToggle: (val) {
+            controller.toggleOverchargedStaff(val);
+            _handleToggle(
+              context,
+              loc.t('overcharged_staff_title', fallback: 'Overcharged Staff'),
+              val,
+            );
+          },
+          onSelectSpeed: (speed) {
+            final ok = controller.selectOverchargedStaffSpeed(speed);
+            if (ok) {
+              controller.audio.playTapVibrate();
+            }
+          },
+        ),
         _buildShopItem(
           context: context,
           title: loc.t('string40', fallback: 'Show Markov Algorithm'),
@@ -2944,6 +3016,530 @@ class _ShopItemTile extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _OverchargedStaffShopTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final int level;
+  final bool isActive;
+  final int selectedSpeed;
+  final ElementalCost? nextCost;
+  final String enabledLabel;
+  final String disabledLabel;
+  final String unlockLabel;
+  final String levelPrefix;
+  final String maxBadgeLabel;
+  final String speedSectionLabel;
+  final VoidCallback onUnlockOrUpgrade;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<int> onSelectSpeed;
+
+  const _OverchargedStaffShopTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.level,
+    required this.isActive,
+    required this.selectedSpeed,
+    required this.nextCost,
+    required this.enabledLabel,
+    required this.disabledLabel,
+    required this.unlockLabel,
+    required this.levelPrefix,
+    required this.maxBadgeLabel,
+    required this.speedSectionLabel,
+    required this.onUnlockOrUpgrade,
+    required this.onToggle,
+    required this.onSelectSpeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = AppPalette.of(context);
+    final isUnlocked = level >= 1;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: palette.isDark
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+            : palette.shopTileSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: isUnlocked && isActive
+            ? Border.all(
+                color: palette.successIcon.withValues(
+                  alpha: palette.isDark ? 0.4 : 0.55,
+                ),
+                width: 1.2,
+              )
+            : (palette.isDark
+                  ? Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.25),
+                      width: 1.0,
+                    )
+                  : Border.all(
+                      color: palette.sandCardBorder,
+                      width: 1.0,
+                    )),
+      ),
+      child: isUnlocked
+          ? _buildUnlockedContent(palette)
+          : Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onUnlockOrUpgrade,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: _buildLockedContent(palette),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildLockedContent(AppPalette palette) {
+    final entries =
+        (nextCost ?? GameController.costOverchargedStaffLv1).nonZeroEntries;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.bolt_rounded,
+              size: 18,
+              color: palette.amberIcon,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: palette.primaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          softWrap: true,
+          style: TextStyle(
+            fontSize: 11,
+            color: palette.amberSubtitle,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              unlockLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    palette.isDark ? FontWeight.normal : FontWeight.w600,
+                color: palette.isDark ? Colors.grey : palette.secondaryText,
+              ),
+            ),
+            ElevatedButton(
+              key: const ValueKey('overcharged_staff_upgrade_button'),
+              onPressed: onUnlockOrUpgrade,
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    palette.isDark ? null : palette.dialogSurface,
+                elevation: palette.isDark ? null : 1,
+                side: palette.isDark
+                    ? null
+                    : BorderSide(color: palette.sandCardBorder),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 5,
+                ),
+                minimumSize: const Size(52, 30),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: _ElementalCostPillRow(
+                entries: entries,
+                palette: palette,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnlockedContent(AppPalette palette) {
+    final activeColor = palette.successIcon;
+    final inactiveColor = palette.isDark ? Colors.grey : palette.mutedText;
+    final isMaxLevel = level >= GameController.overchargedStaffMaxLevel;
+    final nextLevel = level + 1;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header + ON/OFF Toggle
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onToggle(!isActive),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.bolt_rounded,
+                            size: 17,
+                            color: isActive
+                                ? _ShopDialogState._goldFill
+                                : palette.amberIcon,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: palette.primaryText,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            key: const ValueKey('overcharged_staff_level_pill'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMaxLevel
+                                  ? _ShopDialogState._goldFill
+                                  : palette.rewardedAdCardSurface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isMaxLevel
+                                    ? const Color(0xFFFFB300)
+                                    : palette.amberBorder.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Text(
+                              isMaxLevel
+                                  ? maxBadgeLabel
+                                  : '$levelPrefix $level/${GameController.overchargedStaffMaxLevel}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: isMaxLevel
+                                    ? _ShopDialogState._goldDarkInk
+                                    : palette.amberText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: palette.amberSubtitle,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isActive
+                                ? Icons.check_circle
+                                : Icons.cancel_outlined,
+                            size: 13,
+                            color: isActive ? activeColor : inactiveColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              isActive ? enabledLabel : disabledLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isActive ? activeColor : inactiveColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Switch(
+                  key: const ValueKey('overcharged_staff_switch'),
+                  value: isActive,
+                  onChanged: onToggle,
+                  activeTrackColor: activeColor,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Compact Horizontal Row of 4 Speed Pills (1x, 2x, 5x, 10x)
+          AnimatedOpacity(
+            key: const ValueKey('overcharged_staff_speed_row_opacity'),
+            opacity: isActive ? 1.0 : 0.45,
+            duration: const Duration(milliseconds: 160),
+            child: Container(
+              key: const ValueKey('overcharged_staff_speed_row'),
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(
+                color: palette.isDark
+                    ? const Color(0xFF14171F)
+                    : const Color(0xFFE9E0CD),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.25 : 0.45,
+                  ),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  for (int i = 0;
+                      i < GameController.overchargedStaffSpeedOptions.length;
+                      i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    Expanded(
+                      child: _buildSpeedPill(
+                        speed: GameController.overchargedStaffSpeedOptions[i],
+                        palette: palette,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Next-Level Upgrade Row (Lv. 2..4) or MAX Badge
+          if (!isMaxLevel && nextCost != null)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '$levelPrefix $nextLevel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: palette.amberText,
+                  ),
+                ),
+                ElevatedButton(
+                  key: const ValueKey('overcharged_staff_upgrade_button'),
+                  onPressed: onUnlockOrUpgrade,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        palette.isDark ? null : palette.dialogSurface,
+                    elevation: palette.isDark ? null : 1,
+                    side: palette.isDark
+                        ? null
+                        : BorderSide(color: palette.sandCardBorder),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    minimumSize: const Size(52, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: _ElementalCostPillRow(
+                    entries: nextCost!.nonZeroEntries,
+                    palette: palette,
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  speedSectionLabel,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: palette.secondaryText,
+                  ),
+                ),
+                Container(
+                  key: const ValueKey('overcharged_staff_max_badge'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _ShopDialogState._goldFill,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFFB300)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 13,
+                        color: _ShopDialogState._goldDarkInk,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        maxBadgeLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: _ShopDialogState._goldDarkInk,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpeedPill({
+    required int speed,
+    required AppPalette palette,
+  }) {
+    final requiredLevel =
+        GameController.overchargedStaffRequiredLevelForSpeed(speed);
+    final isTierUnlocked = level >= requiredLevel;
+    final isSelected = isTierUnlocked && selectedSpeed == speed;
+    final intervalMs = GameController.overchargedStaffIntervalMsForSpeed(speed);
+
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+
+    if (isSelected) {
+      bgColor = _ShopDialogState._goldFill;
+      borderColor = const Color(0xFFFFB300);
+      textColor = _ShopDialogState._goldDarkInk;
+    } else if (isTierUnlocked) {
+      bgColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.06)
+          : const Color(0xFFFAF6EE);
+      borderColor = palette.amberBorder.withValues(
+        alpha: palette.isDark ? 0.30 : 0.45,
+      );
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.92)
+          : palette.primaryText;
+    } else {
+      bgColor = Colors.transparent;
+      borderColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : palette.sandCardBorder.withValues(alpha: 0.55);
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.32)
+          : palette.mutedText.withValues(alpha: 0.45);
+    }
+
+    return Tooltip(
+      message: '${speed}x (${intervalMs}ms)',
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        enabled: isTierUnlocked,
+        label: '${speed}x',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: ValueKey('overcharged_staff_speed_${speed}x'),
+            onTap: isTierUnlocked ? () => onSelectSpeed(speed) : null,
+            borderRadius: BorderRadius.circular(7.5),
+            child: Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(7.5),
+                border: Border.all(color: borderColor, width: 1.0),
+              ),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isTierUnlocked) ...[
+                      Icon(
+                        Icons.lock_rounded,
+                        size: 10.5,
+                        color: textColor,
+                      ),
+                      const SizedBox(width: 2.5),
+                    ],
+                    Text(
+                      '${speed}x',
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w700,
+                        color: textColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

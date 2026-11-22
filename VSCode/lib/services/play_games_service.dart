@@ -207,6 +207,7 @@ class CloudSaveData {
   final bool unlockedCrystalBallPlus;
   final bool unlockedMarkovRecalibrator;
   final bool giftBoxUnlocked;
+  final int overchargedStaffLevel;
 
   // Feature Active Toggles
   final bool showReset;
@@ -224,6 +225,8 @@ class CloudSaveData {
   final bool crystalBallPlusSavedState;
   final bool showMarkovRecalibrator;
   final bool giftBoxEnabled;
+  final bool overchargedStaffEnabled;
+  final int overchargedStaffSelectedSpeed;
 
   // Story Cutscene Persistence Flags
   final bool hasSeenStoryIntro;
@@ -334,6 +337,7 @@ class CloudSaveData {
     this.unlockedCrystalBallPlus = false,
     this.unlockedMarkovRecalibrator = false,
     this.giftBoxUnlocked = false,
+    this.overchargedStaffLevel = 0,
     this.showReset = false,
     this.showPredictability = false,
     this.showRandom = false,
@@ -349,6 +353,8 @@ class CloudSaveData {
     this.crystalBallPlusSavedState = false,
     this.showMarkovRecalibrator = false,
     this.giftBoxEnabled = false,
+    this.overchargedStaffEnabled = false,
+    this.overchargedStaffSelectedSpeed = 1,
     this.hasSeenStoryIntro = false,
     this.hasSeenStoryReset = false,
     this.hasSeenStoryPredictability = false,
@@ -447,6 +453,7 @@ class CloudSaveData {
     if (unlockedCrystalBallPlus) count++;
     if (unlockedMarkovRecalibrator) count++;
     if (giftBoxUnlocked) count++;
+    if (overchargedStaffLevel >= 1) count++;
     return count;
   }
 
@@ -469,6 +476,10 @@ class CloudSaveData {
     if (unlockedReset) value += 90;
     if (unlockedNewHands) value += 100;
     if (unlockedRandom) value += 240;
+    if (overchargedStaffLevel >= 1) value += 300;
+    if (overchargedStaffLevel >= 2) value += 750;
+    if (overchargedStaffLevel >= 3) value += 1900;
+    if (overchargedStaffLevel >= 4) value += 4000;
     if (unlockedAlgorithm) value += 460;
     if (unlockedYourPrediction) value += 950;
     if (unlockedNextMove) value += 2400;
@@ -514,6 +525,7 @@ class CloudSaveData {
             enemyPhase > local.enemyPhase ||
             total > local.total ||
             userScore > local.userScore ||
+            overchargedStaffLevel > local.overchargedStaffLevel ||
             markovTransitionsCount > local.markovTransitionsCount ||
             totalTreasuryOrbs > local.totalTreasuryOrbs ||
             totalSpoilsOrbs > local.totalSpoilsOrbs ||
@@ -598,6 +610,8 @@ class CloudSaveData {
       unlockedMarkovRecalibrator:
           unlockedMarkovRecalibrator || local.unlockedMarkovRecalibrator,
       giftBoxUnlocked: giftBoxUnlocked || local.giftBoxUnlocked,
+      overchargedStaffLevel:
+          _maxInt(overchargedStaffLevel, local.overchargedStaffLevel),
       showReset: showReset,
       showPredictability: showPredictability,
       showRandom: showRandom,
@@ -613,6 +627,8 @@ class CloudSaveData {
       crystalBallPlusSavedState: crystalBallPlusSavedState,
       showMarkovRecalibrator: showMarkovRecalibrator,
       giftBoxEnabled: giftBoxEnabled,
+      overchargedStaffEnabled: overchargedStaffEnabled,
+      overchargedStaffSelectedSpeed: overchargedStaffSelectedSpeed,
       hasSeenStoryIntro: hasSeenStoryIntro || local.hasSeenStoryIntro,
       hasSeenStoryReset: hasSeenStoryReset || local.hasSeenStoryReset,
       hasSeenStoryPredictability:
@@ -738,6 +754,7 @@ class CloudSaveData {
       unlockedCrystalBallPlus: storage.unlockedCrystalBallPlus,
       unlockedMarkovRecalibrator: storage.unlockedMarkovRecalibrator,
       giftBoxUnlocked: storage.giftBoxUnlocked,
+      overchargedStaffLevel: storage.overchargedStaffLevel,
       showReset: storage.showReset,
       showPredictability: storage.showPredictability,
       showRandom: storage.showRandom,
@@ -753,6 +770,8 @@ class CloudSaveData {
       crystalBallPlusSavedState: storage.crystalBallPlusSavedState,
       showMarkovRecalibrator: storage.showMarkovRecalibrator,
       giftBoxEnabled: storage.giftBoxEnabled,
+      overchargedStaffEnabled: storage.overchargedStaffEnabled,
+      overchargedStaffSelectedSpeed: storage.overchargedStaffSelectedSpeed,
       hasSeenStoryIntro: storage.hasSeenStoryIntro,
       hasSeenStoryReset: storage.hasSeenStoryReset,
       hasSeenStoryPredictability: storage.hasSeenStoryPredictability,
@@ -914,6 +933,7 @@ class CloudSaveData {
     await storage.setUnlockedCrystalBallPlus(unlockedCrystalBallPlus);
     await storage.setUnlockedMarkovRecalibrator(unlockedMarkovRecalibrator);
     await storage.setGiftBoxUnlocked(giftBoxUnlocked);
+    await storage.setOverchargedStaffLevel(overchargedStaffLevel);
 
     await storage.setShowReset(showReset);
     await storage.setShowPredictability(showPredictability);
@@ -931,6 +951,10 @@ class CloudSaveData {
     await storage.setShowMarkovRecalibrator(
         unlockedMarkovRecalibrator ? showMarkovRecalibrator : false);
     await storage.setGiftBoxEnabled(giftBoxUnlocked ? giftBoxEnabled : false);
+    await storage.setOverchargedStaffEnabled(
+        overchargedStaffLevel >= 1 ? overchargedStaffEnabled : false);
+    await storage.setOverchargedStaffSelectedSpeed(
+        overchargedStaffLevel >= 1 ? overchargedStaffSelectedSpeed : 1);
 
     await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
     await storage.setHasSeenStoryReset(hasSeenStoryReset);
@@ -1066,6 +1090,7 @@ class CloudSaveData {
       'unlockedCrystalBallPlus': unlockedCrystalBallPlus,
       'unlockedMarkovRecalibrator': unlockedMarkovRecalibrator,
       'giftBoxUnlocked': giftBoxUnlocked,
+      'overchargedStaffLevel': overchargedStaffLevel,
       'showReset': showReset,
       'showPredictability': showPredictability,
       'showRandom': showRandom,
@@ -1081,6 +1106,8 @@ class CloudSaveData {
       'crystalBallPlusSavedState': crystalBallPlusSavedState,
       'showMarkovRecalibrator': showMarkovRecalibrator,
       'giftBoxEnabled': giftBoxEnabled,
+      'overchargedStaffEnabled': overchargedStaffEnabled,
+      'overchargedStaffSelectedSpeed': overchargedStaffSelectedSpeed,
       'hasSeenStoryIntro': hasSeenStoryIntro,
       'hasSeenStoryReset': hasSeenStoryReset,
       'hasSeenStoryPredictability': hasSeenStoryPredictability,
@@ -1339,6 +1366,8 @@ class CloudSaveData {
       unlockedMarkovRecalibrator:
           map['unlockedMarkovRecalibrator'] as bool? ?? false,
       giftBoxUnlocked: map['giftBoxUnlocked'] as bool? ?? false,
+      overchargedStaffLevel:
+          ((map['overchargedStaffLevel'] as num?)?.toInt() ?? 0).clamp(0, 4),
       showReset: map['showReset'] as bool? ?? false,
       showPredictability: map['showPredictability'] as bool? ?? false,
       showRandom: map['showRandom'] as bool? ?? false,
@@ -1356,6 +1385,12 @@ class CloudSaveData {
           map['crystalBallPlusSavedState'] as bool? ?? false,
       showMarkovRecalibrator: map['showMarkovRecalibrator'] as bool? ?? false,
       giftBoxEnabled: map['giftBoxEnabled'] as bool? ?? false,
+      overchargedStaffEnabled:
+          map['overchargedStaffEnabled'] as bool? ?? false,
+      overchargedStaffSelectedSpeed: (() {
+        final raw = (map['overchargedStaffSelectedSpeed'] as num?)?.toInt() ?? 1;
+        return (raw == 1 || raw == 2 || raw == 5 || raw == 10) ? raw : 1;
+      })(),
       hasSeenStoryIntro: map['hasSeenStoryIntro'] as bool? ?? false,
       hasSeenStoryReset: map['hasSeenStoryReset'] as bool? ?? false,
       hasSeenStoryPredictability:

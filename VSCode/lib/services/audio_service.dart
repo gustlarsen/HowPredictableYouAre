@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -12,9 +13,13 @@ class AudioService {
   static const int defeatVibrationDurationMs = 500;
   static const int defaultVibrationDurationMs = 100;
   static const int tapVibrationDurationMs = 40;
+  static const int rapidFireHapticDurationMs = 25;
+  static const Duration rapidFireHapticMinInterval = Duration(milliseconds: 145);
 
   AudioPlayer? _sfxPlayer;
   AudioPlayer? _bgmPlayer;
+  bool _isRapidFireHapticOnCooldown = false;
+  Timer? _rapidFireHapticCooldownTimer;
 
   bool soundEnabled = true;
   bool musicEnabled = true;
@@ -88,6 +93,21 @@ class AudioService {
     );
   }
 
+  /// Light haptic feedback throttled to at most once every ~150ms so 10x rapid-fire stays crisp.
+  void playRapidFireHaptic() {
+    if (!vibrationEnabled || _isRapidFireHapticOnCooldown) return;
+    _isRapidFireHapticOnCooldown = true;
+    _rapidFireHapticCooldownTimer?.cancel();
+    _rapidFireHapticCooldownTimer = Timer(rapidFireHapticMinInterval, () {
+      _isRapidFireHapticOnCooldown = false;
+      _rapidFireHapticCooldownTimer = null;
+    });
+    vibrate(
+      durationMs: rapidFireHapticDurationMs,
+      fallback: HapticFeedback.lightImpact,
+    );
+  }
+
   void playWinVibrate() {
     vibrate(
       durationMs: winVibrationDurationMs,
@@ -109,8 +129,10 @@ class AudioService {
     );
   }
 
-  Future<void> playWin() async {
-    playWinVibrate();
+  Future<void> playWin({bool vibrate = true}) async {
+    if (vibrate) {
+      playWinVibrate();
+    }
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
@@ -120,8 +142,10 @@ class AudioService {
     }
   }
 
-  Future<void> playDefeat() async {
-    playDefeatVibrate();
+  Future<void> playDefeat({bool vibrate = true}) async {
+    if (vibrate) {
+      playDefeatVibrate();
+    }
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
@@ -131,8 +155,10 @@ class AudioService {
     }
   }
 
-  Future<void> playDraw() async {
-    playDrawVibrate();
+  Future<void> playDraw({bool vibrate = true}) async {
+    if (vibrate) {
+      playDrawVibrate();
+    }
     if (!soundEnabled) return;
     try {
       await _sfxPlayer?.stop();
@@ -206,6 +232,9 @@ class AudioService {
   }
 
   void dispose() {
+    _rapidFireHapticCooldownTimer?.cancel();
+    _rapidFireHapticCooldownTimer = null;
+    _isRapidFireHapticOnCooldown = false;
     _sfxPlayer?.dispose();
     _bgmPlayer?.dispose();
   }

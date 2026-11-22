@@ -567,6 +567,37 @@ class StorageService {
   Future<void> setGiftBoxEnabled(bool val) =>
       _prefs.setBool('giftBoxEnabled', val);
 
+  // Overcharged Staff Tiered Upgrade & Speed Persistence
+  static const String overchargedStaffLevelKey = 'overcharged_staff_level';
+  static const String overchargedStaffEnabledKey = 'overcharged_staff_enabled';
+  static const String overchargedStaffSelectedSpeedKey =
+      'overcharged_staff_selected_speed';
+
+  int get overchargedStaffLevel {
+    final val = _prefs.getInt(overchargedStaffLevelKey) ?? 0;
+    return val.clamp(0, 4);
+  }
+
+  Future<void> setOverchargedStaffLevel(int val) =>
+      _prefs.setInt(overchargedStaffLevelKey, val.clamp(0, 4));
+
+  bool get overchargedStaffEnabled =>
+      _prefs.getBool(overchargedStaffEnabledKey) ?? false;
+
+  Future<void> setOverchargedStaffEnabled(bool val) =>
+      _prefs.setBool(overchargedStaffEnabledKey, val);
+
+  int get overchargedStaffSelectedSpeed {
+    final val = _prefs.getInt(overchargedStaffSelectedSpeedKey) ?? 1;
+    if (val == 1 || val == 2 || val == 5 || val == 10) return val;
+    return 1;
+  }
+
+  Future<void> setOverchargedStaffSelectedSpeed(int val) {
+    final sanitized = (val == 1 || val == 2 || val == 5 || val == 10) ? val : 1;
+    return _prefs.setInt(overchargedStaffSelectedSpeedKey, sanitized);
+  }
+
   // Story Cutscene Persistence Flags
   bool get hasSeenStoryIntro =>
       _prefs.getBool('has_seen_story_intro') ?? false;
@@ -1107,6 +1138,9 @@ class StorageService {
       setCrystalBallPlusSavedState(false),
       setShowMarkovRecalibrator(false),
       setGiftBoxEnabled(false),
+      setOverchargedStaffLevel(0),
+      setOverchargedStaffEnabled(false),
+      setOverchargedStaffSelectedSpeed(1),
       if (!preserveStoryFlags) ...[
         setHasSeenStoryIntro(false),
         setHasSeenStoryReset(false),

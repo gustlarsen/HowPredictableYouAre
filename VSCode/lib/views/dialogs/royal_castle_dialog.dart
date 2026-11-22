@@ -1107,10 +1107,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      loc.t(
-                        artifact.titleKey,
-                        fallback: artifact.fallbackTitle,
-                      ),
+                      artifact == ShopUpgradeArtifact.overchargedStaff &&
+                              controller.storedRelicOverchargedStaffLevel > 0
+                          ? '${loc.t(artifact.titleKey, fallback: artifact.fallbackTitle)} (${loc.t('overcharged_staff_level_prefix', fallback: 'Lv.')} ${controller.storedRelicOverchargedStaffLevel})'
+                          : loc.t(
+                              artifact.titleKey,
+                              fallback: artifact.fallbackTitle,
+                            ),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,

@@ -156,6 +156,97 @@ class GameController extends ChangeNotifier {
     metal: 1200,
   );
 
+  // Overcharged Staff Tiered Upgrade Constants (Levels 1..4)
+  static const int overchargedStaffMaxLevel = 4;
+  static const List<int> overchargedStaffSpeedOptions = [1, 2, 5, 10];
+  static const int overchargedStaffHoldThresholdMs = 250;
+  static const int overchargedStaffCriticalHpLimit = 5;
+
+  static const ElementalCost costOverchargedStaffLv1 = ElementalCost(
+    fire: 100,
+    water: 100,
+    wood: 100,
+  );
+  static const ElementalCost costOverchargedStaffLv2 = ElementalCost(
+    fire: 250,
+    water: 250,
+    wood: 250,
+  );
+  static const ElementalCost costOverchargedStaffLv3 = ElementalCost(
+    fire: 500,
+    water: 500,
+    wood: 500,
+    earth: 200,
+    metal: 200,
+  );
+  static const ElementalCost costOverchargedStaffLv4 = ElementalCost(
+    fire: 1000,
+    water: 1000,
+    wood: 1000,
+    earth: 500,
+    metal: 500,
+  );
+
+  static ElementalCost overchargedStaffCostForLevel(int level) {
+    switch (level) {
+      case 1:
+        return costOverchargedStaffLv1;
+      case 2:
+        return costOverchargedStaffLv2;
+      case 3:
+        return costOverchargedStaffLv3;
+      case 4:
+        return costOverchargedStaffLv4;
+      default:
+        return costOverchargedStaffLv1;
+    }
+  }
+
+  static int overchargedStaffRequiredLevelForSpeed(int speed) {
+    switch (speed) {
+      case 1:
+        return 1;
+      case 2:
+        return 2;
+      case 5:
+        return 3;
+      case 10:
+        return 4;
+      default:
+        return 1;
+    }
+  }
+
+  static int overchargedStaffSpeedForLevel(int level) {
+    switch (level) {
+      case 1:
+        return 1;
+      case 2:
+        return 2;
+      case 3:
+        return 5;
+      case 4:
+        return 10;
+      default:
+        return 1;
+    }
+  }
+
+  static int overchargedStaffIntervalMsForSpeed(int speed) {
+    switch (speed) {
+      case 1:
+        return 750;
+      case 2:
+        return 375;
+      case 5:
+        return 150;
+      case 10:
+        return 75;
+      default:
+        return 750;
+    }
+  }
+
   static int maxHpForEnemyStage(int stage) {
     switch (stage) {
       case 2:
@@ -385,6 +476,7 @@ class GameController extends ChangeNotifier {
   bool unlockedCrystalBallPlus = false;
   bool unlockedMarkovRecalibrator = false;
   bool giftBoxUnlocked = false;
+  int overchargedStaffLevel = 0;
 
   // Active toggles
   bool showReset = false;
@@ -409,6 +501,20 @@ class GameController extends ChangeNotifier {
   bool crystalBallPlusSavedState = false;
   bool showMarkovRecalibrator = false;
   bool giftBoxEnabled = false;
+  bool overchargedStaffEnabled = false;
+  int overchargedStaffSelectedSpeed = 1;
+
+  bool get isOverchargedStaffUnlocked => overchargedStaffLevel >= 1;
+  bool get isOverchargedStaffActive =>
+      overchargedStaffLevel >= 1 && overchargedStaffEnabled;
+  int get overchargedStaffIntervalMs =>
+      overchargedStaffIntervalMsForSpeed(overchargedStaffSelectedSpeed);
+  Duration get overchargedStaffInterval =>
+      Duration(milliseconds: overchargedStaffIntervalMs);
+  ElementalCost? get nextOverchargedStaffUpgradeCost =>
+      overchargedStaffLevel < overchargedStaffMaxLevel
+          ? overchargedStaffCostForLevel(overchargedStaffLevel + 1)
+          : null;
 
   bool get markovRecalibratorUnlocked => unlockedMarkovRecalibrator;
   bool get markovRecalibratorEnabled => showMarkovRecalibrator;
@@ -920,6 +1026,7 @@ class GameController extends ChangeNotifier {
     unlockedCrystalBallPlus = storage.unlockedCrystalBallPlus;
     unlockedMarkovRecalibrator = storage.unlockedMarkovRecalibrator;
     giftBoxUnlocked = storage.giftBoxUnlocked;
+    overchargedStaffLevel = storage.overchargedStaffLevel.clamp(0, overchargedStaffMaxLevel);
 
     enemyPhase = storage.enemyPhase.clamp(1, 3);
     enemyMaxHp = storage.enemyMaxHpRaw ?? maxHpForEnemyPhase(enemyPhase);
@@ -941,6 +1048,20 @@ class GameController extends ChangeNotifier {
     showMarkovRecalibrator =
         unlockedMarkovRecalibrator ? storage.showMarkovRecalibrator : false;
     giftBoxEnabled = giftBoxUnlocked ? storage.giftBoxEnabled : false;
+    overchargedStaffEnabled =
+        overchargedStaffLevel >= 1 ? storage.overchargedStaffEnabled : false;
+    final rawStaffSpeed = storage.overchargedStaffSelectedSpeed;
+    if (overchargedStaffLevel >= 1 &&
+        overchargedStaffSpeedOptions.contains(rawStaffSpeed) &&
+        overchargedStaffRequiredLevelForSpeed(rawStaffSpeed) <=
+            overchargedStaffLevel) {
+      overchargedStaffSelectedSpeed = rawStaffSpeed;
+    } else if (overchargedStaffLevel >= 1) {
+      overchargedStaffSelectedSpeed =
+          overchargedStaffSpeedForLevel(overchargedStaffLevel);
+    } else {
+      overchargedStaffSelectedSpeed = 1;
+    }
 
     if (storage.pcHpRaw != null) {
       computerHp = storage.pcHp.clamp(0, enemyMaxHp);
@@ -1207,6 +1328,8 @@ class GameController extends ChangeNotifier {
         return unlockedCrystalBallPlus;
       case ShopUpgradeArtifact.markovRecalibrator:
         return unlockedMarkovRecalibrator;
+      case ShopUpgradeArtifact.overchargedStaff:
+        return overchargedStaffLevel >= 1;
     }
   }
 
@@ -1236,15 +1359,33 @@ class GameController extends ChangeNotifier {
       case ShopUpgradeArtifact.newSkin:
       case ShopUpgradeArtifact.crystalBallPlus:
       case ShopUpgradeArtifact.markovRecalibrator:
+      case ShopUpgradeArtifact.overchargedStaff:
         return null;
     }
   }
 
+  int get storedRelicOverchargedStaffLevel {
+    int maxLevel = 0;
+    for (final id in relicChamberStoredUpgrades) {
+      final parsed = ShopUpgradeArtifact.parseOverchargedStaffLevel(id);
+      if (parsed != null && parsed > maxLevel) {
+        maxLevel = parsed;
+      }
+    }
+    return maxLevel;
+  }
+
   List<ShopUpgradeArtifact> get availableRelicChamberArtifacts {
     final result = <ShopUpgradeArtifact>[];
+    final seen = <ShopUpgradeArtifact>{};
     for (final id in relicChamberStoredUpgrades) {
       final artifact = ShopUpgradeArtifact.fromId(id);
-      if (artifact != null && !isUpgradeArtifactUnlocked(artifact)) {
+      if (artifact == null || !seen.add(artifact)) continue;
+      if (artifact == ShopUpgradeArtifact.overchargedStaff) {
+        if (storedRelicOverchargedStaffLevel > overchargedStaffLevel) {
+          result.add(artifact);
+        }
+      } else if (!isUpgradeArtifactUnlocked(artifact)) {
         result.add(artifact);
       }
     }
@@ -1703,6 +1844,21 @@ class GameController extends ChangeNotifier {
         unlockedMarkovRecalibrator = true;
         storage.setUnlockedMarkovRecalibrator(true);
         break;
+      case ShopUpgradeArtifact.overchargedStaff:
+        final targetLevel = math
+            .max(
+              overchargedStaffLevel,
+              math.max(1, storedRelicOverchargedStaffLevel),
+            )
+            .clamp(1, overchargedStaffMaxLevel);
+        overchargedStaffLevel = targetLevel;
+        overchargedStaffEnabled = true;
+        overchargedStaffSelectedSpeed =
+            overchargedStaffSpeedForLevel(targetLevel);
+        storage.setOverchargedStaffLevel(overchargedStaffLevel);
+        storage.setOverchargedStaffEnabled(true);
+        storage.setOverchargedStaffSelectedSpeed(overchargedStaffSelectedSpeed);
+        break;
     }
   }
 
@@ -1854,7 +2010,7 @@ class GameController extends ChangeNotifier {
     return shown && earned;
   }
 
-  void playTurn(HandMove userChoice) {
+  void playTurn(HandMove userChoice, {bool isRapidFire = false}) {
     if (userHp <= 0) {
       isDeathAlertPending = true;
       is100RoundsAlertPending = false;
@@ -1909,7 +2065,7 @@ class GameController extends ChangeNotifier {
       }
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDraw();
+      audio.playDraw(vibrate: !isRapidFire);
     } else if (roundOutcome == RoundWinner.user) {
       lastWinner = RoundWinner.user;
       userScore += 1;
@@ -1936,7 +2092,7 @@ class GameController extends ChangeNotifier {
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeDefeatedElements(decreeDefeatedElements.toList());
 
-      audio.playWin();
+      audio.playWin(vibrate: !isRapidFire);
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
@@ -1949,7 +2105,11 @@ class GameController extends ChangeNotifier {
       }
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDefeat();
+      audio.playDefeat(vibrate: !isRapidFire);
+    }
+
+    if (isRapidFire) {
+      audio.playRapidFireHaptic();
     }
 
     totalRounds += 1;
@@ -2127,9 +2287,9 @@ class GameController extends ChangeNotifier {
     return false;
   }
 
-  void playRandom() {
+  void playRandom({bool isRapidFire = false}) {
     final randMove = _engine.getRandomMove();
-    playTurn(randMove);
+    playTurn(randMove, isRapidFire: isRapidFire);
   }
 
   void _computeNextHints() {
@@ -2385,15 +2545,7 @@ class GameController extends ChangeNotifier {
     final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
 
     // 2. Snapshot lost orb-bought upgrades into Relic Chamber (excluding paid IAPs)
-    final lostUpgrades = <String>[];
-    for (final artifact in ShopUpgradeArtifact.values) {
-      if (!isUpgradeArtifactUnlocked(artifact)) continue;
-      final productId = _productIdForArtifact(artifact);
-      if (productId != null && verifiedPaidIds.contains(productId)) {
-        continue;
-      }
-      lostUpgrades.add(artifact.id);
-    }
+    final lostUpgrades = _collectLostRelicIds(verifiedPaidIds);
     final nextRelicUpgrades = lostUpgrades.isNotEmpty
         ? lostUpgrades
         : List<String>.from(relicChamberStoredUpgrades);
@@ -2467,6 +2619,47 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  List<String> _collectLostRelicIds(Set<String> verifiedPaidIds) {
+    final lostUpgrades = <String>[];
+    for (final artifact in ShopUpgradeArtifact.values) {
+      if (!isUpgradeArtifactUnlocked(artifact)) continue;
+      final productId = _productIdForArtifact(artifact);
+      if (productId != null && verifiedPaidIds.contains(productId)) {
+        continue;
+      }
+      if (artifact == ShopUpgradeArtifact.overchargedStaff) {
+        lostUpgrades.add(
+          ShopUpgradeArtifact.overchargedStaffRelicId(overchargedStaffLevel),
+        );
+      } else {
+        lostUpgrades.add(artifact.id);
+      }
+    }
+    return lostUpgrades;
+  }
+
+  List<String> _mergeRelicUpgradeIds(
+    List<String> existing,
+    List<String> incoming,
+  ) {
+    final merged = <String>{};
+    int maxStaffLevel = 0;
+    for (final raw in [...existing, ...incoming]) {
+      final clean = raw.trim();
+      if (clean.isEmpty) continue;
+      final staffLvl = ShopUpgradeArtifact.parseOverchargedStaffLevel(clean);
+      if (staffLvl != null) {
+        if (staffLvl > maxStaffLevel) maxStaffLevel = staffLvl;
+      } else {
+        merged.add(clean);
+      }
+    }
+    if (maxStaffLevel > 0) {
+      merged.add(ShopUpgradeArtifact.overchargedStaffRelicId(maxStaffLevel));
+    }
+    return merged.toList()..sort();
+  }
+
   /// Archives the active run's lost artifacts/power-ups into the Royal Castle's
   /// Relic Chamber, active Elemental Orbs into Spoils of War, and all-time peak
   /// HP/Mana stat levels into the Hall of Heroes (never lowering a previously
@@ -2499,17 +2692,9 @@ class GameController extends ChangeNotifier {
 
     // 2. Archive owned shop artifacts & power-ups into Relic Chamber (excluding paid IAPs)
     //    (Double-Reset Guard: only update if active run has owned artifacts)
-    final lostUpgrades = <String>[];
-    for (final artifact in ShopUpgradeArtifact.values) {
-      if (!isUpgradeArtifactUnlocked(artifact)) continue;
-      final productId = _productIdForArtifact(artifact);
-      if (productId != null && verifiedPaidIds.contains(productId)) {
-        continue;
-      }
-      lostUpgrades.add(artifact.id);
-    }
+    final lostUpgrades = _collectLostRelicIds(verifiedPaidIds);
     final nextRelicUpgrades = lostUpgrades.isNotEmpty
-        ? <String>{...relicChamberStoredUpgrades, ...lostUpgrades}.toList()
+        ? _mergeRelicUpgradeIds(relicChamberStoredUpgrades, lostUpgrades)
         : List<String>.from(relicChamberStoredUpgrades);
 
     // 3. Preserve independent all-time historical peaks and unlock Hall of Heroes claim
@@ -3511,6 +3696,59 @@ class GameController extends ChangeNotifier {
     _computeNextHints();
     _triggerCloudSave();
     notifyListeners();
+  }
+
+  bool unlockOrUpgradeOverchargedStaff() {
+    if (overchargedStaffLevel >= overchargedStaffMaxLevel) {
+      audio.playVibrate();
+      return false;
+    }
+    final nextLevel = overchargedStaffLevel + 1;
+    final cost = overchargedStaffCostForLevel(nextLevel);
+    return purchaseWithOrbs(
+      cost: cost,
+      onUnlock: () {
+        overchargedStaffLevel = nextLevel;
+        if (nextLevel == 1) {
+          overchargedStaffEnabled = true;
+          overchargedStaffSelectedSpeed = 1;
+        } else {
+          overchargedStaffSelectedSpeed =
+              overchargedStaffSpeedForLevel(nextLevel);
+        }
+        storage.setOverchargedStaffLevel(overchargedStaffLevel);
+        storage.setOverchargedStaffEnabled(overchargedStaffEnabled);
+        storage.setOverchargedStaffSelectedSpeed(
+          overchargedStaffSelectedSpeed,
+        );
+      },
+    );
+  }
+
+  void toggleOverchargedStaff(bool val) {
+    if (overchargedStaffLevel < 1) return;
+    overchargedStaffEnabled = val;
+    storage.setOverchargedStaffEnabled(val);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  bool selectOverchargedStaffSpeed(int speed) {
+    if (overchargedStaffLevel < 1 ||
+        !overchargedStaffSpeedOptions.contains(speed)) {
+      audio.playVibrate();
+      return false;
+    }
+    final requiredLevel = overchargedStaffRequiredLevelForSpeed(speed);
+    if (overchargedStaffLevel < requiredLevel) {
+      audio.playVibrate();
+      return false;
+    }
+    overchargedStaffSelectedSpeed = speed;
+    storage.setOverchargedStaffSelectedSpeed(speed);
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
   }
 
   void toggleShowNewHands(bool val) {
