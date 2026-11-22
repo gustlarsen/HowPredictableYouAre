@@ -292,53 +292,58 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
 
                     // Centered bold remaining-turns integer & crisp localized MANA label
                     Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$clampedMana',
-                            key: const ValueKey('mana_value_text'),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              height: 1.0,
-                              letterSpacing: 0.2,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 1),
+                      child: Builder(
+                        builder: (context) {
+                          final scale = (widget.size / 46.0).clamp(0.75, 2.5);
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$clampedMana',
+                                key: const ValueKey('mana_value_text'),
+                                style: TextStyle(
+                                  fontSize: 15.0 * scale,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                  letterSpacing: 0.2,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black,
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1),
+                                    ),
+                                    Shadow(
+                                      color: Color(0xFF001A2C),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
                                 ),
-                                Shadow(
-                                  color: Color(0xFF001A2C),
-                                  blurRadius: 6,
+                              ),
+                              SizedBox(height: 1.5 * scale),
+                              Text(
+                                manaLabel,
+                                key: const ValueKey('mana_label_text'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 7.2 * scale,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white.withValues(alpha: 0.96),
+                                  height: 1.0,
+                                  letterSpacing: 0.7 * scale,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black,
+                                      blurRadius: 3.5,
+                                      offset: Offset(0, 0.8),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 1.5),
-                          Text(
-                            manaLabel,
-                            key: const ValueKey('mana_label_text'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 7.2,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white.withValues(alpha: 0.96),
-                              height: 1.0,
-                              letterSpacing: 0.7,
-                              shadows: const [
-                                Shadow(
-                                  color: Colors.black,
-                                  blurRadius: 3.5,
-                                  offset: Offset(0, 0.8),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -347,7 +352,7 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
             },
           ),
 
-          // Subtle cyan -1 floating indicator drifting upward & fading on drain
+          // Subtle cyan -1 floating indicator positioned at upper-right of the bezel
           AnimatedBuilder(
             animation: _drainIndicatorController,
             builder: (context, _) {
@@ -355,26 +360,28 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
                   _drainIndicatorController.value >= 1.0) {
                 return const SizedBox.shrink();
               }
+              final scale = (widget.size / 46.0).clamp(0.8, 1.5);
               final t = _drainIndicatorController.value;
               final drift = 18.0 * Curves.easeOut.transform(t);
               final opacity = (1.0 - t).clamp(0.0, 1.0);
               return Positioned(
-                top: -4.0 - drift,
+                top: -2.0 * scale - drift,
+                right: -10.0 * scale,
                 child: IgnorePointer(
                   child: Opacity(
                     opacity: opacity,
                     child: Container(
                       key: const ValueKey('mana_drain_indicator'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 5 * scale,
+                        vertical: 1.2 * scale,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF061624).withValues(alpha: 0.86),
-                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFF061624).withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(6 * scale),
                         border: Border.all(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.75),
-                          width: 0.8,
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.78),
+                          width: 0.9,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -386,12 +393,12 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
                       ),
                       child: Text(
                         '-$_lastDrainAmount',
-                        style: const TextStyle(
-                          color: Color(0xFF64F5FF),
+                        style: TextStyle(
+                          color: const Color(0xFF64F5FF),
                           fontWeight: FontWeight.w900,
-                          fontSize: 10.5,
+                          fontSize: 10.5 * scale,
                           height: 1.1,
-                          shadows: [
+                          shadows: const [
                             Shadow(
                               color: Colors.black,
                               blurRadius: 3,

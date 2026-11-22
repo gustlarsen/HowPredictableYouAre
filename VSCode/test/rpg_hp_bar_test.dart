@@ -25,11 +25,10 @@ void main() {
         ),
       );
 
-      // Verifies numeric label "HP 100" and heart icon
-      expect(find.text('HP 100'), findsOneWidget);
-      expect(find.byIcon(Icons.favorite), findsOneWidget);
+      // Verifies numeric label "100 / 100"
+      expect(find.text('100 / 100'), findsOneWidget);
 
-      // Frame has dark semi-transparent container with border
+      // Frame has dark semi-transparent container with rounded pill border
       final container = tester.widget<Container>(
         find.descendant(
           of: find.byType(RpgHpBar),
@@ -37,7 +36,7 @@ void main() {
         ),
       );
       final decoration = container.decoration as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(4.0));
+      expect(decoration.borderRadius, BorderRadius.circular(8.5));
       expect(decoration.border, isNotNull);
     });
 
@@ -124,8 +123,8 @@ void main() {
       expect(find.byKey(const ValueKey('user_hp_bar')), findsOneWidget);
       expect(find.byKey(const ValueKey('pc_hp_bar')), findsOneWidget);
 
-      expect(find.text('HP 100'), findsOneWidget);
-      expect(find.text('HP 95'), findsOneWidget);
+      expect(find.text('100 / 100'), findsOneWidget);
+      expect(find.text('95 / 100'), findsOneWidget);
     });
 
     testWidgets('Damaged hand triggers micro-shake, flash, and floating damage indicator (-1)', (

@@ -176,7 +176,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.text('HP 300'), findsOneWidget);
+        expect(find.text('300 / 300'), findsOneWidget);
 
         // Verify Metal Wizard hints: PC Next Move & Crystal Ball = Metal, Crystal Ball+ = Fire & Water
         expect(controller.pcNextMoves, [HandMove.metal]);
@@ -320,7 +320,7 @@ void main() {
           isTrue,
         );
         expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
-        expect(find.text('HP 400'), findsOneWidget);
+        expect(find.text('400 / 400'), findsOneWidget);
 
         // Verify Baby Mage Robot ignores heavy cumulative history and chooses all 5 elements roughly uniformly.
         for (int i = 0; i < 40; i++) {
@@ -414,7 +414,7 @@ void main() {
         expect(controller.computerHp, 200);
         expect(controller.engine.enemySize, 5);
         expect(find.byKey(const ValueKey('boss_phase_pill_2')), findsOneWidget);
-        expect(find.text('HP 200'), findsOneWidget);
+        expect(find.text('200 / 200'), findsOneWidget);
 
         // Defeat Stage 2 Robot Archmage -> strictly transitions to Stage 3 Metal Wizard (300 HP)
         controller.computerHp = 1;
@@ -439,7 +439,7 @@ void main() {
           isTrue,
         );
         expect(find.byKey(const ValueKey('boss_phase_pill_3')), findsOneWidget);
-        expect(find.text('HP 300'), findsOneWidget);
+        expect(find.text('300 / 300'), findsOneWidget);
 
         // Defeat Stage 3 Metal Wizard -> transitions to Stage 4 Baby Mage Robot (400 HP)
         controller.computerHp = 1;
@@ -462,7 +462,7 @@ void main() {
           isTrue,
         );
         expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsOneWidget);
-        expect(find.text('HP 400'), findsOneWidget);
+        expect(find.text('400 / 400'), findsOneWidget);
 
         // Defeat Stage 4 Baby Mage Robot -> unlocks Standard Victory Ending & triggers campaign cutscene
         controller.computerHp = 1;
@@ -818,7 +818,7 @@ void main() {
           );
           final pcHpBar = tester.widget<RpgHpBar>(pcHpBarFinder);
           expect(pcHpBar.hp, hp);
-          expect(find.text('HP $hp'), findsOneWidget);
+          expect(find.text('$hp / $maxHp'), findsOneWidget);
           final fractionBox = tester.widget<FractionallySizedBox>(
             find.descendant(
               of: pcHpBarFinder,

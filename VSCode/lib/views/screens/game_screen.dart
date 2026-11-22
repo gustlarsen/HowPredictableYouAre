@@ -21,6 +21,7 @@ import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
+import '../widgets/elemental_energy_sphere.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/settings_dialog.dart';
@@ -83,6 +84,7 @@ class _GameScreenState extends State<GameScreen>
   final GlobalKey _clashCenterKey = GlobalKey();
 
   late final AnimationController _flyingOrbController;
+  late final AnimationController _embersController;
   int _lastHandledOrbCollectionEventId = 0;
   int _lastHandledTurnCount = 0;
   HandMove? _activeFlyingOrbMove;
@@ -96,11 +98,28 @@ class _GameScreenState extends State<GameScreen>
       vsync: this,
       duration: const Duration(milliseconds: GameScreen.orbTotalSequenceMs),
     );
+    _embersController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3600),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _hasCheckedForUpdate) return;
       _hasCheckedForUpdate = true;
       unawaited(context.read<GameController>().checkForUpdate());
     });
+  }
+
+  void _syncEmbersAnimation(bool enabled) {
+    if (enabled) {
+      if (!_embersController.isAnimating) {
+        _embersController.repeat();
+      }
+    } else {
+      if (_embersController.isAnimating || _embersController.value != 0.0) {
+        _embersController.stop();
+        _embersController.reset();
+      }
+    }
   }
 
   @override
@@ -113,6 +132,7 @@ class _GameScreenState extends State<GameScreen>
       _lastHandledTurnCount = nextController.turnCount;
       nextController.captureTurn0SnapshotOnBattleEntry();
     }
+    _syncEmbersAnimation(nextController.animationsEnabled);
   }
 
   @override
@@ -120,6 +140,7 @@ class _GameScreenState extends State<GameScreen>
     _deathDialogTimer?.cancel();
     _deathDialogTimer = null;
     _flyingOrbController.dispose();
+    _embersController.dispose();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -1290,19 +1311,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   String _resolveBackgroundImage(GameController controller) {
-    if (controller.lastWinner == null) {
-      return 'assets/images/Splash.png';
-    }
-    switch (controller.lastWinner) {
-      case RoundWinner.user:
-        return 'assets/images/BGBlue.jpg';
-      case RoundWinner.computer:
-        return 'assets/images/BGRed.jpg';
-      case RoundWinner.draw:
-        return 'assets/images/BGDraw.jpg';
-      case null:
-        return 'assets/images/Splash.png';
-    }
+    return 'assets/images/forge_arena_bg.webp';
   }
 
   Offset _resolveBackpackCenter(Size fallbackSize) {
@@ -1318,7 +1327,7 @@ class _GameScreenState extends State<GameScreen>
           backpackBox.localToGlobal(backpackBox.size.center(Offset.zero));
       return stackBox.globalToLocal(globalCenter);
     }
-    return const Offset(24.0, 28.0);
+    return const Offset(33.0, 31.0);
   }
 
   Offset _resolveArenaClashCenter(Size fallbackSize) {
@@ -1337,6 +1346,304 @@ class _GameScreenState extends State<GameScreen>
     return Offset(fallbackSize.width * 0.5, fallbackSize.height * 0.42);
   }
 
+  Widget _buildTopHudBar(
+    BuildContext context,
+    GameController controller,
+    LocalizationService loc,
+    bool inputsLocked,
+  ) {
+    final palette = AppPalette.of(context);
+    final ownedOrbs = <HandMove>{
+      if (controller.fireOrbs > 0) HandMove.rock,
+      if (controller.waterOrbs > 0) HandMove.paper,
+      if (controller.woodOrbs > 0) HandMove.scissors,
+      if (controller.earthOrbs > 0) HandMove.lizard,
+      if (controller.metalOrbs > 0) HandMove.spock,
+    };
+
+    final beveledBg = palette.isDark
+        ? const Color(0xFF151922).withValues(alpha: 0.92)
+        : palette.dialogSurface.withValues(alpha: 0.95);
+    final beveledBorder = palette.isDark
+        ? const Color(0xFF8A6D3B)
+        : palette.sandCardBorder;
+
+    return Padding(
+      key: const ValueKey('battle_top_hud_bar'),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 1. Oversized Open Leather Backpack anchored top-left
+          SizedBox(
+            width: 54,
+            height: 54,
+            child: IconButton(
+              key: const ValueKey('backpack_inventory_button'),
+              padding: EdgeInsets.zero,
+              iconSize: 52,
+              constraints: const BoxConstraints(
+                minWidth: 54,
+                maxWidth: 54,
+                minHeight: 54,
+                maxHeight: 54,
+              ),
+              tooltip: loc.t(
+                'inventory_title',
+                fallback: "Cleric's Backpack",
+              ),
+              onPressed: () => _handleBackpackTap(context, controller),
+              icon: AnimatedBuilder(
+                animation: _flyingOrbController,
+                builder: (context, _) {
+                  final elapsedMs = _flyingOrbController.value *
+                      GameScreen.orbTotalSequenceMs;
+                  const pulseStartMs = GameScreen.orbSpawnDelayMs +
+                      GameScreen.orbFlightDurationMs;
+                  final isPulsing = _flyingOrbController.isAnimating &&
+                      elapsedMs >= pulseStartMs &&
+                      elapsedMs < GameScreen.orbTotalSequenceMs;
+                  final pulseT = isPulsing
+                      ? ((elapsedMs - pulseStartMs) /
+                              GameScreen.backpackPulseDurationMs)
+                          .clamp(0.0, 1.0)
+                      : 0.0;
+                  final scale = isPulsing
+                      ? 1.0 + math.sin(pulseT * math.pi) * 0.22
+                      : 1.0;
+                  final pulseColor =
+                      _lastAbsorbedOrbMove?.elementalPrimaryColor ??
+                          Colors.amber;
+                  final glowStrength =
+                      isPulsing ? math.sin(pulseT * math.pi) : 0.0;
+
+                  return Transform.scale(
+                    scale: scale,
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: RpgBackpackIcon(
+                        key: _backpackKey,
+                        size: 52,
+                        isOpen: true,
+                        ownedOrbs: ownedOrbs,
+                        pulseColor: isPulsing ? pulseColor : null,
+                        glowStrength: glowStrength,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+
+          // 2. Adaptive Rewarded Video Pill (🎬 +50)
+          Expanded(
+            child: (controller.isRewardedAdReady &&
+                    !controller.isRemoveAdsActive)
+                ? LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: AdaptiveRewardedAdButton(
+                          maxWidth: constraints.maxWidth,
+                          onTap: () =>
+                              _handleWatchRewardedAd(context, controller),
+                          tooltip: controller.rewardedAdDescription,
+                          label: AdService.rewardedAdButtonLabel,
+                        ),
+                      );
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 2),
+
+          // 3. WEEK X / 40 Badge Pill
+          Container(
+            key: const ValueKey('battle_week_counter_badge'),
+            width: 74,
+            height: 28,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: beveledBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: beveledBorder,
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: palette.isDark ? 0.35 : 0.10,
+                  ),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1.5),
+                ),
+              ],
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'WEEK ${controller.currentWeek} / ${GameController.maxCampaignWeeks}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10.5,
+                  letterSpacing: 0.4,
+                  color: palette.isDark
+                      ? const Color(0xFFF3E2B8)
+                      : palette.primaryText,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+
+          // 4. Conditional Periodic Gift Button
+          if (controller.shouldShowGiftBox)
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: IconButton(
+                key: const ValueKey('gift_box_button'),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                icon: const Text('🎁', style: TextStyle(fontSize: 19)),
+                tooltip: controller.giftTooltipMessage,
+                onPressed: () {
+                  controller.claimGift();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(controller.giftClaimedMessage),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+          // 5. Conditional Reset Action Button
+          if (controller.showReset)
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                icon: const Icon(
+                  Icons.restart_alt,
+                  size: 20,
+                  color: Colors.redAccent,
+                ),
+                tooltip: loc.t('string53', fallback: 'RESET'),
+                onPressed: () => _confirmReset(context, controller, loc),
+              ),
+            ),
+
+          // 6. Spiral Arcane Portal Button (Beveled Dark Square)
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: beveledBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: beveledBorder, width: 1.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: palette.isDark ? 0.38 : 0.12,
+                    ),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                key: const ValueKey('teleport_portal_button'),
+                padding: EdgeInsets.zero,
+                iconSize: 34,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  maxWidth: 36,
+                  minHeight: 36,
+                  maxHeight: 36,
+                ),
+                tooltip: loc.t(
+                  'teleport_tooltip',
+                  fallback: 'Teleport to World Map (+1 Week)',
+                ),
+                onPressed: inputsLocked
+                    ? null
+                    : () => _handleTeleportTap(context, controller),
+                icon: const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: RpgTeleportPortalIcon(size: 34),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+
+          // 7. Beveled Dark Square Settings Button
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: beveledBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: beveledBorder, width: 1.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: palette.isDark ? 0.38 : 0.12,
+                    ),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                key: const ValueKey('battle_settings_button'),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  maxWidth: 36,
+                  minHeight: 36,
+                  maxHeight: 36,
+                ),
+                icon: Icon(
+                  Icons.settings_outlined,
+                  size: 20,
+                  color: palette.isDark
+                      ? const Color(0xFFD9C398)
+                      : palette.primaryText,
+                ),
+                tooltip: 'Settings',
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => SettingsDialog(controller: controller),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<GameController>();
@@ -1349,6 +1656,7 @@ class _GameScreenState extends State<GameScreen>
         _isDeathSequenceActive ||
         _isBossVictoryDialogOpen;
 
+    _syncEmbersAnimation(controller.animationsEnabled);
     _checkIntroStory(context, controller);
     _checkDeathAlert(context, controller);
     _checkBossVictoryAlert(context, controller);
@@ -1360,171 +1668,11 @@ class _GameScreenState extends State<GameScreen>
     return PopScope(
       canPop: false,
       child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          elevation: 0,
-          centerTitle: false,
-          automaticallyImplyLeading: false,
-          leadingWidth: 48,
-          leading: Center(
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: IconButton(
-                key: const ValueKey('backpack_inventory_button'),
-                padding: EdgeInsets.zero,
-                iconSize: 28,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  maxWidth: 36,
-                  minHeight: 36,
-                  maxHeight: 36,
-                ),
-                tooltip: loc.t(
-                  'inventory_title',
-                  fallback: "Cleric's Backpack",
-                ),
-                onPressed: () => _handleBackpackTap(context, controller),
-                icon: AnimatedBuilder(
-                  animation: _flyingOrbController,
-                  builder: (context, _) {
-                    final elapsedMs = _flyingOrbController.value *
-                        GameScreen.orbTotalSequenceMs;
-                    const pulseStartMs = GameScreen.orbSpawnDelayMs +
-                        GameScreen.orbFlightDurationMs;
-                    final isPulsing = _flyingOrbController.isAnimating &&
-                        elapsedMs >= pulseStartMs &&
-                        elapsedMs < GameScreen.orbTotalSequenceMs;
-                    final pulseT = isPulsing
-                        ? ((elapsedMs - pulseStartMs) /
-                                GameScreen.backpackPulseDurationMs)
-                            .clamp(0.0, 1.0)
-                        : 0.0;
-                    final scale = isPulsing
-                        ? 1.0 + math.sin(pulseT * math.pi) * 0.24
-                        : 1.0;
-                    final pulseColor =
-                        _lastAbsorbedOrbMove?.elementalPrimaryColor ??
-                            Colors.amber;
-                    final glowStrength =
-                        isPulsing ? math.sin(pulseT * math.pi) : 0.0;
-
-                    return Transform.scale(
-                      scale: scale,
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: RpgBackpackIcon(
-                          key: _backpackKey,
-                          size: 28,
-                          pulseColor: isPulsing ? pulseColor : null,
-                          glowStrength: glowStrength,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        titleSpacing: 4,
-        title: (controller.isRewardedAdReady && !controller.isRemoveAdsActive)
-            ? LayoutBuilder(
-                builder: (context, constraints) {
-                  return Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 8,
-                      ),
-                      child: AdaptiveRewardedAdButton(
-                        maxWidth: constraints.maxWidth,
-                        onTap: () =>
-                            _handleWatchRewardedAd(context, controller),
-                        tooltip: controller.rewardedAdDescription,
-                        label: AdService.rewardedAdButtonLabel,
-                      ),
-                    ),
-                  );
-                },
-              )
-            : null,
-        actions: [
-          // Periodic Gift button (unlocked & enabled in Shop, and cooldown ready)
-          if (controller.shouldShowGiftBox)
-            IconButton(
-              key: const ValueKey('gift_box_button'),
-              icon: const Text('🎁', style: TextStyle(fontSize: 22)),
-              tooltip: controller.giftTooltipMessage,
-              onPressed: () {
-                controller.claimGift();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(controller.giftClaimedMessage),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          // Reset action button in AppBar when unlocked & active
-          if (controller.showReset)
-            IconButton(
-              icon: const Icon(Icons.restart_alt, color: Colors.redAccent),
-              tooltip: loc.t('string53', fallback: 'RESET'),
-              onPressed: () => _confirmReset(context, controller, loc),
-            ),
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: IconButton(
-              key: const ValueKey('teleport_portal_button'),
-              padding: EdgeInsets.zero,
-              iconSize: 28,
-              constraints: const BoxConstraints(
-                minWidth: 36,
-                maxWidth: 36,
-                minHeight: 36,
-                maxHeight: 36,
-              ),
-              tooltip: loc.t(
-                'teleport_tooltip',
-                fallback: 'Teleport to World Map (+1 Week)',
-              ),
-              onPressed: inputsLocked
-                  ? null
-                  : () => _handleTeleportTap(context, controller),
-              icon: const SizedBox(
-                width: 28,
-                height: 28,
-                child: RpgTeleportPortalIcon(size: 28),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => SettingsDialog(controller: controller),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        key: _rootStackKey,
-        children: [
-          // Dynamic Background Image with Animated Fade Transition
-          Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: controller.animationsEnabled
-                  ? const Duration(milliseconds: 600)
-                  : Duration.zero,
+        body: Stack(
+          key: _rootStackKey,
+          children: [
+            // Full-Screen Dark Stone Forge Background
+            Positioned.fill(
               child: Image.asset(
                 bgImage,
                 key: ValueKey<String>(bgImage),
@@ -1538,302 +1686,342 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
             ),
-          ),
 
-          // Contrast Overlay for clear text legibility
-          Positioned.fill(
-            child: Container(
-              color: (controller.darkMode ? Colors.black : Colors.black54)
-                  .withValues(alpha: controller.darkMode ? 0.65 : 0.45),
+            // Subtle atmospheric contrast overlay preserving forge stone & embers
+            Positioned.fill(
+              child: Container(
+                color: (controller.darkMode
+                        ? Colors.black
+                        : const Color(0xFFF5EFE3))
+                    .withValues(alpha: controller.darkMode ? 0.22 : 0.35),
+              ),
             ),
-          ),
 
-          // Main Game Layout: Scrollable Upper Region + Pinned Bottom Move-Selection Deck + Safe Bottom Banner Area
-          SafeArea(
-            child: Column(
-              children: [
-                // 1. Scrollable Upper Region (ScoreHeader, HintsBar, VersusArena, MarkovMatrixView)
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, viewportConstraints) {
-                      final hasVisibleHints = controller.showYourPrediction ||
-                          controller.showNextMove ||
-                          controller.showSuggestion ||
-                          controller.showCrystalBall;
+            // Animated Drifting Forge Sparks / Embers rising gently across the edges
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _embersController,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      key: const ValueKey('forge_arena_embers_paint'),
+                      painter: _ForgeEmbersPainter(
+                        progress: controller.animationsEnabled
+                            ? _embersController.value
+                            : 0.25,
+                        isDark: controller.darkMode,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
 
-                      return SingleChildScrollView(
-                        key: const ValueKey('game_upper_scroll_view'),
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: 480,
-                              minHeight: (viewportConstraints.maxHeight - 20)
-                                  .clamp(0.0, double.infinity),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
-                                AnimatedSize(
-                                  duration: const Duration(milliseconds: 250),
-                                  curve: Curves.easeInOut,
-                                  child: AnimatedSwitcher(
-                                    duration: controller.animationsEnabled
-                                        ? const Duration(milliseconds: 250)
-                                        : Duration.zero,
-                                    child: (controller.unlockedPredictability &&
-                                            controller.showPredictability)
-                                        ? Padding(
-                                            key: const ValueKey(
-                                              'score_header_visible',
+            // Main Game Layout: Custom RPG Top HUD + Scrollable Upper Region + Pinned Bottom Deck + Bottom Banner Ad
+            SafeArea(
+              child: Column(
+                children: [
+                  // 0. Custom RPG Top HUD Bar
+                  _buildTopHudBar(context, controller, loc, inputsLocked),
+
+                  // 1. Scrollable Upper Region (ScoreHeader, HintsBar, VersusArena, MarkovMatrixView)
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, viewportConstraints) {
+                        final hasVisibleHints = controller.showYourPrediction ||
+                            controller.showNextMove ||
+                            controller.showSuggestion ||
+                            controller.showCrystalBall;
+
+                        return SingleChildScrollView(
+                          key: const ValueKey('game_upper_scroll_view'),
+                          padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: 480,
+                                minHeight: (viewportConstraints.maxHeight - 8)
+                                    .clamp(0.0, double.infinity),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
+                                  AnimatedSize(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeInOut,
+                                    child: AnimatedSwitcher(
+                                      duration: controller.animationsEnabled
+                                          ? const Duration(milliseconds: 250)
+                                          : Duration.zero,
+                                      child: (controller
+                                                  .unlockedPredictability &&
+                                              controller.showPredictability)
+                                          ? Padding(
+                                              key: const ValueKey(
+                                                'score_header_visible',
+                                              ),
+                                              padding: const EdgeInsets.only(
+                                                bottom: 4,
+                                              ),
+                                              child: ScoreHeader(
+                                                controller: controller,
+                                              ),
+                                            )
+                                          : const SizedBox.shrink(
+                                              key: ValueKey(
+                                                'score_header_hidden',
+                                              ),
                                             ),
-                                            padding: const EdgeInsets.only(
-                                              bottom: 8,
-                                            ),
-                                            child: ScoreHeader(
-                                              controller: controller,
-                                            ),
-                                          )
-                                        : const SizedBox.shrink(
-                                            key: ValueKey(
-                                              'score_header_hidden',
-                                            ),
-                                          ),
+                                    ),
                                   ),
-                                ),
 
-                                // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
-                                HintsBar(controller: controller),
-                                if (hasVisibleHints) const SizedBox(height: 8),
+                                  // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
+                                  HintsBar(controller: controller),
+                                  if (hasVisibleHints)
+                                    const SizedBox(height: 3),
 
-                                // Compact Boss Phase Indicator Pill
-                                _buildBossPhasePill(context, controller),
-                                _buildSacredBlessingPill(context, controller),
-                                const SizedBox(height: 6),
+                                  // Compact Boss Phase Indicator Pill
+                                  _buildBossPhasePill(context, controller),
+                                  _buildSacredBlessingPill(context, controller),
+                                  const SizedBox(height: 2),
 
-                                // Versus Arena: Classic Hand-Lunge (New Skin OFF) or Stationary Orbs + Projectile Clash VFX (New Skin ON)
-                                VersusArena(
-                                  userMove: controller.currentUserMove,
-                                  computerMove: controller.currentComputerMove,
-                                  winner: controller.lastWinner,
-                                  localization: loc,
-                                  animationsEnabled:
-                                      controller.animationsEnabled,
-                                  roundId: controller.turnCount,
-                                  userHp: controller.userHp,
-                                  playerMaxHp: controller.effectivePlayerMaxHp,
-                                  computerHp: controller.computerHp,
-                                  computerMaxHp: controller.enemyMaxHp,
-                                  remainingMana: controller.remainingMana,
-                                  maxMana: controller.playerMaxMana,
-                                  elementalMode: controller.isElementalMode,
-                                  userDamageAmount:
-                                      controller.bossWinDamageToPlayer,
-                                  computerDamageAmount:
-                                      controller.playerWinDamageToBoss,
-                                  isPhase2: controller.enemyUses5Elements,
-                                  enemyStage: controller.enemyStage,
-                                  pcSlotKey: _pcSlotKey,
-                                  clashCenterKey: _clashCenterKey,
-                                  onImpactHaptic: controller.isElementalMode
-                                      ? controller.audio.playTapVibrate
-                                      : null,
-                                ),
-
-                                // Live Markov Transition Matrix (if unlocked & enabled)
-                                if (controller.showAlgorithm) ...[
-                                  const SizedBox(height: 12),
-                                  MarkovMatrixView(
-                                    engine: controller.engine,
-                                    lastUserMove: controller.lastUserMove,
-                                    elementalMode: controller.isElementalMode,
+                                  // Central RPG Versus Arena
+                                  VersusArena(
+                                    userMove: controller.currentUserMove,
+                                    computerMove:
+                                        controller.currentComputerMove,
+                                    winner: controller.lastWinner,
                                     localization: loc,
-                                    isArchmageShortTermView:
-                                        controller.isArchmageBoss &&
-                                        controller.isMarkovRecalibratorActive,
-                                    isBabyMageRandomView:
-                                        controller.isBabyMageBoss,
-                                    isMetalWizardView:
-                                        controller.isMetalWizardBoss,
+                                    animationsEnabled:
+                                        controller.animationsEnabled,
+                                    roundId: controller.turnCount,
+                                    userHp: controller.userHp,
+                                    playerMaxHp:
+                                        controller.effectivePlayerMaxHp,
+                                    computerHp: controller.computerHp,
+                                    computerMaxHp: controller.enemyMaxHp,
+                                    remainingMana: controller.remainingMana,
+                                    maxMana: controller.playerMaxMana,
+                                    elementalMode: controller.isElementalMode,
+                                    userDamageAmount:
+                                        controller.bossWinDamageToPlayer,
+                                    computerDamageAmount:
+                                        controller.playerWinDamageToBoss,
+                                    isPhase2: controller.enemyUses5Elements,
+                                    enemyStage: controller.enemyStage,
+                                    pcSlotKey: _pcSlotKey,
+                                    clashCenterKey: _clashCenterKey,
+                                    onImpactHaptic: controller.isElementalMode
+                                        ? controller.audio.playTapVibrate
+                                        : null,
                                   ),
+
+                                  // Live Markov Transition Matrix (if unlocked & enabled)
+                                  if (controller.showAlgorithm) ...[
+                                    const SizedBox(height: 10),
+                                    MarkovMatrixView(
+                                      engine: controller.engine,
+                                      lastUserMove: controller.lastUserMove,
+                                      elementalMode: controller.isElementalMode,
+                                      localization: loc,
+                                      isArchmageShortTermView:
+                                          controller.isArchmageBoss &&
+                                          controller.isMarkovRecalibratorActive,
+                                      isBabyMageRandomView:
+                                          controller.isBabyMageBoss,
+                                      isMetalWizardView:
+                                          controller.isMetalWizardBoss,
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
 
-                // 2. Pinned Bottom Controls (Move Selection Card)
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        4,
-                        16,
-                        controller.shouldShowBannerAd ? 10 : 8,
-                      ),
-                      child: Builder(
-                        builder: (context) {
-                          final palette = AppPalette.of(context);
-                          return Container(
-                            key: const ValueKey('move_selection_card'),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: palette.amberBorder.withValues(
-                                  alpha: palette.isDark ? 0.25 : 0.45,
-                                ),
-                                width: 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(
-                                    alpha: palette.isDark ? 0.45 : 0.22,
-                                  ),
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                  offset: const Offset(0, -4),
-                                ),
-                              ],
-                            ),
-                            child: Card(
-                              margin: EdgeInsets.zero,
-                              elevation: 0,
-                              color: palette.isDark
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.surface.withValues(alpha: 0.94)
-                                  : palette.deckSurface,
-                              surfaceTintColor:
-                                  palette.isDark ? null : Colors.transparent,
-                              shape: RoundedRectangleBorder(
+                  // 2. Pinned Bottom Controls (Glossy 3D Elemental Action Deck)
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          14,
+                          2,
+                          14,
+                          controller.shouldShowBannerAd ? 10 : 8,
+                        ),
+                        child: Builder(
+                          builder: (context) {
+                            final palette = AppPalette.of(context);
+                            return Container(
+                              key: const ValueKey('move_selection_card'),
+                              decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 10,
+                                border: Border.all(
+                                  color: palette.isDark
+                                      ? const Color(0xFF8A6D3B)
+                                          .withValues(alpha: 0.72)
+                                      : palette.amberBorder
+                                          .withValues(alpha: 0.55),
+                                  width: 1.25,
                                 ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Hand move buttons (single row for 3 classic or all 5 hands)
-                                    Row(
-                                      key: const ValueKey('hand_buttons_row'),
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        for (final move in [
-                                          HandMove.rock,
-                                          HandMove.paper,
-                                          HandMove.scissors,
-                                          if (controller.showNewHands) ...[
-                                            HandMove.lizard,
-                                            HandMove.spock,
-                                          ],
-                                        ])
-                                          _HandActionButton(
-                                            key: ValueKey(
-                                              'hand_button_${move.name}',
-                                            ),
-                                            move: move,
-                                            compact: controller.showNewHands,
-                                            elementalMode:
-                                                controller.isElementalMode,
-                                            isSelected:
-                                                controller.currentUserMove ==
-                                                move,
-                                            localization: loc,
-                                            animationsEnabled:
-                                                controller.animationsEnabled,
-                                            onPressed: inputsLocked
-                                                ? null
-                                                : () =>
-                                                    controller.playTurn(move),
-                                          ),
-                                      ],
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: palette.isDark ? 0.55 : 0.22,
                                     ),
+                                    blurRadius: 12,
+                                    spreadRadius: 1,
+                                    offset: const Offset(0, -4),
+                                  ),
+                                ],
+                              ),
+                              child: Card(
+                                margin: EdgeInsets.zero,
+                                elevation: 0,
+                                color: palette.isDark
+                                    ? const Color(0xFF141820)
+                                        .withValues(alpha: 0.94)
+                                    : palette.deckSurface,
+                                surfaceTintColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 8,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Hand move buttons (single row for 3 classic or all 5 hands)
+                                      Row(
+                                        key: const ValueKey('hand_buttons_row'),
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          for (final move in [
+                                            HandMove.rock,
+                                            HandMove.paper,
+                                            HandMove.scissors,
+                                            if (controller.showNewHands) ...[
+                                              HandMove.lizard,
+                                              HandMove.spock,
+                                            ],
+                                          ])
+                                            _HandActionButton(
+                                              key: ValueKey(
+                                                'hand_button_${move.name}',
+                                              ),
+                                              move: move,
+                                              compact: controller.showNewHands,
+                                              elementalMode:
+                                                  controller.isElementalMode,
+                                              isSelected:
+                                                  controller.currentUserMove ==
+                                                  move,
+                                              localization: loc,
+                                              animationsEnabled:
+                                                  controller.animationsEnabled,
+                                              onPressed: inputsLocked
+                                                  ? null
+                                                  : () =>
+                                                      controller.playTurn(move),
+                                            ),
+                                        ],
+                                      ),
 
-                                    // Optional Random move button (if unlocked & enabled)
-                                    if (controller.showRandom) ...[
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          key: const ValueKey(
-                                            'random_move_button',
-                                          ),
-                                          onPressed: inputsLocked
-                                              ? null
-                                              : controller.playRandom,
-                                          icon: const Icon(
-                                            Icons.casino_outlined,
-                                            size: 18,
-                                          ),
-                                          label: Text(
-                                            loc.t(
-                                              'string16',
-                                              fallback: 'RANDOM MOVE',
+                                      // Optional Random move button (if unlocked & enabled)
+                                      if (controller.showRandom) ...[
+                                        const SizedBox(height: 6),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: OutlinedButton.icon(
+                                            key: const ValueKey(
+                                              'random_move_button',
                                             ),
-                                          ),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: palette.isDark
-                                                ? null
-                                                : palette.amberText,
-                                            backgroundColor: palette.isDark
-                                                ? null
-                                                : palette.dialogCardSurface,
-                                            side: palette.isDark
-                                                ? null
-                                                : BorderSide(
-                                                    color: palette.amberBorder
+                                            onPressed: inputsLocked
+                                                  ? null
+                                                  : controller.playRandom,
+                                            icon: Icon(
+                                              Icons.shuffle_rounded,
+                                              size: 16,
+                                              color: palette.isDark
+                                                  ? const Color(0xFFD9C398)
+                                                  : palette.amberText,
+                                            ),
+                                            label: Text(
+                                              loc.t(
+                                                'string16',
+                                                fallback: 'RANDOM',
+                                              ),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: palette.isDark
+                                                  ? const Color(0xFFE6D5B8)
+                                                  : palette.amberText,
+                                              backgroundColor: palette.isDark
+                                                  ? const Color(0xFF1F2430)
+                                                  : palette.dialogCardSurface,
+                                              side: BorderSide(
+                                                color: palette.isDark
+                                                    ? const Color(0xFF8A6D3B)
+                                                        .withValues(alpha: 0.72)
+                                                    : palette.amberBorder
                                                         .withValues(alpha: 0.65),
-                                                  ),
-                                            visualDensity: VisualDensity.compact,
-                                            tapTargetSize:
-                                                MaterialTapTargetSize
-                                                    .shrinkWrap,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 8,
-                                              horizontal: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
+                                                width: 1.1,
+                                              ),
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                vertical: 7,
+                                                horizontal: 12,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // 3. Bottom Banner Ad: anchored at the very bottom inside SafeArea
-                if (controller.shouldShowBannerAd)
-                  Padding(
-                    key: const ValueKey('bottom_banner_ad_container'),
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Center(
-                      child: controller.adService.buildBannerWidget(),
+                  // 3. Bottom Banner Ad: anchored at the very bottom inside SafeArea
+                  if (controller.shouldShowBannerAd)
+                    Padding(
+                      key: const ValueKey('bottom_banner_ad_container'),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Center(
+                        child: controller.adService.buildBannerWidget(),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Flying Elemental Orb VFX Overlay (from Mid-Arena Clash center to top-left Backpack icon)
           Positioned.fill(
@@ -2308,9 +2496,10 @@ class _HandActionButton extends StatefulWidget {
 }
 
 class _HandActionButtonState extends State<_HandActionButton>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _pressController;
   late Animation<double> _scaleAnimation;
+  late AnimationController _auraController;
 
   @override
   void initState() {
@@ -2323,11 +2512,39 @@ class _HandActionButtonState extends State<_HandActionButton>
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
       CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
     );
+    _auraController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _syncAuraAnimation();
+  }
+
+  void _syncAuraAnimation() {
+    if (widget.isSelected && widget.animationsEnabled) {
+      if (!_auraController.isAnimating) {
+        _auraController.repeat();
+      }
+    } else {
+      if (_auraController.isAnimating || _auraController.value != 0.0) {
+        _auraController.stop();
+        _auraController.reset();
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _HandActionButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSelected != oldWidget.isSelected ||
+        widget.animationsEnabled != oldWidget.animationsEnabled) {
+      _syncAuraAnimation();
+    }
   }
 
   @override
   void dispose() {
     _pressController.dispose();
+    _auraController.dispose();
     super.dispose();
   }
 
@@ -2360,81 +2577,21 @@ class _HandActionButtonState extends State<_HandActionButton>
     final primaryColor = widget.move.elementalPrimaryColor;
     final secondaryColor = widget.move.elementalSecondaryColor;
     final elementLabelColor = palette.elementalText(widget.move);
-    final Color earthIconColor =
-        isSelected ? const Color(0xFFE29E5A) : const Color(0xFFD68C45);
 
-    final horizontalPadding = compact ? 6.0 : 14.0;
-    final verticalPadding = compact ? 8.0 : 10.0;
-    final borderRadius = compact ? 12.0 : 16.0;
-    final circleSize = compact ? 38.0 : 52.0;
-    final imageSize = compact ? 26.0 : 36.0;
-    final emojiFontSize = compact ? 20.0 : 26.0;
-    final iconSize = compact ? 22.0 : 30.0;
-    final labelSpacing = compact ? 4.0 : 6.0;
-    final labelFontSize = compact ? 9.5 : 12.0;
-    final letterSpacing = compact ? 0.2 : 0.5;
+    final horizontalPadding = compact ? 2.0 : 8.0;
+    final verticalPadding = compact ? 3.0 : 8.0;
+    final borderRadius = compact ? 14.0 : 16.0;
+    final circleSize = compact ? 50.0 : 58.0;
+    final imageSize = compact ? 26.0 : 34.0;
+    final emojiFontSize = compact ? 20.0 : 24.0;
+    final iconSize = compact ? 20.0 : 24.0;
+    final labelFontSize = compact ? 8.8 : 10.0;
 
     final String buttonLabel = elemental
         ? widget.move
               .displayLabel(elemental: true, localization: widget.localization)
               .toUpperCase()
         : widget.move.label.toUpperCase();
-
-    final BoxDecoration orbDecoration = elemental
-        ? BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              center: isEarth
-                  ? const Alignment(-0.24, -0.24)
-                  : const Alignment(-0.2, -0.2),
-              radius: 0.88,
-              colors: isEarth
-                  ? [
-                      Color.lerp(
-                        const Color(0xFF3D220E),
-                        const Color(0xFFE29E5A),
-                        isSelected ? 0.28 : 0.16,
-                      )!,
-                      Color.lerp(
-                        const Color(0xFF3D220E),
-                        secondaryColor,
-                        isSelected ? 0.90 : 0.72,
-                      )!,
-                      primaryColor.withValues(alpha: isSelected ? 0.96 : 0.85),
-                    ]
-                  : [
-                      const Color(0xFF0A0C12),
-                      Color.lerp(
-                        const Color(0xFF0E121B),
-                        secondaryColor,
-                        isSelected ? 0.55 : 0.38,
-                      )!,
-                      primaryColor.withValues(alpha: isSelected ? 0.92 : 0.72),
-                    ],
-              stops: const [0.0, 0.58, 1.0],
-            ),
-            border: Border.all(
-              color: isSelected
-                  ? (isEarth
-                        ? Color.lerp(primaryColor, const Color(0xFFE29E5A), 0.55)!
-                        : Color.lerp(primaryColor, Colors.white, 0.45)!)
-                  : primaryColor.withValues(alpha: isEarth ? 0.88 : 0.75),
-              width: isSelected ? 2.2 : 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withValues(alpha: isSelected ? 0.65 : 0.38),
-                blurRadius: isSelected ? 12 : 8,
-                spreadRadius: isSelected ? 2.0 : 1.0,
-              ),
-            ],
-          )
-        : BoxDecoration(
-            color: palette.isDark
-                ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                : palette.amberBorder.withValues(alpha: 0.14),
-            shape: BoxShape.circle,
-          );
 
     Widget buttonContent = InkWell(
       onTap: widget.onPressed == null ? null : _handleTap,
@@ -2447,7 +2604,7 @@ class _HandActionButtonState extends State<_HandActionButton>
         decoration: BoxDecoration(
           color: elemental
               ? (palette.isDark
-                    ? const Color(0xFF10131C).withValues(alpha: 0.85)
+                    ? Colors.transparent
                     : palette.elementalCardBackground(widget.move))
               : (palette.isDark
                     ? theme.colorScheme.surfaceContainerHighest.withValues(
@@ -2455,45 +2612,86 @@ class _HandActionButtonState extends State<_HandActionButton>
                       )
                     : palette.sandCardSurface),
           borderRadius: BorderRadius.circular(borderRadius),
-          border: Border.all(
-            color: elemental
-                ? (palette.isDark
-                      ? primaryColor.withValues(alpha: isSelected ? 0.75 : 0.45)
-                      : elementLabelColor.withValues(
+          border: elemental && palette.isDark
+              ? null
+              : Border.all(
+                  color: elemental
+                      ? elementLabelColor.withValues(
                           alpha: isSelected ? 0.85 : 0.48,
-                        ))
-                : (palette.isDark
-                      ? theme.colorScheme.outline.withValues(alpha: 0.2)
-                      : palette.sandCardBorder),
-            width: elemental && isSelected ? 1.5 : 1.0,
-          ),
-          boxShadow: elemental && isSelected
-              ? [
-                  BoxShadow(
-                    color: (palette.isDark ? primaryColor : elementLabelColor)
-                        .withValues(alpha: palette.isDark ? 0.25 : 0.18),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
+                        )
+                      : (palette.isDark
+                            ? theme.colorScheme.outline.withValues(alpha: 0.2)
+                            : palette.sandCardBorder),
+                  width: elemental && isSelected ? 1.5 : 1.0,
+                ),
         ),
-        child: Column(
-          children: [
-            Container(
-              key: ValueKey('hand_orb_${widget.move.name}'),
-              width: circleSize,
-              height: circleSize,
-              decoration: orbDecoration,
-              child: Center(
+        child: Container(
+          key: ValueKey('hand_orb_${widget.move.name}'),
+          width: circleSize,
+          height: circleSize,
+          decoration: elemental
+              ? null
+              : BoxDecoration(
+                  color: palette.isDark
+                      ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                      : palette.amberBorder.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // Animated CustomPainter flame aura around the active/selected orb
+              if (elemental && isSelected)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _auraController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          key: ValueKey(
+                            'active_orb_flame_aura_${widget.move.name}',
+                          ),
+                          painter: _ActiveOrbFlameAuraPainter(
+                            phase: widget.animationsEnabled
+                                ? _auraController.value
+                                : 0.35,
+                            primaryColor: primaryColor,
+                            secondaryColor: secondaryColor,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+              // Glossy 3D Shaded Elemental Energy Sphere
+              if (elemental)
+                ElementalEnergySphere(
+                  size: circleSize,
+                  primaryColor: primaryColor,
+                  secondaryColor: secondaryColor,
+                  isDark: palette.isDark,
+                ),
+
+              // Crisp Elemental Emblem or Classic Hand in Upper-Center of Sphere
+              Positioned(
+                top: elemental ? circleSize * 0.16 : circleSize * 0.12,
                 child: elemental
                     ? Icon(
                         widget.move.elementalIcon,
                         size: iconSize,
-                        color: isEarth ? earthIconColor : primaryColor,
+                        color: isEarth
+                            ? const Color(0xFFFFF3E0)
+                            : Colors.white,
                         shadows: [
                           Shadow(
-                            color: primaryColor.withValues(alpha: 0.75),
+                            color: Colors.black.withValues(alpha: 0.85),
+                            blurRadius: 5,
+                            offset: const Offset(0, 1),
+                          ),
+                          Shadow(
+                            color: primaryColor.withValues(alpha: 0.9),
                             blurRadius: 8,
                           ),
                         ],
@@ -2513,20 +2711,51 @@ class _HandActionButtonState extends State<_HandActionButton>
                         style: TextStyle(fontSize: emojiFontSize),
                       ),
               ),
-            ),
-            SizedBox(height: labelSpacing),
-            Text(
-              buttonLabel,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: labelFontSize,
-                letterSpacing: letterSpacing,
-                color: elemental
-                    ? elementLabelColor
-                    : (palette.isDark ? null : palette.primaryText),
+
+              // Bold Shadowed Element Label Overlaid Inside Lower Portion of Sphere
+              Positioned(
+                bottom: elemental ? circleSize * 0.13 : 2.0,
+                left: 1,
+                right: 1,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    buttonLabel,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: labelFontSize,
+                      height: 1.0,
+                      letterSpacing: 0.4,
+                      color: elemental
+                          ? elementLabelColor
+                          : (palette.isDark
+                                ? Colors.white
+                                : palette.primaryText),
+                      shadows: palette.isDark
+                          ? const [
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 3.5,
+                                offset: Offset(0, 1),
+                              ),
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 6.0,
+                              ),
+                            ]
+                          : const [
+                              Shadow(
+                                color: Colors.white,
+                                blurRadius: 3.0,
+                              ),
+                            ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2539,5 +2768,153 @@ class _HandActionButtonState extends State<_HandActionButton>
       scale: _scaleAnimation,
       child: buttonContent,
     );
+  }
+}
+
+/// Animated CustomPainter flame/energy aura dancing around the active elemental orb.
+class _ActiveOrbFlameAuraPainter extends CustomPainter {
+  final double phase;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  const _ActiveOrbFlameAuraPainter({
+    required this.phase,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final center = Offset(size.width * 0.5, size.height * 0.5);
+    final baseRadius = size.shortestSide * 0.45;
+    final pulse = 0.5 + 0.5 * math.sin(phase * 2.0 * math.pi);
+
+    // 1. Bright outer elemental aura bloom
+    canvas.drawCircle(
+      center,
+      baseRadius * (1.18 + 0.08 * pulse),
+      Paint()
+        ..color = primaryColor.withValues(alpha: 0.50 + 0.20 * pulse)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7.0),
+    );
+
+    // 2. 10 flickering flame tongues around the circumference
+    const flameCount = 10;
+    final flamePath = Path();
+    for (int i = 0; i < flameCount; i++) {
+      final baseAngle =
+          (i / flameCount) * 2.0 * math.pi + phase * 2.0 * math.pi;
+      final prevAngle = baseAngle - (math.pi / flameCount) * 0.85;
+      final nextAngle = baseAngle + (math.pi / flameCount) * 0.85;
+      final wave = math.sin(phase * 4.0 * math.pi + i * 1.7);
+      final tipRadius = baseRadius * (1.24 + 0.12 * wave);
+      final innerRadius = baseRadius * 0.94;
+
+      final p1 = Offset(
+        center.dx + math.cos(prevAngle) * innerRadius,
+        center.dy + math.sin(prevAngle) * innerRadius,
+      );
+      final tip = Offset(
+        center.dx + math.cos(baseAngle) * tipRadius,
+        center.dy + math.sin(baseAngle) * tipRadius,
+      );
+      final p2 = Offset(
+        center.dx + math.cos(nextAngle) * innerRadius,
+        center.dy + math.sin(nextAngle) * innerRadius,
+      );
+
+      flamePath
+        ..moveTo(p1.dx, p1.dy)
+        ..quadraticBezierTo(tip.dx, tip.dy, p2.dx, p2.dy);
+    }
+
+    canvas.drawPath(
+      flamePath,
+      Paint()
+        ..color = Color.lerp(primaryColor, Colors.white, 0.42)!
+            .withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+    );
+
+    // 3. Crisp glowing selection rim
+    canvas.drawCircle(
+      center,
+      baseRadius * 1.02,
+      Paint()
+        ..color = Color.lerp(primaryColor, Colors.white, 0.55)!
+            .withValues(alpha: 0.92)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActiveOrbFlameAuraPainter oldDelegate) {
+    return oldDelegate.phase != phase ||
+        oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.secondaryColor != secondaryColor;
+  }
+}
+
+/// Subtle animated drifting forge sparks & embers rising gently across the edges.
+class _ForgeEmbersPainter extends CustomPainter {
+  final double progress;
+  final bool isDark;
+
+  const _ForgeEmbersPainter({
+    required this.progress,
+    required this.isDark,
+  });
+
+  static const List<({double x, double phase, double radius, double sway})>
+      _emberSpecs = [
+    (x: 0.06, phase: 0.05, radius: 1.8, sway: 8.0),
+    (x: 0.14, phase: 0.32, radius: 1.3, sway: 6.0),
+    (x: 0.22, phase: 0.68, radius: 1.5, sway: 7.0),
+    (x: 0.78, phase: 0.18, radius: 1.4, sway: 7.0),
+    (x: 0.86, phase: 0.51, radius: 1.9, sway: 9.0),
+    (x: 0.93, phase: 0.82, radius: 1.3, sway: 6.0),
+    (x: 0.10, phase: 0.89, radius: 1.6, sway: 5.5),
+    (x: 0.90, phase: 0.41, radius: 1.5, sway: 6.5),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final baseAlpha = isDark ? 0.68 : 0.35;
+
+    for (final spec in _emberSpecs) {
+      final t = (progress + spec.phase) % 1.0;
+      final y = size.height * (0.92 - 0.80 * t);
+      final x = size.width * spec.x +
+          math.sin(t * 2.0 * math.pi + spec.phase * 8.0) * spec.sway;
+      final fade = math.sin(t * math.pi).clamp(0.0, 1.0);
+      final alpha = (baseAlpha * fade).clamp(0.0, 1.0);
+      if (alpha <= 0.02) continue;
+
+      final pos = Offset(x, y);
+      canvas.drawCircle(
+        pos,
+        spec.radius * 2.4,
+        Paint()
+          ..color = const Color(0xFFFF6D00).withValues(alpha: alpha * 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+      );
+      canvas.drawCircle(
+        pos,
+        spec.radius,
+        Paint()
+          ..color = const Color(0xFFFFD54F).withValues(alpha: alpha),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ForgeEmbersPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.isDark != isDark;
   }
 }

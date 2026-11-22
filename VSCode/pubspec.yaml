@@ -70,6 +70,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/enemies/
+    - assets/images/player/
+    - assets/images/forge_arena_bg.webp
     - assets/images/kingdom_map.jpeg
     - assets/images/watchtower_dungeon_cell.jpeg
     - assets/images/princess_captive.png

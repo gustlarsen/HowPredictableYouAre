@@ -313,32 +313,32 @@ void main() {
         // 15/50 = 30% -> Amber (non-critical)
         // 14/50 = 28% -> Crimson Red + critical pulse glow
         await pumpHpBar(hp: 30, maxHp: 50);
-        expect(find.text('HP 30'), findsOneWidget);
+        expect(find.text('30 / 50'), findsOneWidget);
         expect(readWidthFactor(), closeTo(0.60, 0.001));
         expect(
           readFillColor().toARGB32(),
-          const Color(0xFF2ECC71).withValues(alpha: 0.95).toARGB32(),
+          const Color(0xFF2ECC71).withValues(alpha: 0.96).toARGB32(),
         );
 
         await pumpHpBar(hp: 29, maxHp: 50);
         expect(readWidthFactor(), closeTo(29 / 50, 0.001));
         expect(
           readFillColor().toARGB32(),
-          const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32(),
+          const Color(0xFFFFB300).withValues(alpha: 0.96).toARGB32(),
         );
 
         await pumpHpBar(hp: 15, maxHp: 50);
         expect(readOuterDecor().boxShadow!.first.color, Colors.black54);
         expect(
           readFillColor().toARGB32(),
-          const Color(0xFFFFB300).withValues(alpha: 0.95).toARGB32(),
+          const Color(0xFFFFB300).withValues(alpha: 0.96).toARGB32(),
         );
 
         await pumpHpBar(hp: 14, maxHp: 50);
         expect(readOuterDecor().boxShadow!.first.color.r, greaterThan(0.8));
         expect(
           readFillColor().toARGB32(),
-          const Color(0xFFE74C3C).withValues(alpha: 0.95).toARGB32(),
+          const Color(0xFFE74C3C).withValues(alpha: 0.96).toARGB32(),
         );
 
         // ManaPoolOrb dynamic maxMana = 120: 25/120 > 20% normal cyan vs 24/120 <= 20% low mana
@@ -393,7 +393,7 @@ void main() {
             ),
           ),
         );
-        expect(find.text('HP 50'), findsOneWidget);
+        expect(find.text('50 / 50'), findsOneWidget);
 
         final controller = await _createController(
           prefs: {

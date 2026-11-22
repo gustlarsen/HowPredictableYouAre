@@ -4,63 +4,126 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart' show AdSize;
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/models/move.dart';
 import 'package:how_predictable/models/royal_castle.dart';
 import 'package:how_predictable/models/story_chapter.dart';
+import 'package:how_predictable/services/ad_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/dialogs/victory_cutscene_dialog.dart';
-import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
+import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
+import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
+
+class _TestAdMobClient extends AdMobClient {
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<void> loadBanner({
+    required String adUnitId,
+    required AdSize size,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    onLoaded();
+  }
+
+  @override
+  Widget? buildBannerWidget() => const SizedBox(width: 320, height: 50);
+
+  @override
+  void disposeBanner() {}
+
+  @override
+  Future<void> loadRewarded({
+    required String adUnitId,
+    required VoidCallback onLoaded,
+    required VoidCallback onFailed,
+  }) async {
+    onLoaded();
+  }
+
+  @override
+  Future<bool> showRewarded({
+    required VoidCallback onUserEarnedReward,
+    required VoidCallback onDismissed,
+    required VoidCallback onFailedToShow,
+  }) async {
+    onUserEarnedReward();
+    onDismissed();
+    return true;
+  }
+
+  @override
+  void disposeRewarded() {}
+}
 
 Future<GameController> _createController({
   Map<String, Object> prefs = const {},
+  bool withBannerAd = false,
 }) async {
   SharedPreferences.setMockInitialValues({
     'musicEnabled': false,
     'soundEnabled': false,
     'vibrationEnabled': false,
     'animationsEnabled': false,
-    'hasSeenStoryIntro': true,
+    'has_seen_story_intro': true,
     ...prefs,
   });
   final storage = StorageService();
   await storage.init();
   final localization = LocalizationService();
   await localization.load();
+  final adService = withBannerAd ? AdService(client: _TestAdMobClient()) : null;
+  if (adService != null) {
+    await adService.loadBannerAd();
+  }
   return GameController(
     storage: storage,
     localization: localization,
     audio: AudioService(),
+    adService: adService,
   );
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Robot Mage Asset Integrity & Cutscene Integration', () {
-    test('9:16 cliff cutscene WebP and 512x512 RGBA transparent enemy PNGs exist and are registered in pubspec.yaml', () async {
+  group('Robot Mage & RPG Battle UI Asset Integrity & Cutscene Integration', () {
+    test('9:16 cliff cutscene WebP, forge arena WebP, and 512x512 RGBA transparent player/enemy PNGs exist and are registered in pubspec.yaml', () async {
       final cliffFile = File('assets/images/story/robot_mage_cliff.webp');
       expect(cliffFile.existsSync(), isTrue);
       expect(cliffFile.lengthSync(), greaterThan(20000));
 
+      final forgeBgFile = File('assets/images/forge_arena_bg.webp');
+      expect(forgeBgFile.existsSync(), isTrue);
+      expect(forgeBgFile.lengthSync(), greaterThan(20000));
+
       final pubspecText = File('pubspec.yaml').readAsStringSync();
       expect(pubspecText.contains('assets/images/enemies/'), isTrue);
+      expect(pubspecText.contains('assets/images/player/'), isTrue);
+      expect(pubspecText.contains('assets/images/forge_arena_bg.webp'), isTrue);
       expect(pubspecText.contains('assets/images/story/'), isTrue);
 
-      const expectedEnemySprites = [
+      const expectedSprites = [
+        'assets/images/player/cleric_idle.png',
         'assets/images/enemies/guardian_robot_idle.png',
         'assets/images/enemies/guardian_robot_attack.png',
         'assets/images/enemies/guardian_robot_hit.png',
         'assets/images/enemies/robot_archmage_idle.png',
+        'assets/images/enemies/metal_wizard_idle.png',
         'assets/images/enemies/baby_robot_mage_idle.png',
       ];
 
-      for (final path in expectedEnemySprites) {
+      for (final path in expectedSprites) {
         final file = File(path);
         expect(file.existsSync(), isTrue, reason: 'Missing $path');
         final bytes = file.readAsBytesSync();
@@ -132,8 +195,8 @@ void main() {
     });
   });
 
-  group('VersusArena Boss Sprite Animation Tests', () {
-    testWidgets('Phase 1 Guardian Robot shows idle by default, swaps to attack (~450ms) on PC win, and swaps to hit (~450ms) on Player impact', (WidgetTester tester) async {
+  group('VersusArena Player & Boss Sprite Animation Tests', () {
+    testWidgets('Phase 1 Guardian Robot shows idle by default, swaps to attack (~450ms) on PC win, and swaps to hit (~450ms) on Player impact while Cleric sprite and Sanctuary Runes render cleanly', (WidgetTester tester) async {
       final localization = LocalizationService();
       await localization.load();
 
@@ -166,13 +229,27 @@ void main() {
         );
       }
 
-      // Idle state -> guardian_robot_idle.png
+      // Idle state -> cleric_idle.png, sanctuary_runes_floor_paint, and guardian_robot_idle.png
       await pumpArena(roundId: 0);
       await tester.pump();
+      expect(
+        find.byKey(const ValueKey('sanctuary_runes_floor_paint')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('versus_player_sprite')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
+      expect(find.text('PLAYER'), findsOneWidget);
+      expect(find.text('GUARDIAN ROBOT'), findsOneWidget);
 
       // PC wins round 1 -> guardian_robot_attack.png active for ~450ms, then reverts to idle
       await pumpArena(
@@ -255,6 +332,7 @@ void main() {
         find.byKey(const ValueKey('assets/images/enemies/robot_archmage_idle.png')),
         findsOneWidget,
       );
+      expect(find.text('ROBOT ARCHMAGE'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       // Stage 3: Metal Wizard
@@ -280,12 +358,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
       expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('versus_boss_sprite_stage_3')),
-          matching: find.byType(MetalWizardLairIcon),
-        ),
+        find.byKey(const ValueKey('assets/images/enemies/metal_wizard_idle.png')),
         findsOneWidget,
       );
+      expect(find.text('METAL WIZARD'), findsOneWidget);
 
       // Stage 4: Baby Mage Robot
       await tester.pumpWidget(
@@ -313,6 +389,7 @@ void main() {
         find.byKey(const ValueKey('assets/images/enemies/baby_robot_mage_idle.png')),
         findsOneWidget,
       );
+      expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -349,6 +426,7 @@ void main() {
       expect(find.byKey(const ValueKey('bestiary_silhouette_baby_robot')), findsOneWidget);
       expect(find.byKey(const ValueKey('bestiary_portrait_guardian_robot')), findsNothing);
       expect(find.byKey(const ValueKey('bestiary_portrait_archmage_robot')), findsNothing);
+      expect(find.byKey(const ValueKey('bestiary_portrait_metal_wizard')), findsNothing);
       expect(find.byKey(const ValueKey('bestiary_portrait_baby_robot')), findsNothing);
 
       // 2. All unlocked -> transparent PNG portraits rendered cleanly in Dark & Light modes
@@ -381,12 +459,112 @@ void main() {
 
         expect(find.byKey(const ValueKey('bestiary_portrait_guardian_robot')), findsOneWidget);
         expect(find.byKey(const ValueKey('bestiary_portrait_archmage_robot')), findsOneWidget);
+        expect(find.byKey(const ValueKey('bestiary_portrait_metal_wizard')), findsOneWidget);
         expect(find.byKey(const ValueKey('bestiary_portrait_baby_robot')), findsOneWidget);
         expect(find.byKey(const ValueKey('bestiary_silhouette_guardian_robot')), findsNothing);
         expect(find.byKey(const ValueKey('bestiary_silhouette_archmage_robot')), findsNothing);
+        expect(find.byKey(const ValueKey('bestiary_silhouette_metal_wizard')), findsNothing);
         expect(find.byKey(const ValueKey('bestiary_silhouette_baby_robot')), findsNothing);
         expect(tester.takeException(), isNull);
       }
+    });
+  });
+
+  group('RPG Battle Screen UI Overhaul Full-Screen Integration', () {
+    testWidgets('GameScreen renders forge_arena_bg.webp, drifting embers, open leather backpack HUD, ScoreHeader gauge pill, CustomPainter HintsBar, Sanctuary Runes, Cleric vs Boss, 3D ElementalEnergySphere deck with flame aura, and bottom banner ad', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final controller = await _createController(
+        withBannerAd: true,
+        prefs: {
+          'unlockedPredictability': true,
+          'showPredictability': true,
+          'unlockedYourPrediction': true,
+          'showYourPrediction': true,
+          'unlockedNextMove': true,
+          'showNextMove': true,
+          'unlockedSuggestion': true,
+          'showSuggestion': true,
+          'unlockedCrystalBall': true,
+          'showCrystalBall': true,
+          'unlockedNewHands': true,
+          'showNewHands': true,
+          'unlockedRandom': true,
+          'showRandom': true,
+          'orbs_fire': 10,
+          'orbs_water': 10,
+        },
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: controller,
+          child: MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: const GameScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Forge background & drifting embers
+      expect(
+        find.byKey(const ValueKey<String>('assets/images/forge_arena_bg.webp')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('forge_arena_embers_paint')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('bottom_banner_ad_container')),
+        findsOneWidget,
+      );
+
+      // 2. Top HUD Bar with open leather backpack & WEEK 1 / 40 badge
+      expect(find.byKey(const ValueKey('battle_top_hud_bar')), findsOneWidget);
+      final hudBackpack = tester.widget<RpgBackpackIcon>(
+        find.descendant(
+          of: find.byKey(const ValueKey('battle_top_hud_bar')),
+          matching: find.byType(RpgBackpackIcon),
+        ),
+      );
+      expect(hudBackpack.isOpen, isTrue);
+      expect(hudBackpack.size, 52.0);
+      expect(hudBackpack.ownedOrbs, containsAll([HandMove.rock, HandMove.paper]));
+      expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsOneWidget);
+      expect(find.text('WEEK 1 / 40'), findsOneWidget);
+
+      // 3. ScoreHeader with inline counters & gauge pill
+      expect(find.byKey(const ValueKey('score_header_gauge_pill')), findsOneWidget);
+
+      // 4. HintsBar with CustomPainter mini-icons
+      expect(find.byKey(const ValueKey('hint_mini_icon_brain')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_robot')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_lightbulb')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_crystalBall')), findsOneWidget);
+
+      // 5. Glossy 3D ElementalEnergySphere bottom action deck & flame aura on selected orb
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('move_selection_card')),
+          matching: find.byType(ElementalEnergySphere),
+        ),
+        findsNWidgets(5),
+      );
+      await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('active_orb_flame_aura_rock')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
   });
 }

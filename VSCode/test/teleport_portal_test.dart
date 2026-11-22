@@ -111,7 +111,7 @@ void main() {
         expect(teleportBtn, findsOneWidget);
         expect(teleportIcon, findsOneWidget);
         expect(tester.getSize(teleportBtn), equals(const Size(36.0, 36.0)));
-        expect(tester.getSize(teleportIcon), equals(const Size(28.0, 28.0)));
+        expect(tester.getSize(teleportIcon), equals(const Size(34.0, 34.0)));
 
         // Play 2 rounds: 1 win (+1 Fire Orb) and 1 loss (-1 Player HP)
         controller.crystalBallMove = HandMove.rock;

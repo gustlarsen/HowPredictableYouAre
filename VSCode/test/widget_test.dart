@@ -74,7 +74,7 @@ void main() {
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byType(AppBar),
+        of: find.byKey(const ValueKey('battle_top_hud_bar')),
         matching: find.byType(RpgBackpackIcon),
       ),
       findsOneWidget,
@@ -1128,11 +1128,11 @@ void main() {
     expect(controller.showPredictability, isFalse);
     await tester.pump();
     expect(find.byType(ScoreHeader), findsNothing);
-    expect(find.text('You'), findsNothing);
-    expect(find.text('Total'), findsNothing);
+    expect(find.text('Your Score:'), findsNothing);
+    expect(find.text('Total:'), findsNothing);
     expect(find.text('Gauge'), findsNothing);
 
-    // 3. Unlocked AND Enabled State: Entire ScoreHeader appears with all 4 metrics side-by-side
+    // 3. Unlocked AND Enabled State: Entire ScoreHeader appears with all 4 metrics
     controller.toggleShowPredictability(true);
     await tester.pump();
 
@@ -1141,9 +1141,9 @@ void main() {
       matching: find.byType(Card),
     );
     expect(scoreCardFinder, findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('You')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('PC')), findsOneWidget);
-    expect(find.descendant(of: scoreCardFinder, matching: find.text('Total')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('Your Score:')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('PC Score:')), findsOneWidget);
+    expect(find.descendant(of: scoreCardFinder, matching: find.text('Total:')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('Gauge')), findsOneWidget);
     // Background-tracked stats (1 win, 0 losses, 1 total, 100.0%) are immediately shown
     expect(find.descendant(of: scoreCardFinder, matching: find.text('100.0%')), findsOneWidget);
@@ -2706,19 +2706,19 @@ void main() {
         find.byKey(const ValueKey('backpack_inventory_button'));
     expect(backpackFinder, findsOneWidget);
     final initialSize = tester.getSize(backpackFinder);
-    expect(initialSize, equals(const Size(36.0, 36.0)));
+    expect(initialSize, equals(const Size(54.0, 54.0)));
 
     final backpackIconFinder = find.byType(RpgBackpackIcon);
     expect(backpackIconFinder, findsOneWidget);
     final initialIconSize = tester.getSize(backpackIconFinder);
-    expect(initialIconSize, equals(const Size(28.0, 28.0)));
+    expect(initialIconSize, equals(const Size(52.0, 52.0)));
 
     final teleportFinder = find.byKey(const ValueKey('teleport_portal_button'));
     final teleportIconFinder = find.byType(RpgTeleportPortalIcon);
     expect(teleportFinder, findsOneWidget);
     expect(teleportIconFinder, findsOneWidget);
     expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(28.0, 28.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(34.0, 34.0)));
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
 
     // Gift Box starts locked and hidden from the AppBar
@@ -2745,15 +2745,15 @@ void main() {
 
     // Both Backpack and Teleport Portal buttons maintain strict fixed size outside any Flexible wrapper
     final crowdedSize = tester.getSize(backpackFinder);
-    expect(crowdedSize, equals(const Size(36.0, 36.0)));
+    expect(crowdedSize, equals(const Size(54.0, 54.0)));
     expect(crowdedSize, equals(initialSize));
 
     final crowdedIconSize = tester.getSize(backpackIconFinder);
-    expect(crowdedIconSize, equals(const Size(28.0, 28.0)));
+    expect(crowdedIconSize, equals(const Size(52.0, 52.0)));
     expect(crowdedIconSize, equals(initialIconSize));
 
     expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(28.0, 28.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(34.0, 34.0)));
   });
 
   testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {

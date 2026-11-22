@@ -78,11 +78,11 @@ void main() {
       // Row 2 is below Row 1
       expect(tester.getTopLeft(suggChip).dy, greaterThan(tester.getTopLeft(yourChip).dy));
 
-      // Check mini icons are present
-      expect(find.byIcon(Icons.psychology_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.lightbulb_outline), findsOneWidget);
-      expect(find.byIcon(Icons.auto_awesome), findsOneWidget);
+      // Check custom RPG mini icons (CustomPainter) are present
+      expect(find.byKey(const ValueKey('hint_mini_icon_brain')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_robot')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_lightbulb')), findsOneWidget);
+      expect(find.byKey(const ValueKey('hint_mini_icon_crystalBall')), findsOneWidget);
     });
 
     testWidgets('Single prediction upgrade occupies the row cleanly without empty gaps', (tester) async {

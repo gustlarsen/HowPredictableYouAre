@@ -255,6 +255,7 @@ enum BestiaryCreature {
         'Defeat Guardian Robot in Weeks 1–9 or defeat Robot Archmage to confront the Metal Wizard.',
     icon: Icons.hardware_rounded,
     accentColor: Color(0xFF90A4AE),
+    portraitAsset: 'assets/images/enemies/metal_wizard_idle.png',
   ),
   babyRobot(
     id: 'baby_robot',

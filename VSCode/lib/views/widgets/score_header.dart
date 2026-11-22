@@ -36,50 +36,112 @@ class ScoreHeader extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final loc = controller.localization;
-    final dividerColor = palette.isDark ? theme.dividerColor : palette.divider;
+    final gColor = gaugeColor(
+      controller.percentPredict,
+      isDark: palette.isDark,
+    );
+
+    final cardBg = palette.isDark
+        ? const Color(0xFF151820).withValues(alpha: 0.90)
+        : palette.dialogSurface.withValues(alpha: 0.95);
+    final borderColor = palette.isDark
+        ? const Color(0xFF8A6D3B)
+        : palette.sandCardBorder;
 
     return Card(
-      elevation: 2,
-      color: palette.isDark ? null : palette.dialogSurface.withValues(alpha: 0.95),
-      surfaceTintColor: palette.isDark ? null : Colors.transparent,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      elevation: 3,
+      color: cardBg,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: palette.isDark
-            ? BorderSide.none
-            : BorderSide(color: palette.sandCardBorder),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: borderColor, width: 1.25),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _ScoreItem(
-              label: loc.t('string6', fallback: 'You'),
-              value: '${controller.userScore}',
-              color: palette.isDark ? Colors.green : palette.successText,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _InlineScoreCounter(
+                    label: loc.t('string6', fallback: 'Your Score:'),
+                    value: '${controller.userScore}',
+                    valueColor: palette.isDark
+                        ? Colors.white
+                        : palette.primaryText,
+                  ),
+                  const SizedBox(width: 12),
+                  _InlineScoreCounter(
+                    label: loc.t('string7', fallback: 'PC Score:'),
+                    value: '${controller.pcScore}',
+                    valueColor: palette.isDark
+                        ? Colors.white
+                        : palette.primaryText,
+                  ),
+                  const SizedBox(width: 12),
+                  _InlineScoreCounter(
+                    label: loc.t('string8', fallback: 'Total:'),
+                    value: '${controller.totalRounds}',
+                    valueColor: palette.isDark
+                        ? Colors.white
+                        : palette.primaryText,
+                  ),
+                ],
+              ),
             ),
-            Container(width: 1, height: 28, color: dividerColor),
-            _ScoreItem(
-              label: loc.t('string7', fallback: 'PC'),
-              value: '${controller.pcScore}',
-              color: palette.dangerText,
-            ),
-            Container(width: 1, height: 28, color: dividerColor),
-            _ScoreItem(
-              label: loc.t('string8', fallback: 'Total'),
-              value: '${controller.totalRounds}',
-              color: palette.isDark ? Colors.grey : palette.secondaryText,
-            ),
-            Container(width: 1, height: 28, color: dividerColor),
-            _ScoreItem(
-              label: loc.t('string5', fallback: 'Gauge'),
-              value: '${controller.percentPredict.toStringAsFixed(1)}%',
-              color: gaugeColor(
-                controller.percentPredict,
-                isDark: palette.isDark,
+            const SizedBox(height: 5),
+            Container(
+              key: const ValueKey('score_header_gauge_pill'),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: gColor.withValues(alpha: palette.isDark ? 0.22 : 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: gColor.withValues(alpha: palette.isDark ? 0.78 : 0.65),
+                  width: 1.15,
+                ),
+                boxShadow: [
+                  if (palette.isDark)
+                    BoxShadow(
+                      color: gColor.withValues(alpha: 0.20),
+                      blurRadius: 6,
+                    ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    loc.t('string5', fallback: 'Gauge'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: gColor,
+                    ),
+                  ),
+                  Text(
+                    ': ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: gColor,
+                    ),
+                  ),
+                  Text(
+                    '${controller.percentPredict.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: gColor,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -89,37 +151,41 @@ class ScoreHeader extends StatelessWidget {
   }
 }
 
-class _ScoreItem extends StatelessWidget {
+class _InlineScoreCounter extends StatelessWidget {
   final String label;
   final String value;
-  final Color color;
+  final Color valueColor;
 
-  const _ScoreItem({
+  const _InlineScoreCounter({
     required this.label,
     required this.value,
-    required this.color,
+    required this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Column(
+    final normalizedLabel = label.endsWith(':') ? label : '$label:';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          label,
+          normalizedLabel,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: palette.isDark ? FontWeight.normal : FontWeight.w600,
-            color: palette.isDark ? Colors.grey : palette.mutedText,
+            fontWeight: FontWeight.w500,
+            color: palette.isDark
+                ? const Color(0xFFB5BAC6)
+                : palette.secondaryText,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(width: 4),
         Text(
           value,
           style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: color,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: valueColor,
           ),
         ),
       ],

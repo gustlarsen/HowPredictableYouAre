@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// A sleek, compact RPG-style HP bar with metallic/stone styling,
+/// A sleek, widened RPG-style HP bar with metallic bronze-stone styling,
 /// smooth health fill tween, dynamic color transition (Green -> Amber -> Red),
 /// gentle pulsing glow when in critical condition (< 30% HP),
-/// and support for damage flash and micro-shake effects.
+/// "$clampedHp / $maxHp" numeric display, and damage flash/micro-shake effects.
 class RpgHpBar extends StatefulWidget {
   final int hp;
   final int maxHp;
@@ -17,8 +17,8 @@ class RpgHpBar extends StatefulWidget {
     super.key,
     required this.hp,
     this.maxHp = 100,
-    this.width = 78.0,
-    this.height = 15.0,
+    this.width = 104.0,
+    this.height = 17.0,
     this.flashOpacity = 0.0,
     this.shakeOffset = 0.0,
     this.animationsEnabled = true,
@@ -97,12 +97,14 @@ class _RpgHpBarState extends State<RpgHpBar>
   Widget build(BuildContext context) {
     final safeMaxHp = widget.maxHp <= 0 ? 1 : widget.maxHp;
     final clampedHp = widget.hp.clamp(0, safeMaxHp);
-    final hpRatio = widget.maxHp <= 0 ? 0.0 : clampedHp / widget.maxHp.toDouble();
+    final hpRatio =
+        widget.maxHp <= 0 ? 0.0 : clampedHp / widget.maxHp.toDouble();
     final isCritical = _isCritical(widget.hp, widget.maxHp);
 
     final shake = widget.shakeOffset;
     final paddingLeft = shake > 0 ? shake : 0.0;
     final paddingRight = shake < 0 ? -shake : 0.0;
+    final radius = widget.height / 2.0;
 
     return Padding(
       padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
@@ -117,8 +119,8 @@ class _RpgHpBarState extends State<RpgHpBar>
             width: widget.width,
             height: widget.height,
             decoration: BoxDecoration(
-              color: const Color(0xFF14171E).withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(4.0),
+              color: const Color(0xFF14171E).withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(radius),
               border: Border.all(
                 color: isCritical
                     ? Color.lerp(
@@ -126,8 +128,8 @@ class _RpgHpBarState extends State<RpgHpBar>
                         const Color(0xFFFF5252),
                         pulse,
                       )!
-                    : const Color(0xFF5D5446).withValues(alpha: 0.8),
-                width: isCritical ? 1.4 : 1.0,
+                    : const Color(0xFF8A6D3B).withValues(alpha: 0.90),
+                width: isCritical ? 1.4 : 1.15,
               ),
               boxShadow: [
                 if (isCritical)
@@ -141,13 +143,13 @@ class _RpgHpBarState extends State<RpgHpBar>
                 else
                   const BoxShadow(
                     color: Colors.black54,
-                    blurRadius: 3.0,
+                    blurRadius: 3.5,
                     offset: Offset(0, 1.5),
                   ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(3.0),
+              borderRadius: BorderRadius.circular((radius - 1.0).clamp(2.0, 20.0)),
               child: Stack(
                 fit: StackFit.expand,
                 alignment: Alignment.centerLeft,
@@ -169,7 +171,7 @@ class _RpgHpBarState extends State<RpgHpBar>
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                fillColor.withValues(alpha: 0.95),
+                                fillColor.withValues(alpha: 0.96),
                                 fillColor.withValues(alpha: 0.72),
                               ],
                             ),
@@ -184,9 +186,9 @@ class _RpgHpBarState extends State<RpgHpBar>
                     top: 0,
                     left: 0,
                     right: 0,
-                    height: widget.height * 0.35,
+                    height: widget.height * 0.38,
                     child: Container(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: Colors.white.withValues(alpha: 0.14),
                     ),
                   ),
 
@@ -204,36 +206,28 @@ class _RpgHpBarState extends State<RpgHpBar>
                       ),
                     ),
 
-                  // RPG Numeric Label & Tiny Heart Icon
+                  // RPG Numeric Label "$clampedHp / $safeMaxHp"
                   Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.favorite,
-                          size: 8.5,
-                          color: isCritical
-                              ? Colors.redAccent.shade100
-                              : const Color(0xFFFFD54F),
-                        ),
-                        const SizedBox(width: 3.0),
-                        Text(
-                          'HP $clampedHp',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white.withValues(alpha: 0.95),
-                            letterSpacing: 0.4,
-                            shadows: const [
-                              Shadow(
-                                color: Colors.black,
-                                blurRadius: 2.5,
-                                offset: Offset(0.5, 0.5),
-                              ),
-                            ],
+                    child: Text(
+                      '$clampedHp / $safeMaxHp',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white.withValues(alpha: 0.98),
+                        letterSpacing: 0.3,
+                        height: 1.0,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black,
+                            blurRadius: 3.0,
+                            offset: Offset(0, 0.8),
                           ),
-                        ),
-                      ],
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 4.5,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

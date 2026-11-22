@@ -95,6 +95,7 @@ class _VersusArenaState extends State<VersusArena>
   late AnimationController _damageIndicatorController;
   late AnimationController _bossIdleController;
   late AnimationController _bossActionController;
+  late AnimationController _playerActionController;
   late Animation<double> _punchAnim;
   late Animation<double> _defeatRotationAnim;
   late Animation<double> _drawRotationAnim;
@@ -102,6 +103,7 @@ class _VersusArenaState extends State<VersusArena>
   bool _didTriggerImpactHaptic = false;
   bool _didTriggerImpact = false;
   _BossActionType _bossActionType = _BossActionType.none;
+  _BossActionType _playerActionType = _BossActionType.none;
 
   late int displayedPlayerHp;
   late int displayedPcHp;
@@ -143,6 +145,16 @@ class _VersusArenaState extends State<VersusArena>
         if (status == AnimationStatus.completed && mounted) {
           setState(() {
             _bossActionType = _BossActionType.none;
+          });
+        }
+      });
+    _playerActionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: VersusArena.bossActionDurationMs),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {
+            _playerActionType = _BossActionType.none;
           });
         }
       });
@@ -224,15 +236,28 @@ class _VersusArenaState extends State<VersusArena>
       _bossActionController.stop();
       _bossActionController.reset();
     }
+    _playerActionType = _BossActionType.none;
+    if (_playerActionController.isAnimating ||
+        _playerActionController.value != 0.0) {
+      _playerActionController.stop();
+      _playerActionController.reset();
+    }
   }
 
   void _startRoundAnimations() {
     _didTriggerImpactHaptic = false;
     _didTriggerImpact = false;
     _resetBossAction();
-    if (widget.winner == RoundWinner.computer && widget.animationsEnabled) {
-      _bossActionType = _BossActionType.attack;
-      _bossActionController.forward(from: 0.0);
+    if (widget.animationsEnabled) {
+      if (widget.winner == RoundWinner.computer) {
+        _bossActionType = _BossActionType.attack;
+        _bossActionController.forward(from: 0.0);
+      }
+      if (widget.winner == RoundWinner.user ||
+          widget.winner == RoundWinner.draw) {
+        _playerActionType = _BossActionType.attack;
+        _playerActionController.forward(from: 0.0);
+      }
     }
     if (widget.elementalMode) {
       _vfxController.forward(from: 0.0);
@@ -285,6 +310,10 @@ class _VersusArenaState extends State<VersusArena>
       if (widget.winner == RoundWinner.computer) {
         _activeDamageIsUser = true;
         _damageIndicatorController.forward(from: 0.0);
+        if (widget.animationsEnabled) {
+          _playerActionType = _BossActionType.hit;
+          _playerActionController.forward(from: 0.0);
+        }
       } else if (widget.winner == RoundWinner.user) {
         _activeDamageIsUser = false;
         _damageIndicatorController.forward(from: 0.0);
@@ -416,6 +445,7 @@ class _VersusArenaState extends State<VersusArena>
     _vfxController.removeListener(_handleVfxTick);
     _bossIdleController.dispose();
     _bossActionController.dispose();
+    _playerActionController.dispose();
     _damageIndicatorController.dispose();
     _vfxController.dispose();
     _animController.dispose();
@@ -485,27 +515,31 @@ class _VersusArenaState extends State<VersusArena>
     return _damageIndicatorAnim.value.clamp(0.0, 1.0);
   }
 
+  String _resolveBossCombatantTitle() {
+    switch (widget.enemyStage) {
+      case 2:
+        return widget.localization
+            .t('castle_bestiary_archmage_name', fallback: 'ROBOT ARCHMAGE')
+            .toUpperCase();
+      case 3:
+        return widget.localization
+            .t('castle_bestiary_metal_wizard_name', fallback: 'METAL WIZARD')
+            .toUpperCase();
+      case 4:
+        return widget.localization
+            .t('castle_bestiary_baby_name', fallback: 'BABY MAGE ROBOT')
+            .toUpperCase();
+      default:
+        return widget.localization
+            .t('castle_bestiary_guardian_name', fallback: 'GUARDIAN ROBOT')
+            .toUpperCase();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final winner = widget.winner;
-
-    Color outcomeColor;
-    switch (winner) {
-      case RoundWinner.user:
-        outcomeColor = palette.isDark ? Colors.green : palette.successText;
-        break;
-      case RoundWinner.computer:
-        outcomeColor = palette.dangerText;
-        break;
-      case RoundWinner.draw:
-        outcomeColor = palette.amberText;
-        break;
-      case null:
-        outcomeColor = palette.isDark ? Colors.grey : palette.mutedText;
-        break;
-    }
 
     final userWins = winner == RoundWinner.user;
     final pcWins = winner == RoundWinner.computer;
@@ -545,7 +579,7 @@ class _VersusArenaState extends State<VersusArena>
           drawKey,
           fallback: drawFallback,
         );
-        battleDescColor = palette.amberText;
+        battleDescColor = palette.isDark ? Colors.white : palette.amberText;
       } else {
         final idleKey = widget.elementalMode
             ? 'battle_idle_elemental'
@@ -558,7 +592,7 @@ class _VersusArenaState extends State<VersusArena>
           fallback: idleFallback,
         );
         battleDescColor =
-            palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
+            palette.isDark ? const Color(0xFFD6DCE8) : palette.secondaryText;
       }
     } else if (isDraw) {
       final drawKey = widget.elementalMode
@@ -571,7 +605,7 @@ class _VersusArenaState extends State<VersusArena>
         drawKey,
         fallback: drawFallback,
       );
-      battleDescColor = palette.amberText;
+      battleDescColor = palette.isDark ? Colors.white : palette.amberText;
     } else {
       final idleKey = widget.elementalMode
           ? 'battle_idle_elemental'
@@ -584,7 +618,7 @@ class _VersusArenaState extends State<VersusArena>
         fallback: idleFallback,
       );
       battleDescColor =
-          palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
+          palette.isDark ? const Color(0xFFD6DCE8) : palette.secondaryText;
     }
 
     if (battleDescription.isEmpty) {
@@ -599,41 +633,28 @@ class _VersusArenaState extends State<VersusArena>
         fallback: idleFallback,
       );
       battleDescColor =
-          palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
+          palette.isDark ? const Color(0xFFD6DCE8) : palette.secondaryText;
     }
 
+    final playerCombatantTitle = widget.localization
+        .t('arena_player_label', fallback: 'PLAYER')
+        .toUpperCase();
+    final bossCombatantTitle = _resolveBossCombatantTitle();
+
+    // Transparent floor container: combatants stand directly on the forge stone floor
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-      decoration: BoxDecoration(
-        color: palette.isDark
-            ? theme.colorScheme.surface.withValues(alpha: 0.85)
-            : palette.arenaSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: winner != null
-              ? outcomeColor.withValues(alpha: palette.isDark ? 0.7 : 0.8)
-              : (palette.isDark ? theme.dividerColor : palette.sandCardBorder),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: winner != null
-                ? outcomeColor.withValues(alpha: 0.25)
-                : Colors.black26,
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+      color: Colors.transparent,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              const cardWidth = 86.0;
-              const vsWidth = 56.0;
+              const cardWidth = 104.0;
+              const vsWidth = 48.0;
               const totalItemsWidth = cardWidth * 2 + vsWidth;
-              const bossSpriteSize = 54.0;
-              const bossStageHeight = 50.0;
+              const spriteWidth = 112.0;
+              const spriteHeight = 112.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
               final freeSpace = math.max(0.0, rowWidth - totalItemsWidth);
@@ -650,41 +671,106 @@ class _VersusArenaState extends State<VersusArena>
               final leftCenterX = leftX + cardWidth / 2.0;
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
-              const orbCenterY = bossStageHeight + 64.0;
+              const orbCenterY = 62.0;
+              const floorRunesCenterY = 106.0;
 
-              final bossLeft = (rightCenterX - bossSpriteSize / 2.0)
-                  .clamp(0.0, math.max(0.0, rowWidth - bossSpriteSize))
+              final playerLeft = (leftCenterX - spriteWidth / 2.0)
+                  .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
+                  .toDouble();
+              final bossLeft = (rightCenterX - spriteWidth / 2.0)
+                  .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
                   .toDouble();
 
-              final bossSprite = Positioned(
-                top: -2,
-                left: bossLeft,
-                width: bossSpriteSize,
-                height: bossSpriteSize,
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([
-                    _bossIdleController,
-                    _bossActionController,
-                  ]),
-                  builder: (context, _) {
-                    return _BossArenaSprite(
-                      key: ValueKey('versus_boss_sprite_stage_${widget.enemyStage}'),
-                      enemyStage: widget.enemyStage,
-                      actionType: _bossActionType,
-                      idleProgress: widget.animationsEnabled
+              final sanctuaryRunesLayer = Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _bossIdleController,
+                      _vfxController,
+                    ]),
+                    builder: (context, _) {
+                      final clashPulse = _vfxController.isAnimating
+                          ? math.sin(_vfxController.value * math.pi)
+                          : 0.0;
+                      final idlePulse = widget.animationsEnabled
                           ? _bossIdleController.value
-                          : 0.0,
-                      actionProgress: widget.animationsEnabled
-                          ? _bossActionController.value
-                          : 0.0,
-                      animationsEnabled: widget.animationsEnabled,
-                    );
-                  },
+                          : 0.35;
+                      return CustomPaint(
+                        key: const ValueKey('sanctuary_runes_floor_paint'),
+                        painter: _SanctuaryRunesFloorPainter(
+                          centerX: centerX,
+                          centerY: floorRunesCenterY,
+                          idlePulse: idlePulse,
+                          clashPulse: clashPulse,
+                          isDark: palette.isDark,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+
+              final playerSprite = Positioned(
+                top: 10,
+                left: playerLeft,
+                width: spriteWidth,
+                height: spriteHeight,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _bossIdleController,
+                      _playerActionController,
+                    ]),
+                    builder: (context, _) {
+                      return _PlayerArenaSprite(
+                        key: const ValueKey('versus_player_sprite'),
+                        actionType: _playerActionType,
+                        idleProgress: widget.animationsEnabled
+                            ? _bossIdleController.value
+                            : 0.0,
+                        actionProgress: widget.animationsEnabled
+                            ? _playerActionController.value
+                            : 0.0,
+                        animationsEnabled: widget.animationsEnabled,
+                      );
+                    },
+                  ),
+                ),
+              );
+
+              final bossSprite = Positioned(
+                top: 10,
+                left: bossLeft,
+                width: spriteWidth,
+                height: spriteHeight,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _bossIdleController,
+                      _bossActionController,
+                    ]),
+                    builder: (context, _) {
+                      return _BossArenaSprite(
+                        key: ValueKey(
+                          'versus_boss_sprite_stage_${widget.enemyStage}',
+                        ),
+                        enemyStage: widget.enemyStage,
+                        actionType: _bossActionType,
+                        idleProgress: widget.animationsEnabled
+                            ? _bossIdleController.value
+                            : 0.0,
+                        actionProgress: widget.animationsEnabled
+                            ? _bossActionController.value
+                            : 0.0,
+                        animationsEnabled: widget.animationsEnabled,
+                      );
+                    },
+                  ),
                 ),
               );
 
               final centerColumn = Positioned(
-                top: bossStageHeight,
+                top: 0,
                 left: 0,
                 right: 0,
                 child: Center(
@@ -693,41 +779,43 @@ class _VersusArenaState extends State<VersusArena>
                     children: [
                       ManaPoolOrb(
                         key: const ValueKey('mana_pool_orb'),
+                        size: 88.0,
                         remainingMana: widget.remainingMana,
                         maxMana: widget.maxMana,
                         localization: widget.localization,
                         animationsEnabled: widget.animationsEnabled,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 2),
                       KeyedSubtree(
                         key: const ValueKey('vs_badge'),
                         child: SizedBox(
                           key: widget.clashCenterKey,
                           width: vsWidth,
+                          height: 18,
                           child: Center(
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                                horizontal: 7,
+                                vertical: 1.5,
                               ),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
+                                color: const Color(0xFF151922)
+                                    .withValues(alpha: 0.78),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFF8A6D3B)
+                                      .withValues(alpha: 0.65),
+                                  width: 0.9,
+                                ),
                               ),
-                              child: Text(
+                              child: const Text(
                                 'VS',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                  fontSize: 16,
-                                  letterSpacing: 1,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFD9C398),
+                                  fontSize: 9.5,
+                                  height: 1.0,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
                             ),
@@ -743,7 +831,7 @@ class _VersusArenaState extends State<VersusArena>
                 key: const ValueKey('user_card'),
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: EdgeInsets.only(top: bossStageHeight, left: leftX),
+                  padding: EdgeInsets.only(left: leftX),
                   child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
@@ -764,6 +852,9 @@ class _VersusArenaState extends State<VersusArena>
                           'string9',
                           fallback: 'You Chose:',
                         ),
+                        combatantName: playerCombatantTitle,
+                        combatantNameKey:
+                            const ValueKey('arena_player_name_label'),
                         move: widget.userMove,
                         isLeft: true,
                         isWinner: userWins,
@@ -818,7 +909,7 @@ class _VersusArenaState extends State<VersusArena>
                 key: const ValueKey('pc_card'),
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: EdgeInsets.only(top: bossStageHeight, left: rightX),
+                  padding: EdgeInsets.only(left: rightX),
                   child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
@@ -841,6 +932,9 @@ class _VersusArenaState extends State<VersusArena>
                             'string52',
                             fallback: 'PC Chose:',
                           ),
+                          combatantName: bossCombatantTitle,
+                          combatantNameKey:
+                              const ValueKey('arena_boss_name_label'),
                           move: widget.computerMove,
                           isLeft: false,
                           isWinner: pcWins,
@@ -927,12 +1021,25 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              // Ensure the winning hand renders on top of both the center column (Mana Orb + VS badge)
-              // and the opponent hand, with the alpha-transparent projectile & explosion VFX layer
-              // rendered above all cards.
               final stackChildren = userWins
-                  ? <Widget>[bossSprite, centerColumn, pcCard, userCard, vfxOverlay]
-                  : <Widget>[bossSprite, centerColumn, userCard, pcCard, vfxOverlay];
+                  ? <Widget>[
+                      sanctuaryRunesLayer,
+                      playerSprite,
+                      bossSprite,
+                      centerColumn,
+                      pcCard,
+                      userCard,
+                      vfxOverlay,
+                    ]
+                  : <Widget>[
+                      sanctuaryRunesLayer,
+                      playerSprite,
+                      bossSprite,
+                      centerColumn,
+                      userCard,
+                      pcCard,
+                      vfxOverlay,
+                    ];
 
               return Stack(
                 alignment: Alignment.center,
@@ -941,7 +1048,7 @@ class _VersusArenaState extends State<VersusArena>
               );
             },
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           SizedBox(
             height: 28,
             child: Center(
@@ -953,15 +1060,201 @@ class _VersusArenaState extends State<VersusArena>
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w800,
                   color: battleDescColor,
-                  letterSpacing: 0.4,
+                  letterSpacing: 0.3,
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black,
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                    Shadow(
+                      color: Colors.black87,
+                      blurRadius: 7,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Perspective-compressed (scaleY ~ 0.32) glowing golden-amber runic floor circle
+/// painted directly onto the forge stone floor beneath the Cleric and Boss.
+class _SanctuaryRunesFloorPainter extends CustomPainter {
+  final double centerX;
+  final double centerY;
+  final double idlePulse;
+  final double clashPulse;
+  final bool isDark;
+
+  const _SanctuaryRunesFloorPainter({
+    required this.centerX,
+    required this.centerY,
+    required this.idlePulse,
+    required this.clashPulse,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final radiusX = math.min(size.width * 0.44, 165.0);
+    const scaleY = 0.32;
+    final glowAlpha = (isDark ? 0.36 : 0.24) + 0.12 * idlePulse + 0.24 * clashPulse;
+    final runeAlpha = (isDark ? 0.72 : 0.55) + 0.14 * idlePulse + 0.14 * clashPulse;
+
+    canvas.save();
+    canvas.translate(centerX, centerY);
+    canvas.scale(1.0, scaleY);
+
+    // 1. Soft radial golden-amber sanctuary floor lighting
+    final glowRect = Rect.fromCircle(center: Offset.zero, radius: radiusX * 1.15);
+    canvas.drawCircle(
+      Offset.zero,
+      radiusX * 1.15,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFD54F).withValues(alpha: glowAlpha * 0.85),
+            const Color(0xFFFF8F00).withValues(alpha: glowAlpha * 0.48),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.58, 1.0],
+        ).createShader(glowRect),
+    );
+
+    // 2. Outer and inner runic rings
+    final outerRingPaint = Paint()
+      ..color = const Color(0xFFFFCA28).withValues(alpha: runeAlpha.clamp(0.0, 1.0))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+    final innerRingPaint = Paint()
+      ..color = const Color(0xFFFFE082).withValues(alpha: (runeAlpha * 0.85).clamp(0.0, 1.0))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+
+    canvas.drawCircle(Offset.zero, radiusX, outerRingPaint);
+    canvas.drawCircle(Offset.zero, radiusX * 0.84, innerRingPaint);
+    canvas.drawCircle(Offset.zero, radiusX * 0.46, innerRingPaint);
+
+    // 3. 12 radial arcane rune spokes & sigil ticks between the two outer rings
+    final tickPaint = Paint()
+      ..color = const Color(0xFFFFECB3).withValues(alpha: (runeAlpha * 0.90).clamp(0.0, 1.0))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 12; i++) {
+      final angle = i * (math.pi / 6.0);
+      final c = math.cos(angle);
+      final s = math.sin(angle);
+      final rIn = (i % 3 == 0) ? radiusX * 0.46 : radiusX * 0.84;
+      canvas.drawLine(
+        Offset(c * rIn, s * rIn),
+        Offset(c * radiusX, s * radiusX),
+        tickPaint,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SanctuaryRunesFloorPainter oldDelegate) {
+    return oldDelegate.centerX != centerX ||
+        oldDelegate.centerY != centerY ||
+        oldDelegate.idlePulse != idlePulse ||
+        oldDelegate.clashPulse != clashPulse ||
+        oldDelegate.isDark != isDark;
+  }
+}
+
+/// Full-body Player Cleric sprite (`assets/images/player/cleric_idle.png`) with
+/// subtle breathing bob, forward cast lunge/glow pulse, and hit shake/flash.
+class _PlayerArenaSprite extends StatelessWidget {
+  final _BossActionType actionType;
+  final double idleProgress;
+  final double actionProgress;
+  final bool animationsEnabled;
+
+  const _PlayerArenaSprite({
+    super.key,
+    required this.actionType,
+    required this.idleProgress,
+    required this.actionProgress,
+    required this.animationsEnabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const assetPath = 'assets/images/player/cleric_idle.png';
+    final floatDy =
+        animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.2 : 0.0;
+    double scale = animationsEnabled ? (1.0 + 0.022 * idleProgress) : 1.0;
+    double dx = 0.0;
+    double dy = floatDy;
+    double glowAlpha = 0.22 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
+    Color glowColor = const Color(0xFF00E5FF);
+
+    if (animationsEnabled && actionType != _BossActionType.none) {
+      final t = actionProgress.clamp(0.0, 1.0);
+      final arc = math.sin(t * math.pi);
+      if (actionType == _BossActionType.attack) {
+        dx = 5.5 * arc;
+        scale += 0.06 * arc;
+        glowAlpha = 0.30 + 0.48 * arc;
+        glowColor = const Color(0xFF64F5FF);
+      } else {
+        dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
+        glowAlpha = 0.32 + 0.48 * (1.0 - t);
+        glowColor = Colors.redAccent;
+      }
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 74,
+          height: 74,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: glowColor.withValues(alpha: glowAlpha.clamp(0.0, 0.9)),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
+        Transform.translate(
+          offset: Offset(dx, dy),
+          child: Transform.scale(
+            scale: scale,
+            child: Image.asset(
+              assetPath,
+              key: const ValueKey<String>(assetPath),
+              gaplessPlayback: true,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.person_rounded,
+                size: 48,
+                color: Color(0xFF00E5FF),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -987,7 +1280,7 @@ class _BossArenaSprite extends StatelessWidget {
       case 2:
         return 'assets/images/enemies/robot_archmage_idle.png';
       case 3:
-        return null;
+        return 'assets/images/enemies/metal_wizard_idle.png';
       case 4:
         return 'assets/images/enemies/baby_robot_mage_idle.png';
       default:
@@ -1007,7 +1300,7 @@ class _BossArenaSprite extends StatelessWidget {
       case 2:
         return const Color(0xFFCE93D8);
       case 3:
-        return const Color(0xFF90A4AE);
+        return const Color(0xFFFFCA28);
       case 4:
         return const Color(0xFFFF8A65);
       default:
@@ -1021,12 +1314,13 @@ class _BossArenaSprite extends StatelessWidget {
     final auraBase = _stageAuraColor();
 
     // Gentle idle breathing & floating motion
-    final floatDy = animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.5 : 0.0;
+    final floatDy =
+        animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.5 : 0.0;
     double scale = animationsEnabled ? (1.0 + 0.024 * idleProgress) : 1.0;
     double dx = 0.0;
     double dy = floatDy;
     double tiltAngle = 0.0;
-    double glowAlpha = 0.20 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
+    double glowAlpha = 0.22 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
     Color glowColor = auraBase;
 
     if (animationsEnabled && actionType != _BossActionType.none) {
@@ -1060,11 +1354,12 @@ class _BossArenaSprite extends StatelessWidget {
           glowColor = Colors.redAccent;
         }
       } else if (enemyStage == 3) {
-        // Metal Wizard: metallic glow pulse on attack and shake on hit
+        // Metal Wizard: golden clockwork glow pulse on attack and shake on hit
         if (actionType == _BossActionType.attack) {
-          scale += 0.09 * arc;
-          glowAlpha = 0.28 + 0.50 * arc;
-          glowColor = const Color(0xFF00E5FF);
+          dx = -5.0 * arc;
+          scale += 0.08 * arc;
+          glowAlpha = 0.30 + 0.52 * arc;
+          glowColor = const Color(0xFFFFD54F);
         } else {
           dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
           glowAlpha = 0.30 + 0.45 * (1.0 - t);
@@ -1073,6 +1368,7 @@ class _BossArenaSprite extends StatelessWidget {
       } else {
         // Phase 1 Guardian Robot: attack swap + subtle lunge pulse; hit swap + horizontal shake
         if (actionType == _BossActionType.attack) {
+          dx = -4.5 * arc;
           scale += 0.07 * arc;
           glowAlpha = 0.28 + 0.48 * arc;
           glowColor = const Color(0xFFCE93D8);
@@ -1093,7 +1389,7 @@ class _BossArenaSprite extends StatelessWidget {
             filterQuality: FilterQuality.high,
             errorBuilder: (context, error, stackTrace) => Icon(
               Icons.smart_toy_rounded,
-              size: 40,
+              size: 48,
               color: auraBase,
             ),
           )
@@ -1105,14 +1401,14 @@ class _BossArenaSprite extends StatelessWidget {
       children: [
         // Subtle radial stage aura behind the boss sprite
         Container(
-          width: 54,
-          height: 54,
+          width: 74,
+          height: 74,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
                 color: glowColor.withValues(alpha: glowAlpha.clamp(0.0, 0.9)),
-                blurRadius: 16,
+                blurRadius: 20,
                 spreadRadius: 2,
               ),
             ],
@@ -2075,6 +2371,8 @@ class _ElementPalette {
 
 class _MoveCard extends StatelessWidget {
   final String label;
+  final String combatantName;
+  final Key? combatantNameKey;
   final HandMove? move;
   final bool isLeft;
   final bool isWinner;
@@ -2095,6 +2393,8 @@ class _MoveCard extends StatelessWidget {
 
   const _MoveCard({
     required this.label,
+    required this.combatantName,
+    this.combatantNameKey,
     required this.move,
     required this.isLeft,
     required this.isWinner,
@@ -2132,82 +2432,13 @@ class _MoveCard extends StatelessWidget {
         (isElementalOrb && isWinner) ? (1.0 + 0.08 * pulseProgress) : 1.0;
     const double orbDiameter = 86.0;
 
-    final BoxDecoration circleDecoration = isElementalOrb
-        ? BoxDecoration(
+    // In Elemental Mode, keep the container transparent so the full-body Cleric and Boss
+    // sprites stand directly on the forge sanctuary runes, while displaying a compact
+    // glowing spell-cast crest near the staff head when a move is active.
+    final BoxDecoration circleDecoration = elementalMode
+        ? const BoxDecoration(
             shape: BoxShape.circle,
-            gradient: RadialGradient(
-              center: isEarth
-                  ? const Alignment(-0.24, -0.24)
-                  : const Alignment(-0.2, -0.2),
-              radius: 0.88,
-              colors: isEarth
-                  ? [
-                      Color.lerp(
-                        const Color(0xFF3D220E),
-                        const Color(0xFFE29E5A),
-                        isWinner ? 0.28 : 0.16,
-                      )!,
-                      Color.lerp(
-                        const Color(0xFF3D220E),
-                        secondaryElementColor,
-                        isWinner ? 0.90 : 0.72,
-                      )!,
-                      primaryElementColor.withValues(
-                        alpha: isWinner ? 0.96 : 0.85,
-                      ),
-                    ]
-                  : [
-                      const Color(0xFF0A0C12),
-                      Color.lerp(
-                        const Color(0xFF0E121B),
-                        secondaryElementColor,
-                        isWinner ? 0.55 : 0.38,
-                      )!,
-                      primaryElementColor.withValues(
-                        alpha: isWinner ? 0.92 : 0.72,
-                      ),
-                    ],
-              stops: const [0.0, 0.58, 1.0],
-            ),
-            border: Border.all(
-              color: isWinner
-                  ? (isEarth
-                        ? Color.lerp(
-                            primaryElementColor,
-                            const Color(0xFFE29E5A),
-                            0.55,
-                          )!
-                        : Color.lerp(primaryElementColor, Colors.white, 0.45)!)
-                  : (flashOpacity > 0.0
-                      ? Color.lerp(
-                          Colors.white,
-                          Colors.redAccent,
-                          0.65,
-                        )!.withValues(alpha: 0.85)
-                      : primaryElementColor.withValues(
-                          alpha: isEarth ? 0.90 : 0.75,
-                        )),
-              width: isWinner ? 3.0 : (flashOpacity > 0.0 ? 2.5 : 2.0),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryElementColor.withValues(
-                  alpha: isWinner
-                      ? (0.55 + 0.25 * pulseProgress).clamp(0.0, 1.0)
-                      : (isEarth ? 0.42 : 0.35),
-                ),
-                blurRadius: isWinner
-                    ? (16.0 + 8.0 * pulseProgress)
-                    : (isEarth ? 12.0 : 10.0),
-                spreadRadius: isWinner ? (3.0 + 2.0 * pulseProgress) : 1.5,
-              ),
-              if (isWinner)
-                BoxShadow(
-                  color: secondaryElementColor.withValues(alpha: 0.45),
-                  blurRadius: 22,
-                  spreadRadius: 2,
-                ),
-            ],
+            color: Colors.transparent,
           )
         : BoxDecoration(
             color: isWinner
@@ -2269,57 +2500,91 @@ class _MoveCard extends StatelessWidget {
           width: orbDiameter,
           height: orbDiameter,
           decoration: circleDecoration,
-          child: Center(
-            child: move == null
-                ? Text(
-                    '?',
-                    style: TextStyle(
-                      fontSize: 34,
-                      color: palette.isDark ? Colors.grey : palette.mutedText,
-                    ),
-                  )
-                : elementalMode
-                ? Icon(
-                    move!.elementalIcon,
-                    size: 42 * orbScale,
-                    color: isEarth ? earthIconColor : primaryElementColor,
-                    shadows: [
-                      Shadow(
-                        color: primaryElementColor.withValues(alpha: 0.85),
-                        blurRadius: 12,
-                      ),
-                      const Shadow(
-                        color: Colors.black87,
-                        blurRadius: 4,
-                      ),
-                    ],
-                  )
-                : hasAsset
-                ? Image.asset(
-                    assetPath,
-                    width: 58,
-                    height: 58,
-                    errorBuilder: (context, error, stackTrace) => Text(
-                      move!.emoji,
-                      style: const TextStyle(fontSize: 38),
-                    ),
-                  )
-                : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
-          ),
+          child: elementalMode
+              ? Align(
+                  alignment:
+                      isLeft ? Alignment.topRight : Alignment.topLeft,
+                  child: move == null
+                      ? const SizedBox.shrink()
+                      : Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF0E121B)
+                                .withValues(alpha: 0.84),
+                            border: Border.all(
+                              color: isEarth
+                                  ? earthIconColor
+                                  : primaryElementColor,
+                              width: isWinner ? 1.8 : 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryElementColor.withValues(
+                                  alpha: isWinner ? 0.65 : 0.40,
+                                ),
+                                blurRadius: isWinner ? 10 : 6,
+                              ),
+                              if (isWinner)
+                                BoxShadow(
+                                  color: secondaryElementColor
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(
+                              move!.elementalIcon,
+                              size: 16 * orbScale,
+                              color: isEarth
+                                  ? earthIconColor
+                                  : primaryElementColor,
+                            ),
+                          ),
+                        ),
+                )
+              : Center(
+                  child: move == null
+                      ? Text(
+                          '?',
+                          style: TextStyle(
+                            fontSize: 34,
+                            color: palette.isDark
+                                ? Colors.grey
+                                : palette.mutedText,
+                          ),
+                        )
+                      : hasAsset
+                      ? Image.asset(
+                          assetPath,
+                          width: 58,
+                          height: 58,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            move!.emoji,
+                            style: const TextStyle(fontSize: 38),
+                          ),
+                        )
+                      : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
+                ),
         ),
 
         // Damage White/Red Flash Overlay on hand circle
         if (flashOpacity > 0.0)
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color.lerp(
-                  Colors.white,
-                  Colors.redAccent,
-                  0.65,
-                )!.withValues(
-                  alpha: flashOpacity.clamp(0.0, 1.0) * 0.65,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color.lerp(
+                    Colors.white,
+                    Colors.redAccent,
+                    0.65,
+                  )!.withValues(
+                    alpha: flashOpacity.clamp(0.0, 1.0) *
+                        (elementalMode ? 0.32 : 0.65),
+                  ),
                 ),
               ),
             ),
@@ -2355,7 +2620,6 @@ class _MoveCard extends StatelessWidget {
               ),
             ),
           ),
-
       ],
     );
 
@@ -2363,20 +2627,30 @@ class _MoveCard extends StatelessWidget {
     final paddingRight = shakeOffset < 0 ? -shakeOffset : 0.0;
 
     return SizedBox(
-      width: 86,
+      width: 104,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: palette.isDark ? FontWeight.normal : FontWeight.w600,
-              color: palette.isDark ? Colors.grey : palette.mutedText,
+              fontSize: 10.5,
+              height: 1.1,
+              fontWeight: FontWeight.w600,
+              color: palette.isDark
+                  ? const Color(0xFFB5BAC6).withValues(alpha: 0.85)
+                  : palette.mutedText,
+              shadows: const [
+                Shadow(
+                  color: Colors.black87,
+                  blurRadius: 3,
+                ),
+              ],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 3),
           Padding(
             padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
             child: handBuilder(context, handCircle),
@@ -2388,6 +2662,8 @@ class _MoveCard extends StatelessWidget {
             children: [
               RpgHpBar(
                 key: hpBarKey,
+                width: 104.0,
+                height: 17.0,
                 hp: hp,
                 maxHp: maxHp,
                 flashOpacity: flashOpacity,
@@ -2396,7 +2672,7 @@ class _MoveCard extends StatelessWidget {
               ),
               if (damageIndicatorProgress != null)
                 Positioned(
-                  bottom: 16.0 + (24.0 * damageIndicatorProgress!),
+                  bottom: 18.0 + (24.0 * damageIndicatorProgress!),
                   child: IgnorePointer(
                     child: Opacity(
                       opacity: (1.0 - damageIndicatorProgress!).clamp(0.0, 1.0),
@@ -2451,7 +2727,27 @@ class _MoveCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
+          Text(
+            combatantName,
+            key: combatantNameKey,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 10.5,
+              height: 1.1,
+              letterSpacing: 0.5,
+              color: palette.isDark ? Colors.white : palette.primaryText,
+              shadows: const [
+                Shadow(
+                  color: Colors.black,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           Text(
             move == null
                 ? 'NONE'
@@ -2464,12 +2760,21 @@ class _MoveCard extends StatelessWidget {
                             .toUpperCase()
                       : move!.label.toUpperCase()),
             style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              letterSpacing: 0.5,
+              fontWeight: FontWeight.w700,
+              fontSize: 9.5,
+              height: 1.1,
+              letterSpacing: 0.4,
               color: (elementalMode && move != null)
                   ? palette.elementalText(move!)
-                  : (palette.isDark ? null : palette.primaryText),
+                  : (palette.isDark
+                        ? const Color(0xFFB0B7C6)
+                        : palette.secondaryText),
+              shadows: const [
+                Shadow(
+                  color: Colors.black87,
+                  blurRadius: 3,
+                ),
+              ],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
