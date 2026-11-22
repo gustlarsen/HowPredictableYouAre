@@ -1141,6 +1141,7 @@ void main() {
       matching: find.byType(Card),
     );
     expect(scoreCardFinder, findsOneWidget);
+    expect(find.byKey(const ValueKey('score_header_gauge_pill')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('You')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('PC')), findsOneWidget);
     expect(find.descendant(of: scoreCardFinder, matching: find.text('Total')), findsOneWidget);
@@ -2227,14 +2228,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsNothing);
 
-    // Phase 2 — Mid-Arena Clash (~300ms): Collectible orb spawns at exact center of VersusArena (VS clash point)
+    // Phase 2 — Mid-Arena Clash (~300ms): Collectible orb spawns at exact center of VersusArena (mid-arena clash point)
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byKey(const ValueKey('flying_orb_vfx_overlay')), findsOneWidget);
     final flyingOrbFinder = find.byKey(const ValueKey('flying_orb_fire'));
     expect(flyingOrbFinder, findsOneWidget);
 
-    final clashCenter = tester.getCenter(find.byKey(const ValueKey('vs_badge')));
+    final userOrbCenter = tester.getCenter(find.byKey(const ValueKey('user_orb_container')));
     final pcOrbCenter = tester.getCenter(find.byKey(const ValueKey('pc_orb_container')));
+    final clashCenter = Offset(
+      (userOrbCenter.dx + pcOrbCenter.dx) * 0.5,
+      (userOrbCenter.dy + pcOrbCenter.dy) * 0.5,
+    );
     final backpackCenter = tester.getCenter(find.byType(RpgBackpackIcon));
     final spawnOrbCenter = tester.getCenter(flyingOrbFinder);
 
@@ -3326,16 +3331,16 @@ void main() {
       final initialMoveCardRect = tester.getRect(moveCardFinder);
       final initialRockRect = tester.getRect(rockBtnFinder);
 
-      // Mana Pool Orb sits inside VersusArena directly above VS badge, starting at 100
+      // Mana Pool Orb sits centered near the top of VersusArena without a VS badge, starting at 100
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
-      final vsBadgeFinder = find.byKey(const ValueKey('vs_badge'));
+      expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
       expect(
         find.descendant(of: arenaFinder, matching: manaOrbFinder),
         findsOneWidget,
       );
       expect(
-        tester.getRect(manaOrbFinder).bottom,
-        lessThanOrEqualTo(tester.getRect(vsBadgeFinder).top),
+        tester.getRect(manaOrbFinder).center.dx,
+        closeTo(tester.getRect(arenaFinder).center.dx, 0.5),
       );
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),

@@ -39,20 +39,31 @@ class ScoreHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final loc = controller.localization;
-    final dividerColor = palette.isDark ? theme.dividerColor : palette.divider;
+    final dividerColor = palette.isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : palette.divider;
+    final activeGaugeColor = gaugeColor(
+      controller.percentPredict,
+      isDark: palette.isDark,
+    );
 
     return Card(
       elevation: 2,
-      color: palette.isDark ? null : palette.dialogSurface.withValues(alpha: 0.95),
-      surfaceTintColor: palette.isDark ? null : Colors.transparent,
+      color: palette.isDark
+          ? const Color(0xFF14171F).withValues(alpha: 0.94)
+          : palette.dialogSurface.withValues(alpha: 0.95),
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: palette.isDark
-            ? BorderSide.none
-            : BorderSide(color: palette.sandCardBorder),
+        side: BorderSide(
+          color: palette.isDark
+              ? palette.amberBorder.withValues(alpha: 0.35)
+              : palette.sandCardBorder,
+          width: 1.1,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -61,26 +72,27 @@ class ScoreHeader extends StatelessWidget {
               value: '${controller.userScore}',
               color: palette.isDark ? Colors.green : palette.successText,
             ),
-            Container(width: 1, height: 28, color: dividerColor),
+            Container(width: 1, height: 24, color: dividerColor),
             _ScoreItem(
               label: loc.t('string7', fallback: 'PC'),
               value: '${controller.pcScore}',
               color: palette.dangerText,
             ),
-            Container(width: 1, height: 28, color: dividerColor),
+            Container(width: 1, height: 24, color: dividerColor),
             _ScoreItem(
               label: loc.t('string8', fallback: 'Total'),
               value: '${controller.totalRounds}',
-              color: palette.isDark ? Colors.grey : palette.secondaryText,
+              color: palette.isDark
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.82)
+                  : palette.secondaryText,
             ),
-            Container(width: 1, height: 28, color: dividerColor),
-            _ScoreItem(
+            Container(width: 1, height: 24, color: dividerColor),
+            _GaugePill(
+              key: const ValueKey('score_header_gauge_pill'),
               label: loc.t('string5', fallback: 'Gauge'),
               value: '${controller.percentPredict.toStringAsFixed(1)}%',
-              color: gaugeColor(
-                controller.percentPredict,
-                isDark: palette.isDark,
-              ),
+              color: activeGaugeColor,
+              isDark: palette.isDark,
             ),
           ],
         ),
@@ -104,13 +116,14 @@ class _ScoreItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: palette.isDark ? FontWeight.normal : FontWeight.w600,
-            color: palette.isDark ? Colors.grey : palette.mutedText,
+            fontSize: 11.5,
+            fontWeight: palette.isDark ? FontWeight.w500 : FontWeight.w600,
+            color: palette.isDark ? Colors.grey.shade400 : palette.mutedText,
           ),
         ),
         const SizedBox(height: 2),
@@ -118,11 +131,80 @@ class _ScoreItem extends StatelessWidget {
           value,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 18,
+            height: 1.05,
             color: color,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _GaugePill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final bool isDark;
+
+  const _GaugePill({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.18 : 0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: color.withValues(alpha: isDark ? 0.72 : 0.65),
+          width: 1.2,
+        ),
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.22),
+                  blurRadius: 6,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white.withValues(alpha: 0.90) : color,
+            ),
+          ),
+          Text(
+            ': ',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white.withValues(alpha: 0.75) : color,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 13.5,
+              height: 1.0,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -273,7 +273,7 @@ void main() {
     );
 
     testWidgets(
-      'ManaPoolOrb sits centrally directly above VS badge inside VersusArena and preserves exact fixed arena height',
+      'ManaPoolOrb sits centrally near the top of VersusArena without a VS badge and preserves exact fixed arena height',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
@@ -309,14 +309,17 @@ void main() {
         }
 
         final heightAt100 = await pumpArena(mana: 100);
+        final arenaRect = tester.getRect(find.byType(VersusArena));
         final manaOrbRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
-        final vsBadgeRect = tester.getRect(find.byKey(const ValueKey('vs_badge')));
         final userLabelRect = tester.getRect(find.text('You Chose:'));
         final pcLabelRect = tester.getRect(find.text('PC Chose:'));
 
-        // Centrally aligned horizontally with VS badge and directly above it
-        expect(manaOrbRect.center.dx, closeTo(vsBadgeRect.center.dx, 0.5));
-        expect(manaOrbRect.bottom, lessThanOrEqualTo(vsBadgeRect.top));
+        // Central VS badge is completely removed; ManaPoolOrb is centered horizontally
+        expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
+        expect(find.text('VS'), findsNothing);
+        expect(manaOrbRect.center.dx, closeTo(arenaRect.center.dx, 0.5));
+        expect(find.byKey(const ValueKey('versus_sanctuary_floor_paint')), findsOneWidget);
+        expect(find.byKey(const ValueKey('battle_outcome_ribbon')), findsOneWidget);
 
         // Top-aligned vertically with "You Chose:" and "PC Chose:"
         expect(manaOrbRect.top, closeTo(userLabelRect.top, 0.5));

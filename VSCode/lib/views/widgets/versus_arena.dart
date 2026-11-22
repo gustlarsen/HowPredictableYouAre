@@ -487,7 +487,6 @@ class _VersusArenaState extends State<VersusArena>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final winner = widget.winner;
 
@@ -602,36 +601,75 @@ class _VersusArenaState extends State<VersusArena>
           palette.isDark ? Colors.grey.shade400 : palette.secondaryText;
     }
 
+    final arenaDecoration = palette.isDark
+        ? BoxDecoration(
+            gradient: const RadialGradient(
+              center: Alignment(0.0, 0.08),
+              radius: 1.08,
+              colors: [
+                Color(0xFF232836),
+                Color(0xFF151822),
+                Color(0xFF0B0D13),
+              ],
+              stops: [0.0, 0.58, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: winner != null
+                  ? outcomeColor.withValues(alpha: 0.72)
+                  : const Color(0xFF3E382D).withValues(alpha: 0.85),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: winner != null
+                    ? outcomeColor.withValues(alpha: 0.25)
+                    : Colors.black54,
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          )
+        : BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0.0, 0.08),
+              radius: 1.08,
+              colors: [
+                palette.arenaSurface,
+                const Color(0xFFEDE4D3).withValues(alpha: 0.96),
+                const Color(0xFFDFD3BE).withValues(alpha: 0.96),
+              ],
+              stops: const [0.0, 0.62, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: winner != null
+                  ? outcomeColor.withValues(alpha: 0.8)
+                  : palette.sandCardBorder,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: winner != null
+                    ? outcomeColor.withValues(alpha: 0.25)
+                    : Colors.black26,
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          );
+
     return Container(
+      key: const ValueKey('versus_arena_container'),
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-      decoration: BoxDecoration(
-        color: palette.isDark
-            ? theme.colorScheme.surface.withValues(alpha: 0.85)
-            : palette.arenaSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: winner != null
-              ? outcomeColor.withValues(alpha: palette.isDark ? 0.7 : 0.8)
-              : (palette.isDark ? theme.dividerColor : palette.sandCardBorder),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: winner != null
-                ? outcomeColor.withValues(alpha: 0.25)
-                : Colors.black26,
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: arenaDecoration,
       child: Column(
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
               const cardWidth = 86.0;
-              const vsWidth = 56.0;
-              const totalItemsWidth = cardWidth * 2 + vsWidth;
+              const centerGapWidth = 56.0;
+              const totalItemsWidth = cardWidth * 2 + centerGapWidth;
               const bossSpriteSize = 54.0;
               const bossStageHeight = 50.0;
               final rowWidth = constraints.maxWidth;
@@ -641,7 +679,7 @@ class _VersusArenaState extends State<VersusArena>
 
               final leftX = (0.5 * spaceUnit).clamp(0.0, maxCardLeft);
               final rightX = rowWidth >= totalItemsWidth
-                  ? (2.5 * spaceUnit + cardWidth + vsWidth)
+                  ? (2.5 * spaceUnit + cardWidth + centerGapWidth)
                       .clamp(0.0, maxCardLeft)
                   : maxCardLeft;
               // Exact center-to-center distance so the winning hand moves directly over the opponent
@@ -651,6 +689,22 @@ class _VersusArenaState extends State<VersusArena>
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
               const orbCenterY = bossStageHeight + 64.0;
+
+              final sanctuaryFloor = Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    key: const ValueKey('versus_sanctuary_floor_paint'),
+                    painter: SanctuaryFloorPainter(
+                      leftCenterX: leftCenterX,
+                      rightCenterX: rightCenterX,
+                      centerX: centerX,
+                      orbCenterY: orbCenterY,
+                      isDark: palette.isDark,
+                      accentColor: winner != null ? outcomeColor : null,
+                    ),
+                  ),
+                ),
+              );
 
               final bossLeft = (rightCenterX - bossSpriteSize / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - bossSpriteSize))
@@ -688,53 +742,27 @@ class _VersusArenaState extends State<VersusArena>
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ManaPoolOrb(
-                        key: const ValueKey('mana_pool_orb'),
-                        remainingMana: widget.remainingMana,
-                        maxMana: widget.maxMana,
-                        localization: widget.localization,
-                        animationsEnabled: widget.animationsEnabled,
-                      ),
-                      const SizedBox(height: 6),
-                      KeyedSubtree(
-                        key: const ValueKey('vs_badge'),
-                        child: SizedBox(
-                          key: widget.clashCenterKey,
-                          width: vsWidth,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                'VS',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                  fontSize: 16,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: ManaPoolOrb(
+                    key: const ValueKey('mana_pool_orb'),
+                    remainingMana: widget.remainingMana,
+                    maxMana: widget.maxMana,
+                    localization: widget.localization,
+                    animationsEnabled: widget.animationsEnabled,
+                  ),
+                ),
+              );
+
+              // Anchor for mid-arena projectile clash and parabolic orb-collection flight arc
+              final clashCenterAnchor = Positioned(
+                top: orbCenterY - 18.0,
+                left: centerX - 18.0,
+                width: 36.0,
+                height: 36.0,
+                child: IgnorePointer(
+                  child: SizedBox(
+                    key: widget.clashCenterKey,
+                    width: 36.0,
+                    height: 36.0,
                   ),
                 ),
               );
@@ -927,12 +955,28 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              // Ensure the winning hand renders on top of both the center column (Mana Orb + VS badge)
+              // Ensure the winning hand renders on top of both the center Mana Orb
               // and the opponent hand, with the alpha-transparent projectile & explosion VFX layer
               // rendered above all cards.
               final stackChildren = userWins
-                  ? <Widget>[bossSprite, centerColumn, pcCard, userCard, vfxOverlay]
-                  : <Widget>[bossSprite, centerColumn, userCard, pcCard, vfxOverlay];
+                  ? <Widget>[
+                      sanctuaryFloor,
+                      bossSprite,
+                      centerColumn,
+                      clashCenterAnchor,
+                      pcCard,
+                      userCard,
+                      vfxOverlay,
+                    ]
+                  : <Widget>[
+                      sanctuaryFloor,
+                      bossSprite,
+                      centerColumn,
+                      clashCenterAnchor,
+                      userCard,
+                      pcCard,
+                      vfxOverlay,
+                    ];
 
               return Stack(
                 alignment: Alignment.center,
@@ -945,17 +989,45 @@ class _VersusArenaState extends State<VersusArena>
           SizedBox(
             height: 28,
             child: Center(
-              child: Text(
-                key: const ValueKey('battle_outcome_description'),
-                battleDescription,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: battleDescColor,
-                  letterSpacing: 0.4,
+              child: Container(
+                key: const ValueKey('battle_outcome_ribbon'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.isDark
+                      ? const Color(0xFF080A0F).withValues(alpha: 0.72)
+                      : const Color(0xFF231F1A).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: (winner != null ? battleDescColor : palette.amberBorder)
+                        .withValues(alpha: palette.isDark ? 0.34 : 0.40),
+                    width: 0.9,
+                  ),
+                  boxShadow: palette.isDark
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            blurRadius: 6,
+                            offset: const Offset(0, 1.5),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  key: const ValueKey('battle_outcome_description'),
+                  battleDescription,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.1,
+                    fontWeight: FontWeight.w700,
+                    color: battleDescColor,
+                    letterSpacing: 0.35,
+                  ),
                 ),
               ),
             ),
@@ -963,6 +1035,136 @@ class _VersusArenaState extends State<VersusArena>
         ],
       ),
     );
+  }
+}
+
+/// Renders the atmospheric dark-stone sanctuary floor beneath the combatants:
+/// - Perspective elliptical arcane ritual circle with inner rune ring & tick marks
+/// - Subtle stone floor cracks/radial ley lines
+/// - Soft contact shadows directly beneath the player and opponent positions
+class SanctuaryFloorPainter extends CustomPainter {
+  final double leftCenterX;
+  final double rightCenterX;
+  final double centerX;
+  final double orbCenterY;
+  final bool isDark;
+  final Color? accentColor;
+
+  const SanctuaryFloorPainter({
+    required this.leftCenterX,
+    required this.rightCenterX,
+    required this.centerX,
+    required this.orbCenterY,
+    required this.isDark,
+    this.accentColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final floorCenterY = orbCenterY + 34.0;
+    final runeBaseColor = accentColor ??
+        (isDark ? const Color(0xFFD4A34A) : const Color(0xFF9C6D1E));
+    final runeAlpha = isDark ? 0.24 : 0.22;
+
+    // 1. Central arcane floor glow
+    final floorGlowRect = Rect.fromCenter(
+      center: Offset(centerX, floorCenterY),
+      width: (rightCenterX - leftCenterX) + 74.0,
+      height: 54.0,
+    );
+    canvas.drawOval(
+      floorGlowRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            runeBaseColor.withValues(alpha: isDark ? 0.16 : 0.12),
+            runeBaseColor.withValues(alpha: isDark ? 0.05 : 0.04),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.58, 1.0],
+        ).createShader(floorGlowRect),
+    );
+
+    // 2. Soft elliptical contact shadows beneath Player (left) and Opponent (right)
+    for (final x in [leftCenterX, rightCenterX]) {
+      final shadowRect = Rect.fromCenter(
+        center: Offset(x, floorCenterY + 7.0),
+        width: 74.0,
+        height: 20.0,
+      );
+      canvas.drawOval(
+        shadowRect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.black.withValues(alpha: isDark ? 0.56 : 0.22),
+              Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.62, 1.0],
+          ).createShader(shadowRect),
+      );
+    }
+
+    // 3. Perspective arcane sanctuary ritual rings & rune ticks on the stone floor
+    final outerRingRect = Rect.fromCenter(
+      center: Offset(centerX, floorCenterY),
+      width: math.max(120.0, (rightCenterX - leftCenterX) + 32.0),
+      height: 38.0,
+    );
+    final innerRingRect = Rect.fromCenter(
+      center: Offset(centerX, floorCenterY),
+      width: math.max(92.0, (rightCenterX - leftCenterX) - 6.0),
+      height: 27.0,
+    );
+
+    final outerRingPaint = Paint()
+      ..color = runeBaseColor.withValues(alpha: runeAlpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final innerRingPaint = Paint()
+      ..color = runeBaseColor.withValues(alpha: runeAlpha * 0.78)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
+
+    canvas.drawOval(outerRingRect, outerRingPaint);
+    canvas.drawOval(innerRingRect, innerRingPaint);
+
+    // Faint arcane rune tick marks around the elliptical ring
+    const tickCount = 12;
+    final rxOuter = outerRingRect.width / 2.0;
+    final ryOuter = outerRingRect.height / 2.0;
+    final rxInner = innerRingRect.width / 2.0;
+    final ryInner = innerRingRect.height / 2.0;
+    final tickPaint = Paint()
+      ..color = runeBaseColor.withValues(alpha: runeAlpha * 0.85)
+      ..strokeWidth = 1.1
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < tickCount; i++) {
+      final angle = (i / tickCount) * 2 * math.pi;
+      final p1 = Offset(
+        centerX + math.cos(angle) * rxInner,
+        floorCenterY + math.sin(angle) * ryInner,
+      );
+      final p2 = Offset(
+        centerX + math.cos(angle) * rxOuter,
+        floorCenterY + math.sin(angle) * ryOuter,
+      );
+      canvas.drawLine(p1, p2, tickPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant SanctuaryFloorPainter oldDelegate) {
+    return oldDelegate.leftCenterX != leftCenterX ||
+        oldDelegate.rightCenterX != rightCenterX ||
+        oldDelegate.centerX != centerX ||
+        oldDelegate.orbCenterY != orbCenterY ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.accentColor != accentColor;
   }
 }
 
