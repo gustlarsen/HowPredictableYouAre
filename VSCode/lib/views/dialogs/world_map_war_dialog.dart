@@ -229,14 +229,15 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
   late int _displayedWeek;
   WorldRealmRegion _selectedRegion = WorldRealmRegion.clericSacredCapital;
 
-  int get _maxScrubWeek => widget.controller.maxInspectableWorldMapWeek;
+  int get _maxScrubWeek =>
+      widget.controller.currentWeek.clamp(1, GameController.siegeInvasionWeek);
 
   @override
   void initState() {
     super.initState();
-    final defaultWeek =
-        widget.initialWeek ?? widget.controller.currentWeek.clamp(1, _maxScrubWeek);
-    _displayedWeek = defaultWeek.clamp(1, _maxScrubWeek);
+    final maxWeek = _maxScrubWeek;
+    final defaultWeek = widget.initialWeek ?? maxWeek;
+    _displayedWeek = defaultWeek.clamp(1, maxWeek);
     _selectedRegion = _defaultRegionForWeek(_displayedWeek);
 
     _pulseController = AnimationController(
@@ -308,8 +309,9 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
         isDark ? const Color(0xFF1E2430) : const Color(0xFFFAF6EE);
     final goldAccent =
         isDark ? const Color(0xFFF5C22B) : const Color(0xFFB8860B);
-    final maxWeek = _maxScrubWeek;
-    final displayedWeek = _displayedWeek.clamp(1, maxWeek);
+    final int maxWeek =
+        widget.controller.currentWeek.clamp(1, GameController.siegeInvasionWeek);
+    final int displayedWeek = _displayedWeek.clamp(1, maxWeek);
     final isBorderAlertWeek = displayedWeek >= 35 && displayedWeek <= 40;
     final isSiegeWeek41 = displayedWeek >= GameController.siegeInvasionWeek;
     final conqueredCount = WorldRealmRegion.values
@@ -342,8 +344,9 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Header Row (Single-Line Title + Fixed-MinWidth Week Pill)
+                // 1. Header Row (Vertically Centered Single-Line Title + Fixed-Width Week Pill)
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(6),
@@ -360,52 +363,26 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                loc.t(
-                                  'world_map_modal_title',
-                                  fallback: 'World Map — War Chronicle',
-                                ),
-                                key: const ValueKey('world_map_modal_title_text'),
-                                maxLines: 1,
-                                softWrap: false,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15.5,
-                                  color: palette.primaryText,
-                                ),
-                              ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            loc.t(
+                              'world_map_modal_title',
+                              fallback: 'World Map — War Chronicle',
+                            ),
+                            key: const ValueKey('world_map_modal_title_text'),
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: palette.primaryText,
                             ),
                           ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                loc.t(
-                                  'world_map_modal_subtitle',
-                                  fallback:
-                                      'Tap any realm pin or scrub the timeline to track the invasion',
-                                ),
-                                maxLines: 1,
-                                softWrap: false,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: palette.secondaryText,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1057,7 +1034,9 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               ),
               const SizedBox(width: 6),
               Text(
-                '$weekLabel 1 — $weekLabel $maxWeek',
+                maxWeek > 1
+                    ? '$weekLabel 1 — $weekLabel $maxWeek'
+                    : '$weekLabel 1',
                 key: const ValueKey('world_map_timeline_range_label'),
                 maxLines: 1,
                 softWrap: false,
@@ -1083,9 +1062,11 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               child: Slider(
                 key: const ValueKey('world_map_timeline_slider'),
                 min: 1.0,
-                max: math.max(1.0, maxWeek.toDouble()),
+                max: canScrub ? maxWeek.toDouble() : 1.0,
                 divisions: canScrub ? (maxWeek - 1) : null,
-                value: displayedWeek.clamp(1, maxWeek).toDouble(),
+                value: canScrub
+                    ? displayedWeek.clamp(1, maxWeek).toDouble()
+                    : 1.0,
                 label: '$weekLabel $displayedWeek',
                 onChanged: canScrub
                     ? (val) {

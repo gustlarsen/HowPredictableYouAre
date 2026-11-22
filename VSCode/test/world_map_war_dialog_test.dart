@@ -382,13 +382,17 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // Before confirming reset, currentWeek == 41 -> maxInspectableWorldMapWeek == 41
+        expect(controller.maxInspectableWorldMapWeek, 41);
+
         await tester.tap(
           find.byKey(const ValueKey('week40_kingdom_fall_confirm_button')),
         );
         await tester.pumpAndSettle();
 
         expect(controller.timeoutDefeatCount, 1);
-        expect(controller.maxInspectableWorldMapWeek, 41);
+        // After reset to Week 0, maxInspectableWorldMapWeek clamps safely to 1 (no future spoilers)
+        expect(controller.maxInspectableWorldMapWeek, 1);
       },
     );
 
@@ -462,6 +466,14 @@ void main() {
         final w9 = await pumpForWeek(9);
         final w10 = await pumpForWeek(10);
         final w39 = await pumpForWeek(39);
+
+        // Subtitle is completely removed from header
+        expect(
+          find.text(
+            'Tap any realm pin or scrub the timeline to track the invasion',
+          ),
+          findsNothing,
+        );
 
         // 1. Map dimensions stay 100% identical across Week 9, Week 10, and Week 39
         expect(w9.mapSize.width / w9.mapSize.height, closeTo(3.0 / 4.0, 0.005));
@@ -545,6 +557,138 @@ void main() {
           final badgeRect = tester.getRect(statusBadgeFinder);
           expect(badgeRect.top, greaterThanOrEqualTo(nameRect.bottom));
         }
+      },
+    );
+
+    testWidgets(
+      'Timeline slider restricts scrubbing strictly to Week 1..currentWeek (no future spoilers) and renders safely locked on Week 0 and Week 1',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // Case A: Week 0 and Week 1 render locked Slider safely without divisions error
+        for (final week in [0, 1]) {
+          SharedPreferences.setMockInitialValues({
+            'has_seen_story_intro': true,
+            'animationsEnabled': false,
+            'musicEnabled': false,
+            'current_week': week,
+            'timeout_defeat_count': 3, // Even after prior invasions, never spoil future weeks!
+          });
+          final storage = StorageService();
+          await storage.init();
+
+          final localization = LocalizationService();
+          await tester.runAsync(() => localization.load());
+
+          final controller = GameController(
+            storage: storage,
+            localization: localization,
+            audio: AudioService(),
+            adService: AdService(),
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: WorldMapWarDialog(
+                    key: ValueKey('locked_dialog_week_$week'),
+                    controller: controller,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(
+            find.text(
+              'Tap any realm pin or scrub the timeline to track the invasion',
+            ),
+            findsNothing,
+          );
+          final rangeText = tester.widget<Text>(
+            find.byKey(const ValueKey('world_map_timeline_range_label')),
+          );
+          expect(rangeText.data, 'Week 1');
+
+          final slider = tester.widget<Slider>(
+            find.byKey(const ValueKey('world_map_timeline_slider')),
+          );
+          expect(slider.min, 1.0);
+          expect(slider.max, 1.0);
+          expect(slider.value, 1.0);
+          expect(slider.divisions, isNull);
+          expect(slider.onChanged, isNull);
+
+          controller.dispose();
+        }
+
+        // Case B: currentWeek == 2 allows scrubbing only between Week 1 and Week 2 (never Week 3+)
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+          'current_week': 2,
+          'timeout_defeat_count': 2,
+        });
+        final storage = StorageService();
+        await storage.init();
+        final localization = LocalizationService();
+        await tester.runAsync(() => localization.load());
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          adService: AdService(),
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: WorldMapWarDialog(controller: controller),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Week 2 / 40'), findsOneWidget);
+        expect(find.text('Week 1 — Week 2'), findsOneWidget);
+
+        final sliderFinder = find.byKey(
+          const ValueKey('world_map_timeline_slider'),
+        );
+        final slider = tester.widget<Slider>(sliderFinder);
+        expect(slider.min, 1.0);
+        expect(slider.max, 2.0);
+        expect(slider.divisions, 1);
+        expect(slider.value, 2.0);
+        expect(slider.onChanged, isNotNull);
+
+        // Attempting to tap far right of slider stays capped at Week 2
+        final topLeft = tester.getTopLeft(sliderFinder);
+        final size = tester.getSize(sliderFinder);
+        await tester.tapAt(
+          Offset(topLeft.dx + size.width - 4, topLeft.dy + size.height / 2),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Week 2 / 40'), findsOneWidget);
+
+        // Scrubbing left moves back to Week 1
+        await tester.tapAt(
+          Offset(topLeft.dx + 4, topLeft.dy + size.height / 2),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Week 1 / 40'), findsOneWidget);
       },
     );
   });

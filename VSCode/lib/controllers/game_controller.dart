@@ -699,14 +699,9 @@ class GameController extends ChangeNotifier {
   bool get willNextWeekExceedLimit => currentWeek + 1 > maxCampaignWeeks;
 
   /// Highest week inspectable on the World Map timeline slider:
-  /// ranges from Week 1 up to [currentWeek] (or [siegeInvasionWeek] = 41 once
-  /// Ending 2 / Week 41 Siege has been experienced or reached).
-  int get maxInspectableWorldMapWeek {
-    if (currentWeek >= siegeInvasionWeek || timeoutDefeatCount > 0) {
-      return siegeInvasionWeek;
-    }
-    return currentWeek.clamp(1, siegeInvasionWeek);
-  }
+  /// strictly clamped to [currentWeek] (`1..41`) with no future spoilers.
+  int get maxInspectableWorldMapWeek =>
+      currentWeek.clamp(1, siegeInvasionWeek);
 
   /// True when [productId] has been verified as a real-money Google Play IAP.
   bool isRealMoneyIapProduct(String productId) =>
