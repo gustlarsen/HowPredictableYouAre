@@ -391,5 +391,162 @@ void main() {
         expect(controller.maxInspectableWorldMapWeek, 41);
       },
     );
+
+    testWidgets(
+      'World Map keeps identical rendered Size across Weeks 9, 10, and 39, fixed lore card height, and zero truncation or multi-line wrapping on header, 6 realm pins, and lore card header',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+          'current_week': 40,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await tester.runAsync(() => localization.load());
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+          adService: AdService(),
+        );
+        addTearDown(controller.dispose);
+
+        Future<({Size mapSize, Size loreCardSize, Rect titleRect, double weekPillWidth})>
+            pumpForWeek(int week) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: WorldMapWarDialog(
+                    key: ValueKey('war_dialog_week_$week'),
+                    controller: controller,
+                    initialWeek: week,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final mapSize = tester.getSize(
+            find.byKey(const ValueKey('world_map_war_aspect_viewport')),
+          );
+          final loreCardSize = tester.getSize(
+            find.byKey(const ValueKey('world_map_selected_realm_card')),
+          );
+          final titleRect = tester.getRect(
+            find.byKey(const ValueKey('world_map_modal_title_text')),
+          );
+          final weekPillWidth = tester
+              .getSize(find.byKey(const ValueKey('world_map_week_pill')))
+              .width;
+          return (
+            mapSize: mapSize,
+            loreCardSize: loreCardSize,
+            titleRect: titleRect,
+            weekPillWidth: weekPillWidth,
+          );
+        }
+
+        final w9 = await pumpForWeek(9);
+        final w10 = await pumpForWeek(10);
+        final w39 = await pumpForWeek(39);
+
+        // 1. Map dimensions stay 100% identical across Week 9, Week 10, and Week 39
+        expect(w9.mapSize.width / w9.mapSize.height, closeTo(3.0 / 4.0, 0.005));
+        expect(w10.mapSize, equals(w9.mapSize));
+        expect(w39.mapSize, equals(w9.mapSize));
+
+        // 2. Lore card keeps strict fixed height across weeks & pin selections
+        expect(w10.loreCardSize, equals(w9.loreCardSize));
+        expect(w39.loreCardSize, equals(w9.loreCardSize));
+
+        // 3. Header title stays single-line & week pill keeps constant width (1-digit vs 2-digit)
+        expect(w10.weekPillWidth, equals(w9.weekPillWidth));
+        expect(w39.weekPillWidth, equals(w9.weekPillWidth));
+        expect(w10.titleRect.width, equals(w9.titleRect.width));
+        expect(w9.titleRect.height, lessThanOrEqualTo(24.0));
+        final titleTextWidget = tester.widget<Text>(
+          find.byKey(const ValueKey('world_map_modal_title_text')),
+        );
+        expect(titleTextWidget.maxLines, 1);
+        expect(titleTextWidget.softWrap, isFalse);
+
+        // 4. All 6 realm pin labels render completely on 1 single line without ellipsis truncation
+        final mapRect = tester.getRect(
+          find.byKey(const ValueKey('world_map_war_aspect_viewport')),
+        );
+        for (final region in WorldRealmRegion.values) {
+          final pinFinder = find.byKey(ValueKey('world_map_pin_${region.id}'));
+          expect(pinFinder, findsOneWidget);
+
+          final pinTextFinder = find.descendant(
+            of: pinFinder,
+            matching: find.byType(Text),
+          );
+          final pinText = tester.widget<Text>(pinTextFinder);
+          expect(pinText.maxLines, 1);
+          expect(pinText.softWrap, isFalse);
+          expect(pinText.overflow, isNull);
+
+          final pinTextRect = tester.getRect(pinTextFinder);
+          expect(pinTextRect.left, greaterThanOrEqualTo(mapRect.left));
+          expect(pinTextRect.right, lessThanOrEqualTo(mapRect.right));
+
+          // Tap each pin and verify lore card header name + status badge sit on separate rows without ellipsis
+          await tester.tap(
+            find.descendant(
+              of: pinFinder,
+              matching: find.byIcon(region.icon),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(
+            tester.getSize(
+              find.byKey(const ValueKey('world_map_selected_realm_card')),
+            ),
+            equals(w39.loreCardSize),
+          );
+
+          final realmNameFinder = find.byKey(
+            const ValueKey('world_map_selected_realm_name'),
+          );
+          final statusBadgeFinder = find.byKey(
+            const ValueKey('world_map_selected_realm_status_badge'),
+          );
+          final realmNameText = tester.widget<Text>(realmNameFinder);
+          expect(realmNameText.maxLines, 1);
+          expect(realmNameText.softWrap, isFalse);
+          expect(realmNameText.overflow, isNull);
+
+          final statusText = tester.widget<Text>(
+            find.descendant(
+              of: statusBadgeFinder,
+              matching: find.byType(Text),
+            ),
+          );
+          expect(statusText.maxLines, 1);
+          expect(statusText.softWrap, isFalse);
+          expect(statusText.overflow, isNull);
+
+          final nameRect = tester.getRect(realmNameFinder);
+          final badgeRect = tester.getRect(statusBadgeFinder);
+          expect(badgeRect.top, greaterThanOrEqualTo(nameRect.bottom));
+        }
+      },
+    );
   });
 }
+

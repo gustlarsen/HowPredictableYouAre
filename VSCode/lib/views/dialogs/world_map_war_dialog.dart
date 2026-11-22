@@ -325,7 +325,7 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
       key: const ValueKey('world_map_war_dialog'),
       backgroundColor: bgSurface,
       surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
         side: BorderSide(
@@ -334,106 +334,145 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
         ),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 780),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Header Row
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: goldAccent.withValues(alpha: isDark ? 0.16 : 0.14),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: goldAccent.withValues(alpha: 0.55),
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Header Row (Single-Line Title + Fixed-MinWidth Week Pill)
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: goldAccent.withValues(
+                          alpha: isDark ? 0.16 : 0.14,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: goldAccent.withValues(alpha: 0.55),
+                        ),
                       ),
+                      child: const WatchTowerIcon(size: 24),
                     ),
-                    child: const WatchTowerIcon(size: 24),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.t(
-                            'world_map_modal_title',
-                            fallback: 'World Map — War Chronicle',
-                          ),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15.5,
-                            color: palette.primaryText,
-                          ),
-                        ),
-                        Text(
-                          loc.t(
-                            'world_map_modal_subtitle',
-                            fallback:
-                                'Tap any realm pin or scrub the timeline to track the invasion',
-                          ),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: palette.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    key: const ValueKey('world_map_week_pill'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSiegeWeek41
-                          ? const Color(0xFFD50000).withValues(alpha: 0.18)
-                          : isBorderAlertWeek
-                              ? const Color(0xFFFF6D00).withValues(alpha: 0.18)
-                              : goldAccent.withValues(
-                                  alpha: isDark ? 0.16 : 0.14,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                loc.t(
+                                  'world_map_modal_title',
+                                  fallback: 'World Map — War Chronicle',
                                 ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSiegeWeek41
-                            ? const Color(0xFFFF5252)
-                            : isBorderAlertWeek
-                                ? const Color(0xFFFF9100)
-                                : goldAccent.withValues(alpha: 0.65),
+                                key: const ValueKey('world_map_modal_title_text'),
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15.5,
+                                  color: palette.primaryText,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                loc.t(
+                                  'world_map_modal_subtitle',
+                                  fallback:
+                                      'Tap any realm pin or scrub the timeline to track the invasion',
+                                ),
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: palette.secondaryText,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Text(
-                      '${loc.t('map_week_label', fallback: 'Week')} $displayedWeek / ${GameController.maxCampaignWeeks}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        color: isSiegeWeek41
-                            ? (isDark
-                                ? const Color(0xFFFF8A80)
-                                : const Color(0xFFB71C1C))
-                            : isBorderAlertWeek
-                                ? (isDark
-                                    ? const Color(0xFFFFAB40)
-                                    : const Color(0xFFE65100))
-                                : (isDark
-                                    ? const Color(0xFFF5C22B)
-                                    : const Color(0xFF7A4E00)),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 112,
+                        maxWidth: 112,
+                      ),
+                      child: Container(
+                        key: const ValueKey('world_map_week_pill'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSiegeWeek41
+                              ? const Color(0xFFD50000).withValues(alpha: 0.18)
+                              : isBorderAlertWeek
+                                  ? const Color(0xFFFF6D00)
+                                      .withValues(alpha: 0.18)
+                                  : goldAccent.withValues(
+                                      alpha: isDark ? 0.16 : 0.14,
+                                    ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSiegeWeek41
+                                ? const Color(0xFFFF5252)
+                                : isBorderAlertWeek
+                                    ? const Color(0xFFFF9100)
+                                    : goldAccent.withValues(alpha: 0.65),
+                          ),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${loc.t('map_week_label', fallback: 'Week')} $displayedWeek / ${GameController.maxCampaignWeeks}',
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              color: isSiegeWeek41
+                                  ? (isDark
+                                      ? const Color(0xFFFF8A80)
+                                      : const Color(0xFFB71C1C))
+                                  : isBorderAlertWeek
+                                      ? (isDark
+                                          ? const Color(0xFFFFAB40)
+                                          : const Color(0xFFE65100))
+                                      : (isDark
+                                          ? const Color(0xFFF5C22B)
+                                          : const Color(0xFF7A4E00)),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
+                  ],
+                ),
+                const SizedBox(height: 8),
 
-              // 2. Locked 3:4 Interactive Progressive Conquest Map Viewport
-              Expanded(
-                child: Center(
+                // 2. Locked 3:4 Interactive Progressive Conquest Map Viewport
+                // Sized strictly from the dialog's inner width so its width & height
+                // remain 100% identical across Weeks 1..41 with zero side gaps.
+                SizedBox(
+                  width: double.infinity,
                   child: AspectRatio(
                     key: const ValueKey('world_map_war_aspect_viewport'),
                     aspectRatio: WorldMapWarDialog.mapAspectRatio,
@@ -519,7 +558,7 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                                       ),
                                     ),
 
-                                    // Top Floating Status / Border Alert Banner
+                                    // Top Floating Status / Border Alert Banner (inside map Stack)
                                     if (isBorderAlertWeek || isSiegeWeek41)
                                       Positioned(
                                         top: 8,
@@ -570,17 +609,19 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                                                   ),
                                                 ],
                                               ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(
-                                                    Icons.warning_amber_rounded,
-                                                    size: 15,
-                                                    color: Color(0xFFFFE082),
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  Flexible(
-                                                    child: Text(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons
+                                                          .warning_amber_rounded,
+                                                      size: 15,
+                                                      color: Color(0xFFFFE082),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
                                                       isSiegeWeek41
                                                           ? loc.t(
                                                               'world_map_siege_active_badge',
@@ -592,8 +633,8 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                                                               fallback:
                                                                   'Border Alert — Siege Imminent!',
                                                             ),
-                                                      textAlign:
-                                                          TextAlign.center,
+                                                      maxLines: 1,
+                                                      softWrap: false,
                                                       style: const TextStyle(
                                                         color: Colors.white,
                                                         fontWeight:
@@ -602,8 +643,8 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                                                         letterSpacing: 0.3,
                                                       ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -614,6 +655,7 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                                     for (final region
                                         in WorldRealmRegion.values)
                                       _buildRealmPin(
+                                        context: context,
                                         region: region,
                                         mapWidth: mapW,
                                         mapHeight: mapH,
@@ -632,51 +674,51 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-              // 3. Selected Realm Lore & Status Card
-              _buildSelectedRealmCard(
-                context: context,
-                region: _selectedRegion,
-                displayedWeek: displayedWeek,
-                conqueredCount: conqueredCount,
-                loc: loc,
-                palette: palette,
-                cardSurface: cardSurface,
-                goldAccent: goldAccent,
-              ),
-              const SizedBox(height: 6),
+                // 3. Selected Realm Lore & Status Card (Strict Fixed Height)
+                _buildSelectedRealmCard(
+                  context: context,
+                  region: _selectedRegion,
+                  displayedWeek: displayedWeek,
+                  conqueredCount: conqueredCount,
+                  loc: loc,
+                  palette: palette,
+                  cardSurface: cardSurface,
+                  goldAccent: goldAccent,
+                ),
+                const SizedBox(height: 6),
 
-              // 4. Interactive Timeline Scrubbing Slider
-              _buildTimelineScrubber(
-                context: context,
-                displayedWeek: displayedWeek,
-                maxWeek: maxWeek,
-                loc: loc,
-                palette: palette,
-                cardSurface: cardSurface,
-                goldAccent: goldAccent,
-              ),
-              const SizedBox(height: 4),
+                // 4. Interactive Timeline Scrubbing Slider
+                _buildTimelineScrubber(
+                  context: context,
+                  displayedWeek: displayedWeek,
+                  maxWeek: maxWeek,
+                  loc: loc,
+                  palette: palette,
+                  cardSurface: cardSurface,
+                  goldAccent: goldAccent,
+                ),
+                const SizedBox(height: 4),
 
-              // 5. Close Button Row
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: const ValueKey('world_map_war_close_button'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: goldAccent,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    loc.t('string36', fallback: 'Ok'),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                // 5. Close Button Row
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: const ValueKey('world_map_war_close_button'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: goldAccent,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      loc.t('string36', fallback: 'Ok'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -684,6 +726,7 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
   }
 
   Widget _buildRealmPin({
+    required BuildContext context,
     required WorldRealmRegion region,
     required double mapWidth,
     required double mapHeight,
@@ -695,87 +738,127 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
     final isSelected = _selectedRegion == region;
     final status = region.statusForWeek(displayedWeek);
     final accent = _accentForStatus(status, palette);
-    const double pinBoxW = 104.0;
-    const double pinBoxH = 66.0;
-    final double left = (region.position.dx * mapWidth - pinBoxW / 2)
-        .clamp(0.0, math.max(0.0, mapWidth - pinBoxW))
+    final labelText = region.localizedName(loc);
+    final labelStyle = TextStyle(
+      color: isSelected
+          ? const Color(0xFFFFE082)
+          : Colors.white.withValues(alpha: 0.96),
+      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+      fontSize: 10.5,
+      height: 1.15,
+    );
+
+    const double edgePad = 6.0;
+    const double badgeMaxDiameter = 32.0;
+    const double labelGap = 2.0;
+    const double labelPillPadH = 12.0; // 6 left + 6 right
+    const double labelPillPadV = 4.0; // 2 top + 2 bottom
+
+    final painter = TextPainter(
+      text: TextSpan(text: labelText, style: labelStyle),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+
+    final maxAvailableW = math.max(40.0, mapWidth - edgePad * 2);
+    final pillW = math.min(maxAvailableW, painter.width + labelPillPadH + 2.0);
+    final pillH = painter.height + labelPillPadV + 2.0;
+    final badgeDiameter = isSelected ? badgeMaxDiameter : 27.0;
+
+    final iconCenterX = region.position.dx * mapWidth;
+    final iconCenterY = region.position.dy * mapHeight;
+
+    final iconLeft = (iconCenterX - badgeDiameter / 2)
+        .clamp(edgePad, math.max(edgePad, mapWidth - edgePad - badgeDiameter))
         .toDouble();
-    final double top = (region.position.dy * mapHeight - pinBoxH / 2)
-        .clamp(0.0, math.max(0.0, mapHeight - pinBoxH))
+    final pillLeft = (iconCenterX - pillW / 2)
+        .clamp(edgePad, math.max(edgePad, mapWidth - edgePad - pillW))
         .toDouble();
 
-    final badgeDiameter = isSelected ? 34.0 : 28.0;
+    final totalH = badgeMaxDiameter + labelGap + pillH;
+    final boxLeft = math.min(iconLeft, pillLeft);
+    final boxRight = math.max(iconLeft + badgeDiameter, pillLeft + pillW);
+    final boxTop = (iconCenterY - badgeMaxDiameter / 2)
+        .clamp(edgePad, math.max(edgePad, mapHeight - edgePad - totalH))
+        .toDouble();
 
     return Positioned(
-      left: left,
-      top: top,
-      width: pinBoxW,
-      height: pinBoxH,
+      left: boxLeft,
+      top: boxTop,
+      width: boxRight - boxLeft,
+      height: totalH,
       child: GestureDetector(
         key: ValueKey('world_map_pin_${region.id}'),
-        behavior: HitTestBehavior.opaque,
+        behavior: HitTestBehavior.deferToChild,
         onTap: () {
           widget.controller.audio.playTapVibrate();
           setState(() {
             _selectedRegion = region;
           });
         },
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+            Positioned(
+              left: iconLeft - boxLeft,
+              top: (badgeMaxDiameter - badgeDiameter) / 2,
               width: badgeDiameter,
               height: badgeDiameter,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF14161D).withValues(alpha: 0.90),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFFF5C22B) : accent,
-                  width: isSelected ? 2.4 : 1.7,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isSelected ? const Color(0xFFF5C22B) : accent)
-                        .withValues(alpha: isSelected ? 0.65 : 0.38 + 0.2 * pulse),
-                    blurRadius: isSelected ? 12 : 7,
-                    spreadRadius: isSelected ? 1.8 : 0.8,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: badgeDiameter,
+                height: badgeDiameter,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF14161D).withValues(alpha: 0.90),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFFF5C22B) : accent,
+                    width: isSelected ? 2.4 : 1.7,
                   ),
-                ],
-              ),
-              child: Icon(
-                region.icon,
-                size: isSelected ? 18 : 15,
-                color: isSelected ? const Color(0xFFF5C22B) : accent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isSelected ? const Color(0xFFF5C22B) : accent)
+                          .withValues(
+                            alpha: isSelected ? 0.65 : 0.38 + 0.2 * pulse,
+                          ),
+                      blurRadius: isSelected ? 12 : 7,
+                      spreadRadius: isSelected ? 1.8 : 0.8,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  region.icon,
+                  size: isSelected ? 17 : 14.5,
+                  color: isSelected ? const Color(0xFFF5C22B) : accent,
+                ),
               ),
             ),
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10131A).withValues(
-                  alpha: isSelected ? 0.94 : 0.82,
+            Positioned(
+              left: pillLeft - boxLeft,
+              top: badgeMaxDiameter + labelGap,
+              width: pillW,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10131A).withValues(
+                    alpha: isSelected ? 0.94 : 0.84,
+                  ),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: (isSelected ? const Color(0xFFF5C22B) : accent)
+                        .withValues(alpha: isSelected ? 0.90 : 0.55),
+                    width: isSelected ? 1.2 : 0.8,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: (isSelected ? const Color(0xFFF5C22B) : accent)
-                      .withValues(alpha: isSelected ? 0.90 : 0.55),
-                  width: isSelected ? 1.2 : 0.8,
-                ),
-              ),
-              child: Text(
-                region.localizedName(loc),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFFFFE082)
-                      : Colors.white.withValues(alpha: 0.95),
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 9.2,
-                  height: 1.1,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    labelText,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: labelStyle,
+                  ),
                 ),
               ),
             ),
@@ -800,59 +883,76 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
     final statusLabel = region.localizedStatusBadge(loc, displayedWeek);
     final loreText = region.localizedLore(loc, displayedWeek);
 
-    return Container(
-      key: const ValueKey('world_map_selected_realm_card'),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: cardSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: statusColor.withValues(alpha: palette.isDark ? 0.55 : 0.65),
-          width: 1.3,
+    return SizedBox(
+      height: 124,
+      child: Container(
+        key: const ValueKey('world_map_selected_realm_card'),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        decoration: BoxDecoration(
+          color: cardSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: statusColor.withValues(alpha: palette.isDark ? 0.55 : 0.65),
+            width: 1.3,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: statusColor.withValues(alpha: 0.55),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: Realm Icon + Full Realm Name (single-line, never truncated)
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  child: Icon(
+                    region.icon,
+                    size: 16,
+                    color: statusColor,
                   ),
                 ),
-                child: Icon(
-                  region.icon,
-                  size: 16,
-                  color: statusColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  region.localizedName(loc),
-                  key: const ValueKey('world_map_selected_realm_name'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: palette.primaryText,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        region.localizedName(loc),
+                        key: const ValueKey('world_map_selected_realm_name'),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: palette.primaryText,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
+              ],
+            ),
+            const SizedBox(height: 5),
+
+            // Row 2: Dedicated Status Badge Row (single-line, never squeezed/truncated)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
                 child: Container(
                   key: const ValueKey('world_map_selected_realm_status_badge'),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3.5,
+                    horizontal: 9,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(
@@ -866,7 +966,7 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                   child: Text(
                     statusLabel,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 10.5,
@@ -877,21 +977,25 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            loreText,
-            key: const ValueKey('world_map_selected_realm_lore'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.3,
-              color: palette.secondaryText,
             ),
-          ),
-        ],
+            const SizedBox(height: 5),
+
+            // Row 3: Up to 3 lines of lore text inside the fixed-height card
+            Expanded(
+              child: Text(
+                loreText,
+                key: const ValueKey('world_map_selected_realm_lore'),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.3,
+                  color: palette.secondaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -930,17 +1034,24 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               ),
               const SizedBox(width: 5),
               Expanded(
-                child: Text(
-                  loc.t(
-                    'world_map_timeline_label',
-                    fallback: 'Conquest Timeline',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11.5,
-                    color: palette.primaryText,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      loc.t(
+                        'world_map_timeline_label',
+                        fallback: 'Conquest Timeline',
+                      ),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11.5,
+                        color: palette.primaryText,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -948,6 +1059,8 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               Text(
                 '$weekLabel 1 — $weekLabel $maxWeek',
                 key: const ValueKey('world_map_timeline_range_label'),
+                maxLines: 1,
+                softWrap: false,
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
