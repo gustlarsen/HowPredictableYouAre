@@ -180,10 +180,14 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 
                   // Active Wing Content
                   Flexible(
-                    child: SingleChildScrollView(
-                      key: ValueKey('castle_wing_scroll_${_selectedWing.name}'),
-                      child: _buildSelectedWing(context, palette, loc),
-                    ),
+                    child: _selectedWing == CastleWing.relicChamber
+                        ? _buildRelicChamberWing(context, palette, loc)
+                        : SingleChildScrollView(
+                            key: ValueKey(
+                              'castle_wing_scroll_${_selectedWing.name}',
+                            ),
+                            child: _buildSelectedWing(context, palette, loc),
+                          ),
                   ),
 
                   const SizedBox(height: 8),
@@ -1098,141 +1102,137 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     final canRestoreAd =
         artifacts.isNotEmpty && controller.adService.isRewardedAdReady;
 
-    return Column(
-      key: const ValueKey('castle_wing_relic_chamber'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: palette.rewardedAdCardSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: palette.rewardedAdCardBorder),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const RunicShieldIcon(size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  loc.t(
-                    'castle_relics_desc',
-                    fallback:
-                        'Upgrades lost when a previous campaign fell are preserved here. Restore them once into your current run.',
-                  ),
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.4,
-                    color: palette.primaryText,
-                  ),
-                ),
+    void showRestoredToast() {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t(
+                'castle_relics_restored_msg',
+                fallback: 'Relics restored with their previous active states!',
               ),
-            ],
+            ),
+            duration: const Duration(seconds: 2),
           ),
-        ),
-        const SizedBox(height: 12),
+        );
+    }
 
-        if (artifacts.isEmpty)
-          Container(
-            key: const ValueKey('relic_chamber_empty_state'),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: palette.dialogCardSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: palette.sandCardBorder),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.inventory_2_outlined,
-                  size: 32,
-                  color: palette.mutedText,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  loc.t(
-                    'castle_relics_empty',
-                    fallback: 'No lost relics awaiting restoration.',
-                  ),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: palette.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else ...[
-          for (final artifact in artifacts) ...[
+    if (artifacts.isEmpty) {
+      return SingleChildScrollView(
+        key: const ValueKey('castle_wing_scroll_relicChamber'),
+        child: Column(
+          key: const ValueKey('castle_wing_relic_chamber'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Container(
-              key: ValueKey('relic_chamber_item_${artifact.id}'),
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
-                color: palette.dialogCardSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: palette.amberBorder.withValues(alpha: 0.45),
-                ),
+                color: palette.rewardedAdCardSurface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: palette.rewardedAdCardBorder),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(artifact.icon, color: palette.amberIcon, size: 20),
+                  const RunicShieldIcon(size: 24),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      artifact == ShopUpgradeArtifact.overchargedStaff &&
-                              controller.storedRelicOverchargedStaffLevel > 0
-                          ? '${loc.t(artifact.titleKey, fallback: artifact.fallbackTitle)} (${loc.t('overcharged_staff_level_prefix', fallback: 'Lv.')} ${controller.storedRelicOverchargedStaffLevel})'
-                          : loc.t(
-                              artifact.titleKey,
-                              fallback: artifact.fallbackTitle,
-                            ),
+                      loc.t(
+                        'castle_relics_desc',
+                        fallback:
+                            'Upgrades lost when a previous campaign fell are preserved here. Restore them once into your current run.',
+                      ),
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 12,
+                        height: 1.4,
                         color: palette.primaryText,
                       ),
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              key: const ValueKey('relic_chamber_empty_state'),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: palette.dialogCardSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: palette.sandCardBorder),
+              ),
+              child: Column(
+                children: [
                   Icon(
-                    Icons.history_edu_rounded,
-                    size: 16,
-                    color: palette.amberSubtitle,
+                    Icons.inventory_2_outlined,
+                    size: 32,
+                    color: palette.mutedText,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    loc.t(
+                      'castle_relics_empty',
+                      fallback: 'No lost relics awaiting restoration.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: palette.secondaryText,
+                    ),
                   ),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 6),
-          if (isRemoveAds)
-            ElevatedButton.icon(
+        ),
+      );
+    }
+
+    final count = artifacts.length;
+    final summaryText = count == 1
+        ? loc.t(
+            'castle_relics_ready_summary_one',
+            fallback: '1 Relic ready • Previous active state preserved',
+          )
+        : loc
+              .t(
+                'castle_relics_ready_summary_many',
+                fallback: '{count} Relics ready • Previous active states preserved',
+              )
+              .replaceAll('{count}', '$count');
+
+    final activeLabel = loc.t(
+      'castle_relics_status_active',
+      fallback: 'Active',
+    );
+    final inactiveLabel = loc.t(
+      'castle_relics_status_inactive',
+      fallback: 'Inactive',
+    );
+
+    return Column(
+      key: const ValueKey('castle_wing_relic_chamber'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Pinned Full-Width Golden Restore Relics Button at the Top
+        if (isRemoveAds)
+          SizedBox(
+            height: 44,
+            child: ElevatedButton.icon(
               key: const ValueKey('relic_chamber_restore_direct_button'),
               onPressed: () {
                 final ok = controller.restoreRelicsDirect();
-                if (ok && context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          loc.t(
-                            'castle_relics_restored_msg',
-                            fallback: 'Lost relics restored to your campaign!',
-                          ),
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                }
+                if (ok) showRestoredToast();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _goldFill,
                 foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1243,64 +1243,201 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   'castle_relics_restore_direct',
                   fallback: 'Restore Relics',
                 ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                ),
               ),
-            )
-          else ...[
-            ElevatedButton.icon(
+            ),
+          )
+        else
+          SizedBox(
+            height: 44,
+            child: ElevatedButton(
               key: const ValueKey('relic_chamber_restore_ad_button'),
               onPressed: canRestoreAd
                   ? () {
                       controller.watchAdToRestoreRelics(
-                        onRestored: () {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  loc.t(
-                                    'castle_relics_restored_msg',
-                                    fallback:
-                                        'Lost relics restored to your campaign!',
-                                  ),
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                        },
+                        onRestored: showRestoredToast,
                       );
                     }
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _goldFill,
                 foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
+                disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_relics_restore_ad',
-                  fallback: 'Watch Ad to Restore Relics',
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      loc.t(
+                        'castle_relics_restore_direct',
+                        fallback: 'Restore Relics',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.ondemand_video_rounded, size: 19),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+
+        // 2. Pinned Compact Header Summary Beneath the Button
+        Container(
+          key: const ValueKey('relic_chamber_header_summary'),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+          decoration: BoxDecoration(
+            color: palette.rewardedAdCardSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.rewardedAdCardBorder),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const RunicShieldIcon(size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      summaryText,
+                      key: const ValueKey('relic_chamber_summary_subtitle'),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: palette.primaryText,
+                      ),
+                    ),
+                    if (!isRemoveAds) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        loc.t(
+                          'castle_relics_ad_disclosure',
+                          fallback:
+                              'Rewarded Video Ad: watch an ad to restore all lost run upgrades once.',
+                        ),
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.25,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 3. Scrollable List of Archived Relics with Active/Inactive Badges
+        Flexible(
+          child: SingleChildScrollView(
+            key: const ValueKey('castle_wing_scroll_relicChamber'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final artifact in artifacts) ...[
+                  Builder(
+                    builder: (context) {
+                      final isStoredActive =
+                          controller.isRelicStoredEnabled(artifact);
+                      final isStaff =
+                          artifact == ShopUpgradeArtifact.overchargedStaff &&
+                          controller.storedRelicOverchargedStaffLevel > 0;
+                      final titleText = isStaff
+                          ? '${loc.t(artifact.titleKey, fallback: artifact.fallbackTitle)} (${loc.t('overcharged_staff_level_prefix', fallback: 'Lv.')} ${controller.storedRelicOverchargedStaffLevel})'
+                          : loc.t(
+                              artifact.titleKey,
+                              fallback: artifact.fallbackTitle,
+                            );
+                      return Container(
+                        key: ValueKey('relic_chamber_item_${artifact.id}'),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.dialogCardSurface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: palette.amberBorder.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              artifact.icon,
+                              color: palette.amberIcon,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    titleText,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: palette.primaryText,
+                                    ),
+                                  ),
+                                  if (isStaff) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${loc.t('overcharged_staff_speed_label', fallback: 'Fire Speed')}: ${controller.storedRelicOverchargedStaffSpeed}x',
+                                      key: const ValueKey(
+                                        'relic_chamber_staff_speed',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: palette.amberSubtitle,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _RelicStatusBadge(
+                              key: ValueKey(
+                                'relic_chamber_status_${artifact.id}',
+                              ),
+                              isActive: isStoredActive,
+                              label: isStoredActive ? activeLabel : inactiveLabel,
+                              palette: palette,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 5),
-            Text(
-              loc.t(
-                'castle_relics_ad_disclosure',
-                fallback:
-                    'Rewarded Video Ad: watch an ad to restore all lost run upgrades once.',
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10.5, color: palette.mutedText),
-            ),
-          ],
-        ],
+          ),
+        ),
       ],
     );
   }
@@ -3038,3 +3175,74 @@ class _ChronicleStatCard extends StatelessWidget {
     );
   }
 }
+
+class _RelicStatusBadge extends StatelessWidget {
+  final bool isActive;
+  final String label;
+  final AppPalette palette;
+
+  const _RelicStatusBadge({
+    super.key,
+    required this.isActive,
+    required this.label,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+    if (isActive) {
+      bgColor = palette.isDark
+          ? const Color(0xFF10B981).withValues(alpha: 0.16)
+          : const Color(0xFF10B981).withValues(alpha: 0.12);
+      borderColor = palette.isDark
+          ? const Color(0xFF34D399).withValues(alpha: 0.55)
+          : const Color(0xFF059669).withValues(alpha: 0.45);
+      textColor =
+          palette.isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46);
+    } else {
+      bgColor = palette.isDark
+          ? const Color(0xFF64748B).withValues(alpha: 0.18)
+          : const Color(0xFF64748B).withValues(alpha: 0.12);
+      borderColor = palette.isDark
+          ? const Color(0xFF94A3B8).withValues(alpha: 0.40)
+          : const Color(0xFF64748B).withValues(alpha: 0.35);
+      textColor =
+          palette.isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

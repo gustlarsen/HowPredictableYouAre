@@ -621,6 +621,8 @@ class GameController extends ChangeNotifier {
   int spoilsMetalOrbs = 0;
 
   List<String> relicChamberStoredUpgrades = [];
+  Map<String, bool> relicChamberStoredUpgradeStates = {};
+  int? relicChamberStoredOverchargedStaffSpeed;
   int peakHpUpgradeLevel = 0;
   int peakManaUpgradeLevel = 0;
   bool hallOfHeroesClaimAvailable = false;
@@ -1266,6 +1268,11 @@ class GameController extends ChangeNotifier {
     spoilsMetalOrbs = storage.spoilsMetalOrbs;
 
     relicChamberStoredUpgrades = List<String>.from(storage.relicChamberUpgrades);
+    relicChamberStoredUpgradeStates = Map<String, bool>.from(
+      storage.relicChamberUpgradeStates,
+    );
+    relicChamberStoredOverchargedStaffSpeed =
+        storage.relicChamberOverchargedStaffSpeed;
     peakHpUpgradeLevel = math.max(storage.peakHpUpgradeLevel, hpUpgradeLevel);
     peakManaUpgradeLevel =
         math.max(storage.peakManaUpgradeLevel, manaUpgradeLevel);
@@ -1418,6 +1425,47 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  bool isUpgradeArtifactEnabled(ShopUpgradeArtifact artifact) {
+    switch (artifact) {
+      case ShopUpgradeArtifact.predictability:
+        return showPredictability;
+      case ShopUpgradeArtifact.reset:
+        return showReset;
+      case ShopUpgradeArtifact.newHands:
+        return showNewHands;
+      case ShopUpgradeArtifact.random:
+        return showRandom;
+      case ShopUpgradeArtifact.algorithm:
+        return showAlgorithm;
+      case ShopUpgradeArtifact.yourPrediction:
+        return showYourPrediction;
+      case ShopUpgradeArtifact.nextMove:
+        return showNextMove;
+      case ShopUpgradeArtifact.giftBox:
+        return giftBoxEnabled;
+      case ShopUpgradeArtifact.suggestion:
+        return showSuggestion;
+      case ShopUpgradeArtifact.newSkin:
+        return showNewSkin;
+      case ShopUpgradeArtifact.removeAds:
+        return removeAdsEnabled;
+      case ShopUpgradeArtifact.crystalBall:
+        return showCrystalBall;
+      case ShopUpgradeArtifact.crystalBallPlus:
+        return showCrystalBallPlus;
+      case ShopUpgradeArtifact.markovRecalibrator:
+        return showMarkovRecalibrator;
+      case ShopUpgradeArtifact.overchargedStaff:
+        return overchargedStaffEnabled;
+    }
+  }
+
+  /// Returns the saved pre-defeat toggle state for [artifact] in the Relic Chamber,
+  /// defaulting to `true` for backward compatibility with older saves.
+  bool isRelicStoredEnabled(ShopUpgradeArtifact artifact) {
+    return relicChamberStoredUpgradeStates[artifact.id] ?? true;
+  }
+
   String? _productIdForArtifact(ShopUpgradeArtifact artifact) {
     switch (artifact) {
       case ShopUpgradeArtifact.predictability:
@@ -1458,6 +1506,18 @@ class GameController extends ChangeNotifier {
       }
     }
     return maxLevel;
+  }
+
+  int get storedRelicOverchargedStaffSpeed {
+    final targetLevel = storedRelicOverchargedStaffLevel;
+    if (targetLevel <= 0) return 1;
+    final stored = relicChamberStoredOverchargedStaffSpeed;
+    if (stored != null &&
+        overchargedStaffSpeedOptions.contains(stored) &&
+        overchargedStaffRequiredLevelForSpeed(stored) <= targetLevel) {
+      return stored;
+    }
+    return overchargedStaffSpeedForLevel(targetLevel);
   }
 
   List<ShopUpgradeArtifact> get availableRelicChamberArtifacts {
@@ -1875,48 +1935,77 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  void _unlockArtifactWithoutCost(ShopUpgradeArtifact artifact) {
+  void _unlockArtifactWithoutCost(
+    ShopUpgradeArtifact artifact, {
+    required bool enabled,
+    int? staffSpeed,
+  }) {
     switch (artifact) {
       case ShopUpgradeArtifact.predictability:
         unlockedPredictability = true;
+        showPredictability = enabled;
         storage.setUnlockedPredictability(true);
+        storage.setShowPredictability(enabled);
         break;
       case ShopUpgradeArtifact.reset:
         unlockedReset = true;
+        showReset = enabled;
         storage.setUnlockedReset(true);
+        storage.setShowReset(enabled);
         break;
       case ShopUpgradeArtifact.newHands:
         unlockedNewHands = true;
+        showNewHands = enabled;
         storage.setUnlockedNewHands(true);
+        storage.setShowNewHands(enabled);
         _grantTreasuryEarthMetalBonusIfNeeded();
         break;
       case ShopUpgradeArtifact.random:
         unlockedRandom = true;
+        showRandom = enabled;
         storage.setUnlockedRandom(true);
+        storage.setShowRandom(enabled);
         break;
       case ShopUpgradeArtifact.algorithm:
         unlockedAlgorithm = true;
+        showAlgorithm = enabled;
         storage.setUnlockedAlgorithm(true);
+        storage.setShowAlgorithm(enabled);
         break;
       case ShopUpgradeArtifact.yourPrediction:
         unlockedYourPrediction = true;
+        showYourPrediction = enabled;
         storage.setUnlockedYourPrediction(true);
+        storage.setShowYourPrediction(enabled);
         break;
       case ShopUpgradeArtifact.nextMove:
         unlockedNextMove = true;
+        showNextMove = enabled;
         storage.setUnlockedNextMove(true);
+        storage.setShowNextMove(enabled);
         break;
       case ShopUpgradeArtifact.giftBox:
         giftBoxUnlocked = true;
+        giftBoxEnabled = enabled;
         storage.setGiftBoxUnlocked(true);
+        storage.setGiftBoxEnabled(enabled);
+        if (enabled) {
+          _resumeGiftTimerIfNeeded();
+        } else {
+          _pauseGiftTimer();
+        }
         break;
       case ShopUpgradeArtifact.suggestion:
         unlockedSuggestion = true;
+        showSuggestion = enabled;
         storage.setUnlockedSuggestion(true);
+        storage.setShowSuggestion(enabled);
         break;
       case ShopUpgradeArtifact.newSkin:
         unlockedNewSkin = true;
+        showNewSkin = enabled;
         storage.setUnlockedNewSkin(true);
+        storage.setShowNewSkin(enabled);
         break;
       case ShopUpgradeArtifact.removeAds:
         unlockedAds = true;
@@ -1927,17 +2016,29 @@ class GameController extends ChangeNotifier {
         break;
       case ShopUpgradeArtifact.crystalBall:
         unlockedCrystalBall = true;
+        showCrystalBall = enabled;
         storage.setUnlockedCrystalBall(true);
+        storage.setShowCrystalBall(enabled);
+        if (!enabled) {
+          showCrystalBallPlus = false;
+          storage.setShowCrystalBallPlus(false);
+        }
         break;
       case ShopUpgradeArtifact.crystalBallPlus:
         unlockedCrystalBall = true;
         unlockedCrystalBallPlus = true;
+        crystalBallPlusSavedState = enabled;
+        showCrystalBallPlus = showCrystalBall ? enabled : false;
         storage.setUnlockedCrystalBall(true);
         storage.setUnlockedCrystalBallPlus(true);
+        storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
+        storage.setShowCrystalBallPlus(showCrystalBallPlus);
         break;
       case ShopUpgradeArtifact.markovRecalibrator:
         unlockedMarkovRecalibrator = true;
+        showMarkovRecalibrator = enabled;
         storage.setUnlockedMarkovRecalibrator(true);
+        storage.setShowMarkovRecalibrator(enabled);
         break;
       case ShopUpgradeArtifact.overchargedStaff:
         final targetLevel = math
@@ -1947,29 +2048,68 @@ class GameController extends ChangeNotifier {
             )
             .clamp(1, overchargedStaffMaxLevel);
         overchargedStaffLevel = targetLevel;
-        overchargedStaffEnabled = true;
-        overchargedStaffSelectedSpeed =
-            overchargedStaffSpeedForLevel(targetLevel);
+        overchargedStaffEnabled = enabled;
+        final resolvedSpeed = (staffSpeed != null &&
+                overchargedStaffSpeedOptions.contains(staffSpeed) &&
+                overchargedStaffRequiredLevelForSpeed(staffSpeed) <= targetLevel)
+            ? staffSpeed
+            : overchargedStaffSpeedForLevel(targetLevel);
+        overchargedStaffSelectedSpeed = resolvedSpeed;
         storage.setOverchargedStaffLevel(overchargedStaffLevel);
-        storage.setOverchargedStaffEnabled(true);
+        storage.setOverchargedStaffEnabled(overchargedStaffEnabled);
         storage.setOverchargedStaffSelectedSpeed(overchargedStaffSelectedSpeed);
         break;
     }
   }
 
   bool _restoreStoredRelics() {
-    final toRestore = availableRelicChamberArtifacts;
+    final toRestore = availableRelicChamberArtifacts.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
     if (toRestore.isEmpty) {
       relicChamberStoredUpgrades = [];
+      relicChamberStoredUpgradeStates = {};
+      relicChamberStoredOverchargedStaffSpeed = null;
       storage.setRelicChamberUpgrades(const []);
+      storage.setRelicChamberUpgradeStates(const {});
+      storage.setRelicChamberOverchargedStaffSpeed(null);
       notifyListeners();
       return false;
     }
+
+    final savedStates = <ShopUpgradeArtifact, bool>{
+      for (final artifact in toRestore) artifact: isRelicStoredEnabled(artifact),
+    };
+    final savedStaffSpeed = storedRelicOverchargedStaffSpeed;
+
     for (final artifact in toRestore) {
-      _unlockArtifactWithoutCost(artifact);
+      _unlockArtifactWithoutCost(
+        artifact,
+        enabled: savedStates[artifact] ?? true,
+        staffSpeed: artifact == ShopUpgradeArtifact.overchargedStaff
+            ? savedStaffSpeed
+            : null,
+      );
     }
+
+    if (_engine.enableExtendedHands != showNewHands) {
+      _engine = MarkovEngine(
+        enableExtendedHands: showNewHands,
+        enableEnemyExtendedHands: enemyUses5Elements,
+        enemyAllowedMoves: bossAllowedMoves,
+        enableElementalMode: isElementalMode,
+      );
+      _resetBattleState();
+    } else {
+      _engine.enableElementalMode = isElementalMode;
+      _computeNextHints();
+    }
+
     relicChamberStoredUpgrades = [];
+    relicChamberStoredUpgradeStates = {};
+    relicChamberStoredOverchargedStaffSpeed = null;
     storage.setRelicChamberUpgrades(const []);
+    storage.setRelicChamberUpgradeStates(const {});
+    storage.setRelicChamberOverchargedStaffSpeed(null);
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -2664,11 +2804,30 @@ class GameController extends ChangeNotifier {
     final updatedSpoilsEarth = spoilsEarthOrbs + earthOrbs;
     final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
 
-    // 2. Snapshot lost orb-bought upgrades into Relic Chamber (excluding paid IAPs)
+    // 2. Snapshot lost orb-bought upgrades & active states into Relic Chamber (excluding paid IAPs)
     final lostUpgrades = _collectLostRelicIds(verifiedPaidIds);
+    final lostUpgradeStates = _collectLostRelicStates(verifiedPaidIds);
     final nextRelicUpgrades = lostUpgrades.isNotEmpty
-        ? lostUpgrades
+        ? _mergeRelicUpgradeIds(relicChamberStoredUpgrades, lostUpgrades)
         : List<String>.from(relicChamberStoredUpgrades);
+    final nextRelicStates = lostUpgrades.isNotEmpty
+        ? <String, bool>{
+            ...relicChamberStoredUpgradeStates,
+            ...lostUpgradeStates,
+          }
+        : Map<String, bool>.from(relicChamberStoredUpgradeStates);
+    final int? nextRelicStaffSpeed;
+    if (lostUpgrades.isEmpty) {
+      nextRelicStaffSpeed = relicChamberStoredOverchargedStaffSpeed;
+    } else if (lostUpgradeStates.containsKey(
+      ShopUpgradeArtifact.overchargedStaff.id,
+    )) {
+      nextRelicStaffSpeed = overchargedStaffLevel >= storedRelicOverchargedStaffLevel
+          ? overchargedStaffSelectedSpeed
+          : relicChamberStoredOverchargedStaffSpeed;
+    } else {
+      nextRelicStaffSpeed = relicChamberStoredOverchargedStaffSpeed;
+    }
 
     // 2b. Preserve independent all-time historical peaks and unlock Hall of Heroes claim for the next cycle
     final nextPeakHp = math.max(peakHpUpgradeLevel, hpUpgradeLevel);
@@ -2704,6 +2863,8 @@ class GameController extends ChangeNotifier {
       metal: updatedSpoilsMetal,
     );
     await storage.setRelicChamberUpgrades(nextRelicUpgrades);
+    await storage.setRelicChamberUpgradeStates(nextRelicStates);
+    await storage.setRelicChamberOverchargedStaffSpeed(nextRelicStaffSpeed);
     await storage.setPeakHpUpgradeLevel(nextPeakHp);
     await storage.setPeakManaUpgradeLevel(nextPeakMana);
     await storage.setHallOfHeroesClaimAvailable(nextClaimAvailable);
@@ -2775,6 +2936,20 @@ class GameController extends ChangeNotifier {
     return lostUpgrades;
   }
 
+  Map<String, bool> _collectLostRelicStates(Set<String> verifiedPaidIds) {
+    final states = <String, bool>{};
+    for (final artifact in ShopUpgradeArtifact.values) {
+      if (artifact == ShopUpgradeArtifact.removeAds) continue;
+      if (!isUpgradeArtifactUnlocked(artifact)) continue;
+      final productId = _productIdForArtifact(artifact);
+      if (productId != null && verifiedPaidIds.contains(productId)) {
+        continue;
+      }
+      states[artifact.id] = isUpgradeArtifactEnabled(artifact);
+    }
+    return states;
+  }
+
   List<String> _mergeRelicUpgradeIds(
     List<String> existing,
     List<String> incoming,
@@ -2836,12 +3011,31 @@ class GameController extends ChangeNotifier {
     final updatedSpoilsEarth = spoilsEarthOrbs + earthOrbs;
     final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
 
-    // 2. Archive owned shop artifacts & power-ups into Relic Chamber (excluding paid IAPs & Remove Ads)
+    // 2. Archive owned shop artifacts & power-ups (and active states) into Relic Chamber (excluding paid IAPs & Remove Ads)
     //    (Double-Reset Guard: only update if active run has owned artifacts)
     final lostUpgrades = _collectLostRelicIds(verifiedPaidIds);
+    final lostUpgradeStates = _collectLostRelicStates(verifiedPaidIds);
     final nextRelicUpgrades = lostUpgrades.isNotEmpty
         ? _mergeRelicUpgradeIds(relicChamberStoredUpgrades, lostUpgrades)
         : List<String>.from(relicChamberStoredUpgrades);
+    final nextRelicStates = lostUpgrades.isNotEmpty
+        ? <String, bool>{
+            ...relicChamberStoredUpgradeStates,
+            ...lostUpgradeStates,
+          }
+        : Map<String, bool>.from(relicChamberStoredUpgradeStates);
+    final int? nextRelicStaffSpeed;
+    if (lostUpgrades.isEmpty) {
+      nextRelicStaffSpeed = relicChamberStoredOverchargedStaffSpeed;
+    } else if (lostUpgradeStates.containsKey(
+      ShopUpgradeArtifact.overchargedStaff.id,
+    )) {
+      nextRelicStaffSpeed = overchargedStaffLevel >= storedRelicOverchargedStaffLevel
+          ? overchargedStaffSelectedSpeed
+          : relicChamberStoredOverchargedStaffSpeed;
+    } else {
+      nextRelicStaffSpeed = relicChamberStoredOverchargedStaffSpeed;
+    }
 
     // 3. Preserve independent all-time historical peaks and unlock Hall of Heroes claim
     final nextPeakHp = math.max(peakHpUpgradeLevel, hpUpgradeLevel);
@@ -2868,6 +3062,8 @@ class GameController extends ChangeNotifier {
     }
     if (lostUpgrades.isNotEmpty) {
       await storage.setRelicChamberUpgrades(nextRelicUpgrades);
+      await storage.setRelicChamberUpgradeStates(nextRelicStates);
+      await storage.setRelicChamberOverchargedStaffSpeed(nextRelicStaffSpeed);
     }
     await storage.setPeakHpUpgradeLevel(nextPeakHp);
     await storage.setPeakManaUpgradeLevel(nextPeakMana);

@@ -277,6 +277,8 @@ class CloudSaveData {
   final int spoilsEarthOrbs;
   final int spoilsMetalOrbs;
   final List<String> relicChamberUpgrades;
+  final Map<String, bool> relicChamberUpgradeStates;
+  final int? relicChamberOverchargedStaffSpeed;
   final int hpUpgradeLevel;
   final int manaUpgradeLevel;
   final int peakHpUpgradeLevel;
@@ -401,6 +403,8 @@ class CloudSaveData {
     this.spoilsEarthOrbs = 0,
     this.spoilsMetalOrbs = 0,
     this.relicChamberUpgrades = const [],
+    this.relicChamberUpgradeStates = const {},
+    this.relicChamberOverchargedStaffSpeed,
     this.hpUpgradeLevel = 0,
     this.manaUpgradeLevel = 0,
     this.peakHpUpgradeLevel = 0,
@@ -716,6 +720,8 @@ class CloudSaveData {
       spoilsEarthOrbs: spoilsEarthOrbs,
       spoilsMetalOrbs: spoilsMetalOrbs,
       relicChamberUpgrades: relicChamberUpgrades,
+      relicChamberUpgradeStates: relicChamberUpgradeStates,
+      relicChamberOverchargedStaffSpeed: relicChamberOverchargedStaffSpeed,
       hpUpgradeLevel: hpUpgradeLevel,
       manaUpgradeLevel: manaUpgradeLevel,
       peakHpUpgradeLevel: _maxInt(peakHpUpgradeLevel, local.peakHpUpgradeLevel),
@@ -855,6 +861,9 @@ class CloudSaveData {
       spoilsEarthOrbs: storage.spoilsEarthOrbs,
       spoilsMetalOrbs: storage.spoilsMetalOrbs,
       relicChamberUpgrades: storage.relicChamberUpgrades,
+      relicChamberUpgradeStates: storage.relicChamberUpgradeStates,
+      relicChamberOverchargedStaffSpeed:
+          storage.relicChamberOverchargedStaffSpeed,
       hpUpgradeLevel: storage.hpUpgradeLevel,
       manaUpgradeLevel: storage.manaUpgradeLevel,
       peakHpUpgradeLevel: storage.peakHpUpgradeLevel,
@@ -943,6 +952,10 @@ class CloudSaveData {
       metal: spoilsMetalOrbs,
     );
     await storage.setRelicChamberUpgrades(relicChamberUpgrades);
+    await storage.setRelicChamberUpgradeStates(relicChamberUpgradeStates);
+    await storage.setRelicChamberOverchargedStaffSpeed(
+      relicChamberOverchargedStaffSpeed,
+    );
     await storage.setHpUpgradeLevel(hpUpgradeLevel);
     await storage.setManaUpgradeLevel(manaUpgradeLevel);
     await storage.setPeakHpUpgradeLevel(peakHpUpgradeLevel);
@@ -1099,6 +1112,10 @@ class CloudSaveData {
         'metal': spoilsMetalOrbs,
       },
       'relicChamberUpgrades': relicChamberUpgrades,
+      if (relicChamberUpgradeStates.isNotEmpty)
+        'relicChamberUpgradeStates': relicChamberUpgradeStates,
+      if (relicChamberOverchargedStaffSpeed != null)
+        'relicChamberOverchargedStaffSpeed': relicChamberOverchargedStaffSpeed,
       'hpUpgradeLevel': hpUpgradeLevel,
       'manaUpgradeLevel': manaUpgradeLevel,
       'peakHpUpgradeLevel': peakHpUpgradeLevel,
@@ -1285,6 +1302,32 @@ class CloudSaveData {
         .toList();
   }
 
+  static Map<String, bool> _parseBoolMap(dynamic raw) {
+    if (raw is! Map) return const {};
+    final parsed = <String, bool>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString().trim();
+      final value = entry.value;
+      if (key.isNotEmpty && value is bool) {
+        parsed[key] = value;
+      }
+    }
+    return parsed;
+  }
+
+  static int? _parseStaffSpeedOrNull(dynamic raw) {
+    final val = (raw as num?)?.toInt();
+    if (val == 1 ||
+        val == 2 ||
+        val == 5 ||
+        val == 10 ||
+        val == 20 ||
+        val == 30) {
+      return val;
+    }
+    return null;
+  }
+
   factory CloudSaveData.fromJson(Map<String, dynamic> map) {
     final orbsMap = map['orbs'] is Map ? map['orbs'] as Map : null;
     int fire =
@@ -1368,6 +1411,9 @@ class CloudSaveData {
       spoilsEarthOrbs: (spoilsMap?['earth'] as num?)?.toInt() ?? 0,
       spoilsMetalOrbs: (spoilsMap?['metal'] as num?)?.toInt() ?? 0,
       relicChamberUpgrades: _parseStringList(map['relicChamberUpgrades']),
+      relicChamberUpgradeStates: _parseBoolMap(map['relicChamberUpgradeStates']),
+      relicChamberOverchargedStaffSpeed:
+          _parseStaffSpeedOrNull(map['relicChamberOverchargedStaffSpeed']),
       hpUpgradeLevel: (map['hpUpgradeLevel'] as num?)?.toInt() ?? 0,
       manaUpgradeLevel: (map['manaUpgradeLevel'] as num?)?.toInt() ?? 0,
       peakHpUpgradeLevel: (map['peakHpUpgradeLevel'] as num?)?.toInt() ??

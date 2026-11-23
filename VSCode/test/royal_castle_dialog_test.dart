@@ -1328,4 +1328,397 @@ void main() {
       },
     );
   });
+
+  group('Relic Chamber Pinned Restore & Exact Active/Inactive State Preservation', () {
+    test(
+      'Archiving via permadeath defeat and Forfeit Run preserves exact per-relic enabled states and Overcharged Staff speed across StorageService reload and CloudSaveData',
+      () async {
+        final playGamesClient = _TestPlayGamesClient();
+        final controller = await _createController(
+          playGamesClient: playGamesClient,
+          loadJsonStrings: true,
+          prefs: {
+            'current_week': 12,
+            'unlockedPredictability': true,
+            'showPredictability': true,
+            'unlockedReset': true,
+            'showReset': false,
+            'unlockedRandom': true,
+            'showRandom': true,
+            'unlockedAlgorithm': true,
+            'showAlgorithm': false,
+            'unlockedYourPrediction': true,
+            'showYourPrediction': false,
+            'unlockedNextMove': true,
+            'showNextMove': true,
+            'unlockedSuggestion': true,
+            'showSuggestion': false,
+            'unlockedNewHands': true,
+            'showNewHands': true,
+            'unlockedNewSkin': true,
+            'showNewSkin': false,
+            'unlockedCrystalBall': true,
+            'showCrystalBall': true,
+            'unlockedCrystalBallPlus': true,
+            'showCrystalBallPlus': false,
+            'unlockedMarkovRecalibrator': true,
+            'showMarkovRecalibrator': true,
+            'giftBoxUnlocked': true,
+            'giftBoxEnabled': false,
+            'overcharged_staff_level': 6,
+            'overcharged_staff_enabled': false,
+            'overcharged_staff_selected_speed': 10,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        // 1. Trigger 0 HP defeat -> archives all relics + exact active/inactive states + staff 10x speed
+        await controller.applyPermadeathReset(
+          cause: PermadeathCause.battleDefeat,
+        );
+        expect(controller.unlockedPredictability, isFalse);
+        expect(controller.showPredictability, isFalse);
+        expect(controller.unlockedNewSkin, isFalse);
+        expect(controller.showNewSkin, isFalse);
+        expect(controller.overchargedStaffLevel, 0);
+        expect(controller.overchargedStaffEnabled, isFalse);
+
+        // Verify archived states & Overcharged Staff speed
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.predictability), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.reset), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.random), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.algorithm), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.yourPrediction), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.nextMove), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.suggestion), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.newHands), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.newSkin), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.crystalBall), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.crystalBallPlus), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.markovRecalibrator), isTrue);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.giftBox), isFalse);
+        expect(controller.isRelicStoredEnabled(ShopUpgradeArtifact.overchargedStaff), isFalse);
+        expect(controller.storedRelicOverchargedStaffLevel, 6);
+        expect(controller.storedRelicOverchargedStaffSpeed, 10);
+
+        // 2. Survive StorageService reload from SharedPreferences without wiping prefs
+        final reloadedStorage = StorageService();
+        await reloadedStorage.init();
+        final reloadedAdService = AdService(client: _TestAdMobClient());
+        await reloadedAdService.initialize(adsRemoved: false);
+        final reloadedController = GameController(
+          storage: reloadedStorage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: reloadedAdService,
+        );
+        addTearDown(reloadedController.dispose);
+
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.reset), isFalse);
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.newSkin), isFalse);
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.predictability), isTrue);
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.overchargedStaff), isFalse);
+        expect(reloadedController.storedRelicOverchargedStaffSpeed, 10);
+
+        // 3. Survive PlayGamesService CloudSaveData JSON round-trip
+        await Future<void>.delayed(Duration.zero);
+        final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload);
+        expect(cloud, isNotNull);
+        expect(cloud!.relicChamberUpgradeStates['reset'], isFalse);
+        expect(cloud.relicChamberUpgradeStates['new_skin'], isFalse);
+        expect(cloud.relicChamberUpgradeStates['predictability'], isTrue);
+        expect(cloud.relicChamberUpgradeStates['overcharged_staff'], isFalse);
+        expect(cloud.relicChamberOverchargedStaffSpeed, 10);
+
+        // 4. Restore via Rewarded Ad -> restores exact prior active/inactive states & 10x speed
+        final restored = await reloadedController.watchAdToRestoreRelics();
+        expect(restored, isTrue);
+        expect(reloadedController.unlockedPredictability, isTrue);
+        expect(reloadedController.showPredictability, isTrue);
+        expect(reloadedController.unlockedReset, isTrue);
+        expect(reloadedController.showReset, isFalse);
+        expect(reloadedController.unlockedRandom, isTrue);
+        expect(reloadedController.showRandom, isTrue);
+        expect(reloadedController.unlockedAlgorithm, isTrue);
+        expect(reloadedController.showAlgorithm, isFalse);
+        expect(reloadedController.unlockedYourPrediction, isTrue);
+        expect(reloadedController.showYourPrediction, isFalse);
+        expect(reloadedController.unlockedNextMove, isTrue);
+        expect(reloadedController.showNextMove, isTrue);
+        expect(reloadedController.unlockedSuggestion, isTrue);
+        expect(reloadedController.showSuggestion, isFalse);
+        expect(reloadedController.unlockedNewHands, isTrue);
+        expect(reloadedController.showNewHands, isTrue);
+        expect(reloadedController.unlockedNewSkin, isTrue);
+        expect(reloadedController.showNewSkin, isFalse);
+        expect(reloadedController.unlockedCrystalBall, isTrue);
+        expect(reloadedController.showCrystalBall, isTrue);
+        expect(reloadedController.unlockedCrystalBallPlus, isTrue);
+        expect(reloadedController.showCrystalBallPlus, isFalse);
+        expect(reloadedController.unlockedMarkovRecalibrator, isTrue);
+        expect(reloadedController.showMarkovRecalibrator, isTrue);
+        expect(reloadedController.giftBoxUnlocked, isTrue);
+        expect(reloadedController.giftBoxEnabled, isFalse);
+        expect(reloadedController.overchargedStaffLevel, 6);
+        expect(reloadedController.overchargedStaffEnabled, isFalse);
+        expect(reloadedController.overchargedStaffSelectedSpeed, 10);
+        expect(reloadedController.relicChamberStoredUpgrades, isEmpty);
+        expect(reloadedController.relicChamberStoredUpgradeStates, isEmpty);
+        expect(reloadedController.relicChamberStoredOverchargedStaffSpeed, isNull);
+        expect(reloadedController.hasAvailableRelicChamberUpgrades, isFalse);
+
+        // 5. Also verify Forfeit Run (resetAllProgress) captures & restores flipped states (e.g., New Skin ON, Random OFF, Staff ON at 5x)
+        reloadedController.toggleShowNewSkin(true);
+        reloadedController.toggleShowRandom(false);
+        reloadedController.toggleOverchargedStaff(true);
+        reloadedController.selectOverchargedStaffSpeed(5);
+        await reloadedController.resetAllProgress();
+
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.newSkin), isTrue);
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.random), isFalse);
+        expect(reloadedController.isRelicStoredEnabled(ShopUpgradeArtifact.overchargedStaff), isTrue);
+        expect(reloadedController.storedRelicOverchargedStaffSpeed, 5);
+
+        expect(await reloadedController.watchAdToRestoreRelics(), isTrue);
+        expect(reloadedController.showNewSkin, isTrue);
+        expect(reloadedController.showRandom, isFalse);
+        expect(reloadedController.overchargedStaffEnabled, isTrue);
+        expect(reloadedController.overchargedStaffSelectedSpeed, 5);
+
+        // 6. Backward compatibility: legacy CloudSaveData JSON without relicChamberUpgradeStates defaults to true
+        final legacyCloud = CloudSaveData.tryParse(
+          '{"relicChamberUpgrades": ["reset", "new_skin", "overcharged_staff:4"]}',
+        )!;
+        expect(legacyCloud.relicChamberUpgradeStates, isEmpty);
+        SharedPreferences.setMockInitialValues({});
+        final legacyStorage = StorageService();
+        await legacyStorage.init();
+        await legacyCloud.applyToStorage(legacyStorage);
+        final legacyAdService = AdService(client: _TestAdMobClient());
+        await legacyAdService.initialize(adsRemoved: false);
+        final legacyController = GameController(
+          storage: legacyStorage,
+          localization: LocalizationService(),
+          audio: AudioService(),
+          adService: legacyAdService,
+        );
+        addTearDown(legacyController.dispose);
+        expect(legacyController.isRelicStoredEnabled(ShopUpgradeArtifact.reset), isTrue);
+        expect(legacyController.isRelicStoredEnabled(ShopUpgradeArtifact.newSkin), isTrue);
+        expect(await legacyController.watchAdToRestoreRelics(), isTrue);
+        expect(legacyController.showReset, isTrue);
+        expect(legacyController.showNewSkin, isTrue);
+        expect(legacyController.overchargedStaffLevel, 4);
+        expect(legacyController.overchargedStaffEnabled, isTrue);
+        expect(legacyController.overchargedStaffSelectedSpeed, 10);
+      },
+    );
+
+    test(
+      'Relic Chamber UI strings are localized in en, pt, es, and de',
+      () async {
+        final loc = LocalizationService();
+        await loc.load();
+        const keys = [
+          'castle_relics_status_active',
+          'castle_relics_status_inactive',
+          'castle_relics_ready_summary_one',
+          'castle_relics_ready_summary_many',
+          'castle_relics_restored_msg',
+          'castle_relics_restore_direct',
+        ];
+        for (final lang in LocalizationService.supportedLanguages) {
+          loc.setLanguage(lang);
+          for (final key in keys) {
+            final value = loc.t(key);
+            expect(value, isNotEmpty, reason: 'Missing $lang $key');
+            expect(value, isNot(key), reason: 'Fallback key returned for $lang $key');
+          }
+        }
+      },
+    );
+
+    testWidgets(
+      'RoyalCastleDialog Relics tab pins golden Restore Relics button at top above scrollable list, shows Active/Inactive badges without per-row ad icons, and clears notification dot on restore',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final prefsWithMixedRelics = <String, Object>{
+          'unlockedPredictability': true,
+          'showPredictability': true,
+          'unlockedReset': true,
+          'showReset': false,
+          'unlockedRandom': true,
+          'showRandom': true,
+          'unlockedAlgorithm': true,
+          'showAlgorithm': false,
+          'unlockedYourPrediction': true,
+          'showYourPrediction': false,
+          'unlockedNextMove': true,
+          'showNextMove': true,
+          'unlockedSuggestion': true,
+          'showSuggestion': false,
+          'unlockedNewHands': true,
+          'showNewHands': true,
+          'unlockedNewSkin': true,
+          'showNewSkin': false,
+          'overcharged_staff_level': 6,
+          'overcharged_staff_enabled': false,
+          'overcharged_staff_selected_speed': 10,
+        };
+
+        for (final isRemoveAds in [false, true]) {
+          for (final isDark in [true, false]) {
+            final controller = await _createController(
+              loadJsonStrings: true,
+              prefs: {
+                ...prefsWithMixedRelics,
+                'darkMode': isDark,
+                if (isRemoveAds) ...{
+                  'unlockedAds': true,
+                  'removeAdsEnabled': true,
+                },
+              },
+            );
+            addTearDown(controller.dispose);
+
+            await controller.applyPermadeathReset(
+              cause: PermadeathCause.battleDefeat,
+            );
+
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: ThemeData.light(useMaterial3: true),
+                darkTheme: ThemeData.dark(useMaterial3: true),
+                themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+                home: Scaffold(
+                  body: RoyalCastleDialog(
+                    controller: controller,
+                    initialWing: CastleWing.relicChamber,
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+
+            final buttonKey = isRemoveAds
+                ? const ValueKey('relic_chamber_restore_direct_button')
+                : const ValueKey('relic_chamber_restore_ad_button');
+            final buttonFinder = find.byKey(buttonKey);
+            final scrollFinder = find.byKey(
+              const ValueKey('castle_wing_scroll_relicChamber'),
+            );
+            final summaryFinder = find.byKey(
+              const ValueKey('relic_chamber_header_summary'),
+            );
+
+            expect(buttonFinder, findsOneWidget);
+            expect(scrollFinder, findsOneWidget);
+            expect(summaryFinder, findsOneWidget);
+            expect(find.text('Restore Relics'), findsOneWidget);
+            expect(
+              find.text('10 Relics ready • Previous active states preserved'),
+              findsOneWidget,
+            );
+
+            // Rewarded ad icon appears inside button when ads active, hidden when Remove Ads active
+            final adIconInButton = find.descendant(
+              of: buttonFinder,
+              matching: find.byIcon(Icons.ondemand_video_rounded),
+            );
+            expect(
+              adIconInButton,
+              isRemoveAds ? findsNothing : findsOneWidget,
+            );
+
+            // Button is pinned ABOVE the scrollable list and BELOW the tab bar
+            final tabBarBottom = tester
+                .getBottomLeft(find.byKey(const ValueKey('royal_castle_tab_bar')))
+                .dy;
+            final buttonTop = tester.getTopLeft(buttonFinder).dy;
+            final buttonBottom = tester.getBottomLeft(buttonFinder).dy;
+            final scrollTop = tester.getTopLeft(scrollFinder).dy;
+
+            expect(buttonTop, greaterThan(tabBarBottom));
+            expect(buttonBottom, lessThanOrEqualTo(scrollTop));
+            expect(
+              find.descendant(of: scrollFinder, matching: buttonFinder),
+              findsNothing,
+            );
+
+            // Verify button stays pinned at exact same Y when scrolling the relic list
+            await tester.drag(scrollFinder, const Offset(0, -250));
+            await tester.pumpAndSettle();
+            expect(tester.getTopLeft(buttonFinder).dy, closeTo(buttonTop, 0.5));
+
+            // Scroll back to top and check Active / Inactive status badges and no per-row ad icons
+            await tester.drag(scrollFinder, const Offset(0, 250));
+            await tester.pumpAndSettle();
+
+            final predStatus = find.byKey(
+              const ValueKey('relic_chamber_status_predictability'),
+            );
+            final resetStatus = find.byKey(
+              const ValueKey('relic_chamber_status_reset'),
+            );
+            expect(predStatus, findsOneWidget);
+            expect(resetStatus, findsOneWidget);
+            expect(
+              find.descendant(of: predStatus, matching: find.text('Active')),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: resetStatus, matching: find.text('Inactive')),
+              findsOneWidget,
+            );
+
+            // No video/ad icons on individual relic rows
+            expect(
+              find.descendant(
+                of: scrollFinder,
+                matching: find.byIcon(Icons.ondemand_video_rounded),
+              ),
+              findsNothing,
+            );
+            expect(
+              find.descendant(
+                of: scrollFinder,
+                matching: find.byIcon(Icons.play_circle_fill_rounded),
+              ),
+              findsNothing,
+            );
+
+            // Tap Restore Relics -> restores exact Active/Inactive states, clears pool, clears tab dot, shows toast
+            expect(find.byKey(const Key('castle_tab_relics_dot')), findsOneWidget);
+            await tester.tap(buttonFinder);
+            await tester.pumpAndSettle();
+
+            expect(controller.unlockedPredictability, isTrue);
+            expect(controller.showPredictability, isTrue);
+            expect(controller.unlockedReset, isTrue);
+            expect(controller.showReset, isFalse);
+            expect(controller.unlockedNewSkin, isTrue);
+            expect(controller.showNewSkin, isFalse);
+            expect(controller.overchargedStaffLevel, 6);
+            expect(controller.overchargedStaffEnabled, isFalse);
+            expect(controller.overchargedStaffSelectedSpeed, 10);
+            expect(controller.hasAvailableRelicChamberUpgrades, isFalse);
+            expect(find.byKey(const Key('castle_tab_relics_dot')), findsNothing);
+            expect(find.byKey(const ValueKey('relic_chamber_empty_state')), findsOneWidget);
+            expect(
+              find.text('Relics restored with their previous active states!'),
+              findsOneWidget,
+            );
+          }
+        }
+      },
+    );
+  });
 }
+

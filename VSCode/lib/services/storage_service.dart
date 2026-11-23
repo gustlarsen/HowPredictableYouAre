@@ -902,6 +902,10 @@ class StorageService {
 
   // Relic Chamber Stored Upgrades (snapshot of lost run's orb-bought upgrades)
   static const String _relicChamberUpgradesKey = 'relic_chamber_upgrades';
+  static const String _relicChamberUpgradeStatesKey =
+      'relic_chamber_upgrade_states';
+  static const String _relicChamberOverchargedStaffSpeedKey =
+      'relic_chamber_overcharged_staff_speed';
 
   List<String> get relicChamberUpgrades {
     final list = _prefs.getStringList(_relicChamberUpgradesKey);
@@ -918,6 +922,67 @@ class StorageService {
             .toList()
           ..sort();
     return _prefs.setStringList(_relicChamberUpgradesKey, cleaned);
+  }
+
+  Map<String, bool> get relicChamberUpgradeStates {
+    final raw = _prefs.getString(_relicChamberUpgradeStatesKey);
+    if (raw == null || raw.isEmpty) return const {};
+    try {
+      final decoded = json.decode(raw);
+      if (decoded is! Map) return const {};
+      final result = <String, bool>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key.toString().trim();
+        final value = entry.value;
+        if (key.isNotEmpty && value is bool) {
+          result[key] = value;
+        }
+      }
+      return result;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Future<void> setRelicChamberUpgradeStates(Map<String, bool> states) {
+    if (states.isEmpty) {
+      return _prefs.remove(_relicChamberUpgradeStatesKey);
+    }
+    final sortedKeys =
+        states.keys.map((k) => k.trim()).where((k) => k.isNotEmpty).toList()
+          ..sort();
+    final encoded = <String, bool>{
+      for (final key in sortedKeys) key: states[key] ?? true,
+    };
+    if (encoded.isEmpty) {
+      return _prefs.remove(_relicChamberUpgradeStatesKey);
+    }
+    return _prefs.setString(_relicChamberUpgradeStatesKey, json.encode(encoded));
+  }
+
+  int? get relicChamberOverchargedStaffSpeed {
+    final val = _prefs.getInt(_relicChamberOverchargedStaffSpeedKey);
+    if (val == 1 ||
+        val == 2 ||
+        val == 5 ||
+        val == 10 ||
+        val == 20 ||
+        val == 30) {
+      return val;
+    }
+    return null;
+  }
+
+  Future<void> setRelicChamberOverchargedStaffSpeed(int? speed) {
+    if (speed == 1 ||
+        speed == 2 ||
+        speed == 5 ||
+        speed == 10 ||
+        speed == 20 ||
+        speed == 30) {
+      return _prefs.setInt(_relicChamberOverchargedStaffSpeedKey, speed!);
+    }
+    return _prefs.remove(_relicChamberOverchargedStaffSpeedKey);
   }
 
   // Royal Library: Narrative Endings & Markov Bestiary
@@ -1100,6 +1165,8 @@ class StorageService {
       setTreasuryEarthMetalBonusGranted(false),
       setAllSpoilsOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setRelicChamberUpgrades(const []),
+      setRelicChamberUpgradeStates(const {}),
+      setRelicChamberOverchargedStaffSpeed(null),
       setPeakHpUpgradeLevel(0),
       setPeakManaUpgradeLevel(0),
       setHallOfHeroesClaimAvailable(false),
