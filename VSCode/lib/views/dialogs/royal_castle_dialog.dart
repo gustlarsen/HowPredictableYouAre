@@ -263,7 +263,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           isOnGoldBackground: isSelected,
         ),
         label: loc.t('castle_tab_treasury_short', fallback: 'Treasury'),
-        hasDot: controller.isAnyTreasuryElementFull,
+        hasDot: controller.isTreasuryFull,
       ),
       (
         wing: CastleWing.relicChamber,
@@ -736,11 +736,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     LocalizationService loc,
   ) {
     final totalStored = controller.totalTreasuryOrbs;
+    final maxCapacity = controller.treasuryMaxCapacity;
+    final isFull = controller.isTreasuryFull;
     final overallFraction =
-        (totalStored / GameController.maxTreasuryTotal).clamp(0.0, 1.0);
+        maxCapacity > 0 ? (totalStored / maxCapacity).clamp(0.0, 1.0) : 0.0;
     final isRemoveAds = controller.isRemoveAdsActive;
-    final canClaimAd = totalStored > 0 && controller.adService.isRewardedAdReady;
-    final canClaimDirect = isRemoveAds && totalStored > 0;
+    final canClaimAd = totalStored >= 1 && controller.adService.isRewardedAdReady;
+    final canClaimDirect = isRemoveAds && totalStored >= 1;
 
     final vaultBg = palette.isDark
         ? const LinearGradient(
@@ -754,6 +756,49 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             colors: [Color(0xFFF6E8C6), Color(0xFFEBDCB4)],
           );
     final vaultBorderColor = palette.isDark ? _goldFill : palette.amberBorder;
+
+    final fullTag = loc.t('castle_treasury_full_tag', fallback: 'FULL');
+    final progressLabel = isFull
+        ? '$totalStored / $maxCapacity • $fullTag'
+        : '$totalStored / $maxCapacity';
+
+    final levelPillLabel = loc
+        .t('castle_treasury_level_pill', fallback: 'Lv. {level}')
+        .replaceAll('{level}', '${controller.treasuryVaultLevel}');
+
+    final upgradeCallout = Text(
+      loc.t(
+        'castle_treasury_upgrade_callout',
+        fallback: 'Claim to collect & upgrade vault (+20 capacity)',
+      ),
+      key: const ValueKey('treasury_upgrade_callout'),
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w600,
+        height: 1.25,
+        color: palette.isDark ? const Color(0xFFFBE29A) : palette.amberText,
+      ),
+    );
+
+    void showClaimedToast() {
+      if (!context.mounted) return;
+      final msg = loc
+          .t(
+            'castle_treasury_claimed_upgrade_msg',
+            fallback:
+                'Treasury claimed! Vault capacity increased to {cap} (+20)!',
+          )
+          .replaceAll('{cap}', '${controller.treasuryMaxCapacity}');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+    }
 
     return Column(
       key: const ValueKey('castle_wing_treasury'),
@@ -771,7 +816,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Title & Chest Icon
+              // Title & Vault Level Pill Badge
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -792,13 +837,49 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                     ),
                   ),
-                  const TreasuryChestIcon(size: 22),
+                  const SizedBox(width: 8),
+                  Container(
+                    key: const ValueKey('treasury_vault_level_pill'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFE082), _goldFill],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: palette.isDark
+                            ? const Color(0xFFFFF3C4)
+                            : palette.amberBorder,
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _goldFill.withValues(
+                            alpha: palette.isDark ? 0.35 : 0.25,
+                          ),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      levelPillLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                        color: _goldDarkInk,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
 
-              // Full-Width Integrated Progress Bar (X / 250 centered inside)
+              // Full-Width Integrated Progress Bar (X / Y centered inside)
               Container(
+                key: const ValueKey('treasury_progress_track'),
                 height: 21,
                 decoration: BoxDecoration(
                   color: palette.isDark
@@ -806,8 +887,22 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       : const Color(0xFFDCC99E),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: vaultBorderColor.withValues(alpha: 0.55),
+                    color: isFull
+                        ? _goldFill
+                        : vaultBorderColor.withValues(alpha: 0.55),
+                    width: isFull ? 1.6 : 1.0,
                   ),
+                  boxShadow: isFull
+                      ? [
+                          BoxShadow(
+                            color: _goldFill.withValues(
+                              alpha: palette.isDark ? 0.42 : 0.32,
+                            ),
+                            blurRadius: 8,
+                            spreadRadius: 0.5,
+                          ),
+                        ]
+                      : null,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(9),
@@ -819,31 +914,45 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         widthFactor: overallFraction,
                         child: Container(
                           key: const ValueKey('treasury_total_progress'),
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [Color(0xFFD97B12), _goldFill],
+                              colors: isFull
+                                  ? const [
+                                      Color(0xFFFFA000),
+                                      Color(0xFFFFE082),
+                                    ]
+                                  : const [Color(0xFFD97B12), _goldFill],
                             ),
                           ),
                         ),
                       ),
                       Center(
-                        child: Text(
-                          '$totalStored / ${GameController.maxTreasuryTotal}',
-                          key: const ValueKey('treasury_total_count'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11.5,
-                            color: palette.isDark
-                                ? Colors.white
-                                : const Color(0xFF231F1A),
-                            shadows: palette.isDark
-                                ? const [
-                                    Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 3,
-                                    ),
-                                  ]
-                                : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              progressLabel,
+                              key: const ValueKey('treasury_total_count'),
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                                color: isFull
+                                    ? _goldDarkInk
+                                    : (palette.isDark
+                                        ? Colors.white
+                                        : const Color(0xFF231F1A)),
+                                shadows: !isFull && palette.isDark
+                                    ? const [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 3,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -864,12 +973,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         key: ValueKey('treasury_element_${move.orbKey}'),
                         move: move,
                         count: controller.treasuryOrbsFor(move),
-                        cap: GameController.maxTreasuryPerElement,
                         label: _shortElementTitle(move, loc),
-                        fullTag: loc.t(
-                          'castle_treasury_full_tag',
-                          fallback: 'FULL',
-                        ),
                         palette: palette,
                       ),
                     ),
@@ -877,8 +981,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
               ),
               const SizedBox(height: 12),
 
-              // Wide Bright-Gold Claim Button & AdMob Disclosure
-              if (isRemoveAds)
+              // Wide Bright-Gold Claim Button, Upgrade Callout & AdMob Disclosure
+              if (isRemoveAds) ...[
                 SizedBox(
                   height: 42,
                   child: ElevatedButton.icon(
@@ -886,22 +990,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     onPressed: canClaimDirect
                         ? () {
                             final ok = controller.claimTreasuryDirect();
-                            if (ok && context.mounted) {
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      loc.t(
-                                        'castle_treasury_claimed_msg',
-                                        fallback:
-                                            'Treasury orbs transferred to your backpack!',
-                                      ),
-                                    ),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                            }
+                            if (ok) showClaimedToast();
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -924,8 +1013,10 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                     ),
                   ),
-                )
-              else ...[
+                ),
+                const SizedBox(height: 6),
+                upgradeCallout,
+              ] else ...[
                 SizedBox(
                   height: 42,
                   child: ElevatedButton(
@@ -933,23 +1024,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     onPressed: canClaimAd
                         ? () {
                             controller.watchAdToClaimTreasury(
-                              onClaimed: () {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context)
-                                  ..hideCurrentSnackBar()
-                                  ..showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        loc.t(
-                                          'castle_treasury_claimed_msg',
-                                          fallback:
-                                              'Treasury orbs transferred to your backpack!',
-                                        ),
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                              },
+                              onClaimed: showClaimedToast,
                             );
                           }
                         : null,
@@ -984,7 +1059,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 6),
+                upgradeCallout,
+                const SizedBox(height: 3),
                 Text(
                   loc.t(
                     'castle_treasury_ad_disclosure_short',
@@ -2327,24 +2404,19 @@ class _CompactVerticalTabPill extends StatelessWidget {
 class _TreasuryHorizontalOrbColumn extends StatelessWidget {
   final HandMove move;
   final int count;
-  final int cap;
   final String label;
-  final String fullTag;
   final AppPalette palette;
 
   const _TreasuryHorizontalOrbColumn({
     super.key,
     required this.move,
     required this.count,
-    required this.cap,
     required this.label,
-    required this.fullTag,
     required this.palette,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isFull = count >= cap;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2355,16 +2427,19 @@ class _TreasuryHorizontalOrbColumn extends StatelessWidget {
           isDark: palette.isDark,
         ),
         const SizedBox(height: 5),
-        Text(
-          '$count',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13.5,
-            color: isFull
-                ? (palette.isDark
-                      ? _RoyalCastleDialogState._goldFill
-                      : palette.amberText)
-                : palette.primaryText,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$count',
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13.5,
+                color: palette.primaryText,
+              ),
+            ),
           ),
         ),
         Text(
@@ -2378,24 +2453,6 @@ class _TreasuryHorizontalOrbColumn extends StatelessWidget {
                 : palette.secondaryText,
           ),
         ),
-        if (isFull) ...[
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: _RoyalCastleDialogState._goldFill,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              fullTag,
-              style: const TextStyle(
-                fontSize: 8.5,
-                fontWeight: FontWeight.w800,
-                color: _RoyalCastleDialogState._goldDarkInk,
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }

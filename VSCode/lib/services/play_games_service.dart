@@ -268,6 +268,9 @@ class CloudSaveData {
   final int treasuryWoodOrbs;
   final int treasuryEarthOrbs;
   final int treasuryMetalOrbs;
+  final int treasuryMaxCapacity;
+  final int treasuryVaultLevel;
+  final bool treasuryEarthMetalBonusGranted;
   final int spoilsFireOrbs;
   final int spoilsWaterOrbs;
   final int spoilsWoodOrbs;
@@ -389,6 +392,9 @@ class CloudSaveData {
     this.treasuryWoodOrbs = 0,
     this.treasuryEarthOrbs = 0,
     this.treasuryMetalOrbs = 0,
+    this.treasuryMaxCapacity = StorageService.defaultTreasuryMaxCapacity,
+    this.treasuryVaultLevel = StorageService.defaultTreasuryVaultLevel,
+    this.treasuryEarthMetalBonusGranted = false,
     this.spoilsFireOrbs = 0,
     this.spoilsWaterOrbs = 0,
     this.spoilsWoodOrbs = 0,
@@ -539,6 +545,10 @@ class CloudSaveData {
             overchargedStaffLevel > local.overchargedStaffLevel ||
             markovTransitionsCount > local.markovTransitionsCount ||
             totalTreasuryOrbs > local.totalTreasuryOrbs ||
+            treasuryMaxCapacity > local.treasuryMaxCapacity ||
+            treasuryVaultLevel > local.treasuryVaultLevel ||
+            (treasuryEarthMetalBonusGranted &&
+                !local.treasuryEarthMetalBonusGranted) ||
             totalSpoilsOrbs > local.totalSpoilsOrbs ||
             relicChamberUpgrades.length > local.relicChamberUpgrades.length ||
             hpUpgradeLevel > local.hpUpgradeLevel ||
@@ -694,6 +704,12 @@ class CloudSaveData {
       treasuryWoodOrbs: treasuryWoodOrbs,
       treasuryEarthOrbs: treasuryEarthOrbs,
       treasuryMetalOrbs: treasuryMetalOrbs,
+      treasuryMaxCapacity:
+          _maxInt(treasuryMaxCapacity, local.treasuryMaxCapacity),
+      treasuryVaultLevel: _maxInt(treasuryVaultLevel, local.treasuryVaultLevel),
+      treasuryEarthMetalBonusGranted:
+          treasuryEarthMetalBonusGranted ||
+          local.treasuryEarthMetalBonusGranted,
       spoilsFireOrbs: spoilsFireOrbs,
       spoilsWaterOrbs: spoilsWaterOrbs,
       spoilsWoodOrbs: spoilsWoodOrbs,
@@ -830,6 +846,9 @@ class CloudSaveData {
       treasuryWoodOrbs: storage.treasuryWoodOrbs,
       treasuryEarthOrbs: storage.treasuryEarthOrbs,
       treasuryMetalOrbs: storage.treasuryMetalOrbs,
+      treasuryMaxCapacity: storage.treasuryMaxCapacity,
+      treasuryVaultLevel: storage.treasuryVaultLevel,
+      treasuryEarthMetalBonusGranted: storage.treasuryEarthMetalBonusGranted,
       spoilsFireOrbs: storage.spoilsFireOrbs,
       spoilsWaterOrbs: storage.spoilsWaterOrbs,
       spoilsWoodOrbs: storage.spoilsWoodOrbs,
@@ -910,6 +929,11 @@ class CloudSaveData {
       wood: treasuryWoodOrbs,
       earth: treasuryEarthOrbs,
       metal: treasuryMetalOrbs,
+    );
+    await storage.setTreasuryMaxCapacity(treasuryMaxCapacity);
+    await storage.setTreasuryVaultLevel(treasuryVaultLevel);
+    await storage.setTreasuryEarthMetalBonusGranted(
+      treasuryEarthMetalBonusGranted,
     );
     await storage.setAllSpoilsOrbs(
       fire: spoilsFireOrbs,
@@ -1064,6 +1088,9 @@ class CloudSaveData {
         'earth': treasuryEarthOrbs,
         'metal': treasuryMetalOrbs,
       },
+      'treasuryMaxCapacity': treasuryMaxCapacity,
+      'treasuryVaultLevel': treasuryVaultLevel,
+      'treasuryEarthMetalBonusGranted': treasuryEarthMetalBonusGranted,
       'spoilsOfWarOrbs': {
         'fire': spoilsFireOrbs,
         'water': spoilsWaterOrbs,
@@ -1237,6 +1264,16 @@ class CloudSaveData {
     await storage.setBabyMageRobotDefeatedCount(
       _maxInt(storage.babyMageRobotDefeatedCount, babyMageRobotDefeatedCount),
     );
+    await storage.setTreasuryMaxCapacity(
+      _maxInt(storage.treasuryMaxCapacity, treasuryMaxCapacity),
+    );
+    await storage.setTreasuryVaultLevel(
+      _maxInt(storage.treasuryVaultLevel, treasuryVaultLevel),
+    );
+    if (treasuryEarthMetalBonusGranted &&
+        !storage.treasuryEarthMetalBonusGranted) {
+      await storage.setTreasuryEarthMetalBonusGranted(true);
+    }
   }
 
   static List<String> _parseStringList(dynamic raw) {
@@ -1309,6 +1346,22 @@ class CloudSaveData {
       treasuryWoodOrbs: (treasuryMap?['wood'] as num?)?.toInt() ?? 0,
       treasuryEarthOrbs: (treasuryMap?['earth'] as num?)?.toInt() ?? 0,
       treasuryMetalOrbs: (treasuryMap?['metal'] as num?)?.toInt() ?? 0,
+      treasuryMaxCapacity: (() {
+        final raw = (map['treasuryMaxCapacity'] as num?)?.toInt();
+        if (raw == null || raw < StorageService.defaultTreasuryMaxCapacity) {
+          return StorageService.defaultTreasuryMaxCapacity;
+        }
+        return raw;
+      })(),
+      treasuryVaultLevel: (() {
+        final raw = (map['treasuryVaultLevel'] as num?)?.toInt();
+        if (raw == null || raw < StorageService.defaultTreasuryVaultLevel) {
+          return StorageService.defaultTreasuryVaultLevel;
+        }
+        return raw;
+      })(),
+      treasuryEarthMetalBonusGranted:
+          map['treasuryEarthMetalBonusGranted'] as bool? ?? false,
       spoilsFireOrbs: (spoilsMap?['fire'] as num?)?.toInt() ?? 0,
       spoilsWaterOrbs: (spoilsMap?['water'] as num?)?.toInt() ?? 0,
       spoilsWoodOrbs: (spoilsMap?['wood'] as num?)?.toInt() ?? 0,

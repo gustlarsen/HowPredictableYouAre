@@ -45,8 +45,10 @@ class GameController extends ChangeNotifier {
   static const int damagePerLoss = 1;
   static const int phase2BaseBossDamage = 2;
   static const int phase2BonusBossDamage = 4;
-  static const int maxTreasuryPerElement = 50;
-  static const int maxTreasuryTotal = 250;
+  static const int initialTreasuryCapacity =
+      StorageService.defaultTreasuryMaxCapacity;
+  static const int treasuryEarthMetalBonus = 100;
+  static const int treasuryClaimCapacityBonus = 20;
   static const int maxWeeklyAdConsagrations = 3;
   static const int vitalityBlessingBonusHp = 15;
   static const int clairvoyanceBlessingMoves = 3;
@@ -608,6 +610,9 @@ class GameController extends ChangeNotifier {
   int treasuryWoodOrbs = 0;
   int treasuryEarthOrbs = 0;
   int treasuryMetalOrbs = 0;
+  int treasuryMaxCapacity = initialTreasuryCapacity;
+  int treasuryVaultLevel = StorageService.defaultTreasuryVaultLevel;
+  bool treasuryEarthMetalBonusGranted = false;
 
   int spoilsFireOrbs = 0;
   int spoilsWaterOrbs = 0;
@@ -1244,6 +1249,15 @@ class GameController extends ChangeNotifier {
     treasuryWoodOrbs = storage.treasuryWoodOrbs;
     treasuryEarthOrbs = storage.treasuryEarthOrbs;
     treasuryMetalOrbs = storage.treasuryMetalOrbs;
+    treasuryMaxCapacity = storage.treasuryMaxCapacity;
+    treasuryVaultLevel = storage.treasuryVaultLevel;
+    treasuryEarthMetalBonusGranted = storage.treasuryEarthMetalBonusGranted;
+    if (unlockedNewHands && !treasuryEarthMetalBonusGranted) {
+      treasuryMaxCapacity += treasuryEarthMetalBonus;
+      treasuryEarthMetalBonusGranted = true;
+      storage.setTreasuryMaxCapacity(treasuryMaxCapacity);
+      storage.setTreasuryEarthMetalBonusGranted(true);
+    }
 
     spoilsFireOrbs = storage.spoilsFireOrbs;
     spoilsWaterOrbs = storage.spoilsWaterOrbs;
@@ -1335,19 +1349,7 @@ class GameController extends ChangeNotifier {
       treasuryEarthOrbs +
       treasuryMetalOrbs;
 
-  bool get isAnyTreasuryElementFull =>
-      treasuryFireOrbs >= maxTreasuryPerElement ||
-      treasuryWaterOrbs >= maxTreasuryPerElement ||
-      treasuryWoodOrbs >= maxTreasuryPerElement ||
-      treasuryEarthOrbs >= maxTreasuryPerElement ||
-      treasuryMetalOrbs >= maxTreasuryPerElement;
-
-  bool get isTreasuryCompletelyFull =>
-      treasuryFireOrbs >= maxTreasuryPerElement &&
-      treasuryWaterOrbs >= maxTreasuryPerElement &&
-      treasuryWoodOrbs >= maxTreasuryPerElement &&
-      treasuryEarthOrbs >= maxTreasuryPerElement &&
-      treasuryMetalOrbs >= maxTreasuryPerElement;
+  bool get isTreasuryFull => totalTreasuryOrbs >= treasuryMaxCapacity;
 
   int spoilsOrbsFor(HandMove move) {
     switch (move) {
@@ -1490,7 +1492,7 @@ class GameController extends ChangeNotifier {
   int get hallOfHeroesTargetMaxMana => baseMaxMana + peakManaUpgradeLevel;
 
   bool get hasRoyalCastleNotification =>
-      isAnyTreasuryElementFull ||
+      isTreasuryFull ||
       hasAvailableRelicChamberUpgrades ||
       hasSpoilsOfWarOrbs ||
       hasHallOfHeroesBlessings;
@@ -1562,42 +1564,38 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  void _grantTreasuryEarthMetalBonusIfNeeded() {
+    if (treasuryEarthMetalBonusGranted) return;
+    treasuryMaxCapacity += treasuryEarthMetalBonus;
+    treasuryEarthMetalBonusGranted = true;
+    storage.setTreasuryMaxCapacity(treasuryMaxCapacity);
+    storage.setTreasuryEarthMetalBonusGranted(true);
+  }
+
   void _depositTreasuryOrbForMove(HandMove move, int delta) {
     if (delta <= 0) return;
+    final remainingSpace = math.max(0, treasuryMaxCapacity - totalTreasuryOrbs);
+    final toAdd = math.min(delta, remainingSpace);
+    if (toAdd <= 0) return;
     switch (move) {
       case HandMove.rock:
-        treasuryFireOrbs = math.min(
-          maxTreasuryPerElement,
-          treasuryFireOrbs + delta,
-        );
+        treasuryFireOrbs += toAdd;
         storage.setTreasuryFireOrbs(treasuryFireOrbs);
         break;
       case HandMove.paper:
-        treasuryWaterOrbs = math.min(
-          maxTreasuryPerElement,
-          treasuryWaterOrbs + delta,
-        );
+        treasuryWaterOrbs += toAdd;
         storage.setTreasuryWaterOrbs(treasuryWaterOrbs);
         break;
       case HandMove.scissors:
-        treasuryWoodOrbs = math.min(
-          maxTreasuryPerElement,
-          treasuryWoodOrbs + delta,
-        );
+        treasuryWoodOrbs += toAdd;
         storage.setTreasuryWoodOrbs(treasuryWoodOrbs);
         break;
       case HandMove.lizard:
-        treasuryEarthOrbs = math.min(
-          maxTreasuryPerElement,
-          treasuryEarthOrbs + delta,
-        );
+        treasuryEarthOrbs += toAdd;
         storage.setTreasuryEarthOrbs(treasuryEarthOrbs);
         break;
       case HandMove.spock:
-        treasuryMetalOrbs = math.min(
-          maxTreasuryPerElement,
-          treasuryMetalOrbs + delta,
-        );
+        treasuryMetalOrbs += toAdd;
         storage.setTreasuryMetalOrbs(treasuryMetalOrbs);
         break;
     }
@@ -1605,26 +1603,30 @@ class GameController extends ChangeNotifier {
 
   void _depositTreasuryAllElements(int amountPerElement) {
     if (amountPerElement <= 0) return;
-    treasuryFireOrbs = math.min(
-      maxTreasuryPerElement,
-      treasuryFireOrbs + amountPerElement,
-    );
-    treasuryWaterOrbs = math.min(
-      maxTreasuryPerElement,
-      treasuryWaterOrbs + amountPerElement,
-    );
-    treasuryWoodOrbs = math.min(
-      maxTreasuryPerElement,
-      treasuryWoodOrbs + amountPerElement,
-    );
-    treasuryEarthOrbs = math.min(
-      maxTreasuryPerElement,
-      treasuryEarthOrbs + amountPerElement,
-    );
-    treasuryMetalOrbs = math.min(
-      maxTreasuryPerElement,
-      treasuryMetalOrbs + amountPerElement,
-    );
+    int remainingSpace = math.max(0, treasuryMaxCapacity - totalTreasuryOrbs);
+    if (remainingSpace <= 0) return;
+    for (int round = 0; round < amountPerElement && remainingSpace > 0; round++) {
+      if (remainingSpace > 0) {
+        treasuryFireOrbs += 1;
+        remainingSpace -= 1;
+      }
+      if (remainingSpace > 0) {
+        treasuryWaterOrbs += 1;
+        remainingSpace -= 1;
+      }
+      if (remainingSpace > 0) {
+        treasuryWoodOrbs += 1;
+        remainingSpace -= 1;
+      }
+      if (remainingSpace > 0) {
+        treasuryEarthOrbs += 1;
+        remainingSpace -= 1;
+      }
+      if (remainingSpace > 0) {
+        treasuryMetalOrbs += 1;
+        remainingSpace -= 1;
+      }
+    }
     _persistTreasuryOrbsToStorage();
   }
 
@@ -1740,9 +1742,14 @@ class GameController extends ChangeNotifier {
     treasuryEarthOrbs = 0;
     treasuryMetalOrbs = 0;
 
+    treasuryMaxCapacity += treasuryClaimCapacityBonus;
+    treasuryVaultLevel += 1;
+
     _persistOrbsToStorage();
     _persistTurn0OrbsToStorage();
     _persistTreasuryOrbsToStorage();
+    storage.setTreasuryMaxCapacity(treasuryMaxCapacity);
+    storage.setTreasuryVaultLevel(treasuryVaultLevel);
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -1881,6 +1888,7 @@ class GameController extends ChangeNotifier {
       case ShopUpgradeArtifact.newHands:
         unlockedNewHands = true;
         storage.setUnlockedNewHands(true);
+        _grantTreasuryEarthMetalBonusIfNeeded();
         break;
       case ShopUpgradeArtifact.random:
         unlockedRandom = true;
@@ -2159,7 +2167,7 @@ class GameController extends ChangeNotifier {
       // Grant +1 (or 2x with Harvest blessing) Elemental Orb of the defeated AI/PC element
       final orbGain = isHarvestBlessingActive ? 2 : 1;
       _incrementOrbForMove(currentComputerMove!, orbGain);
-      // Mirror +1 Elemental Orb into Royal Treasury Piggy Bank (capped at 50/element)
+      // Mirror +1 Elemental Orb into Royal Treasury Vault (up to shared treasuryMaxCapacity)
       _depositTreasuryOrbForMove(currentComputerMove!, 1);
       lastCollectedOrbMove = currentComputerMove;
       orbCollectionEventId += 1;
@@ -3254,6 +3262,7 @@ class GameController extends ChangeNotifier {
         showNewHands = false;
         storage.setUnlockedNewHands(true);
         storage.setShowNewHands(false);
+        _grantTreasuryEarthMetalBonusIfNeeded();
       },
     );
   }
@@ -3501,6 +3510,7 @@ class GameController extends ChangeNotifier {
         }
         unlockedNewHands = true;
         storage.setUnlockedNewHands(true);
+        _grantTreasuryEarthMetalBonusIfNeeded();
         break;
       case BillingService.productYourPrediction:
         if (!unlockedYourPrediction) {

@@ -778,12 +778,18 @@ class StorageService {
     return _prefs.remove(shortTermTransitionsKey);
   }
 
-  // Royal Treasury Piggy Bank Orbs (capped at 50 per element)
+  // Royal Treasury Piggy Bank Orbs (shared vault capacity)
+  static const int defaultTreasuryMaxCapacity = 200;
+  static const int defaultTreasuryVaultLevel = 1;
   static const String _treasuryFireKey = 'treasury_orbs_fire';
   static const String _treasuryWaterKey = 'treasury_orbs_water';
   static const String _treasuryWoodKey = 'treasury_orbs_wood';
   static const String _treasuryEarthKey = 'treasury_orbs_earth';
   static const String _treasuryMetalKey = 'treasury_orbs_metal';
+  static const String _treasuryMaxCapacityKey = 'treasury_max_capacity';
+  static const String _treasuryVaultLevelKey = 'treasury_vault_level';
+  static const String _treasuryEarthMetalBonusGrantedKey =
+      'treasury_earth_metal_bonus_granted';
 
   int get treasuryFireOrbs => _prefs.getInt(_treasuryFireKey) ?? 0;
   Future<void> setTreasuryFireOrbs(int val) =>
@@ -804,6 +810,38 @@ class StorageService {
   int get treasuryMetalOrbs => _prefs.getInt(_treasuryMetalKey) ?? 0;
   Future<void> setTreasuryMetalOrbs(int val) =>
       _prefs.setInt(_treasuryMetalKey, val);
+
+  int get treasuryMaxCapacity {
+    final val = _prefs.getInt(_treasuryMaxCapacityKey);
+    if (val == null || val < defaultTreasuryMaxCapacity) {
+      return defaultTreasuryMaxCapacity;
+    }
+    return val;
+  }
+
+  Future<void> setTreasuryMaxCapacity(int val) => _prefs.setInt(
+    _treasuryMaxCapacityKey,
+    val < defaultTreasuryMaxCapacity ? defaultTreasuryMaxCapacity : val,
+  );
+
+  int get treasuryVaultLevel {
+    final val = _prefs.getInt(_treasuryVaultLevelKey);
+    if (val == null || val < defaultTreasuryVaultLevel) {
+      return defaultTreasuryVaultLevel;
+    }
+    return val;
+  }
+
+  Future<void> setTreasuryVaultLevel(int val) => _prefs.setInt(
+    _treasuryVaultLevelKey,
+    val < defaultTreasuryVaultLevel ? defaultTreasuryVaultLevel : val,
+  );
+
+  bool get treasuryEarthMetalBonusGranted =>
+      _prefs.getBool(_treasuryEarthMetalBonusGrantedKey) ?? false;
+
+  Future<void> setTreasuryEarthMetalBonusGranted(bool val) =>
+      _prefs.setBool(_treasuryEarthMetalBonusGrantedKey, val);
 
   Future<void> setAllTreasuryOrbs({
     required int fire,
@@ -1057,6 +1095,9 @@ class StorageService {
   Future<void> clearAllCastleData() {
     return Future.wait([
       setAllTreasuryOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
+      setTreasuryMaxCapacity(defaultTreasuryMaxCapacity),
+      setTreasuryVaultLevel(defaultTreasuryVaultLevel),
+      setTreasuryEarthMetalBonusGranted(false),
       setAllSpoilsOrbs(fire: 0, water: 0, wood: 0, earth: 0, metal: 0),
       setRelicChamberUpgrades(const []),
       setPeakHpUpgradeLevel(0),

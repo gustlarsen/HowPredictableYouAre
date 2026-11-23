@@ -175,49 +175,68 @@ void main() {
 
   group('Royal Castle Hub Unit & Logic Tests', () {
     test(
-      'Winning rounds mirrors +1 orb to Royal Treasury (capped at 50 per element) and claiming transfers & resets to 0',
+      'Winning rounds mirrors +1 orb to Royal Treasury up to shared 200 capacity (e.g. 200 Fire alone) and claiming transfers, resets to 0, & upgrades capacity +20',
       () async {
         final adClient = _TestAdMobClient(grantRewardOnShow: false);
-        final controller = await _createController(adClient: adClient);
+        final controller = await _createController(
+          adClient: adClient,
+          prefs: {
+            'enemy_stage': 4,
+            'enemy_max_hp': 400,
+            'pcHp': 400,
+            'mana_upgrade_level': 150,
+            'royal_decrees_completed_cycle_ids': [
+              'decree_no_repeat_10',
+              'decree_defeat_15',
+              'decree_predict_70',
+            ],
+          },
+        );
         addTearDown(controller.dispose);
 
-        // Win 52 Fire orbs (Paper beats Rock/Fire in elemental mode)
-        for (int i = 0; i < 52; i++) {
+        expect(controller.treasuryMaxCapacity, 200);
+        expect(controller.treasuryVaultLevel, 1);
+
+        // Win 205 Fire orbs (Paper beats Rock/Fire in elemental mode)
+        for (int i = 0; i < 205; i++) {
           controller.crystalBallMove = HandMove.rock;
           controller.playTurn(HandMove.paper);
         }
 
-        // Backpack receives all 52; Treasury caps Fire at 50 per element
-        // (and defeat15 Royal Decree deposits +5 to each element).
-        expect(controller.fireOrbs, 52);
-        expect(controller.treasuryFireOrbs, 50);
-        expect(controller.treasuryWaterOrbs, 5);
-        expect(controller.totalTreasuryOrbs, 70);
-        expect(controller.isAnyTreasuryElementFull, isTrue);
+        // Backpack receives all 205; Treasury caps shared total at 200 Fire orbs alone
+        expect(controller.fireOrbs, 205);
+        expect(controller.treasuryFireOrbs, 200);
+        expect(controller.treasuryWaterOrbs, 0);
+        expect(controller.totalTreasuryOrbs, 200);
+        expect(controller.isTreasuryFull, isTrue);
         expect(controller.hasRoyalCastleNotification, isTrue);
 
-        // Early ad dismissal does not claim or reset Treasury
+        // Early ad dismissal does not claim, reset Treasury, or upgrade vault
         final failedClaim = await controller.watchAdToClaimTreasury();
         expect(failedClaim, isFalse);
-        expect(controller.fireOrbs, 52);
-        expect(controller.treasuryFireOrbs, 50);
+        expect(controller.fireOrbs, 205);
+        expect(controller.treasuryFireOrbs, 200);
+        expect(controller.treasuryMaxCapacity, 200);
+        expect(controller.treasuryVaultLevel, 1);
 
-        // Complete rewarded ad transfers Treasury orbs & resets Treasury to 0
+        // Complete rewarded ad transfers Treasury orbs, resets Treasury to 0,
+        // increments vault level (1 -> 2), and increases capacity (+20 -> 220)
         adClient.grantRewardOnShow = true;
         final okClaim = await controller.watchAdToClaimTreasury();
         expect(okClaim, isTrue);
-        expect(controller.fireOrbs, 102);
-        expect(controller.waterOrbs, 5);
-        expect(controller.turn0FireOrbs, 50);
+        expect(controller.fireOrbs, 405);
+        expect(controller.turn0FireOrbs, 200);
         expect(controller.treasuryFireOrbs, 0);
         expect(controller.totalTreasuryOrbs, 0);
-        expect(controller.isAnyTreasuryElementFull, isFalse);
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 220);
+        expect(controller.isTreasuryFull, isFalse);
         expect(controller.hasRoyalCastleNotification, isFalse);
       },
     );
 
     test(
-      'Remove Ads users can claim Treasury, restore Relics, and reclaim Spoils directly without watching an ad',
+      'Remove Ads users can claim Treasury anytime (>= 1 orb), restore Relics, and reclaim Spoils directly without watching an ad',
       () async {
         final adClient = _TestAdMobClient(rewardedAvailable: false);
         final controller = await _createController(
@@ -225,7 +244,7 @@ void main() {
           prefs: {
             'unlockedAds': true,
             'removeAdsEnabled': true,
-            'treasury_orbs_water': 12,
+            'treasury_orbs_water': 1,
             'spoils_orbs_wood': 7,
             'relic_chamber_upgrades': ['reset', 'algorithm'],
           },
@@ -233,9 +252,12 @@ void main() {
         addTearDown(controller.dispose);
 
         expect(controller.isRemoveAdsActive, isTrue);
+        expect(controller.isTreasuryFull, isFalse);
         expect(controller.claimTreasuryDirect(), isTrue);
-        expect(controller.waterOrbs, 12);
+        expect(controller.waterOrbs, 1);
         expect(controller.treasuryWaterOrbs, 0);
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 220);
 
         expect(controller.restoreRelicsDirect(), isTrue);
         expect(controller.unlockedReset, isTrue);
@@ -496,7 +518,7 @@ void main() {
             'current_week': 10,
             'orbs_fire': 9,
             'orbs_water': 2,
-            'treasury_orbs_fire': 50,
+            'treasury_orbs_fire': 190,
             'treasury_orbs_wood': 10,
             'spoils_orbs_earth': 6,
             'relic_chamber_upgrades': ['reset'],
@@ -592,6 +614,11 @@ void main() {
             findsOneWidget,
           );
           expect(
+            find.byKey(const ValueKey('treasury_vault_level_pill')),
+            findsOneWidget,
+          );
+          expect(find.text('Lv. 1'), findsOneWidget);
+          expect(
             find.byKey(const ValueKey('treasury_orbs_horizontal_row')),
             findsOneWidget,
           );
@@ -599,11 +626,19 @@ void main() {
             find.byKey(const ValueKey('treasury_total_count')),
             findsOneWidget,
           );
-          expect(find.text('60 / 250'), findsOneWidget);
-          expect(find.text('FULL'), findsOneWidget);
+          expect(find.text('200 / 200 • FULL'), findsOneWidget);
+          expect(find.text('FULL'), findsNothing);
           expect(find.byType(ElementalEnergySphere), findsAtLeastNWidgets(5));
           expect(
             find.byKey(const ValueKey('treasury_claim_ad_button')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('treasury_upgrade_callout')),
+            findsOneWidget,
+          );
+          expect(
+            find.text('Claim to collect & upgrade vault (+20 capacity)'),
             findsOneWidget,
           );
           expect(
@@ -671,9 +706,18 @@ void main() {
         // Claim Treasury via Rewarded Ad (no scrolling needed)
         await tester.tap(find.byKey(const ValueKey('treasury_claim_ad_button')));
         await tester.pumpAndSettle();
-        expect(controller.fireOrbs, 59);
+        expect(controller.fireOrbs, 199);
         expect(controller.woodOrbs, 10);
         expect(controller.totalTreasuryOrbs, 0);
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 220);
+        expect(find.text('Lv. 2'), findsOneWidget);
+        expect(find.text('0 / 220'), findsOneWidget);
+        expect(
+          find.text('Treasury claimed! Vault capacity increased to 220 (+20)!'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('castle_tab_treasury_dot')), findsNothing);
       },
     );
 
@@ -690,7 +734,7 @@ void main() {
         final controller = await _createController(
           loadJsonStrings: true,
           prefs: {
-            'treasury_orbs_fire': 50,
+            'treasury_orbs_fire': 200,
             'unlockedAds': true,
             'removeAdsEnabled': true,
           },
@@ -1031,7 +1075,11 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isTrue);
-          expect(find.byType(TreasuryChestIcon), findsNWidgets(2));
+          expect(find.byType(TreasuryChestIcon), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('treasury_vault_level_pill')),
+            findsOneWidget,
+          );
 
           // Wing 4 (Relics)
           await tester.tap(relicsTab);
@@ -1056,6 +1104,226 @@ void main() {
           expect(find.byType(RubyHeartIcon), findsOneWidget);
           expect(find.byType(ManaCrystalIcon), findsOneWidget);
           expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  });
+
+  group('Royal Treasury Progressive Shared Capacity & Persistence', () {
+    test(
+      'Unlocking Earth & Metal grants +100 capacity once (200 -> 300), toggling ON/OFF grants nothing extra, and existing saves migrate on load',
+      () async {
+        // 1. Fresh account starts at 200 capacity, Lv. 1
+        final controller = await _createController(
+          prefs: {
+            'orbs_earth': 100,
+            'orbs_metal': 100,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        expect(controller.treasuryMaxCapacity, 200);
+        expect(controller.treasuryVaultLevel, 1);
+        expect(controller.treasuryEarthMetalBonusGranted, isFalse);
+
+        // Unlock Earth & Metal -> +100 capacity once (200 -> 300)
+        expect(controller.unlockNewHands(), isTrue);
+        expect(controller.unlockedNewHands, isTrue);
+        expect(controller.treasuryEarthMetalBonusGranted, isTrue);
+        expect(controller.treasuryMaxCapacity, 300);
+        expect(controller.storage.treasuryMaxCapacity, 300);
+        expect(controller.storage.treasuryEarthMetalBonusGranted, isTrue);
+
+        // Toggling Earth & Metal ON/OFF never grants extra capacity
+        controller.toggleShowNewHands(true);
+        expect(controller.treasuryMaxCapacity, 300);
+        controller.toggleShowNewHands(false);
+        expect(controller.treasuryMaxCapacity, 300);
+        controller.toggleShowNewHands(true);
+        expect(controller.treasuryMaxCapacity, 300);
+
+        // Resetting run and re-unlocking Earth & Metal never grants +100 again
+        await controller.resetAllProgress();
+        expect(controller.unlockedNewHands, isFalse);
+        expect(controller.treasuryEarthMetalBonusGranted, isTrue);
+        expect(controller.treasuryMaxCapacity, 300);
+
+        controller.addAllOrbs(100);
+        expect(controller.unlockNewHands(), isTrue);
+        expect(controller.treasuryMaxCapacity, 300);
+
+        // 2. Existing save migration: unlockedNewHands=true & bonus flag=false -> +100 on load
+        final migratedController = await _createController(
+          prefs: {
+            'unlockedNewHands': true,
+          },
+        );
+        addTearDown(migratedController.dispose);
+        expect(migratedController.treasuryEarthMetalBonusGranted, isTrue);
+        expect(migratedController.treasuryMaxCapacity, 300);
+        expect(migratedController.storage.treasuryEarthMetalBonusGranted, isTrue);
+        expect(migratedController.storage.treasuryMaxCapacity, 300);
+
+        // 3. IAP unlock path also grants +100 once
+        final iapController = await _createController();
+        addTearDown(iapController.dispose);
+        expect(iapController.treasuryMaxCapacity, 200);
+        expect(
+          iapController.unlockByProductId(BillingService.productNewHands),
+          isTrue,
+        );
+        expect(iapController.treasuryMaxCapacity, 300);
+        expect(iapController.treasuryEarthMetalBonusGranted, isTrue);
+        // Calling IAP restore again does not add another +100
+        expect(
+          iapController.unlockByProductId(BillingService.productNewHands),
+          isTrue,
+        );
+        expect(iapController.treasuryMaxCapacity, 300);
+      },
+    );
+
+    test(
+      'Treasury capacity, vault level, and Earth/Metal bonus flag survive 0 HP defeat, Week 40 deadline, Reset All Progress, and sync/merge via CloudSaveData',
+      () async {
+        final playGamesClient = _TestPlayGamesClient();
+        final controller = await _createController(
+          playGamesClient: playGamesClient,
+          prefs: {
+            'unlockedAds': true,
+            'removeAdsEnabled': true,
+            'treasury_orbs_fire': 5,
+            'orbs_earth': 50,
+            'orbs_metal': 50,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        // Claim with >= 1 orb -> Lv. 1 -> Lv. 2, capacity 200 -> 220
+        expect(controller.claimTreasuryDirect(), isTrue);
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 220);
+
+        // Unlock Earth & Metal -> capacity 220 -> 320
+        expect(controller.unlockNewHands(), isTrue);
+        expect(controller.treasuryMaxCapacity, 320);
+
+        // 0 HP defeat preserves capacity, vault level, and bonus flag
+        await controller.applyPermadeathReset(
+          cause: PermadeathCause.battleDefeat,
+        );
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 320);
+        expect(controller.treasuryEarthMetalBonusGranted, isTrue);
+
+        // Week 40 deadline preserves capacity, vault level, and bonus flag
+        await controller.applyPermadeathReset(
+          cause: PermadeathCause.deadlineExceeded,
+        );
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 320);
+        expect(controller.treasuryEarthMetalBonusGranted, isTrue);
+
+        // Reset All Progress preserves capacity, vault level, and bonus flag
+        await controller.resetAllProgress();
+        expect(controller.treasuryVaultLevel, 2);
+        expect(controller.treasuryMaxCapacity, 320);
+        expect(controller.treasuryEarthMetalBonusGranted, isTrue);
+
+        // CloudSaveData round-trip & merge (max(local, cloud) and local || cloud)
+        await Future<void>.delayed(Duration.zero);
+        final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload)!;
+        expect(cloud.treasuryVaultLevel, 2);
+        expect(cloud.treasuryMaxCapacity, 320);
+        expect(cloud.treasuryEarthMetalBonusGranted, isTrue);
+
+        const olderCloud = CloudSaveData(
+          treasuryMaxCapacity: 260,
+          treasuryVaultLevel: 4,
+          treasuryEarthMetalBonusGranted: false,
+        );
+        const richerLocal = CloudSaveData(
+          treasuryMaxCapacity: 320,
+          treasuryVaultLevel: 2,
+          treasuryEarthMetalBonusGranted: true,
+        );
+        final merged = olderCloud.mergeOverLocal(richerLocal);
+        expect(merged.treasuryMaxCapacity, 320);
+        expect(merged.treasuryVaultLevel, 4);
+        expect(merged.treasuryEarthMetalBonusGranted, isTrue);
+      },
+    );
+
+    testWidgets(
+      'Treasury tab renders Lv. X pill, partial/full shared bar, 4- & 5-digit FittedBox counters, +20 sub-label, and Dark/Light theme without overflow',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 760);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {
+            'treasury_orbs_fire': 1240,
+            'treasury_orbs_water': 12400,
+            'treasury_max_capacity': 20000,
+            'treasury_vault_level': 7,
+            'unlockedAds': true,
+            'removeAdsEnabled': true,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: RoyalCastleDialog(
+                  controller: controller,
+                  initialWing: CastleWing.treasury,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          expect(find.text('Lv. 7'), findsOneWidget);
+          expect(find.text('13640 / 20000'), findsOneWidget);
+          expect(find.text('1240'), findsOneWidget);
+          expect(find.text('12400'), findsOneWidget);
+          expect(
+            find.text('Claim to collect & upgrade vault (+20 capacity)'),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('treasury_claim_direct_button')),
+            findsOneWidget,
+          );
+          // Not full yet -> no Treasury tab dot
+          expect(
+            find.byKey(const Key('castle_tab_treasury_dot')),
+            findsNothing,
+          );
+
+          // Verify 4- and 5-digit orb counters are wrapped in FittedBox(scaleDown)
+          final fireColumn = find.byKey(const ValueKey('treasury_element_fire'));
+          final fireFitted = find.descendant(
+            of: fireColumn,
+            matching: find.byType(FittedBox),
+          );
+          expect(fireFitted, findsOneWidget);
+          expect(
+            tester.widget<FittedBox>(fireFitted).fit,
+            BoxFit.scaleDown,
+          );
         }
       },
     );
