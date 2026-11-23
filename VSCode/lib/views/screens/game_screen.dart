@@ -1966,68 +1966,126 @@ class _GameScreenState extends State<GameScreen>
                   // 0. Custom RPG Top HUD Bar
                   _buildTopHudBar(context, controller, loc, inputsLocked),
 
-                  // 1. Scrollable Upper Region (ScoreHeader, HintsBar, VersusArena, MarkovMatrixView)
+                  // 1. Bounded Top Scrollable HUD + Stationary Grounded VersusArena
                   Expanded(
                     child: LayoutBuilder(
-                      builder: (context, viewportConstraints) {
+                      builder: (context, middleConstraints) {
                         final hasVisibleHints = controller.showYourPrediction ||
                             controller.showNextMove ||
                             controller.showSuggestion ||
                             controller.showCrystalBall;
+                        final isCompactHeight =
+                            middleConstraints.maxHeight < 370.0;
 
-                        return SingleChildScrollView(
-                          key: const ValueKey('game_upper_scroll_view'),
-                          padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: 480,
-                                minHeight: (viewportConstraints.maxHeight - 8)
-                                    .clamp(0.0, double.infinity),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
-                                  AnimatedSize(
-                                    duration: const Duration(milliseconds: 250),
-                                    curve: Curves.easeInOut,
-                                    child: AnimatedSwitcher(
-                                      duration: controller.animationsEnabled
-                                          ? const Duration(milliseconds: 250)
-                                          : Duration.zero,
-                                      child: (controller
-                                                  .unlockedPredictability &&
-                                              controller.showPredictability)
-                                          ? Padding(
-                                              key: const ValueKey(
-                                                'score_header_visible',
-                                              ),
-                                              padding: const EdgeInsets.only(
-                                                bottom: 4,
-                                              ),
-                                              child: ScoreHeader(
-                                                controller: controller,
-                                              ),
-                                            )
-                                          : const SizedBox.shrink(
-                                              key: ValueKey(
-                                                'score_header_hidden',
-                                              ),
+                        return Column(
+                          children: [
+                            // 1a. Bounded Scrollable Upper HUD Panel (ScoreHeader, HintsBar, SacredBlessing, MarkovMatrixView)
+                            Expanded(
+                              child: ClipRect(
+                                child: SingleChildScrollView(
+                                  key: const ValueKey('game_upper_scroll_view'),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    2,
+                                    12,
+                                    6,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.topCenter,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 480,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Scoreboard & Predictability Gauge Header (hidden unless unlocked & enabled)
+                                          AnimatedSize(
+                                            duration: const Duration(
+                                              milliseconds: 250,
                                             ),
+                                            curve: Curves.easeInOut,
+                                            child: AnimatedSwitcher(
+                                              duration: controller
+                                                      .animationsEnabled
+                                                  ? const Duration(
+                                                      milliseconds: 250,
+                                                    )
+                                                  : Duration.zero,
+                                              child: (controller
+                                                          .unlockedPredictability &&
+                                                      controller
+                                                          .showPredictability)
+                                                  ? Padding(
+                                                      key: const ValueKey(
+                                                        'score_header_visible',
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                        bottom: 4,
+                                                      ),
+                                                      child: ScoreHeader(
+                                                        controller: controller,
+                                                      ),
+                                                    )
+                                                  : const SizedBox.shrink(
+                                                      key: ValueKey(
+                                                        'score_header_hidden',
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+
+                                          // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
+                                          HintsBar(controller: controller),
+                                          if (hasVisibleHints)
+                                            const SizedBox(height: 6),
+
+                                          _buildSacredBlessingPill(
+                                            context,
+                                            controller,
+                                          ),
+
+                                          // Live Markov Transition Matrix moved to Top Scrollable HUD (if unlocked & enabled)
+                                          if (controller.showAlgorithm) ...[
+                                            const SizedBox(height: 6),
+                                            MarkovMatrixView(
+                                              engine: controller.engine,
+                                              lastUserMove:
+                                                  controller.lastUserMove,
+                                              elementalMode:
+                                                  controller.isElementalMode,
+                                              localization: loc,
+                                              isArchmageShortTermView: controller
+                                                      .isArchmageBoss &&
+                                                  controller
+                                                      .isMarkovRecalibratorActive,
+                                              isBabyMageRandomView:
+                                                  controller.isBabyMageBoss,
+                                              isMetalWizardView:
+                                                  controller.isMetalWizardBoss,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                   ),
+                                ),
+                              ),
+                            ),
 
-                                  // Unlocked Hint Pills (Prediction, Next move, Suggestion, Crystal Ball)
-                                  HintsBar(controller: controller),
-                                  if (hasVisibleHints)
-                                    const SizedBox(height: 6),
-
-                                  _buildSacredBlessingPill(context, controller),
-                                  const SizedBox(height: 6),
-
-                                  // Central RPG Versus Arena
-                                  VersusArena(
+                            // 1b. Stationary Grounded VersusArena Locked Directly Above Bottom Move Card
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 480,
+                                  ),
+                                  child: VersusArena(
+                                    compactHeight: isCompactHeight,
                                     userMove: controller.currentUserMove,
                                     computerMove:
                                         controller.currentComputerMove,
@@ -2056,28 +2114,10 @@ class _GameScreenState extends State<GameScreen>
                                         ? controller.audio.playTapVibrate
                                         : null,
                                   ),
-
-                                  // Live Markov Transition Matrix (if unlocked & enabled)
-                                  if (controller.showAlgorithm) ...[
-                                    const SizedBox(height: 10),
-                                    MarkovMatrixView(
-                                      engine: controller.engine,
-                                      lastUserMove: controller.lastUserMove,
-                                      elementalMode: controller.isElementalMode,
-                                      localization: loc,
-                                      isArchmageShortTermView:
-                                          controller.isArchmageBoss &&
-                                          controller.isMarkovRecalibratorActive,
-                                      isBabyMageRandomView:
-                                          controller.isBabyMageBoss,
-                                      isMetalWizardView:
-                                          controller.isMetalWizardBoss,
-                                    ),
-                                  ],
-                                ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         );
                       },
                     ),

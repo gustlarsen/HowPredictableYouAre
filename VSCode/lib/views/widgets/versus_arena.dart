@@ -60,6 +60,7 @@ class VersusArena extends StatefulWidget {
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
   final Key? clashCenterKey;
+  final bool compactHeight;
 
   const VersusArena({
     super.key,
@@ -83,6 +84,7 @@ class VersusArena extends StatefulWidget {
     this.onImpactHaptic,
     this.pcSlotKey,
     this.clashCenterKey,
+    this.compactHeight = false,
   });
 
   @override
@@ -656,6 +658,7 @@ class _VersusArenaState extends State<VersusArena>
               const totalItemsWidth = cardWidth * 2 + vsWidth;
               const spriteWidth = 112.0;
               const spriteHeight = 112.0;
+              final arenaStackHeight = widget.compactHeight ? 132.0 : 140.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
               final freeSpace = math.max(0.0, rowWidth - totalItemsWidth);
@@ -672,8 +675,9 @@ class _VersusArenaState extends State<VersusArena>
               final leftCenterX = leftX + cardWidth / 2.0;
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
-              const orbCenterY = 43.0;
-              const floorRunesCenterY = 92.0;
+              final orbCenterY = arenaStackHeight - 80.0;
+              final floorRunesCenterY = widget.compactHeight ? 90.0 : 96.0;
+              final spriteTop = widget.compactHeight ? -4.0 : 0.0;
 
               final playerLeft = (leftCenterX - spriteWidth / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
@@ -715,7 +719,7 @@ class _VersusArenaState extends State<VersusArena>
               );
 
               final playerSprite = Positioned(
-                top: -2,
+                top: spriteTop,
                 left: playerLeft,
                 width: spriteWidth,
                 height: spriteHeight,
@@ -743,7 +747,7 @@ class _VersusArenaState extends State<VersusArena>
               );
 
               final bossSprite = Positioned(
-                top: -2,
+                top: spriteTop,
                 left: bossLeft,
                 width: spriteWidth,
                 height: spriteHeight,
@@ -774,13 +778,13 @@ class _VersusArenaState extends State<VersusArena>
               );
 
               final centerColumn = Positioned(
-                top: 0,
+                top: 6,
                 left: 0,
                 right: 0,
                 child: Center(
                   child: ManaPoolOrb(
                     key: const ValueKey('mana_pool_orb'),
-                    size: 88.0,
+                    size: 72.0,
                     remainingMana: widget.remainingMana,
                     maxMana: widget.maxMana,
                     localization: widget.localization,
@@ -804,12 +808,11 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              final userCard = Align(
+              final userCard = Positioned(
                 key: const ValueKey('user_card'),
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(left: leftX),
-                  child: AnimatedBuilder(
+                bottom: 0,
+                left: leftX,
+                child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
                       _vfxController,
@@ -874,16 +877,14 @@ class _VersusArenaState extends State<VersusArena>
                         },
                       );
                     },
-                  ),
                 ),
               );
 
-              final pcCard = Align(
+              final pcCard = Positioned(
                 key: const ValueKey('pc_card'),
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(left: rightX),
-                  child: AnimatedBuilder(
+                bottom: 0,
+                left: rightX,
+                child: AnimatedBuilder(
                     animation: Listenable.merge([
                       _animController,
                       _vfxController,
@@ -952,7 +953,6 @@ class _VersusArenaState extends State<VersusArena>
                         ),
                       );
                     },
-                  ),
                 ),
               );
 
@@ -1012,39 +1012,61 @@ class _VersusArenaState extends State<VersusArena>
                       vfxOverlay,
                     ];
 
-              return Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: stackChildren,
+              return SizedBox(
+                height: arenaStackHeight,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: stackChildren,
+                ),
               );
             },
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           SizedBox(
-            height: 28,
+            height: 30,
             child: Center(
-              child: Text(
-                key: const ValueKey('battle_outcome_description'),
-                battleDescription,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: battleDescColor,
-                  letterSpacing: 0.3,
-                  shadows: const [
-                    Shadow(
-                      color: Colors.black,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
+              child: Container(
+                key: const ValueKey('battle_outcome_ribbon'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.isDark
+                      ? const Color(0xFF0E121A).withValues(alpha: 0.78)
+                      : palette.dialogSurface.withValues(alpha: 0.88),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: palette.isDark
+                        ? const Color(0xFF8A6D3B).withValues(alpha: 0.55)
+                        : palette.sandCardBorder,
+                    width: 1.0,
+                  ),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    key: const ValueKey('battle_outcome_description'),
+                    battleDescription,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: battleDescColor,
+                      letterSpacing: 0.3,
+                      shadows: palette.isDark
+                          ? const [
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 4,
+                                offset: Offset(0, 1),
+                              ),
+                            ]
+                          : null,
                     ),
-                    Shadow(
-                      color: Colors.black87,
-                      blurRadius: 7,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1056,7 +1078,8 @@ class _VersusArenaState extends State<VersusArena>
 }
 
 /// Perspective-compressed (scaleY ~ 0.32) glowing golden-amber runic floor circle
-/// painted directly onto the forge stone floor beneath the Cleric and Boss.
+/// and grounded contact shadows painted directly onto the stone floor circle beneath
+/// the Cleric and Boss.
 ///
 /// When [suppressRunesGeometry] is `true` (used over `temple_arena_bg`, which
 /// already features a painted golden-cyan rune circle), the redundant ring and
@@ -1239,12 +1262,38 @@ class SanctuaryRunesFloorPainter extends CustomPainter {
     }
 
     canvas.restore();
+
+    // 4. Soft grounded contact shadows beneath Cleric (left) and Boss (right) feet
+    for (final footX in [
+      leftCenterX ?? (centerX - radiusX * 0.62),
+      rightCenterX ?? (centerX + radiusX * 0.62),
+    ]) {
+      final shadowRect = Rect.fromCenter(
+        center: Offset(footX, centerY + 3.0),
+        width: 64.0,
+        height: 15.0,
+      );
+      canvas.drawOval(
+        shadowRect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.black.withValues(alpha: isDark ? 0.62 : 0.36),
+              Colors.black.withValues(alpha: isDark ? 0.24 : 0.12),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.58, 1.0],
+          ).createShader(shadowRect),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant SanctuaryRunesFloorPainter oldDelegate) {
     return oldDelegate.centerX != centerX ||
         oldDelegate.centerY != centerY ||
+        oldDelegate.leftCenterX != leftCenterX ||
+        oldDelegate.rightCenterX != rightCenterX ||
         oldDelegate.idlePulse != idlePulse ||
         oldDelegate.clashPulse != clashPulse ||
         oldDelegate.isDark != isDark ||

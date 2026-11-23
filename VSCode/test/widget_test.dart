@@ -2659,10 +2659,10 @@ void main() {
     expect(scissorsBtnFinder, findsOneWidget);
     expect(randomBtnFinder, findsOneWidget);
 
-    // Move selection card is outside the SingleChildScrollView, while VersusArena is inside it
+    // Move selection card and VersusArena are both outside the bounded top HUD SingleChildScrollView
     expect(
       find.descendant(of: scrollViewFinder, matching: find.byType(VersusArena)),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.descendant(of: scrollViewFinder, matching: moveCardFinder),
@@ -2683,20 +2683,24 @@ void main() {
     expect(adGap, greaterThanOrEqualTo(8.0));
     expect(adGap, lessThanOrEqualTo(12.0));
 
-    // VersusArena is cleanly centered inside the upper scrollable viewport in minimal UI
+    // VersusArena and combatants are grounded directly above the pinned move-selection card
     final scrollViewportRect = tester.getRect(scrollViewFinder);
     final minimalArenaRect = tester.getRect(find.byType(VersusArena));
-    expect(
-      minimalArenaRect.center.dy,
-      closeTo(scrollViewportRect.center.dy, 16.0),
+    final minimalPlayerSpriteRect = tester.getRect(
+      find.byKey(const ValueKey('versus_player_sprite')),
     );
+    final minimalBossSpriteRect = tester.getRect(
+      find.byKey(const ValueKey('versus_boss_sprite_stage_1')),
+    );
+    expect(minimalArenaRect.top, greaterThanOrEqualTo(scrollViewportRect.bottom - 0.5));
+    expect(minimalCardRect.top - minimalArenaRect.bottom, inInclusiveRange(0.0, 12.0));
 
     final minimalRockRect = tester.getRect(rockBtnFinder);
     final minimalPaperRect = tester.getRect(paperBtnFinder);
     final minimalScissorsRect = tester.getRect(scissorsBtnFinder);
     final minimalRandomRect = tester.getRect(randomBtnFinder);
 
-    // 2. Enable ScoreHeader, HintsBar, and MarkovTransitionMatrix:
+    // 2. Enable ScoreHeader, HintsBar, and MarkovTransitionMatrix inside top scrollable HUD:
     controller.unlockedPredictability = true;
     controller.showPredictability = true;
     controller.unlockedYourPrediction = true;
@@ -2715,7 +2719,38 @@ void main() {
     expect(find.byType(VersusArena), findsOneWidget);
     expect(find.byType(MarkovMatrixView), findsOneWidget);
 
-    // Move selection card and buttons remain anchored at the exact same bottom coordinates as in minimal UI
+    // ScoreHeader, HintsBar, and MarkovMatrixView are inside the top scroll panel in exact vertical order
+    expect(
+      find.descendant(of: scrollViewFinder, matching: find.byType(ScoreHeader)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: scrollViewFinder, matching: find.byType(HintsBar)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: scrollViewFinder, matching: find.byType(MarkovMatrixView)),
+      findsOneWidget,
+    );
+    expect(
+      tester.getRect(find.byType(ScoreHeader)).bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(HintsBar)).top),
+    );
+    expect(
+      tester.getRect(find.byType(HintsBar)).bottom,
+      lessThanOrEqualTo(tester.getRect(find.byType(MarkovMatrixView)).top),
+    );
+
+    // VersusArena, player/boss sprites, and bottom deck remain at exact same screen coordinates
+    expect(tester.getRect(find.byType(VersusArena)), equals(minimalArenaRect));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('versus_player_sprite'))),
+      equals(minimalPlayerSpriteRect),
+    );
+    expect(
+      tester.getRect(find.byKey(const ValueKey('versus_boss_sprite_stage_1'))),
+      equals(minimalBossSpriteRect),
+    );
     expect(tester.getRect(moveCardFinder), equals(minimalCardRect));
     expect(tester.getRect(rockBtnFinder), equals(minimalRockRect));
     expect(tester.getRect(paperBtnFinder), equals(minimalPaperRect));
@@ -2723,11 +2758,7 @@ void main() {
     expect(tester.getRect(randomBtnFinder), equals(minimalRandomRect));
     expect(tester.getRect(bannerContainerFinder), equals(minimalBannerRect));
 
-    // ScoreHeader, HintsBar, and VersusArena are comfortably visible above the pinned move card before scrolling
-    expect(tester.getRect(find.byType(ScoreHeader)).top, greaterThanOrEqualTo(scrollViewportRect.top));
-    expect(tester.getRect(find.byType(VersusArena)).bottom, lessThanOrEqualTo(minimalCardRect.top));
-
-    // 3. Enable New Hands (5 elements: FIRE, WATER, WOOD, EARTH, METAL) and scroll MarkovTransitionMatrix:
+    // 3. Enable New Hands (5 elements: FIRE, WATER, WOOD, EARTH, METAL) and scroll top HUD:
     controller.unlockedNewHands = true;
     controller.toggleShowNewHands(true);
     await tester.pumpAndSettle();
@@ -2746,20 +2777,31 @@ void main() {
     final randomRectBeforeScroll = tester.getRect(randomBtnFinder);
     final bannerRectBeforeScroll = tester.getRect(bannerContainerFinder);
     final matrixTopBeforeScroll = tester.getTopLeft(find.byType(MarkovMatrixView)).dy;
-    final arenaTopBeforeScroll = tester.getTopLeft(find.byType(VersusArena)).dy;
+    final arenaRectBeforeScroll = tester.getRect(find.byType(VersusArena));
+    final playerSpriteRectBeforeScroll = tester.getRect(
+      find.byKey(const ValueKey('versus_player_sprite')),
+    );
+    final bossSpriteRectBeforeScroll = tester.getRect(
+      find.byKey(const ValueKey('versus_boss_sprite_stage_1')),
+    );
 
-    // Scroll the upper SingleChildScrollView upward to bring MarkovTransitionMatrix up
+    // Scroll the bounded top SingleChildScrollView upward to inspect MarkovTransitionMatrix
     await tester.drag(scrollViewFinder, const Offset(0, -220));
     await tester.pumpAndSettle();
 
-    // Upper informational sections (VersusArena and MarkovMatrixView) scrolled upward
+    // MarkovMatrixView inside top HUD scrolled upward, while VersusArena & fighters stayed 100% stationary
     expect(
       tester.getTopLeft(find.byType(MarkovMatrixView)).dy,
       lessThan(matrixTopBeforeScroll),
     );
+    expect(tester.getRect(find.byType(VersusArena)), equals(arenaRectBeforeScroll));
     expect(
-      tester.getTopLeft(find.byType(VersusArena)).dy,
-      lessThan(arenaTopBeforeScroll),
+      tester.getRect(find.byKey(const ValueKey('versus_player_sprite'))),
+      equals(playerSpriteRectBeforeScroll),
+    );
+    expect(
+      tester.getRect(find.byKey(const ValueKey('versus_boss_sprite_stage_1'))),
+      equals(bossSpriteRectBeforeScroll),
     );
 
     // Pinned bottom move-selection card, all 5 element buttons, RANDOM button, and banner ad remain completely stationary
@@ -2771,6 +2813,31 @@ void main() {
     expect(tester.getRect(spockBtnFinder), equals(spockRectBeforeScroll));
     expect(tester.getRect(randomBtnFinder), equals(randomRectBeforeScroll));
     expect(tester.getRect(bannerContainerFinder), equals(bannerRectBeforeScroll));
+
+    // 4. Collapse and expand MarkovTransitionMatrix via its header toggle without moving VersusArena
+    await tester.drag(scrollViewFinder, const Offset(0, 220));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(MarkovMatrixView), matching: find.byType(Table)),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('markov_matrix_collapse_toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('markov_matrix_collapsed_body')), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(MarkovMatrixView), matching: find.byType(Table)),
+      findsNothing,
+    );
+    expect(tester.getRect(find.byType(VersusArena)), equals(arenaRectBeforeScroll));
+
+    await tester.tap(find.byKey(const ValueKey('markov_matrix_collapse_toggle')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byType(MarkovMatrixView), matching: find.byType(Table)),
+      findsOneWidget,
+    );
+    expect(tester.getRect(find.byType(VersusArena)), equals(arenaRectBeforeScroll));
   });
 
   testWidgets('Backpack button maintains strict fixed size (36x36 with 28px icon) and does not shrink when all top bar icons are active on narrow screens', (WidgetTester tester) async {

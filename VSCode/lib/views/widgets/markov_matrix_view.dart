@@ -14,6 +14,7 @@ class MarkovMatrixView extends StatelessWidget {
   final bool isArchmageShortTermView;
   final bool isBabyMageRandomView;
   final bool isMetalWizardView;
+  final bool initiallyExpanded;
 
   const MarkovMatrixView({
     super.key,
@@ -24,6 +25,7 @@ class MarkovMatrixView extends StatelessWidget {
     this.isArchmageShortTermView = false,
     this.isBabyMageRandomView = false,
     this.isMetalWizardView = false,
+    this.initiallyExpanded = true,
   });
 
   Widget _buildMoveHeader(
@@ -230,38 +232,20 @@ class MarkovMatrixView extends StatelessWidget {
             ) ??
             'Markov Transition Matrix');
 
-    return Card(
-      color: palette.isDark
-          ? theme.colorScheme.surface.withValues(alpha: 0.9)
-          : palette.deckSurface,
-      surfaceTintColor: palette.isDark ? null : Colors.transparent,
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: palette.isDark
-            ? BorderSide.none
-            : BorderSide(color: palette.sandCardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              headerTitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-                color: palette.primaryText,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (isArchmageShortTermView ||
-                isBabyMageRandomView ||
-                isMetalWizardView)
-              _buildModeBanner(palette),
-            Table(
+    return _MarkovCollapsibleCard(
+      initiallyExpanded: initiallyExpanded,
+      headerTitle: headerTitle,
+      palette: palette,
+      theme: theme,
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          if (isArchmageShortTermView ||
+              isBabyMageRandomView ||
+              isMetalWizardView)
+            _buildModeBanner(palette),
+          Table(
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 // Header row
@@ -413,9 +397,116 @@ class MarkovMatrixView extends StatelessWidget {
                 }),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MarkovCollapsibleCard extends StatefulWidget {
+  final bool initiallyExpanded;
+  final String headerTitle;
+  final AppPalette palette;
+  final ThemeData theme;
+  final Widget body;
+
+  const _MarkovCollapsibleCard({
+    required this.initiallyExpanded,
+    required this.headerTitle,
+    required this.palette,
+    required this.theme,
+    required this.body,
+  });
+
+  @override
+  State<_MarkovCollapsibleCard> createState() => _MarkovCollapsibleCardState();
+}
+
+class _MarkovCollapsibleCardState extends State<_MarkovCollapsibleCard> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    final theme = widget.theme;
+
+    return Card(
+      color: palette.isDark
+          ? theme.colorScheme.surface.withValues(alpha: 0.9)
+          : palette.deckSurface,
+      surfaceTintColor: palette.isDark ? null : Colors.transparent,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: palette.isDark
+            ? BorderSide.none
+            : BorderSide(color: palette.sandCardBorder),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(12, 8, 12, _isExpanded ? 12 : 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              key: const ValueKey('markov_matrix_collapse_toggle'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Text(
+                        widget.headerTitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: palette.primaryText,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Center(
+                        child: Icon(
+                          _isExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          key: const ValueKey('markov_matrix_collapse_icon'),
+                          size: 20,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: _isExpanded
+                  ? widget.body
+                  : const SizedBox.shrink(
+                      key: ValueKey('markov_matrix_collapsed_body'),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
