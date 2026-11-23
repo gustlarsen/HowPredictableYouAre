@@ -16,6 +16,7 @@ import 'package:how_predictable/theme/app_theme.dart';
 import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 
 void main() {
@@ -460,8 +461,8 @@ void main() {
         const Color(0xFFC47A38).withValues(alpha: 0.52),
       );
 
-      // Verify GameScreen EARTH deck label uses tan-bronze #D68C45 in Dark Mode
-      // and VersusArena omits the chosen-element text label while keeping the glowing staff icon
+      // Verify GameScreen EARTH orb renders bold white shadowed text inside the glossy 3D orb
+      // and VersusArena omits the chosen-element text label while keeping the glowing staff emblem
       controller.playTurn(HandMove.lizard);
       await tester.pumpWidget(
         MaterialApp(
@@ -476,7 +477,8 @@ void main() {
 
       final earthLabels = tester.widgetList<Text>(find.text('EARTH')).toList();
       expect(earthLabels, hasLength(1));
-      expect(earthLabels.single.style?.color, const Color(0xFFD68C45));
+      expect(earthLabels.single.style?.color, Colors.white);
+      expect(earthLabels.single.style?.shadows, isNotEmpty);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('user_card')),
@@ -487,7 +489,9 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('user_orb_container')),
-          matching: find.byIcon(HandMove.lizard.elementalIcon),
+          matching: find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.lizard,
+          ),
         ),
         findsOneWidget,
       );

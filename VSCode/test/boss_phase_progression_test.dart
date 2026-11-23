@@ -13,6 +13,7 @@ import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/rpg_hp_bar.dart';
@@ -786,9 +787,24 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byIcon(HandMove.metal.elementalIcon), findsOneWidget);
-        expect(find.byIcon(HandMove.rock.elementalIcon), findsOneWidget);
-        expect(find.byIcon(HandMove.paper.elementalIcon), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.metal,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.rock,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.paper,
+          ),
+          findsOneWidget,
+        );
       },
     );
 

@@ -19,6 +19,7 @@ import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
@@ -595,7 +596,12 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.byIcon(predictedBeforeTurn.elementalIcon), findsWidgets);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == predictedBeforeTurn,
+      ),
+      findsWidgets,
+    );
 
     // When the user plays a hand, the PC plays the exact move shown in the Crystal Ball
     await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
@@ -1713,14 +1719,18 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('user_orb_container')),
-        matching: find.byIcon(HandMove.paper.elementalIcon),
+        matching: find.byWidgetPredicate(
+          (w) => w is ElementalSymbolIcon && w.move == HandMove.paper,
+        ),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('pc_orb_container')),
-        matching: find.byIcon(playedPcMove.elementalIcon),
+        matching: find.byWidgetPredicate(
+          (w) => w is ElementalSymbolIcon && w.move == playedPcMove,
+        ),
       ),
       findsOneWidget,
     );
@@ -1908,9 +1918,24 @@ void main() {
     expect(find.text('FIRE'), findsNothing);
     expect(find.text('WATER'), findsNothing);
     expect(find.text('WOOD'), findsNothing);
-    expect(find.byIcon(HandMove.rock.elementalIcon), findsNothing);
-    expect(find.byIcon(HandMove.paper.elementalIcon), findsNothing);
-    expect(find.byIcon(HandMove.scissors.elementalIcon), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.rock,
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.paper,
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.scissors,
+      ),
+      findsNothing,
+    );
 
     // Reopen ShopDialog and toggle New Skin OFF -> reverts to Elemental Theme without resetting match
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
@@ -1937,9 +1962,24 @@ void main() {
     expect(find.text('FIRE'), findsWidgets);
     expect(find.text('WATER'), findsWidgets);
     expect(find.text('WOOD'), findsWidgets);
-    expect(find.byIcon(HandMove.rock.elementalIcon), findsWidgets);
-    expect(find.byIcon(HandMove.paper.elementalIcon), findsWidgets);
-    expect(find.byIcon(HandMove.scissors.elementalIcon), findsWidgets);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.rock,
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.paper,
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ElementalSymbolIcon && w.move == HandMove.scissors,
+      ),
+      findsWidgets,
+    );
     expect(find.byKey(const ValueKey('hand_orb_rock')), findsOneWidget);
     expect(find.byKey(const ValueKey('user_orb_container')), findsOneWidget);
     expect(find.byKey(const ValueKey('pc_orb_container')), findsOneWidget);

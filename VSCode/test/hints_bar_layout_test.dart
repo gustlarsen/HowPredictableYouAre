@@ -8,6 +8,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 
 void main() {
@@ -468,11 +469,15 @@ void main() {
       // Both winning elemental icons (Fire & Metal) are rendered inside the pill
       final fireIcon = find.descendant(
         of: cbPlusChip,
-        matching: find.byIcon(HandMove.rock.elementalIcon),
+        matching: find.byWidgetPredicate(
+          (w) => w is ElementalSymbolIcon && w.move == HandMove.rock,
+        ),
       );
       final metalIcon = find.descendant(
         of: cbPlusChip,
-        matching: find.byIcon(HandMove.spock.elementalIcon),
+        matching: find.byWidgetPredicate(
+          (w) => w is ElementalSymbolIcon && w.move == HandMove.spock,
+        ),
       );
       expect(fireIcon, findsOneWidget);
       expect(metalIcon, findsOneWidget);
@@ -494,7 +499,9 @@ void main() {
           expect(
             find.descendant(
               of: cbPlusChip,
-              matching: find.byIcon(counter.elementalIcon),
+              matching: find.byWidgetPredicate(
+                (w) => w is ElementalSymbolIcon && w.move == counter,
+              ),
             ),
             findsOneWidget,
           );

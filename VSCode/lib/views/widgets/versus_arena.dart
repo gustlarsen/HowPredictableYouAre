@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/move.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import 'elemental_symbol_icon.dart';
 import 'mana_pool_orb.dart';
 import 'metal_wizard_lair_icon.dart';
 import 'rpg_hp_bar.dart';
@@ -2500,12 +2501,9 @@ class _MoveCard extends StatelessWidget {
                             ],
                           ),
                           child: Center(
-                            child: Icon(
-                              move!.elementalIcon,
-                              size: 16 * orbScale,
-                              color: isEarth
-                                  ? earthIconColor
-                                  : primaryElementColor,
+                            child: ElementalSymbolIcon(
+                              move: move!,
+                              size: 18 * orbScale,
                             ),
                           ),
                         ),

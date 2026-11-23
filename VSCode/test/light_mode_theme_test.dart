@@ -569,14 +569,15 @@ void main() {
           ),
         );
 
-        // Earth label uses high-contrast #6E3D14 instead of yellow/amber
+        // Earth orb label renders crisp bold white text with dark outline/drop shadows inside 3D orb
         final earthLabel = tester.widget<Text>(
           find.descendant(
             of: earthBtnFinder,
             matching: find.text('EARTH'),
           ),
         );
-        expect(earthLabel.style?.color, const Color(0xFF6E3D14));
+        expect(earthLabel.style?.color, Colors.white);
+        expect(earthLabel.style?.shadows, isNotEmpty);
         expect(tester.takeException(), isNull);
       },
     );

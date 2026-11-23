@@ -3,6 +3,7 @@ import '../../services/markov_engine.dart';
 import '../../services/localization_service.dart';
 import '../../models/move.dart';
 import '../../theme/app_theme.dart';
+import 'elemental_symbol_icon.dart';
 import 'metal_wizard_lair_icon.dart';
 
 class MarkovMatrixView extends StatelessWidget {
@@ -38,10 +39,9 @@ class MarkovMatrixView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                move.elementalIcon,
+              ElementalSymbolIcon(
+                move: move,
                 size: 18,
-                color: elementColor,
               ),
               Text(
                 move.displayLabel(elemental: true, localization: localization),

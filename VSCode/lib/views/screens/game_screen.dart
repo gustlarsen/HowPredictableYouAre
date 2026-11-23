@@ -21,6 +21,7 @@ import '../widgets/rpg_backpack_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
 import '../widgets/elemental_energy_sphere.dart';
+import '../widgets/elemental_symbol_icon.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/settings_dialog.dart';
@@ -2458,10 +2459,9 @@ class _GameScreenState extends State<GameScreen>
                                 ],
                               ),
                               child: Center(
-                                child: Icon(
-                                  orbMove.elementalIcon,
-                                  size: 15,
-                                  color: Colors.white,
+                                child: ElementalSymbolIcon(
+                                  move: orbMove,
+                                  size: 17,
                                 ),
                               ),
                             ),
@@ -2553,10 +2553,9 @@ class _GameScreenState extends State<GameScreen>
               ],
             ),
             child: Center(
-              child: Icon(
-                move.elementalIcon,
-                size: 13,
-                color: Colors.white,
+              child: ElementalSymbolIcon(
+                move: move,
+                size: 15,
               ),
             ),
           ),
@@ -2901,10 +2900,17 @@ class _HandActionButtonState extends State<_HandActionButton>
     final compact = widget.compact;
     final elemental = widget.elementalMode;
     final isSelected = widget.isSelected;
-    final bool isEarth = widget.move == HandMove.lizard;
     final primaryColor = widget.move.elementalPrimaryColor;
     final secondaryColor = widget.move.elementalSecondaryColor;
     final elementLabelColor = palette.elementalText(widget.move);
+
+    final (Color orbInnerColor, Color orbOuterColor) = switch (widget.move) {
+      HandMove.rock => (const Color(0xFFFF3D00), const Color(0xFF8E0000)),
+      HandMove.paper => (const Color(0xFF00B0FF), const Color(0xFF013A63)),
+      HandMove.scissors => (const Color(0xFF00C853), const Color(0xFF0B4F22)),
+      HandMove.lizard => (const Color(0xFFC47A38), const Color(0xFF3D220E)),
+      HandMove.spock => (const Color(0xFFCFD8DC), const Color(0xFF37474F)),
+    };
 
     final horizontalPadding = compact ? 2.0 : 8.0;
     final verticalPadding = compact ? 3.0 : 8.0;
@@ -2912,7 +2918,7 @@ class _HandActionButtonState extends State<_HandActionButton>
     final circleSize = compact ? 50.0 : 58.0;
     final imageSize = compact ? 26.0 : 34.0;
     final emojiFontSize = compact ? 20.0 : 24.0;
-    final iconSize = compact ? 20.0 : 24.0;
+    final elementalSymbolSize = compact ? 25.0 : 30.0;
     final labelFontSize = compact ? 8.8 : 10.0;
 
     final String buttonLabel = elemental
@@ -3028,36 +3034,63 @@ class _HandActionButtonState extends State<_HandActionButton>
                   ),
                 ),
 
-              // Glossy 3D Shaded Elemental Energy Sphere
+              // Glossy 3D Shaded Elemental Energy Sphere with Outer Glow, Inner Bevel & Specular Arc
               if (elemental)
-                ElementalEnergySphere(
-                  size: circleSize,
-                  primaryColor: primaryColor,
-                  secondaryColor: secondaryColor,
-                  isDark: palette.isDark,
+                Container(
+                  width: circleSize,
+                  height: circleSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.28, -0.32),
+                      radius: 0.90,
+                      colors: [orbInnerColor, orbOuterColor],
+                      stops: const [0.10, 1.0],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: orbInnerColor.withValues(
+                          alpha: isSelected ? 0.58 : 0.32,
+                        ),
+                        blurRadius: isSelected ? 12 : 7,
+                        spreadRadius: isSelected ? 1.0 : 0.2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2.5),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ElementalEnergySphere(
+                        size: circleSize,
+                        primaryColor: orbInnerColor,
+                        secondaryColor: orbOuterColor,
+                        isDark: palette.isDark,
+                      ),
+                      IgnorePointer(
+                        child: CustomPaint(
+                          size: Size.square(circleSize),
+                          painter: _ActionOrbGlossPainter(
+                            primaryColor: orbInnerColor,
+                            secondaryColor: orbOuterColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
-              // Crisp Elemental Emblem or Classic Hand in Upper-Center of Sphere
+              // Crisp Elemental Emblem or Classic Hand in Upper-Middle of Sphere
               Positioned(
-                top: elemental ? circleSize * 0.16 : circleSize * 0.12,
+                top: elemental ? circleSize * 0.12 : circleSize * 0.12,
                 child: elemental
-                    ? Icon(
-                        widget.move.elementalIcon,
-                        size: iconSize,
-                        color: isEarth
-                            ? const Color(0xFFFFF3E0)
-                            : Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.85),
-                            blurRadius: 5,
-                            offset: const Offset(0, 1),
-                          ),
-                          Shadow(
-                            color: primaryColor.withValues(alpha: 0.9),
-                            blurRadius: 8,
-                          ),
-                        ],
+                    ? ElementalSymbolIcon(
+                        move: widget.move,
+                        size: elementalSymbolSize,
                       )
                     : hasAsset
                     ? Image.asset(
@@ -3075,11 +3108,11 @@ class _HandActionButtonState extends State<_HandActionButton>
                       ),
               ),
 
-              // Bold Shadowed Element Label Overlaid Inside Lower Portion of Sphere
+              // Bold Shadowed White Element Label Inside Lower Third of Sphere
               Positioned(
-                bottom: elemental ? circleSize * 0.13 : 2.0,
-                left: 1,
-                right: 1,
+                bottom: elemental ? circleSize * 0.11 : 2.0,
+                left: 4,
+                right: 4,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
@@ -3089,13 +3122,41 @@ class _HandActionButtonState extends State<_HandActionButton>
                       fontWeight: FontWeight.w900,
                       fontSize: labelFontSize,
                       height: 1.0,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0.5,
                       color: elemental
-                          ? elementLabelColor
+                          ? Colors.white
                           : (palette.isDark
                                 ? Colors.white
                                 : palette.primaryText),
-                      shadows: palette.isDark
+                      shadows: elemental
+                          ? const [
+                              Shadow(
+                                color: Color(0xFF0A0E14),
+                                offset: Offset(-0.9, -0.9),
+                                blurRadius: 0.6,
+                              ),
+                              Shadow(
+                                color: Color(0xFF0A0E14),
+                                offset: Offset(0.9, -0.9),
+                                blurRadius: 0.6,
+                              ),
+                              Shadow(
+                                color: Color(0xFF0A0E14),
+                                offset: Offset(-0.9, 0.9),
+                                blurRadius: 0.6,
+                              ),
+                              Shadow(
+                                color: Color(0xFF0A0E14),
+                                offset: Offset(0.9, 0.9),
+                                blurRadius: 0.6,
+                              ),
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 3.5,
+                                offset: Offset(0, 1.5),
+                              ),
+                            ]
+                          : palette.isDark
                           ? const [
                               Shadow(
                                 color: Colors.black,
@@ -3131,6 +3192,81 @@ class _HandActionButtonState extends State<_HandActionButton>
       scale: _scaleAnimation,
       child: buttonContent,
     );
+  }
+}
+
+/// Renders a crisp dark/light inner beveled rim and glossy top-left glass
+/// specular highlight arc for the bottom 3D elemental action orbs.
+class _ActionOrbGlossPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  const _ActionOrbGlossPainter({
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final double s = size.shortestSide;
+    final Offset center = Offset(size.width * 0.5, size.height * 0.5);
+    final double radius = s * 0.5;
+
+    // 1. Crisp dark outer border ring
+    canvas.drawCircle(
+      center,
+      radius - 0.7,
+      Paint()
+        ..color = const Color(0xFF0D1117).withValues(alpha: 0.78)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3,
+    );
+
+    // 2. Crisp inner beveled rim (top-left bright highlight -> bottom-right deep rim)
+    canvas.drawCircle(
+      center,
+      radius - 2.1,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.45),
+            primaryColor.withValues(alpha: 0.25),
+            secondaryColor.withValues(alpha: 0.65),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: radius))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+
+    // 3. Glossy top-left glass specular highlight arc (approx 10 o'clock to 12:30)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * 0.79),
+      3.55,
+      1.35,
+      false,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.62),
+            Colors.white.withValues(alpha: 0.14),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius * 0.79))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (s * 0.055).clamp(2.2, 3.4)
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActionOrbGlossPainter oldDelegate) {
+    return oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.secondaryColor != secondaryColor;
   }
 }
 

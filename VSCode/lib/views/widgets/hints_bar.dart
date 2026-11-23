@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../theme/app_theme.dart';
+import 'elemental_symbol_icon.dart';
 
 enum HintMiniIconType {
   brain,
@@ -244,10 +245,9 @@ class _HintChip extends StatelessWidget {
                             width: iconSlotSize,
                             height: iconSlotSize,
                             child: Center(
-                              child: Icon(
-                                moves[i].elementalIcon,
-                                size: 15,
-                                color: palette.elementalText(moves[i]),
+                              child: ElementalSymbolIcon(
+                                move: moves[i],
+                                size: 16,
                               ),
                             ),
                           ),
