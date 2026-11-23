@@ -1474,7 +1474,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     final weekLabel = loc.t('map_week_label', fallback: 'Week');
     final fastestWeek = controller.fastestVictoryWeek;
     final fastestText =
-        (fastestWeek != null && fastestWeek > 0) ? '$weekLabel $fastestWeek' : '--';
+        (fastestWeek != null && fastestWeek >= 0) ? '$weekLabel $fastestWeek' : '--';
 
     final Color secretAccent = palette.isDark
         ? const Color(0xFF00E5FF)
@@ -1955,7 +1955,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
-                          color: (fastestWeek != null && fastestWeek > 0)
+                          color: (fastestWeek != null && fastestWeek >= 0)
                               ? palette.amberText
                               : palette.mutedText,
                         ),
@@ -2061,7 +2061,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                       subtitle: loc.t(
                         'castle_heroes_ending_4_sub',
-                        fallback: 'Week 1',
+                        fallback: 'Week 0',
                       ),
                       count: controller.secretVictoryCount,
                       palette: palette,

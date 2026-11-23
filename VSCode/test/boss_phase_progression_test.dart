@@ -109,11 +109,11 @@ void main() {
     );
 
     testWidgets(
-      'Week-1 Secret Route: Stage 1 (100 HP) -> Stage 3 Metal Wizard (300 HP, 100% Metal) -> Secret Week-1 Ending',
+      'Week-0 Secret Route: Stage 1 (100 HP) -> Stage 3 Metal Wizard (300 HP, 100% Metal) -> Secret Week-0 Ending',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
-            'current_week': 1,
+            'current_week': 0,
             'enemy_stage': 1,
             'enemy_max_hp': 100,
             'pcHp': 1,
@@ -131,7 +131,7 @@ void main() {
         await tester.pumpWidget(_wrapScreen(controller));
         await tester.pumpAndSettle();
 
-        // Force Turn 1 winning counter against Guardian Robot at 1 HP in Week 1.
+        // Force Turn 1 winning counter against Guardian Robot at 1 HP in Week 0.
         controller.crystalBallMove = HandMove.rock;
         controller.playTurn(HandMove.paper);
 
@@ -142,7 +142,7 @@ void main() {
         expect(
           controller.isEndingUnlocked(NarrativeEnding.secretWeek1),
           isFalse,
-          reason: 'Secret Week-1 ending must only unlock after defeating Metal Wizard in Week 1',
+          reason: 'Secret Week-0 ending must only unlock after defeating Metal Wizard in Week 0',
         );
 
         // Further inputs are blocked while victory is pending.
@@ -163,7 +163,7 @@ void main() {
         expect(controller.enemyStage, 3);
         expect(controller.enemyMaxHp, 300);
         expect(controller.computerHp, 300);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
         expect(
           controller.isBestiaryEncountered(BestiaryCreature.metalWizard),
           isTrue,
@@ -198,7 +198,7 @@ void main() {
         expect(controller.computerHp, 290);
         expect(controller.metalOrbs, 10);
 
-        // Reduce Metal Wizard to 1 HP and finish him while still in Week 1
+        // Reduce Metal Wizard to 1 HP and finish him while still in Week 0
         controller.computerHp = 1;
         controller.playTurn(HandMove.paper); // Water rusts Metal -> 0 HP
         expect(controller.computerHp, 0);
@@ -210,9 +210,9 @@ void main() {
 
         await tester.pumpAndSettle();
         expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
-        expect(find.text('Week 1 Lightning Victory!'), findsOneWidget);
+        expect(find.text('Week 0 Lightning Victory!'), findsOneWidget);
 
-        // Confirm modal -> opens Secret Week-1 Victory Cutscene (skipping Stage 4).
+        // Confirm modal -> opens Secret Week-0 Victory Cutscene (skipping Stage 4).
         await tester.tap(
           find.byKey(const ValueKey('boss_victory_confirm_button')),
         );
@@ -222,8 +222,8 @@ void main() {
           find.byKey(const ValueKey('victory_cutscene_dialog')),
           findsOneWidget,
         );
-        expect(find.text('SECRET WEEK-1 VICTORY'), findsOneWidget);
-        expect(find.text('A Week-One Miracle!'), findsOneWidget);
+        expect(find.text('SECRET WEEK-0 VICTORY'), findsOneWidget);
+        expect(find.text('A Week-Zero Miracle!'), findsOneWidget);
 
         final nextBtnFinder = find.byKey(
           const ValueKey('victory_cutscene_next_button'),
@@ -245,11 +245,11 @@ void main() {
         await tester.tap(finishBtnFinder);
         await tester.pumpAndSettle();
 
-        // Cycle concludes cleanly back to Week 1 Stage 1.
+        // Cycle concludes cleanly back to Week 0 Stage 1.
         expect(controller.isBossVictoryPending, isFalse);
         expect(controller.enemyStage, 1);
         expect(controller.enemyMaxHp, 100);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
       },
     );
 
@@ -500,16 +500,16 @@ void main() {
 
         expect(controller.enemyStage, 1);
         expect(controller.enemyMaxHp, 100);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
       },
     );
 
     test(
-      'Stage 1 beaten in Week 1 followed by advancing to Week 2+ transitions Stage 3 Metal Wizard defeat into Stage 4 Baby Mage Robot (not Secret Ending)',
+      'Stage 1 beaten in Week 0 followed by advancing to Week 1+ transitions Stage 3 Metal Wizard defeat into Stage 4 Baby Mage Robot (not Secret Ending)',
       () async {
         final controller = await _createController(
           prefs: {
-            'current_week': 1,
+            'current_week': 0,
             'enemy_stage': 3,
             'enemy_max_hp': 300,
             'pcHp': 300,
@@ -517,9 +517,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        // Calendar advances to Week 2 before finishing the Metal Wizard
+        // Calendar advances to Week 1 before finishing the Metal Wizard
         controller.completeBattleWeek();
-        expect(controller.currentWeek, 2);
+        expect(controller.currentWeek, 1);
         expect(controller.enemyStage, 3);
 
         controller.computerHp = 1;

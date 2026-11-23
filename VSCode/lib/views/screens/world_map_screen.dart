@@ -12,6 +12,7 @@ import '../dialogs/observatory_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
+import '../dialogs/week0_scream_warning_dialog.dart';
 import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
@@ -48,6 +49,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   GameController? _controller;
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
+  bool _isWeek0ScreamDialogOpen = false;
   bool _metricsRebuildScheduled = false;
 
   @override
@@ -220,6 +222,33 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     }
   }
 
+  void _checkWeek0ScreamWarning(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldShowWeek0ScreamWarning || _isWeek0ScreamDialogOpen) {
+      return;
+    }
+    _isWeek0ScreamDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !context.mounted) {
+        _isWeek0ScreamDialogOpen = false;
+        return;
+      }
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) {
+        _isWeek0ScreamDialogOpen = false;
+        return;
+      }
+      if (!controller.consumePendingWeek0ScreamWarning()) {
+        _isWeek0ScreamDialogOpen = false;
+        return;
+      }
+      await Week0ScreamWarningDialog.show(context, controller: controller);
+      _isWeek0ScreamDialogOpen = false;
+    });
+  }
+
   Future<void> _enterMetalWizardLair(
     BuildContext context,
     GameController controller,
@@ -231,6 +260,9 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         builder: (_) => const GameScreen(),
       ),
     );
+    if (context.mounted) {
+      _checkWeek0ScreamWarning(context, controller);
+    }
   }
 
   void _openObservatory(BuildContext context, GameController controller) {
@@ -265,6 +297,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
 
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
+    _checkWeek0ScreamWarning(context, controller);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0D14),

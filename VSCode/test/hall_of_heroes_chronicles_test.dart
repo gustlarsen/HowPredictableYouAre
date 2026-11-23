@@ -219,8 +219,8 @@ void main() {
         expect(controller.fastestVictoryWeek, 14);
         expect(controller.advanceAfterBossVictory(), isTrue);
 
-        // 5. Secret Week-1 Victory (Stage 1 -> Stage 3 on Week 1) updates fastestVictoryWeek to 1
-        controller.currentWeek = 1;
+        // 5. Secret Week-0 Victory (Stage 1 -> Stage 3 on Week 0) updates fastestVictoryWeek to 0
+        controller.currentWeek = 0;
         controller.enemyStage = 1;
         controller.computerHp = 1;
         controller.crystalBallMove = HandMove.rock;
@@ -230,14 +230,14 @@ void main() {
         expect(controller.enemyStage, 3);
 
         controller.computerHp = 1;
-        controller.playTurn(HandMove.rock); // defeats Metal Wizard on Week 1
+        controller.playTurn(HandMove.rock); // defeats Metal Wizard on Week 0
         expect(controller.metalWizardDefeatedCount, 2);
         expect(controller.secretVictoryCount, 1);
         expect(controller.totalCyclesCount, 5);
-        expect(controller.fastestVictoryWeek, 1);
+        expect(controller.fastestVictoryWeek, 0);
         expect(controller.advanceAfterBossVictory(), isTrue);
 
-        // Subsequent slower Standard Victory (Week 25) keeps fastestVictoryWeek at 1
+        // Subsequent slower Standard Victory (Week 25) keeps fastestVictoryWeek at 0
         controller.currentWeek = 25;
         controller.enemyStage = 4;
         controller.computerHp = 1;
@@ -246,7 +246,7 @@ void main() {
         expect(controller.babyMageRobotDefeatedCount, 2);
         expect(controller.standardVictoryCount, 2);
         expect(controller.totalCyclesCount, 6);
-        expect(controller.fastestVictoryWeek, 1);
+        expect(controller.fastestVictoryWeek, 0);
       },
     );
 
@@ -358,7 +358,7 @@ void main() {
         expect(merged.metalWizardDefeatedCount, 4);
         expect(merged.babyMageRobotDefeatedCount, 2);
 
-        // Min non-zero ignores null/0 on either side
+        // Min valid week ignores null / negative sentinel on either side, and preserves Week 0
         expect(
           const CloudSaveData(fastestVictoryWeek: null)
               .mergeOverLocal(const CloudSaveData(fastestVictoryWeek: 14))
@@ -367,9 +367,15 @@ void main() {
         );
         expect(
           const CloudSaveData(fastestVictoryWeek: 9)
-              .mergeOverLocal(const CloudSaveData(fastestVictoryWeek: 0))
+              .mergeOverLocal(const CloudSaveData(fastestVictoryWeek: -1))
               .fastestVictoryWeek,
           9,
+        );
+        expect(
+          const CloudSaveData(fastestVictoryWeek: 0)
+              .mergeOverLocal(const CloudSaveData(fastestVictoryWeek: 9))
+              .fastestVictoryWeek,
+          0,
         );
 
         // When local has more orbs than cloud, loadAndResolveCloudSave still merges higher cloud chronicles
@@ -468,7 +474,7 @@ void main() {
             'forfeit_run_count': 4,
             'standard_victory_count': 3,
             'secret_victory_count': 3,
-            'fastest_victory_week': 1,
+            'fastest_victory_week': 0,
             'guardian_robot_defeated_count': 12,
             'robot_archmage_defeated_count': 7,
             'metal_wizard_defeated_count': 9,
@@ -508,7 +514,7 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('17'), findsOneWidget);
-          expect(find.text('Week 1'), findsAtLeastNWidgets(2));
+          expect(find.text('Week 0'), findsAtLeastNWidgets(2));
           expect(find.text('5'), findsOneWidget);
           expect(find.text('2'), findsOneWidget);
           expect(find.text('4'), findsOneWidget);

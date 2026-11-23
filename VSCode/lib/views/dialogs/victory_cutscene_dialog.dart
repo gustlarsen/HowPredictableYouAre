@@ -97,10 +97,10 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             speakerKey: 'victory_cutscene_narrator',
             fallbackSpeaker: 'Royal Chronicler',
             titleKey: 'secret_cutscene_p1_title',
-            fallbackTitle: 'A Week-One Miracle!',
+            fallbackTitle: 'A Week-Zero Miracle!',
             bodyKey: 'secret_cutscene_p1_body',
             fallbackBody:
-                'On the very first week of the siege, your decisive counters shatter the Guardian Robot and defeat the Metal Wizard himself before the Archmage or Baby Mage Robot could ever be created!',
+                'On Week 0, at the very dawn of the siege, your decisive counters shatter the Guardian Robot and defeat the Metal Wizard himself before the Archmage or Baby Mage Robot could ever be created!',
           ),
           _VictoryPanelData(
             icon: Icons.favorite_rounded,
@@ -111,7 +111,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'Rescued Intact',
             bodyKey: 'secret_cutscene_p2_body',
             fallbackBody:
-                'With the citadel vault unsealed in Week 1, you rescue the Princess completely untouched before the dark foundry\'s contingencies can awaken.',
+                'With the citadel vault unsealed in Week 0, you rescue the Princess completely untouched before the dark foundry\'s contingencies can awaken.',
           ),
           _VictoryPanelData(
             icon: Icons.emoji_events_rounded,
@@ -122,7 +122,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'Secret Ending Unlocked',
             bodyKey: 'secret_cutscene_p3_body',
             fallbackBody:
-                'Peace returns in record time! The Secret Week-1 Ending has been inscribed in the Royal Library as you prepare for the next cycle.',
+                'Peace returns in record time! The Secret Week-0 Ending has been inscribed in the Royal Library as you prepare for the next cycle.',
           ),
         ];
       case VictoryCutsceneType.standardVictory:
@@ -175,7 +175,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
     final isLast = _index == panels.length - 1;
 
     final cutsceneBanner = widget.type == VictoryCutsceneType.secretWeek1
-        ? loc.t('secret_cutscene_header', fallback: 'SECRET WEEK-1 VICTORY')
+        ? loc.t('secret_cutscene_header', fallback: 'SECRET WEEK-0 VICTORY')
         : loc.t('standard_cutscene_header', fallback: 'CAMPAIGN VICTORY');
 
     return SafeArea(
@@ -211,33 +211,43 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
                       // Header badge + skip button
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: panel.accentColor.withValues(
-                                alpha: palette.isDark ? 0.18 : 0.14,
-                              ),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: panel.accentColor.withValues(alpha: 0.65),
-                              ),
-                            ),
-                            child: Text(
-                              cutsceneBanner,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                                color: palette.isDark
-                                    ? panel.accentColor
-                                    : palette.primaryText,
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: panel.accentColor.withValues(
+                                      alpha: palette.isDark ? 0.18 : 0.14,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: panel.accentColor.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    cutsceneBanner,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.8,
+                                      color: palette.isDark
+                                          ? panel.accentColor
+                                          : palette.primaryText,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           TextButton(
                             key: const ValueKey('victory_cutscene_skip_button'),
                             onPressed: () {

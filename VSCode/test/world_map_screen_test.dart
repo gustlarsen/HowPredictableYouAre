@@ -178,7 +178,7 @@ void main() {
         expect(bannerFinder, findsOneWidget);
         expect(templeFinder, findsOneWidget);
 
-        expect(find.text('Week 1 / 40'), findsOneWidget);
+        expect(find.text('Week 0 / 40'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('backpack_inventory_button')),
           findsOneWidget,
@@ -407,8 +407,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(controller.currentWeek, 1);
-        expect(find.text('Week 1 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 0);
+        expect(find.text('Week 0 / 40'), findsOneWidget);
 
         // 1. Tap Metal Wizard's Lair -> bespoke MetalWizardLairIcon pin & fresh 100-round battle (100 Mana)
         final wizardLairPin = find.byKey(
@@ -444,7 +444,7 @@ void main() {
         expect(controller.totalRounds, 0);
         expect(controller.remainingMana, 100);
 
-        // Play 1 round then tap Teleport button in AppBar -> returns to map, week advances 1 -> 2
+        // Play 1 round then tap Teleport button in AppBar -> returns to map, week advances 0 -> 1
         await tester.tap(find.byKey(const ValueKey('hand_button_rock')));
         await tester.pumpAndSettle();
         expect(controller.totalRounds, 1);
@@ -456,9 +456,27 @@ void main() {
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(find.byType(GameScreen), findsNothing);
-        expect(controller.currentWeek, 2);
-        expect(storage.currentWeek, 2);
-        expect(find.text('Week 2 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 1);
+        expect(storage.currentWeek, 1);
+        expect(find.text('Week 1 / 40'), findsOneWidget);
+
+        // Leaving Week 0 without defeating both bosses triggers the 2-slide Watch Tower Alert modal once
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('week0_scream_next_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('week0_scream_got_it_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsNothing,
+        );
 
         // 2. Re-enter Metal Wizard's Lair -> fresh 100-round battle again
         await tester.tap(
@@ -486,20 +504,24 @@ void main() {
         );
         expect(returnBtn, findsOneWidget);
 
-        // Tap Return to Map -> pops back to WorldMapScreen and increments Week 2 -> 3
+        // Tap Return to Map -> pops back to WorldMapScreen and increments Week 1 -> 2
         await tester.tap(returnBtn);
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(find.byType(GameScreen), findsNothing);
-        expect(controller.currentWeek, 3);
-        expect(storage.currentWeek, 3);
-        expect(find.text('Week 3 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 2);
+        expect(storage.currentWeek, 2);
+        expect(find.text('Week 2 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsNothing,
+        );
 
         // Persisted in CloudSaveData
         expect(fakePlayGamesClient.saveCount, greaterThanOrEqualTo(1));
         final cloud = CloudSaveData.tryParse(fakePlayGamesClient.savedPayload)!;
-        expect(cloud.currentWeek, 3);
+        expect(cloud.currentWeek, 2);
       },
     );
 

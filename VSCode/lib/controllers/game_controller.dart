@@ -436,7 +436,14 @@ class GameController extends ChangeNotifier {
   set enemyPhase(int value) => enemyStage = value;
   int enemyMaxHp = pcMaxHp;
   int get enemyHp => computerHp;
-  int currentWeek = 1;
+  int currentWeek = 0;
+
+  // Post-Week-0 Scream Warning Modal State (per-campaign)
+  bool hasShownWeek0ScreamWarning = false;
+  bool pendingWeek0ScreamWarning = false;
+
+  bool get shouldShowWeek0ScreamWarning =>
+      pendingWeek0ScreamWarning && !hasShownWeek0ScreamWarning;
 
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
   int adConsagrationsThisWeek = 0;
@@ -1070,6 +1077,8 @@ class GameController extends ChangeNotifier {
     pcScore = storage.pcScore;
     totalRounds = storage.total;
     currentWeek = storage.currentWeek;
+    hasShownWeek0ScreamWarning = storage.hasShownWeek0ScreamWarning;
+    pendingWeek0ScreamWarning = storage.pendingWeek0ScreamWarning;
     if (storage.userHpRaw != null) {
       userHp = storage.userHp.clamp(0, effectivePlayerMaxHp);
     } else {
@@ -2262,7 +2271,7 @@ class GameController extends ChangeNotifier {
   }
 
   void _recordFastestVictoryWeek(int week) {
-    final effectiveWeek = week < 1 ? 1 : week;
+    final effectiveWeek = week < 0 ? 0 : week;
     fastestVictoryWeek = fastestVictoryWeek == null
         ? effectiveWeek
         : math.min(fastestVictoryWeek!, effectiveWeek);
@@ -2285,13 +2294,13 @@ class GameController extends ChangeNotifier {
     } else if (defeatedStage == 3) {
       metalWizardDefeatedCount += 1;
       storage.setMetalWizardDefeatedCount(metalWizardDefeatedCount);
-      if (week == 1) {
+      if (week == 0) {
         _markEndingUnlocked(NarrativeEnding.secretWeek1);
         secretVictoryCount += 1;
         totalCyclesCount += 1;
         storage.setSecretVictoryCount(secretVictoryCount);
         storage.setTotalCyclesCount(totalCyclesCount);
-        _recordFastestVictoryWeek(1);
+        _recordFastestVictoryWeek(0);
       } else {
         _markBestiaryEncountered(BestiaryCreature.babyRobot);
       }
@@ -2309,7 +2318,7 @@ class GameController extends ChangeNotifier {
 
   /// Advances the campaign state after the user confirms the Boss Defeated modal
   /// (and any ending cutscene). Returns `true` if the campaign cycle concluded
-  /// (Secret Week-1 Ending on Stage 3 in Week 1, or Stage 4 Standard Victory Ending)
+  /// (Secret Week-0 Ending on Stage 3 in Week 0, or Stage 4 Standard Victory Ending)
   /// so the caller can return to the World Map.
   bool advanceAfterBossVictory() {
     final defeatedStage = pendingBossVictoryStage ?? enemyStage;
@@ -2319,20 +2328,24 @@ class GameController extends ChangeNotifier {
     pendingBossVictoryWeek = null;
 
     final bool concludesCycle =
-        (defeatedStage == 3 && week == 1) || defeatedStage == 4;
+        (defeatedStage == 3 && week == 0) || defeatedStage == 4;
     if (concludesCycle) {
       enemyStage = 1;
       enemyMaxHp = pcMaxHp;
-      currentWeek = 1;
+      currentWeek = 0;
       adConsagrationsThisWeek = 0;
       activeBattleBlessing = null;
       battleBonusTempHp = 0;
+      hasShownWeek0ScreamWarning = false;
+      pendingWeek0ScreamWarning = false;
       storage.setEnemyStage(1);
       storage.setEnemyMaxHp(pcMaxHp);
-      storage.setCurrentWeek(1);
+      storage.setCurrentWeek(0);
       storage.setAdConsagrationsThisWeek(0);
       storage.setActiveBattleBlessing(null);
       storage.setBattleBonusTempHp(0);
+      storage.setHasShownWeek0ScreamWarning(false);
+      storage.setPendingWeek0ScreamWarning(false);
       _refreshCompletedDecreesAndResetBattleTrackers();
       _resetBattleState();
       recordTurn0OrbSnapshot();
@@ -2511,15 +2524,34 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Consumes [pendingWeek0ScreamWarning] and marks [hasShownWeek0ScreamWarning]
+  /// as `true` so the post-Week-0 Watch Tower alert carousel shows at most once
+  /// per campaign cycle.
+  bool consumePendingWeek0ScreamWarning() {
+    if (!shouldShowWeek0ScreamWarning) return false;
+    pendingWeek0ScreamWarning = false;
+    hasShownWeek0ScreamWarning = true;
+    storage.setPendingWeek0ScreamWarning(false);
+    storage.setHasShownWeek0ScreamWarning(true);
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
   /// Advances the campaign calendar by +1 Week upon exiting a battle via
   /// battle completion or Teleport, persists locally, resets weekly ad
   /// consagrations and active battle blessings, resets the battle arena for
   /// the next encounter while keeping collected Elemental Orbs, and syncs Cloud Save.
   void completeBattleWeek() {
+    final wasWeek0 = currentWeek == 0;
     currentWeek += 1;
     adConsagrationsThisWeek = 0;
     activeBattleBlessing = null;
     battleBonusTempHp = 0;
+    if (wasWeek0 && !hasShownWeek0ScreamWarning) {
+      pendingWeek0ScreamWarning = true;
+      storage.setPendingWeek0ScreamWarning(true);
+    }
     storage.setCurrentWeek(currentWeek);
     storage.setAdConsagrationsThisWeek(0);
     storage.setActiveBattleBlessing(null);

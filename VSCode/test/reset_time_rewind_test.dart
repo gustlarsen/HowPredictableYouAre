@@ -296,7 +296,7 @@ void main() {
         expect(controller.lostOrbsFor(HandMove.rock), 1);
 
         controller.teleportToWorldMap();
-        expect(controller.currentWeek, 2);
+        expect(controller.currentWeek, 1);
         expect(controller.fireOrbs, 16);
         expect(controller.turn0FireOrbs, 16);
         expect(controller.totalRounds, 0);

@@ -191,6 +191,7 @@ class CloudSaveData {
   int get enemyPhase => enemyStage;
   final int enemyMaxHp;
   final int currentWeek;
+  final bool hasShownWeek0ScreamWarning;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -326,7 +327,8 @@ class CloudSaveData {
     int? enemyStage,
     int enemyPhase = 1,
     this.enemyMaxHp = 100,
-    this.currentWeek = 1,
+    this.currentWeek = 0,
+    this.hasShownWeek0ScreamWarning = false,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -558,9 +560,9 @@ class CloudSaveData {
             metalWizardDefeatedCount > local.metalWizardDefeatedCount ||
             babyMageRobotDefeatedCount > local.babyMageRobotDefeatedCount ||
             (fastestVictoryWeek != null &&
-                fastestVictoryWeek! > 0 &&
+                fastestVictoryWeek! >= 0 &&
                 (local.fastestVictoryWeek == null ||
-                    local.fastestVictoryWeek! <= 0 ||
+                    local.fastestVictoryWeek! < 0 ||
                     fastestVictoryWeek! < local.fastestVictoryWeek!)))) {
       return true;
     }
@@ -570,8 +572,8 @@ class CloudSaveData {
   static int _maxInt(int a, int b) => a > b ? a : b;
 
   static int? _minNonZeroWeek(int? a, int? b) {
-    final validA = (a != null && a > 0) ? a : null;
-    final validB = (b != null && b > 0) ? b : null;
+    final validA = (a != null && a >= 0) ? a : null;
+    final validB = (b != null && b >= 0) ? b : null;
     if (validA == null) return validB;
     if (validB == null) return validA;
     return validA < validB ? validA : validB;
@@ -615,6 +617,9 @@ class CloudSaveData {
       enemyMaxHp: enemyMaxHp,
       currentWeek:
           currentWeek > local.currentWeek ? currentWeek : local.currentWeek,
+      hasShownWeek0ScreamWarning: currentWeek == local.currentWeek
+          ? (hasShownWeek0ScreamWarning || local.hasShownWeek0ScreamWarning)
+          : hasShownWeek0ScreamWarning,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -764,6 +769,7 @@ class CloudSaveData {
       enemyStage: storage.enemyStage,
       enemyMaxHp: storage.enemyMaxHp,
       currentWeek: storage.currentWeek,
+      hasShownWeek0ScreamWarning: storage.hasShownWeek0ScreamWarning,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -885,6 +891,7 @@ class CloudSaveData {
     await storage.setEnemyStage(enemyStage);
     await storage.setEnemyMaxHp(enemyMaxHp);
     await storage.setCurrentWeek(currentWeek);
+    await storage.setHasShownWeek0ScreamWarning(hasShownWeek0ScreamWarning);
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
     await storage.setPendingBattleBlessing(pendingBattleBlessing);
     await storage.setActiveBattleBlessing(activeBattleBlessing);
@@ -1081,7 +1088,7 @@ class CloudSaveData {
       'forfeitRunCount': forfeitRunCount,
       'standardVictoryCount': standardVictoryCount,
       'secretVictoryCount': secretVictoryCount,
-      if (fastestVictoryWeek != null && fastestVictoryWeek! > 0)
+      if (fastestVictoryWeek != null && fastestVictoryWeek! >= 0)
         'fastestVictoryWeek': fastestVictoryWeek,
       'guardianRobotDefeatedCount': guardianRobotDefeatedCount,
       'robotArchmageDefeatedCount': robotArchmageDefeatedCount,
@@ -1105,6 +1112,7 @@ class CloudSaveData {
       'enemyPhase': enemyStage,
       'enemyMaxHp': enemyMaxHp,
       'currentWeek': currentWeek,
+      'hasShownWeek0ScreamWarning': hasShownWeek0ScreamWarning,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -1334,7 +1342,7 @@ class CloudSaveData {
       secretVictoryCount: _parseNonNegativeInt(map['secretVictoryCount']),
       fastestVictoryWeek: (() {
         final raw = (map['fastestVictoryWeek'] as num?)?.toInt();
-        return (raw != null && raw > 0) ? raw : null;
+        return (raw != null && raw >= 0) ? raw : null;
       })(),
       guardianRobotDefeatedCount:
           _parseNonNegativeInt(map['guardianRobotDefeatedCount']),
@@ -1379,9 +1387,11 @@ class CloudSaveData {
                 return 100;
               })())
           .clamp(100, 9999),
-      currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 1) < 0
+      currentWeek: ((map['currentWeek'] as num?)?.toInt() ?? 0) < 0
           ? 0
-          : ((map['currentWeek'] as num?)?.toInt() ?? 1),
+          : ((map['currentWeek'] as num?)?.toInt() ?? 0),
+      hasShownWeek0ScreamWarning:
+          map['hasShownWeek0ScreamWarning'] as bool? ?? false,
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

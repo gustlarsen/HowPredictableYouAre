@@ -275,7 +275,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(GameScreen), findsOneWidget);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
       },
     );
 

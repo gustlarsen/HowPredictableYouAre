@@ -278,7 +278,7 @@ enum BestiaryCreature {
         '300 HP • Pure Metal Obsession: Conjures exclusively Metal spells, testing the Cleric\'s endurance and Mana reserves.',
     hintKey: 'castle_bestiary_metal_wizard_hint',
     fallbackHint:
-        'Defeat Guardian Robot in Weeks 1–9 or defeat Robot Archmage to confront the Metal Wizard.',
+        'Defeat Guardian Robot in Weeks 0–9 or defeat Robot Archmage to confront the Metal Wizard.',
     icon: Icons.hardware_rounded,
     accentColor: Color(0xFF90A4AE),
     portraitAsset: 'assets/images/enemies/metal_wizard_idle.png',
@@ -294,7 +294,7 @@ enum BestiaryCreature {
         '400 HP • Pure Random Chaos: Ignores all Markov logic and strikes with pure uniform randomness across all 5 elements.',
     hintKey: 'castle_bestiary_baby_hint',
     fallbackHint:
-        'Defeat the Metal Wizard in Week 2 or later to unleash his final automated contingency.',
+        'Defeat the Metal Wizard in Week 1 or later to unleash his final automated contingency.',
     icon: Icons.casino_outlined,
     accentColor: Color(0xFFBA68C8),
     portraitAsset: 'assets/images/enemies/baby_robot_mage_idle.png',
@@ -334,12 +334,12 @@ enum NarrativeEnding {
   secretWeek1(
     id: 'ending_secret_week1',
     titleKey: 'castle_ending_secret_w1_title',
-    fallbackTitle: 'Swift Savior (Secret Week-1)',
+    fallbackTitle: 'Swift Savior (Secret Week-0)',
     descKey: 'castle_ending_secret_w1_desc',
     fallbackDesc:
-        'Defeated both the Guardian Robot and the Metal Wizard in Week 1 before backup constructs could be built, rescuing the princess untouched!',
+        'Defeated both the Guardian Robot and the Metal Wizard in Week 0 before backup constructs could be built, rescuing the princess untouched!',
     hintKey: 'castle_ending_secret_w1_hint',
-    fallbackHint: 'Defeat the Guardian Robot and Metal Wizard in Week 1.',
+    fallbackHint: 'Defeat the Guardian Robot and Metal Wizard in Week 0.',
     icon: Icons.auto_awesome_rounded,
     accentColor: Color(0xFF00E5FF),
   ),

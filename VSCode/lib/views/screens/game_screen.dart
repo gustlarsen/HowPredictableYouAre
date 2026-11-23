@@ -1188,8 +1188,8 @@ class _GameScreenState extends State<GameScreen>
     final bool isStage1ToArchmage =
         defeatedStage == 1 && week >= GameController.phase2StartWeek;
     final bool isStage2Defeat = defeatedStage == 2;
-    final bool isSecretWeek1 = defeatedStage == 3 && week == 1;
-    final bool isStage3ToBabyMage = defeatedStage == 3 && week >= 2;
+    final bool isSecretWeek1 = defeatedStage == 3 && week == 0;
+    final bool isStage3ToBabyMage = defeatedStage == 3 && week >= 1;
     final bool isStage4Defeat = defeatedStage == 4;
 
     late final String emoji;
@@ -1268,12 +1268,12 @@ class _GameScreenState extends State<GameScreen>
       );
       subtitle = loc.t(
         'boss_victory_secret_w1_subtitle',
-        fallback: 'Week 1 Lightning Victory!',
+        fallback: 'Week 0 Lightning Victory!',
       );
       body = loc.t(
         'boss_victory_secret_w1_body',
         fallback:
-            'You defeated both the Guardian Robot and the Metal Wizard in Week 1 before the Archmage or Baby Mage Robot could ever be created! The Princess is rescued untouched.',
+            'You defeated both the Guardian Robot and the Metal Wizard in Week 0 before the Archmage or Baby Mage Robot could ever be created! The Princess is rescued untouched.',
       );
       buttonLabel = loc.t(
         'boss_victory_watch_cutscene_btn',

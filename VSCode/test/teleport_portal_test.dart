@@ -94,7 +94,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
 
         // Enter battle via Metal Wizard's Lair
         await tester.tap(
@@ -146,7 +146,7 @@ void main() {
 
         expect(find.byType(TeleportConfirmDialog), findsNothing);
         expect(find.byType(GameScreen), findsOneWidget);
-        expect(controller.currentWeek, 1);
+        expect(controller.currentWeek, 0);
         expect(controller.totalRounds, 2);
         expect(controller.remainingMana, 98);
         expect(controller.confirmBattleTeleport, isTrue);
@@ -160,12 +160,20 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
         await tester.pumpAndSettle();
 
-        // Returned smoothly to WorldMapScreen, Week advanced 1 -> 2, orbs preserved, battle reset cleanly
+        // Returned smoothly to WorldMapScreen, Week advanced 0 -> 1, orbs preserved, battle reset cleanly
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(find.byType(GameScreen), findsNothing);
-        expect(controller.currentWeek, 2);
-        expect(storage.currentWeek, 2);
-        expect(find.text('Week 2 / 40'), findsOneWidget);
+        expect(controller.currentWeek, 1);
+        expect(storage.currentWeek, 1);
+        expect(find.text('Week 1 / 40'), findsOneWidget);
+
+        // Dismiss post-Week-0 Watch Tower Alert carousel modal
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('week0_scream_skip_button')));
+        await tester.pumpAndSettle();
 
         expect(controller.fireOrbs, 1);
         expect(storage.fireOrbs, 1);
@@ -177,10 +185,10 @@ void main() {
         expect(controller.pcScore, 0);
         expect(controller.confirmBattleTeleport, isTrue);
 
-        // Cloud Save persisted Week 2 and Orbs
+        // Cloud Save persisted Week 1 and Orbs
         expect(fakeClient.saveCount, greaterThanOrEqualTo(1));
         final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
-        expect(cloud.currentWeek, 2);
+        expect(cloud.currentWeek, 1);
         expect(cloud.fireOrbs, 1);
       },
     );
@@ -245,10 +253,18 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
-        expect(controller.currentWeek, 2);
+        expect(controller.currentWeek, 1);
         expect(controller.waterOrbs, 1);
         expect(controller.confirmBattleTeleport, isFalse);
         expect(storage.confirmBattleTeleport, isFalse);
+
+        // Dismiss post-Week-0 Watch Tower Alert carousel modal
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('week0_scream_skip_button')));
+        await tester.pumpAndSettle();
 
         // 2. Re-enter battle -> tapping Teleport skips confirmation dialog immediately!
         await tester.tap(
@@ -267,8 +283,12 @@ void main() {
 
         expect(find.byType(TeleportConfirmDialog), findsNothing);
         expect(find.byType(WorldMapScreen), findsOneWidget);
-        expect(controller.currentWeek, 3);
-        expect(find.text('Week 3 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsNothing,
+        );
+        expect(controller.currentWeek, 2);
+        expect(find.text('Week 2 / 40'), findsOneWidget);
         expect(controller.waterOrbs, 1);
         expect(controller.woodOrbs, 1);
         expect(controller.remainingMana, 100);

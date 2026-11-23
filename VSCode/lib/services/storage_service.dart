@@ -311,15 +311,31 @@ class StorageService {
   Future<void> setHallOfHeroesClaimAvailable(bool val) =>
       _prefs.setBool(_hallOfHeroesClaimAvailableKey, val);
 
-  // Campaign Week Calendar (starts at Week 1; Permadeath resets to Week 0)
+  // Campaign Week Calendar (always starts at Week 0)
   static const String currentWeekKey = 'current_week';
   int get currentWeek {
-    final val = _prefs.getInt(currentWeekKey) ?? 1;
+    final val = _prefs.getInt(currentWeekKey) ?? 0;
     return val < 0 ? 0 : val;
   }
 
   Future<void> setCurrentWeek(int val) =>
       _prefs.setInt(currentWeekKey, val < 0 ? 0 : val);
+
+  // Post-Week-0 Scream Warning Modal Persistence Flags (per-campaign)
+  static const String hasShownWeek0ScreamWarningKey =
+      'has_shown_week0_scream_warning';
+  static const String pendingWeek0ScreamWarningKey =
+      'pending_week0_scream_warning';
+
+  bool get hasShownWeek0ScreamWarning =>
+      _prefs.getBool(hasShownWeek0ScreamWarningKey) ?? false;
+  Future<void> setHasShownWeek0ScreamWarning(bool val) =>
+      _prefs.setBool(hasShownWeek0ScreamWarningKey, val);
+
+  bool get pendingWeek0ScreamWarning =>
+      _prefs.getBool(pendingWeek0ScreamWarningKey) ?? false;
+  Future<void> setPendingWeek0ScreamWarning(bool val) =>
+      _prefs.setBool(pendingWeek0ScreamWarningKey, val);
 
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Sacred Blessings
   static const String _adConsagrationsThisWeekKey =
@@ -1007,12 +1023,12 @@ class StorageService {
 
   int? get fastestVictoryWeek {
     final val = _prefs.getInt(_fastestVictoryWeekKey);
-    if (val == null || val <= 0) return null;
+    if (val == null || val < 0) return null;
     return val;
   }
 
   Future<void> setFastestVictoryWeek(int? val) {
-    if (val == null || val <= 0) {
+    if (val == null || val < 0) {
       return _prefs.remove(_fastestVictoryWeekKey);
     }
     return _prefs.setInt(_fastestVictoryWeekKey, val);
@@ -1125,7 +1141,9 @@ class StorageService {
       setEnemyMaxHp(100),
       setHpUpgradeLevel(0),
       setManaUpgradeLevel(0),
-      setCurrentWeek(1),
+      setCurrentWeek(0),
+      setHasShownWeek0ScreamWarning(false),
+      setPendingWeek0ScreamWarning(false),
       setAdConsagrationsThisWeek(0),
       setPendingBattleBlessing(null),
       setActiveBattleBlessing(null),

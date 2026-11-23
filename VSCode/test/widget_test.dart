@@ -60,7 +60,7 @@ void main() {
     expect(find.byKey(const ValueKey('world_map_screen')), findsOneWidget);
     expect(find.byKey(const ValueKey('world_map_bottom_left_hud')), findsOneWidget);
     expect(find.byKey(const ValueKey('week_counter_badge')), findsOneWidget);
-    expect(find.text('Week 1 / 40'), findsOneWidget);
+    expect(find.text('Week 0 / 40'), findsOneWidget);
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
 
     // Enter 100-round battle by tapping Metal Wizard's Lair
@@ -70,8 +70,8 @@ void main() {
     expect(find.text('How Predictable You Are'), findsNothing);
     expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsNothing);
     expect(find.byKey(const ValueKey('week_counter_badge')), findsNothing);
-    expect(find.text('WEEK 1 / 40'), findsNothing);
-    expect(find.text('Week 1 / 40'), findsNothing);
+    expect(find.text('WEEK 0 / 40'), findsNothing);
+    expect(find.text('Week 0 / 40'), findsNothing);
     expect(find.byKey(const ValueKey('game_retreat_button')), findsNothing);
     expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
     expect(find.byIcon(Icons.arrow_back), findsNothing);
@@ -149,7 +149,7 @@ void main() {
     expect(controller.totalRounds, 0);
     expect(controller.userScore, 0);
     expect(controller.pcScore, 0);
-    expect(controller.currentWeek, 2);
+    expect(controller.currentWeek, 1);
   });
 
   testWidgets('VersusArena animates 500ms forward, then simultaneous 500ms return and 500ms 360 rotation', (WidgetTester tester) async {
