@@ -15,6 +15,9 @@ class ScoreHeader extends StatelessWidget {
   static const Color lightAmberBronze = Color(0xFF8A5A00);
   static const Color lightCrimsonRed = Color(0xFFC62828);
 
+  static const Color neutralSilver = Colors.white70;
+  static const Color lightNeutralSlate = Color(0xFF5C5246);
+
   /// Returns a semantic color matching the RPG HP bar aesthetic:
   /// - Emerald green (`0xFF2ECC71` in Dark Mode, `0xFF1B6E36` in Light Mode) for high percentages (>= 60%)
   /// - Amber/gold (`0xFFFFB300` in Dark Mode, `0xFF8A5A00` in Light Mode) for moderate percentages (30%–59%)
@@ -38,10 +41,14 @@ class ScoreHeader extends StatelessWidget {
 
     final palette = AppPalette.of(context);
     final loc = controller.localization;
-    final gColor = gaugeColor(
-      controller.percentPredict,
-      isDark: palette.isDark,
-    );
+    final bool hasDecisiveRound =
+        (controller.userScore + controller.pcScore) > 0;
+    final Color gColor = hasDecisiveRound
+        ? gaugeColor(controller.percentPredict, isDark: palette.isDark)
+        : (palette.isDark ? neutralSilver : lightNeutralSlate);
+    final String gaugeValueText = hasDecisiveRound
+        ? '${controller.percentPredict.toStringAsFixed(1)}%'
+        : '--%';
 
     final cardBg = palette.isDark
         ? const Color(0xFF151820).withValues(alpha: 0.90)
@@ -96,7 +103,7 @@ class ScoreHeader extends StatelessWidget {
                 const SizedBox(width: 10),
                 _InlineScoreCounter(
                   label: loc.t('string5', fallback: 'Gauge'),
-                  value: '${controller.percentPredict.toStringAsFixed(1)}%',
+                  value: gaugeValueText,
                   labelColor: gColor,
                   labelWeight: FontWeight.w700,
                   valueColor: gColor,

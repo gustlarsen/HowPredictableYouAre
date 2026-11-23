@@ -3560,7 +3560,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: find.byType(ScoreHeader), matching: find.text('0.0%')),
+        find.descendant(of: find.byType(ScoreHeader), matching: find.text('--%')),
         findsOneWidget,
       );
 
