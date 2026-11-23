@@ -2774,14 +2774,10 @@ class _GameScreenState extends State<GameScreen>
                     key: const ValueKey('reset_orbs_lost_card'),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: palette.isDark
-                          ? const Color(0xFF23171B)
-                          : const Color(0xFFFDF0EE),
+                      color: palette.rewardedAdCardSurface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: palette.dangerText.withValues(
-                          alpha: palette.isDark ? 0.45 : 0.35,
-                        ),
+                        color: palette.rewardedAdCardBorder,
                       ),
                     ),
                     child: Column(
@@ -2790,12 +2786,13 @@ class _GameScreenState extends State<GameScreen>
                         Text(
                           localization.t(
                             'reset_orbs_lost_header',
-                            fallback: 'Elemental Orbs that will be lost:',
+                            fallback:
+                                'Elemental Orbs sent to Castle Spoils (reclaimable anytime):',
                           ),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12.5,
-                            color: palette.dangerText,
+                            color: palette.amberText,
                           ),
                         ),
                         const SizedBox(height: 10),

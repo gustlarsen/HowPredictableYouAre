@@ -385,6 +385,12 @@ void main() {
           findsOneWidget,
         );
         expect(find.byKey(const ValueKey('reset_orbs_lost_card')), findsOneWidget);
+        expect(
+          find.text(
+            'Elemental Orbs sent to Castle Spoils (reclaimable anytime):',
+          ),
+          findsOneWidget,
+        );
         expect(find.text('-7 Fire'), findsOneWidget);
         expect(find.text('-5 Water'), findsOneWidget);
         expect(find.text('-6 Wood'), findsOneWidget);
@@ -510,15 +516,56 @@ void main() {
         await tester.tap(find.byIcon(Icons.restart_alt));
         await tester.pumpAndSettle();
 
+        const darkPalette = AppPalette(isDark: true);
         final darkDialog = tester.widget<AlertDialog>(
           find.byKey(const ValueKey('reset_confirm_dialog')),
         );
         expect(darkDialog.backgroundColor, const Color(0xFF14161D));
+        final darkOrbsCard = tester.widget<Container>(
+          find.byKey(const ValueKey('reset_orbs_lost_card')),
+        );
+        final darkOrbsDecoration = darkOrbsCard.decoration! as BoxDecoration;
+        expect(darkOrbsDecoration.color, darkPalette.rewardedAdCardSurface);
+        expect(
+          (darkOrbsDecoration.border! as Border).top.color,
+          darkPalette.rewardedAdCardBorder,
+        );
+        final darkHeaderText = tester.widget<Text>(
+          find.text(
+            'Elemental Orbs sent to Castle Spoils (reclaimable anytime):',
+          ),
+        );
+        expect(darkHeaderText.style?.color, darkPalette.amberText);
         expect(find.text('-1 Fire'), findsOneWidget);
         expect(find.byKey(const ValueKey('reset_lost_orb_water')), findsNothing);
         expect(find.byKey(const ValueKey('reset_lost_orb_wood')), findsNothing);
         expect(find.byKey(const ValueKey('reset_lost_orb_earth')), findsNothing);
         expect(find.byKey(const ValueKey('reset_lost_orb_metal')), findsNothing);
+
+        // Cancel, switch back to Light Mode, and verify warm amber/gold box styling
+        await tester.tap(find.byKey(const ValueKey('reset_cancel_button')));
+        await tester.pumpAndSettle();
+        controller.toggleDarkMode(false);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.pumpAndSettle();
+        final lightOrbsCard = tester.widget<Container>(
+          find.byKey(const ValueKey('reset_orbs_lost_card')),
+        );
+        final lightOrbsDecoration = lightOrbsCard.decoration! as BoxDecoration;
+        expect(lightOrbsDecoration.color, lightPalette.rewardedAdCardSurface);
+        expect(
+          (lightOrbsDecoration.border! as Border).top.color,
+          lightPalette.rewardedAdCardBorder,
+        );
+        final lightHeaderText = tester.widget<Text>(
+          find.text(
+            'Elemental Orbs sent to Castle Spoils (reclaimable anytime):',
+          ),
+        );
+        expect(lightHeaderText.style?.color, lightPalette.amberText);
+        expect(find.text('-1 Fire'), findsOneWidget);
       },
     );
 
@@ -536,6 +583,15 @@ void main() {
           'reset_cancel',
           'reset_rewind_done',
         ];
+        const expectedHeaders = {
+          'en': 'Elemental Orbs sent to Castle Spoils (reclaimable anytime):',
+          'pt':
+              'Orbes enviados aos Espólios no Castelo (resgatáveis a qualquer momento):',
+          'es':
+              'Orbes enviados al Botín del Castillo (reclamables en cualquier momento):',
+          'de':
+              'Orbs an die Schloss-Beute gesendet (jederzeit einforderbar):',
+        };
         for (final lang in LocalizationService.supportedLanguages) {
           localization.setLanguage(lang);
           for (final key in keys) {
@@ -543,6 +599,10 @@ void main() {
             expect(value, isNot(key), reason: 'Missing $lang translation for $key');
             expect(value.trim(), isNotEmpty);
           }
+          expect(
+            localization.t('reset_orbs_lost_header'),
+            expectedHeaders[lang],
+          );
         }
       },
     );
