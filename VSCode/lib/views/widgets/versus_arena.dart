@@ -698,12 +698,15 @@ class _VersusArenaState extends State<VersusArena>
                           : 0.35;
                       return CustomPaint(
                         key: const ValueKey('sanctuary_runes_floor_paint'),
-                        painter: _SanctuaryRunesFloorPainter(
+                        painter: SanctuaryRunesFloorPainter(
                           centerX: centerX,
                           centerY: floorRunesCenterY,
                           idlePulse: idlePulse,
                           clashPulse: clashPulse,
                           isDark: palette.isDark,
+                          suppressRunesGeometry: widget.enemyStage == 4,
+                          leftCenterX: leftCenterX,
+                          rightCenterX: rightCenterX,
                         ),
                       );
                     },
@@ -1054,20 +1057,78 @@ class _VersusArenaState extends State<VersusArena>
 
 /// Perspective-compressed (scaleY ~ 0.32) glowing golden-amber runic floor circle
 /// painted directly onto the forge stone floor beneath the Cleric and Boss.
-class _SanctuaryRunesFloorPainter extends CustomPainter {
+///
+/// When [suppressRunesGeometry] is `true` (used over `temple_arena_bg`, which
+/// already features a painted golden-cyan rune circle), the redundant ring and
+/// spoke geometry is suppressed, leaving only soft radial cyan-gold contact
+/// shadows beneath the combatants and mid-arena clash light bounce on the stone floor.
+class SanctuaryRunesFloorPainter extends CustomPainter {
   final double centerX;
   final double centerY;
   final double idlePulse;
   final double clashPulse;
   final bool isDark;
+  final bool suppressRunesGeometry;
+  final double? leftCenterX;
+  final double? rightCenterX;
 
-  const _SanctuaryRunesFloorPainter({
+  const SanctuaryRunesFloorPainter({
     required this.centerX,
     required this.centerY,
     required this.idlePulse,
     required this.clashPulse,
     required this.isDark,
+    this.suppressRunesGeometry = false,
+    this.leftCenterX,
+    this.rightCenterX,
   });
+
+  void _paintTempleContactShadow(
+    Canvas canvas, {
+    required double x,
+    required double y,
+    required Color accentColor,
+    required double glowAlpha,
+  }) {
+    const shadowRadius = 46.0;
+    canvas.save();
+    canvas.translate(x, y);
+    canvas.scale(1.0, 0.28);
+
+    // Subtle grounding contact shadow
+    final shadowRect = Rect.fromCircle(center: Offset.zero, radius: shadowRadius);
+    canvas.drawCircle(
+      Offset.zero,
+      shadowRadius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.black.withValues(alpha: isDark ? 0.42 : 0.24),
+            Colors.black.withValues(alpha: isDark ? 0.16 : 0.08),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(shadowRect),
+    );
+
+    // Soft radial cyan-gold floor bounce under the combatant
+    final bounceRadius = shadowRadius * 1.18;
+    final bounceRect = Rect.fromCircle(center: Offset.zero, radius: bounceRadius);
+    canvas.drawCircle(
+      Offset.zero,
+      bounceRadius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            accentColor.withValues(alpha: glowAlpha * 0.42),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 1.0],
+        ).createShader(bounceRect),
+    );
+
+    canvas.restore();
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1076,6 +1137,52 @@ class _SanctuaryRunesFloorPainter extends CustomPainter {
     final radiusX = math.min(size.width * 0.44, 165.0);
     const scaleY = 0.32;
     final glowAlpha = (isDark ? 0.36 : 0.24) + 0.12 * idlePulse + 0.24 * clashPulse;
+
+    if (suppressRunesGeometry) {
+      // Soft radial cyan-gold contact shadows under Cleric (left) & Baby Mage Robot (right)
+      final contactY = centerY - 2.0;
+      _paintTempleContactShadow(
+        canvas,
+        x: leftCenterX ?? (centerX - radiusX * 0.62),
+        y: contactY,
+        accentColor: const Color(0xFF00E5FF),
+        glowAlpha: glowAlpha,
+      );
+      _paintTempleContactShadow(
+        canvas,
+        x: rightCenterX ?? (centerX + radiusX * 0.62),
+        y: contactY,
+        accentColor: const Color(0xFFFFE082),
+        glowAlpha: glowAlpha,
+      );
+
+      // Soft mid-arena cyan-gold clash light bounce over the Temple's painted rune floor
+      canvas.save();
+      canvas.translate(centerX, centerY);
+      canvas.scale(1.0, scaleY);
+      final bounceRadius = radiusX * (0.95 + 0.18 * clashPulse);
+      final bounceRect = Rect.fromCircle(center: Offset.zero, radius: bounceRadius);
+      canvas.drawCircle(
+        Offset.zero,
+        bounceRadius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              const Color(0xFFFFE082).withValues(
+                alpha: (glowAlpha * (0.34 + 0.55 * clashPulse)).clamp(0.0, 0.85),
+              ),
+              const Color(0xFF80DEEA).withValues(
+                alpha: (glowAlpha * (0.24 + 0.40 * clashPulse)).clamp(0.0, 0.70),
+              ),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.52, 1.0],
+          ).createShader(bounceRect),
+      );
+      canvas.restore();
+      return;
+    }
+
     final runeAlpha = (isDark ? 0.72 : 0.55) + 0.14 * idlePulse + 0.14 * clashPulse;
 
     canvas.save();
@@ -1135,12 +1242,15 @@ class _SanctuaryRunesFloorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SanctuaryRunesFloorPainter oldDelegate) {
+  bool shouldRepaint(covariant SanctuaryRunesFloorPainter oldDelegate) {
     return oldDelegate.centerX != centerX ||
         oldDelegate.centerY != centerY ||
         oldDelegate.idlePulse != idlePulse ||
         oldDelegate.clashPulse != clashPulse ||
-        oldDelegate.isDark != isDark;
+        oldDelegate.isDark != isDark ||
+        oldDelegate.suppressRunesGeometry != suppressRunesGeometry ||
+        oldDelegate.leftCenterX != leftCenterX ||
+        oldDelegate.rightCenterX != rightCenterX;
   }
 }
 

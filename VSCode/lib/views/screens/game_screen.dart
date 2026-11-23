@@ -96,6 +96,7 @@ class _GameScreenState extends State<GameScreen>
 
   late final AnimationController _flyingOrbController;
   late final AnimationController _embersController;
+  late final AnimationController _templeAtmosphereController;
   int _lastHandledOrbCollectionEventId = 0;
   int _lastHandledTurnCount = 0;
   HandMove? _activeFlyingOrbMove;
@@ -112,6 +113,10 @@ class _GameScreenState extends State<GameScreen>
     _embersController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3600),
+    );
+    _templeAtmosphereController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4000),
     );
     _overchargedChargeController = AnimationController(
       vsync: this,
@@ -130,8 +135,11 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
-  void _syncEmbersAnimation(bool enabled) {
-    if (enabled) {
+  void _syncAtmosphereAnimations(GameController controller) {
+    final enabled = controller.animationsEnabled;
+    final isTemple = controller.isBabyMageBoss;
+
+    if (enabled && !isTemple) {
       if (!_embersController.isAnimating) {
         _embersController.repeat();
       }
@@ -139,6 +147,18 @@ class _GameScreenState extends State<GameScreen>
       if (_embersController.isAnimating || _embersController.value != 0.0) {
         _embersController.stop();
         _embersController.reset();
+      }
+    }
+
+    if (enabled && isTemple) {
+      if (!_templeAtmosphereController.isAnimating) {
+        _templeAtmosphereController.repeat();
+      }
+    } else {
+      if (_templeAtmosphereController.isAnimating ||
+          _templeAtmosphereController.value != 0.0) {
+        _templeAtmosphereController.stop();
+        _templeAtmosphereController.reset();
       }
     }
   }
@@ -153,7 +173,7 @@ class _GameScreenState extends State<GameScreen>
       _lastHandledTurnCount = nextController.turnCount;
       nextController.captureTurn0SnapshotOnBattleEntry();
     }
-    _syncEmbersAnimation(nextController.animationsEnabled);
+    _syncAtmosphereAnimations(nextController);
   }
 
   @override
@@ -165,6 +185,7 @@ class _GameScreenState extends State<GameScreen>
     _deathDialogTimer = null;
     _flyingOrbController.dispose();
     _embersController.dispose();
+    _templeAtmosphereController.dispose();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -1502,8 +1523,15 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  static const String forgeArenaBackgroundAsset =
+      'assets/images/forge_arena_bg.webp';
+  static const String templeArenaBackgroundAsset =
+      'assets/images/temple_arena_bg.webp';
+
   String _resolveBackgroundImage(GameController controller) {
-    return 'assets/images/forge_arena_bg.webp';
+    return controller.isBabyMageBoss
+        ? templeArenaBackgroundAsset
+        : forgeArenaBackgroundAsset;
   }
 
   Offset _resolveBackpackCenter(Size fallbackSize) {
@@ -1817,7 +1845,7 @@ class _GameScreenState extends State<GameScreen>
       });
     }
 
-    _syncEmbersAnimation(controller.animationsEnabled);
+    _syncAtmosphereAnimations(controller);
     _checkIntroStory(context, controller);
     _checkDeathAlert(context, controller);
     _checkBossVictoryAlert(context, controller);
@@ -1826,29 +1854,49 @@ class _GameScreenState extends State<GameScreen>
     _checkUpdateSnackBar(context, controller);
     _checkFlyingOrbVfx(controller);
 
+    final isBabyMageBoss = controller.isBabyMageBoss;
+    final switcherDuration = controller.animationsEnabled
+        ? const Duration(milliseconds: 400)
+        : Duration.zero;
+
     return PopScope(
       canPop: false,
       child: Scaffold(
         body: Stack(
           key: _rootStackKey,
           children: [
-            // Full-Screen Dark Stone Forge Background
+            // Full-Screen Battle Background (Sacred Temple for Baby Mage Robot; Dark Stone Forge for all others)
             Positioned.fill(
-              child: Image.asset(
-                bgImage,
-                key: ValueKey<String>(bgImage),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: controller.darkMode
-                      ? const Color(0xFF0D0E12)
-                      : const Color(0xFFF7F8FA),
+              child: AnimatedSwitcher(
+                duration: switcherDuration,
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                layoutBuilder: (currentChild, previousChildren) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    alignment: Alignment.center,
+                    children: <Widget>[
+                      ...previousChildren,
+                      ?currentChild,
+                    ],
+                  );
+                },
+                child: Image.asset(
+                  bgImage,
+                  key: ValueKey<String>(bgImage),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: controller.darkMode
+                        ? const Color(0xFF0D0E12)
+                        : const Color(0xFFF7F8FA),
+                  ),
                 ),
               ),
             ),
 
-            // Subtle atmospheric contrast overlay preserving forge stone & embers
+            // Subtle atmospheric contrast overlay preserving arena art & HUD legibility
             Positioned.fill(
               child: Container(
                 color: (controller.darkMode
@@ -1858,22 +1906,55 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
 
-            // Animated Drifting Forge Sparks / Embers rising gently across the edges
+            // Animated Ambient Atmosphere Layer (Sacred Temple rays/torches/incense/dust for Baby Mage Robot; Forge embers for others)
             Positioned.fill(
               child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _embersController,
-                  builder: (context, _) {
-                    return CustomPaint(
-                      key: const ValueKey('forge_arena_embers_paint'),
-                      painter: _ForgeEmbersPainter(
-                        progress: controller.animationsEnabled
-                            ? _embersController.value
-                            : 0.25,
-                        isDark: controller.darkMode,
-                      ),
+                child: AnimatedSwitcher(
+                  duration: switcherDuration,
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: <Widget>[
+                        ...previousChildren,
+                        ?currentChild,
+                      ],
                     );
                   },
+                  child: isBabyMageBoss
+                      ? AnimatedBuilder(
+                          key: const ValueKey('temple_arena_atmosphere_layer'),
+                          animation: _templeAtmosphereController,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              key: const ValueKey(
+                                'temple_arena_atmosphere_paint',
+                              ),
+                              painter: TempleAtmospherePainter(
+                                progress: controller.animationsEnabled
+                                    ? _templeAtmosphereController.value
+                                    : 0.25,
+                                isDark: controller.darkMode,
+                              ),
+                            );
+                          },
+                        )
+                      : AnimatedBuilder(
+                          key: const ValueKey('forge_arena_atmosphere_layer'),
+                          animation: _embersController,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              key: const ValueKey('forge_arena_embers_paint'),
+                              painter: _ForgeEmbersPainter(
+                                progress: controller.animationsEnabled
+                                    ? _embersController.value
+                                    : 0.25,
+                                isDark: controller.darkMode,
+                              ),
+                            );
+                          },
+                        ),
                 ),
               ),
             ),
@@ -3414,6 +3495,272 @@ class _ForgeEmbersPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ForgeEmbersPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.isDark != isDark;
+  }
+}
+
+/// Lightweight 60 FPS Sacred Temple ambient painter layered over `temple_arena_bg`:
+/// 1. Shimmering Gothic rose-window diagonal light beams (`~4.0s` breathing cycle).
+/// 2. Flickering warm amber wall torch halos & rising altar incense wisps.
+/// 3. 32 drifting golden-cyan sacred dust motes across the nave and sunbeams.
+class TempleAtmospherePainter extends CustomPainter {
+  final double progress;
+  final bool isDark;
+
+  const TempleAtmospherePainter({
+    required this.progress,
+    required this.isDark,
+  });
+
+  static const double _imageAspectRatio = 571.0 / 1024.0;
+
+  static const List<
+      ({
+        double x,
+        double yStart,
+        double travel,
+        double phase,
+        double radius,
+        double sway,
+        bool isGold,
+      })> _moteSpecs = [
+    (x: 0.12, yStart: 0.86, travel: 0.62, phase: 0.03, radius: 1.5, sway: 7.0, isGold: true),
+    (x: 0.18, yStart: 0.78, travel: 0.56, phase: 0.19, radius: 1.2, sway: 5.5, isGold: false),
+    (x: 0.24, yStart: 0.90, travel: 0.68, phase: 0.41, radius: 1.7, sway: 8.5, isGold: true),
+    (x: 0.29, yStart: 0.72, travel: 0.54, phase: 0.64, radius: 1.3, sway: 6.0, isGold: false),
+    (x: 0.33, yStart: 0.84, travel: 0.64, phase: 0.82, radius: 1.6, sway: 7.5, isGold: true),
+    (x: 0.36, yStart: 0.68, travel: 0.52, phase: 0.11, radius: 1.4, sway: 6.5, isGold: false),
+    (x: 0.39, yStart: 0.88, travel: 0.66, phase: 0.29, radius: 1.8, sway: 8.0, isGold: true),
+    (x: 0.42, yStart: 0.74, travel: 0.58, phase: 0.53, radius: 1.2, sway: 5.0, isGold: false),
+    (x: 0.45, yStart: 0.62, travel: 0.48, phase: 0.77, radius: 1.5, sway: 6.5, isGold: true),
+    (x: 0.47, yStart: 0.80, travel: 0.60, phase: 0.91, radius: 1.3, sway: 7.0, isGold: false),
+    (x: 0.50, yStart: 0.70, travel: 0.54, phase: 0.07, radius: 1.7, sway: 6.0, isGold: true),
+    (x: 0.52, yStart: 0.89, travel: 0.65, phase: 0.36, radius: 1.4, sway: 8.0, isGold: false),
+    (x: 0.54, yStart: 0.64, travel: 0.50, phase: 0.58, radius: 1.6, sway: 5.5, isGold: true),
+    (x: 0.57, yStart: 0.79, travel: 0.58, phase: 0.73, radius: 1.2, sway: 7.0, isGold: false),
+    (x: 0.60, yStart: 0.85, travel: 0.62, phase: 0.15, radius: 1.8, sway: 8.5, isGold: true),
+    (x: 0.63, yStart: 0.71, travel: 0.52, phase: 0.44, radius: 1.3, sway: 6.0, isGold: false),
+    (x: 0.66, yStart: 0.88, travel: 0.64, phase: 0.69, radius: 1.5, sway: 7.5, isGold: true),
+    (x: 0.69, yStart: 0.66, travel: 0.50, phase: 0.87, radius: 1.4, sway: 5.5, isGold: false),
+    (x: 0.72, yStart: 0.81, travel: 0.60, phase: 0.24, radius: 1.7, sway: 8.0, isGold: true),
+    (x: 0.76, yStart: 0.75, travel: 0.56, phase: 0.49, radius: 1.3, sway: 6.5, isGold: false),
+    (x: 0.81, yStart: 0.87, travel: 0.64, phase: 0.62, radius: 1.6, sway: 7.0, isGold: true),
+    (x: 0.86, yStart: 0.77, travel: 0.55, phase: 0.94, radius: 1.2, sway: 5.5, isGold: false),
+    (x: 0.90, yStart: 0.84, travel: 0.60, phase: 0.33, radius: 1.5, sway: 6.5, isGold: true),
+    (x: 0.15, yStart: 0.58, travel: 0.42, phase: 0.56, radius: 1.3, sway: 5.0, isGold: false),
+    (x: 0.27, yStart: 0.54, travel: 0.40, phase: 0.79, radius: 1.4, sway: 6.0, isGold: true),
+    (x: 0.41, yStart: 0.52, travel: 0.38, phase: 0.09, radius: 1.5, sway: 5.5, isGold: false),
+    (x: 0.49, yStart: 0.48, travel: 0.35, phase: 0.46, radius: 1.3, sway: 4.5, isGold: true),
+    (x: 0.56, yStart: 0.51, travel: 0.37, phase: 0.71, radius: 1.5, sway: 5.5, isGold: false),
+    (x: 0.64, yStart: 0.55, travel: 0.40, phase: 0.85, radius: 1.4, sway: 6.0, isGold: true),
+    (x: 0.74, yStart: 0.57, travel: 0.42, phase: 0.21, radius: 1.3, sway: 5.0, isGold: false),
+    (x: 0.84, yStart: 0.60, travel: 0.44, phase: 0.66, radius: 1.6, sway: 6.5, isGold: true),
+    (x: 0.35, yStart: 0.93, travel: 0.66, phase: 0.38, radius: 1.4, sway: 7.0, isGold: false),
+  ];
+
+  static const List<({double nx, double ny, double radius, double seed})>
+      _torchSpecs = [
+    (nx: 0.058, ny: 0.521, radius: 32.0, seed: 0.4),
+    (nx: 0.937, ny: 0.519, radius: 32.0, seed: 2.1),
+    (nx: 0.187, ny: 0.532, radius: 20.0, seed: 3.7),
+    (nx: 0.813, ny: 0.530, radius: 20.0, seed: 5.0),
+  ];
+
+  static const List<({double nx, double ny, double sideSeed})> _brazierSpecs = [
+    (nx: 0.392, ny: 0.555, sideSeed: 0.0),
+    (nx: 0.608, ny: 0.555, sideSeed: 2.4),
+  ];
+
+  static const List<double> _wispPhases = [0.0, 0.22, 0.45, 0.68, 0.87];
+
+  Rect _resolveCoveredImageRect(Size size) {
+    final widgetAspect = size.width / size.height;
+    if (widgetAspect > _imageAspectRatio) {
+      final drawW = size.width;
+      final drawH = size.width / _imageAspectRatio;
+      return Rect.fromLTWH(0.0, (size.height - drawH) * 0.5, drawW, drawH);
+    }
+    final drawH = size.height;
+    final drawW = size.height * _imageAspectRatio;
+    return Rect.fromLTWH((size.width - drawW) * 0.5, 0.0, drawW, drawH);
+  }
+
+  Offset _imgPt(Rect rect, double nx, double ny) {
+    return Offset(rect.left + rect.width * nx, rect.top + rect.height * ny);
+  }
+
+  void _paintRoseWindowBeams(Canvas canvas, Rect imageRect) {
+    final topY = imageRect.top + imageRect.height * 0.15;
+    final bottomY = imageRect.top + imageRect.height * 0.65;
+
+    final beams = [
+      (
+        topLeft: 0.42,
+        topRight: 0.49,
+        bottomLeft: 0.21,
+        bottomRight: 0.38,
+        phase: 0.0,
+        peakAlpha: isDark ? 0.068 : 0.045,
+      ),
+      (
+        topLeft: 0.46,
+        topRight: 0.55,
+        bottomLeft: 0.37,
+        bottomRight: 0.63,
+        phase: 1.6,
+        peakAlpha: isDark ? 0.052 : 0.036,
+      ),
+      (
+        topLeft: 0.52,
+        topRight: 0.59,
+        bottomLeft: 0.61,
+        bottomRight: 0.79,
+        phase: 3.2,
+        peakAlpha: isDark ? 0.064 : 0.042,
+      ),
+    ];
+
+    for (final beam in beams) {
+      final breath = 0.62 +
+          0.38 * math.sin(progress * 2.0 * math.pi + beam.phase);
+      final alpha = (beam.peakAlpha * breath).clamp(0.0, 0.12);
+      if (alpha <= 0.005) continue;
+
+      final path = Path()
+        ..moveTo(imageRect.left + imageRect.width * beam.topLeft, topY)
+        ..lineTo(imageRect.left + imageRect.width * beam.topRight, topY)
+        ..lineTo(imageRect.left + imageRect.width * beam.bottomRight, bottomY)
+        ..lineTo(imageRect.left + imageRect.width * beam.bottomLeft, bottomY)
+        ..close();
+
+      final shaderRect = Rect.fromLTRB(
+        imageRect.left + imageRect.width * beam.bottomLeft,
+        topY,
+        imageRect.left + imageRect.width * beam.bottomRight,
+        bottomY,
+      );
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF80DEEA).withValues(alpha: alpha * 0.35),
+              const Color(0xFFE0F7FA).withValues(alpha: alpha),
+              const Color(0xFFFFF8E1).withValues(alpha: alpha * 0.55),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.28, 0.72, 1.0],
+          ).createShader(shaderRect),
+      );
+    }
+  }
+
+  void _paintWallTorches(Canvas canvas, Rect imageRect) {
+    final baseAlpha = isDark ? 0.42 : 0.26;
+    for (final torch in _torchSpecs) {
+      final center = _imgPt(imageRect, torch.nx, torch.ny);
+      final wave1 = math.sin(progress * 2.0 * math.pi * 3.0 + torch.seed);
+      final wave2 = math.cos(progress * 2.0 * math.pi * 5.0 + torch.seed * 1.7);
+      final flicker = (0.72 + 0.16 * wave1 + 0.12 * wave2).clamp(0.42, 1.0);
+      final radius = torch.radius * (0.94 + 0.12 * flicker);
+      final rect = Rect.fromCircle(center: center, radius: radius);
+
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              const Color(0xFFFFB300).withValues(alpha: baseAlpha * flicker),
+              const Color(0xFFFF8F00)
+                  .withValues(alpha: baseAlpha * 0.48 * flicker),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.45, 1.0],
+          ).createShader(rect),
+      );
+    }
+  }
+
+  void _paintAltarIncenseWisps(Canvas canvas, Rect imageRect) {
+    final wispAlphaBase = isDark ? 0.18 : 0.12;
+    final riseHeight = imageRect.height * 0.085;
+    final wispPaint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+
+    for (final brazier in _brazierSpecs) {
+      final basePos = _imgPt(imageRect, brazier.nx, brazier.ny);
+      for (final phase in _wispPhases) {
+        final t = (progress + phase + brazier.sideSeed * 0.13) % 1.0;
+        final fade = math.sin(t * math.pi).clamp(0.0, 1.0);
+        final alpha = (wispAlphaBase * fade).clamp(0.0, 0.30);
+        if (alpha <= 0.01) continue;
+
+        final dx = math.sin(t * 2.0 * math.pi + brazier.sideSeed) *
+            (3.5 + 3.0 * t);
+        final dy = -riseHeight * t;
+        final radius = 3.2 + 4.4 * t;
+        final pos = Offset(basePos.dx + dx, basePos.dy + dy);
+
+        wispPaint.color = Color.lerp(
+          const Color(0xFFFFF8E1),
+          const Color(0xFFE0F7FA),
+          t,
+        )!
+            .withValues(alpha: alpha);
+        canvas.drawCircle(pos, radius, wispPaint);
+      }
+    }
+  }
+
+  void _paintSacredDustMotes(Canvas canvas, Size size) {
+    final baseAlpha = isDark ? 0.72 : 0.42;
+    final haloPaint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4);
+    final corePaint = Paint();
+
+    for (final spec in _moteSpecs) {
+      final t = (progress + spec.phase) % 1.0;
+      final fade = math.sin(t * math.pi).clamp(0.0, 1.0);
+      final alpha = (baseAlpha * fade).clamp(0.0, 1.0);
+      if (alpha <= 0.02) continue;
+
+      final y = size.height * (spec.yStart - spec.travel * t);
+      final x = size.width * spec.x +
+          math.sin(t * 2.0 * math.pi + spec.phase * 9.0) * spec.sway;
+      final pos = Offset(x, y);
+
+      final haloColor = spec.isGold
+          ? const Color(0xFFFFE082)
+          : const Color(0xFF00E5FF);
+      final coreColor = spec.isGold
+          ? const Color(0xFFFFF8E1)
+          : const Color(0xFF80DEEA);
+
+      haloPaint.color = haloColor.withValues(alpha: alpha * 0.48);
+      canvas.drawCircle(pos, spec.radius * 2.3, haloPaint);
+
+      corePaint.color = coreColor.withValues(alpha: alpha);
+      canvas.drawCircle(pos, spec.radius, corePaint);
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final imageRect = _resolveCoveredImageRect(size);
+
+    _paintRoseWindowBeams(canvas, imageRect);
+    _paintWallTorches(canvas, imageRect);
+    _paintAltarIncenseWisps(canvas, imageRect);
+    _paintSacredDustMotes(canvas, size);
+  }
+
+  @override
+  bool shouldRepaint(covariant TempleAtmospherePainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.isDark != isDark;
   }
 }
