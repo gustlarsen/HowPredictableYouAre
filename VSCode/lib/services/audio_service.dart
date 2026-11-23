@@ -14,12 +14,18 @@ class AudioService {
   static const int defaultVibrationDurationMs = 100;
   static const int tapVibrationDurationMs = 40;
   static const int rapidFireHapticDurationMs = 25;
-  static const Duration rapidFireHapticMinInterval = Duration(milliseconds: 145);
+  static const Duration rapidFireHapticMinInterval = Duration(milliseconds: 120);
+  static const Duration rapidFireSfxMinInterval = Duration(milliseconds: 120);
 
   AudioPlayer? _sfxPlayer;
   AudioPlayer? _bgmPlayer;
   bool _isRapidFireHapticOnCooldown = false;
   Timer? _rapidFireHapticCooldownTimer;
+  bool _isRapidFireSfxOnCooldown = false;
+  Timer? _rapidFireSfxCooldownTimer;
+
+  @visibleForTesting
+  VoidCallback? onSfxTriggeredForTest;
 
   bool soundEnabled = true;
   bool musicEnabled = true;
@@ -93,7 +99,7 @@ class AudioService {
     );
   }
 
-  /// Light haptic feedback throttled to at most once every ~150ms so 10x rapid-fire stays crisp.
+  /// Light haptic feedback throttled to at most once every ~120ms so 10x/20x/30x rapid-fire stays crisp.
   void playRapidFireHaptic() {
     if (!vibrationEnabled || _isRapidFireHapticOnCooldown) return;
     _isRapidFireHapticOnCooldown = true;
@@ -106,6 +112,19 @@ class AudioService {
       durationMs: rapidFireHapticDurationMs,
       fallback: HapticFeedback.lightImpact,
     );
+  }
+
+  bool _consumeRapidFireSfxSlot({required bool throttleSfx}) {
+    if (!soundEnabled) return false;
+    if (!throttleSfx) return true;
+    if (_isRapidFireSfxOnCooldown) return false;
+    _isRapidFireSfxOnCooldown = true;
+    _rapidFireSfxCooldownTimer?.cancel();
+    _rapidFireSfxCooldownTimer = Timer(rapidFireSfxMinInterval, () {
+      _isRapidFireSfxOnCooldown = false;
+      _rapidFireSfxCooldownTimer = null;
+    });
+    return true;
   }
 
   void playWinVibrate() {
@@ -129,11 +148,12 @@ class AudioService {
     );
   }
 
-  Future<void> playWin({bool vibrate = true}) async {
+  Future<void> playWin({bool vibrate = true, bool throttleSfx = false}) async {
     if (vibrate) {
       playWinVibrate();
     }
-    if (!soundEnabled) return;
+    if (!_consumeRapidFireSfxSlot(throttleSfx: throttleSfx)) return;
+    onSfxTriggeredForTest?.call();
     try {
       await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/attack.mid'));
@@ -142,11 +162,12 @@ class AudioService {
     }
   }
 
-  Future<void> playDefeat({bool vibrate = true}) async {
+  Future<void> playDefeat({bool vibrate = true, bool throttleSfx = false}) async {
     if (vibrate) {
       playDefeatVibrate();
     }
-    if (!soundEnabled) return;
+    if (!_consumeRapidFireSfxSlot(throttleSfx: throttleSfx)) return;
+    onSfxTriggeredForTest?.call();
     try {
       await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/defeat.mid'));
@@ -155,11 +176,12 @@ class AudioService {
     }
   }
 
-  Future<void> playDraw({bool vibrate = true}) async {
+  Future<void> playDraw({bool vibrate = true, bool throttleSfx = false}) async {
     if (vibrate) {
       playDrawVibrate();
     }
-    if (!soundEnabled) return;
+    if (!_consumeRapidFireSfxSlot(throttleSfx: throttleSfx)) return;
+    onSfxTriggeredForTest?.call();
     try {
       await _sfxPlayer?.stop();
       await _sfxPlayer?.play(AssetSource('audio/draw.mid'));
@@ -235,6 +257,9 @@ class AudioService {
     _rapidFireHapticCooldownTimer?.cancel();
     _rapidFireHapticCooldownTimer = null;
     _isRapidFireHapticOnCooldown = false;
+    _rapidFireSfxCooldownTimer?.cancel();
+    _rapidFireSfxCooldownTimer = null;
+    _isRapidFireSfxOnCooldown = false;
     _sfxPlayer?.dispose();
     _bgmPlayer?.dispose();
   }

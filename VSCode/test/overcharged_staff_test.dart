@@ -133,15 +133,15 @@ void main() {
 
   group('Overcharged Staff Unit, Persistence, Cloud Save & Relic Chamber Tests', () {
     test(
-      'Purchasing Levels 1–4 deducts exact elemental orb costs and updates speed tiers & intervals',
+      'Purchasing Levels 1–6 deducts exact elemental orb costs and updates speed tiers & intervals',
       () async {
         final controller = await _createController(
           prefs: {
-            'orbs_fire': 2000,
-            'orbs_water': 2000,
-            'orbs_wood': 2000,
-            'orbs_earth': 1000,
-            'orbs_metal': 1000,
+            'orbs_fire': 8000,
+            'orbs_water': 8000,
+            'orbs_wood': 8000,
+            'orbs_earth': 4000,
+            'orbs_metal': 4000,
           },
         );
         addTearDown(controller.dispose);
@@ -161,11 +161,11 @@ void main() {
         expect(controller.isOverchargedStaffActive, isTrue);
         expect(controller.overchargedStaffSelectedSpeed, 1);
         expect(controller.overchargedStaffIntervalMs, 750);
-        expect(controller.fireOrbs, 1900);
-        expect(controller.waterOrbs, 1900);
-        expect(controller.woodOrbs, 1900);
-        expect(controller.earthOrbs, 1000);
-        expect(controller.metalOrbs, 1000);
+        expect(controller.fireOrbs, 7900);
+        expect(controller.waterOrbs, 7900);
+        expect(controller.woodOrbs, 7900);
+        expect(controller.earthOrbs, 4000);
+        expect(controller.metalOrbs, 4000);
         expect(controller.selectOverchargedStaffSpeed(2), isFalse);
 
         // Level 2: 250 Fire + 250 Water + 250 Wood -> auto-selects 2x (375ms)
@@ -173,9 +173,9 @@ void main() {
         expect(controller.overchargedStaffLevel, 2);
         expect(controller.overchargedStaffSelectedSpeed, 2);
         expect(controller.overchargedStaffIntervalMs, 375);
-        expect(controller.fireOrbs, 1650);
-        expect(controller.waterOrbs, 1650);
-        expect(controller.woodOrbs, 1650);
+        expect(controller.fireOrbs, 7650);
+        expect(controller.waterOrbs, 7650);
+        expect(controller.woodOrbs, 7650);
         expect(controller.selectOverchargedStaffSpeed(1), isTrue);
         expect(controller.overchargedStaffIntervalMs, 750);
         expect(controller.selectOverchargedStaffSpeed(5), isFalse);
@@ -185,55 +185,85 @@ void main() {
         expect(controller.overchargedStaffLevel, 3);
         expect(controller.overchargedStaffSelectedSpeed, 5);
         expect(controller.overchargedStaffIntervalMs, 150);
-        expect(controller.fireOrbs, 1150);
-        expect(controller.waterOrbs, 1150);
-        expect(controller.woodOrbs, 1150);
-        expect(controller.earthOrbs, 800);
-        expect(controller.metalOrbs, 800);
+        expect(controller.fireOrbs, 7150);
+        expect(controller.waterOrbs, 7150);
+        expect(controller.woodOrbs, 7150);
+        expect(controller.earthOrbs, 3800);
+        expect(controller.metalOrbs, 3800);
         expect(controller.selectOverchargedStaffSpeed(10), isFalse);
 
-        // Level 4 MAX: 1,000 F/W/W + 500 E/M -> auto-selects 10x (75ms)
+        // Level 4: 1,000 F/W/W + 500 E/M -> auto-selects 10x (75ms)
         expect(controller.unlockOrUpgradeOverchargedStaff(), isTrue);
         expect(controller.overchargedStaffLevel, 4);
         expect(controller.overchargedStaffSelectedSpeed, 10);
         expect(controller.overchargedStaffIntervalMs, 75);
-        expect(controller.fireOrbs, 150);
-        expect(controller.waterOrbs, 150);
-        expect(controller.woodOrbs, 150);
+        expect(controller.fireOrbs, 6150);
+        expect(controller.waterOrbs, 6150);
+        expect(controller.woodOrbs, 6150);
+        expect(controller.earthOrbs, 3300);
+        expect(controller.metalOrbs, 3300);
+        expect(controller.selectOverchargedStaffSpeed(20), isFalse);
+
+        // Level 5: 2,000 F/W/W + 1,000 E/M -> auto-selects 20x (38ms)
+        expect(controller.unlockOrUpgradeOverchargedStaff(), isTrue);
+        expect(controller.overchargedStaffLevel, 5);
+        expect(controller.overchargedStaffSelectedSpeed, 20);
+        expect(controller.overchargedStaffIntervalMs, 38);
+        expect(controller.fireOrbs, 4150);
+        expect(controller.waterOrbs, 4150);
+        expect(controller.woodOrbs, 4150);
+        expect(controller.earthOrbs, 2300);
+        expect(controller.metalOrbs, 2300);
+        expect(controller.selectOverchargedStaffSpeed(30), isFalse);
+
+        // Level 6 MAX: 3,500 F/W/W + 2,000 E/M -> auto-selects 30x (25ms)
+        expect(controller.unlockOrUpgradeOverchargedStaff(), isTrue);
+        expect(controller.overchargedStaffLevel, 6);
+        expect(controller.overchargedStaffSelectedSpeed, 30);
+        expect(controller.overchargedStaffIntervalMs, 25);
+        expect(controller.fireOrbs, 650);
+        expect(controller.waterOrbs, 650);
+        expect(controller.woodOrbs, 650);
         expect(controller.earthOrbs, 300);
         expect(controller.metalOrbs, 300);
         expect(controller.nextOverchargedStaffUpgradeCost, isNull);
         expect(controller.unlockOrUpgradeOverchargedStaff(), isFalse);
 
+        // Free switching among all 6 unlocked speeds
+        for (final speed in const [1, 2, 5, 10, 20, 30]) {
+          expect(controller.selectOverchargedStaffSpeed(speed), isTrue);
+          expect(controller.overchargedStaffSelectedSpeed, speed);
+        }
+
         // Storage persistence check
-        expect(controller.storage.overchargedStaffLevel, 4);
+        expect(controller.storage.overchargedStaffLevel, 6);
         expect(controller.storage.overchargedStaffEnabled, isTrue);
-        expect(controller.storage.overchargedStaffSelectedSpeed, 10);
+        expect(controller.storage.overchargedStaffSelectedSpeed, 30);
       },
     );
 
     test(
-      'CloudSaveData serializes, compares, and restores Overcharged Staff state',
+      'CloudSaveData serializes, compares, and restores Overcharged Staff Levels 1–6 and 30x speed',
       () async {
         final controller = await _createController(
           prefs: {
-            'overcharged_staff_level': 3,
+            'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 5,
+            'overcharged_staff_selected_speed': 30,
           },
         );
         addTearDown(controller.dispose);
 
         final snapshot = CloudSaveData.fromStorage(controller.storage);
-        expect(snapshot.overchargedStaffLevel, 3);
+        expect(snapshot.overchargedStaffLevel, 6);
         expect(snapshot.overchargedStaffEnabled, isTrue);
-        expect(snapshot.overchargedStaffSelectedSpeed, 5);
+        expect(snapshot.overchargedStaffSelectedSpeed, 30);
 
         final parsed = CloudSaveData.tryParse(snapshot.toJsonString());
         expect(parsed, isNotNull);
-        expect(parsed!.overchargedStaffLevel, 3);
+        expect(parsed!.overchargedStaffLevel, 6);
         expect(parsed.overchargedStaffEnabled, isTrue);
-        expect(parsed.overchargedStaffSelectedSpeed, 5);
+        expect(parsed.overchargedStaffSelectedSpeed, 30);
         expect(
           parsed.hasHigherProgressionOrOrbsThan(const CloudSaveData()),
           isTrue,
@@ -243,59 +273,59 @@ void main() {
         final freshStorage = StorageService();
         await freshStorage.init();
         await parsed.applyToStorage(freshStorage);
-        expect(freshStorage.overchargedStaffLevel, 3);
+        expect(freshStorage.overchargedStaffLevel, 6);
         expect(freshStorage.overchargedStaffEnabled, isTrue);
-        expect(freshStorage.overchargedStaffSelectedSpeed, 5);
+        expect(freshStorage.overchargedStaffSelectedSpeed, 30);
       },
     );
 
     test(
-      'Relic Chamber captures and restores Overcharged Staff along with its unlocked level across defeat & resetAllProgress',
+      'Relic Chamber captures and restores Overcharged Staff along with its unlocked level up to Lv. 6 across defeat & resetAllProgress',
       () async {
         final playGamesClient = _TestPlayGamesClient();
         final controller = await _createController(
           playGamesClient: playGamesClient,
           prefs: {
-            'overcharged_staff_level': 3,
+            'overcharged_staff_level': 5,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 5,
+            'overcharged_staff_selected_speed': 20,
             'current_week': 12,
           },
         );
         addTearDown(controller.dispose);
 
-        // Permadeath defeat -> captures 'overcharged_staff:3' in Relic Chamber
+        // Permadeath defeat -> captures 'overcharged_staff:5' in Relic Chamber
         await controller.applyPermadeathReset(
           cause: PermadeathCause.battleDefeat,
         );
         expect(controller.overchargedStaffLevel, 0);
         expect(controller.overchargedStaffEnabled, isFalse);
-        expect(controller.storedRelicOverchargedStaffLevel, 3);
+        expect(controller.storedRelicOverchargedStaffLevel, 5);
         expect(
           controller.availableRelicChamberArtifacts,
           contains(ShopUpgradeArtifact.overchargedStaff),
         );
 
-        // Restore via Relic Chamber -> restores Lv. 3 and unlocks 5x speed
+        // Restore via Relic Chamber -> restores Lv. 5 and unlocks 20x speed
         final restored = await controller.watchAdToRestoreRelics();
         expect(restored, isTrue);
-        expect(controller.overchargedStaffLevel, 3);
+        expect(controller.overchargedStaffLevel, 5);
         expect(controller.overchargedStaffEnabled, isTrue);
-        expect(controller.overchargedStaffSelectedSpeed, 5);
+        expect(controller.overchargedStaffSelectedSpeed, 20);
         expect(controller.relicChamberStoredUpgrades, isEmpty);
 
-        // Upgrade to Lv. 4 and use resetAllProgress -> captures 'overcharged_staff:4'
-        controller.addAllOrbs(1500);
+        // Upgrade to Lv. 6 and use resetAllProgress -> captures 'overcharged_staff:6'
+        controller.addAllOrbs(4000);
         expect(controller.unlockOrUpgradeOverchargedStaff(), isTrue);
-        expect(controller.overchargedStaffLevel, 4);
+        expect(controller.overchargedStaffLevel, 6);
         await controller.resetAllProgress();
         expect(controller.overchargedStaffLevel, 0);
-        expect(controller.storedRelicOverchargedStaffLevel, 4);
+        expect(controller.storedRelicOverchargedStaffLevel, 6);
 
-        final restoredLv4 = await controller.watchAdToRestoreRelics();
-        expect(restoredLv4, isTrue);
-        expect(controller.overchargedStaffLevel, 4);
-        expect(controller.overchargedStaffSelectedSpeed, 10);
+        final restoredLv6 = await controller.watchAdToRestoreRelics();
+        expect(restoredLv6, isTrue);
+        expect(controller.overchargedStaffLevel, 6);
+        expect(controller.overchargedStaffSelectedSpeed, 30);
       },
     );
 
@@ -325,9 +355,9 @@ void main() {
   group('Overcharged Staff ShopDialog & RoyalCastleDialog Widget Tests', () {
     for (final isDark in [true, false]) {
       testWidgets(
-        'ShopDialog purchases Lv 1-4, displays 1x/2x/5x/10x speed pills, locks, toggle dimming, and MAX badge (${isDark ? "Dark" : "Light"} Mode)',
+        'ShopDialog purchases Lv 1-6 on 360dp width, renders 1x/2x/5x/10x/20x/30x single-row pills without overflow, locks, toggle dimming, and MAX badge (${isDark ? "Dark" : "Light"} Mode)',
         (WidgetTester tester) async {
-          tester.view.physicalSize = const Size(380, 760);
+          tester.view.physicalSize = const Size(360, 760);
           tester.view.devicePixelRatio = 1.0;
           addTearDown(() {
             tester.view.resetPhysicalSize();
@@ -337,11 +367,11 @@ void main() {
           final controller = await _createController(
             prefs: {
               'darkMode': isDark,
-              'orbs_fire': 2000,
-              'orbs_water': 2000,
-              'orbs_wood': 2000,
-              'orbs_earth': 1000,
-              'orbs_metal': 1000,
+              'orbs_fire': 8000,
+              'orbs_water': 8000,
+              'orbs_wood': 8000,
+              'orbs_earth': 4000,
+              'orbs_metal': 4000,
             },
           );
           addTearDown(controller.dispose);
@@ -395,17 +425,27 @@ void main() {
           expect(controller.overchargedStaffEnabled, isTrue);
           expect(controller.overchargedStaffSelectedSpeed, 1);
 
-          // Speed row visible with 1x active and 2x/5x/10x showing lock icons
+          // Speed row visible with all 6 pills aligned on a single horizontal row & 5 lock icons
           expect(
             find.byKey(const ValueKey('overcharged_staff_speed_row')),
             findsOneWidget,
           );
+          final pillYCenters = <int>{
+            for (final speed in const [1, 2, 5, 10, 20, 30])
+              tester
+                  .getCenter(
+                    find.byKey(ValueKey('overcharged_staff_speed_${speed}x')),
+                  )
+                  .dy
+                  .round(),
+          };
+          expect(pillYCenters.length, 1);
           expect(
             find.descendant(
               of: find.byKey(const ValueKey('overcharged_staff_speed_row')),
               matching: find.byIcon(Icons.lock_rounded),
             ),
-            findsNWidgets(3),
+            findsNWidgets(5),
           );
 
           // Toggle OFF dims speed selector row
@@ -430,7 +470,7 @@ void main() {
           );
           expect(activeOpacity.opacity, 1.0);
 
-          // Purchase Level 2 -> auto-selects 2x, 2 locks remain (5x, 10x)
+          // Purchase Level 2 -> auto-selects 2x, 4 locks remain (5x, 10x, 20x, 30x)
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
@@ -442,10 +482,10 @@ void main() {
               of: find.byKey(const ValueKey('overcharged_staff_speed_row')),
               matching: find.byIcon(Icons.lock_rounded),
             ),
-            findsNWidgets(2),
+            findsNWidgets(4),
           );
 
-          // Switch back to 1x, then back to 2x
+          // Switch back to 1x
           final speed1x = find.byKey(const ValueKey('overcharged_staff_speed_1x'));
           await tester.ensureVisible(speed1x);
           await tester.pumpAndSettle();
@@ -453,7 +493,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(controller.overchargedStaffSelectedSpeed, 1);
 
-          // Purchase Level 3 -> 5x auto-selected, 5 3D orbs shown for Lv. 4 upgrade
+          // Purchase Level 3 -> 5x auto-selected, 3 locks remain
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
@@ -467,14 +507,51 @@ void main() {
             ),
             findsNWidgets(5),
           );
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('overcharged_staff_speed_row')),
+              matching: find.byIcon(Icons.lock_rounded),
+            ),
+            findsNWidgets(3),
+          );
 
-          // Purchase Level 4 -> 10x auto-selected, MAX badge rendered, no locks
+          // Purchase Level 4 -> 10x auto-selected, 2 locks remain (20x, 30x)
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 4);
           expect(controller.overchargedStaffSelectedSpeed, 10);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('overcharged_staff_speed_row')),
+              matching: find.byIcon(Icons.lock_rounded),
+            ),
+            findsNWidgets(2),
+          );
+
+          // Purchase Level 5 -> 20x auto-selected, 1 lock remains (30x)
+          await tester.ensureVisible(upgradeBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(upgradeBtn);
+          await tester.pumpAndSettle();
+          expect(controller.overchargedStaffLevel, 5);
+          expect(controller.overchargedStaffSelectedSpeed, 20);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('overcharged_staff_speed_row')),
+              matching: find.byIcon(Icons.lock_rounded),
+            ),
+            findsNWidgets(1),
+          );
+
+          // Purchase Level 6 MAX -> 30x auto-selected, MAX badge rendered, 0 locks
+          await tester.ensureVisible(upgradeBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(upgradeBtn);
+          await tester.pumpAndSettle();
+          expect(controller.overchargedStaffLevel, 6);
+          expect(controller.overchargedStaffSelectedSpeed, 30);
           expect(
             find.byKey(const ValueKey('overcharged_staff_max_badge')),
             findsOneWidget,
@@ -491,12 +568,12 @@ void main() {
       );
     }
 
-    testWidgets('RoyalCastleDialog Relic Chamber shows Overcharged Staff with its level', (
+    testWidgets('RoyalCastleDialog Relic Chamber shows Overcharged Staff with its level up to Lv. 6', (
       WidgetTester tester,
     ) async {
       final controller = await _createController(
         prefs: {
-          'relic_chamber_upgrades': ['overcharged_staff:3'],
+          'relic_chamber_upgrades': ['overcharged_staff:6'],
         },
       );
       addTearDown(controller.dispose);
@@ -518,7 +595,7 @@ void main() {
         find.byKey(const ValueKey('relic_chamber_item_overcharged_staff')),
         findsOneWidget,
       );
-      expect(find.text('Overcharged Staff (Lv. 3)'), findsOneWidget);
+      expect(find.text('Overcharged Staff (Lv. 6)'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
@@ -661,7 +738,86 @@ void main() {
     );
 
     testWidgets(
-      '10x rapid-fire (75ms) throttles light haptic feedback to at most once every ~150ms',
+      'Hold at 20x (38ms) on Random and 30x (25ms) on Fire rapid-fires at exact intervals and stops on release',
+      (WidgetTester tester) async {
+        // Part A: 20x (38ms) on Random button
+        final controller20x = await _createController(
+          prefs: {
+            'overcharged_staff_level': 5,
+            'overcharged_staff_enabled': true,
+            'overcharged_staff_selected_speed': 20, // 38ms
+            'unlockedRandom': true,
+            'showRandom': true,
+            'mana_upgrade_level': 100,
+          },
+        );
+        addTearDown(controller20x.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller20x,
+            child: MaterialApp(
+              key: const ValueKey('app_20x'),
+              theme: ThemeData.dark(useMaterial3: true),
+              home: const GameScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final randomBtn = find.byKey(const ValueKey('random_move_button'));
+        final randomGesture = await tester.startGesture(tester.getCenter(randomBtn));
+        await tester.pump(const Duration(milliseconds: 255)); // 1 initial + 1 rapid at 250ms = 2
+        expect(controller20x.totalRounds, 2);
+        await tester.pump(const Duration(milliseconds: 38));
+        expect(controller20x.totalRounds, 3);
+        await tester.pump(const Duration(milliseconds: 38));
+        expect(controller20x.totalRounds, 4);
+        await tester.pump(const Duration(milliseconds: 38));
+        expect(controller20x.totalRounds, 5);
+        await randomGesture.up();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(controller20x.totalRounds, 5);
+
+        // Part B: 30x (25ms) on Fire button
+        final controller30x = await _createController(
+          prefs: {
+            'overcharged_staff_level': 6,
+            'overcharged_staff_enabled': true,
+            'overcharged_staff_selected_speed': 30, // 25ms
+            'mana_upgrade_level': 100,
+          },
+        );
+        addTearDown(controller30x.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller30x,
+            child: MaterialApp(
+              key: const ValueKey('app_30x'),
+              theme: ThemeData.dark(useMaterial3: true),
+              home: const GameScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final fireBtn = find.byKey(const ValueKey('hand_button_rock'));
+        final fireGesture = await tester.startGesture(tester.getCenter(fireBtn));
+        await tester.pump(const Duration(milliseconds: 255)); // 1 initial + 1 rapid at 250ms = 2
+        expect(controller30x.totalRounds, 2);
+        for (int i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
+        expect(controller30x.totalRounds, 6);
+        await fireGesture.up();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(controller30x.totalRounds, 6);
+      },
+    );
+
+    testWidgets(
+      '10x (75ms) and 30x (25ms) rapid-fire throttle light haptics and attack SFX to at most once every ~120ms',
       (WidgetTester tester) async {
         const vibratorChannel = MethodChannel(
           'com.gustlarsen.howpredictable/vibrator',
@@ -687,12 +843,18 @@ void main() {
           );
         });
 
+        int sfxCalls = 0;
+        final audioService = AudioService();
+        audioService.onSfxTriggeredForTest = () => sfxCalls++;
+
         final controller = await _createController(
+          audioService: audioService,
           prefs: {
-            'overcharged_staff_level': 4,
+            'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 10, // 75ms
+            'overcharged_staff_selected_speed': 30, // 25ms (40 shots/sec)
             'vibrationEnabled': true,
+            'soundEnabled': true,
             'mana_upgrade_level': 100,
           },
         );
@@ -711,33 +873,35 @@ void main() {
 
         final fireBtn = find.byKey(const ValueKey('hand_button_rock'));
         final gesture = await tester.startGesture(tester.getCenter(fireBtn));
-        // Advance through 250ms threshold + 4 intervals (4 * 75ms = 300ms -> 5 rapid ticks)
-        await tester.pump(const Duration(milliseconds: 255));
-        await tester.pump(const Duration(milliseconds: 75));
-        await tester.pump(const Duration(milliseconds: 75));
-        await tester.pump(const Duration(milliseconds: 75));
-        await tester.pump(const Duration(milliseconds: 75));
+        // Advance through 250ms threshold + 10 intervals of 25ms (t = 250..500ms -> 11 rapid ticks)
+        await tester.pump(const Duration(milliseconds: 250));
+        for (int i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
         await gesture.up();
         await tester.pump(const Duration(milliseconds: 200));
 
-        // 6 rounds total (1 initial + 5 rapid ticks), but rapid haptics throttled to 3 (at 255, 405, 555)
-        expect(controller.totalRounds, 6);
+        // 12 rounds total (1 initial + 11 rapid ticks at 25ms intervals),
+        // but 120ms cooldown throttles rapid haptics to 3 (250ms, 375ms, 500ms)
+        // and SFX to 4 (1 initial + 3 rapid-fire throttled triggers).
+        expect(controller.totalRounds, 12);
         expect(rapidVibrationCalls.length, 3);
+        expect(sfxCalls, 4);
       },
     );
 
     testWidgets(
-      'Safety brake stops rapid-fire immediately when playerHp <= 5, when enemyHp == 0, or when remainingMana == 0',
+      'Safety brake stops 30x rapid-fire immediately when playerHp <= 5, when enemyHp == 0, or when remainingMana == 0',
       (WidgetTester tester) async {
-        // Case A: Critical HP protection (playerHp drops to 5 -> halts immediately)
+        // Case A: Critical HP protection at 30x (playerHp drops to 5 -> halts immediately)
         final hpController = await _createController(
           prefs: {
-            'overcharged_staff_level': 4,
+            'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 10, // 75ms
-            'userHp': 7,
-            'pcScore': 43,
-            'total': 43,
+            'overcharged_staff_selected_speed': 30, // 25ms
+            'userHp': 9,
+            'pcScore': 41,
+            'total': 41,
             // Force Stage 3 Metal Wizard (100% Metal). Player plays Wood (scissors) -> loses every round!
             'enemy_stage': 3,
             'pcHp': 300,
@@ -759,27 +923,33 @@ void main() {
 
         final woodBtn = find.byKey(const ValueKey('hand_button_scissors'));
         final hpGesture = await tester.startGesture(tester.getCenter(woodBtn));
-        // Initial press: 7 -> 6 HP. Rapid tick at 250ms: 6 -> 5 HP -> safety brake triggers!
+        // Initial press: 9 -> 8 HP. 250ms: 8 -> 7, 275ms: 7 -> 6, 300ms: 6 -> 5 (safety brake!)
         await tester.pump(const Duration(milliseconds: 100));
+        expect(hpController.userHp, 8);
+        await tester.pump(const Duration(milliseconds: 155)); // 255ms -> 7 HP
+        expect(hpController.userHp, 7);
+        await tester.pump(const Duration(milliseconds: 25)); // 280ms -> 6 HP
         expect(hpController.userHp, 6);
-        await tester.pump(const Duration(milliseconds: 160));
+        await tester.pump(const Duration(milliseconds: 25)); // 305ms -> 5 HP (halted!)
         expect(hpController.userHp, 5);
-        // Hold for another 500ms: must NOT fire more rounds or drop below 5 HP
-        await tester.pump(const Duration(milliseconds: 500));
+        // Hold for another 300ms (12 more 25ms intervals): must NOT drop below 5 HP
+        for (int i = 0; i < 12; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
         expect(hpController.userHp, 5);
         await hpGesture.up();
         await tester.pump();
 
-        // Case B: Boss defeated (enemyHp == 0 -> halts immediately)
+        // Case B: Boss defeated at 30x (enemyHp == 0 -> halts immediately)
         final bossController = await _createController(
           prefs: {
-            'overcharged_staff_level': 4,
+            'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 10, // 75ms
+            'overcharged_staff_selected_speed': 30, // 25ms
             'enemy_stage': 3, // 100% Metal -> Fire (rock) beats Metal!
-            'pcHp': 2,
-            'userScore': 298,
-            'total': 298,
+            'pcHp': 3,
+            'userScore': 297,
+            'total': 297,
             'mana_upgrade_level': 300,
           },
         );
@@ -799,23 +969,27 @@ void main() {
 
         final fireBtn = find.byKey(const ValueKey('hand_button_rock'));
         final bossGesture = await tester.startGesture(tester.getCenter(fireBtn));
-        await tester.pump(const Duration(milliseconds: 100)); // 2 -> 1 HP
+        await tester.pump(const Duration(milliseconds: 100)); // 3 -> 2 HP
+        expect(bossController.enemyHp, 2);
+        await tester.pump(const Duration(milliseconds: 155)); // 255ms -> 1 HP
         expect(bossController.enemyHp, 1);
-        await tester.pump(const Duration(milliseconds: 160)); // 1 -> 0 HP
+        await tester.pump(const Duration(milliseconds: 25)); // 280ms -> 0 HP (halted!)
         expect(bossController.enemyHp, 0);
         expect(bossController.totalRounds, 300);
-        await tester.pump(const Duration(milliseconds: 300));
+        for (int i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
         expect(bossController.totalRounds, 300);
         await bossGesture.up();
         await tester.pumpAndSettle();
 
-        // Case C: Mana reaches 0 (remainingMana == 0 -> halts immediately)
+        // Case C: Mana reaches 0 at 30x (remainingMana == 0 -> halts immediately)
         final manaController = await _createController(
           prefs: {
-            'overcharged_staff_level': 4,
+            'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
-            'overcharged_staff_selected_speed': 10, // 75ms
-            'total': 98, // 2 mana remaining out of 100
+            'overcharged_staff_selected_speed': 30, // 25ms
+            'total': 97, // 3 mana remaining out of 100
           },
         );
         addTearDown(manaController.dispose);
@@ -834,12 +1008,16 @@ void main() {
 
         final waterBtn = find.byKey(const ValueKey('hand_button_paper'));
         final manaGesture = await tester.startGesture(tester.getCenter(waterBtn));
-        await tester.pump(const Duration(milliseconds: 100)); // 99 rounds (1 mana left)
+        await tester.pump(const Duration(milliseconds: 100)); // 98 rounds (2 mana left)
+        expect(manaController.remainingMana, 2);
+        await tester.pump(const Duration(milliseconds: 155)); // 99 rounds (1 mana left)
         expect(manaController.remainingMana, 1);
-        await tester.pump(const Duration(milliseconds: 160)); // 100 rounds (0 mana left)
+        await tester.pump(const Duration(milliseconds: 25)); // 100 rounds (0 mana left!)
         expect(manaController.remainingMana, 0);
         expect(manaController.totalRounds, 100);
-        await tester.pump(const Duration(milliseconds: 300));
+        for (int i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
         expect(manaController.totalRounds, 100);
         await manaGesture.up();
         await tester.pumpAndSettle();

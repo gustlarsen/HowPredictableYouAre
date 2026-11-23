@@ -480,6 +480,8 @@ class CloudSaveData {
     if (overchargedStaffLevel >= 2) value += 750;
     if (overchargedStaffLevel >= 3) value += 1900;
     if (overchargedStaffLevel >= 4) value += 4000;
+    if (overchargedStaffLevel >= 5) value += 8000;
+    if (overchargedStaffLevel >= 6) value += 14500;
     if (unlockedAlgorithm) value += 460;
     if (unlockedYourPrediction) value += 950;
     if (unlockedNextMove) value += 2400;
@@ -1367,7 +1369,7 @@ class CloudSaveData {
           map['unlockedMarkovRecalibrator'] as bool? ?? false,
       giftBoxUnlocked: map['giftBoxUnlocked'] as bool? ?? false,
       overchargedStaffLevel:
-          ((map['overchargedStaffLevel'] as num?)?.toInt() ?? 0).clamp(0, 4),
+          ((map['overchargedStaffLevel'] as num?)?.toInt() ?? 0).clamp(0, 6),
       showReset: map['showReset'] as bool? ?? false,
       showPredictability: map['showPredictability'] as bool? ?? false,
       showRandom: map['showRandom'] as bool? ?? false,
@@ -1389,7 +1391,14 @@ class CloudSaveData {
           map['overchargedStaffEnabled'] as bool? ?? false,
       overchargedStaffSelectedSpeed: (() {
         final raw = (map['overchargedStaffSelectedSpeed'] as num?)?.toInt() ?? 1;
-        return (raw == 1 || raw == 2 || raw == 5 || raw == 10) ? raw : 1;
+        return (raw == 1 ||
+                raw == 2 ||
+                raw == 5 ||
+                raw == 10 ||
+                raw == 20 ||
+                raw == 30)
+            ? raw
+            : 1;
       })(),
       hasSeenStoryIntro: map['hasSeenStoryIntro'] as bool? ?? false,
       hasSeenStoryReset: map['hasSeenStoryReset'] as bool? ?? false,

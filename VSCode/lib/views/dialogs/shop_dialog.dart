@@ -1199,7 +1199,7 @@ class _ShopDialogState extends State<ShopDialog> {
           subtitle: loc.t(
             'overcharged_staff_desc',
             fallback:
-                'Hold any element or Random to unleash rapid-fire attacks (1x–10x), with auto-stop safety at 5 HP or less.',
+                'Hold any element or Random to unleash rapid-fire attacks (1x–30x), with auto-stop safety at 5 HP or less.',
           ),
           level: controller.overchargedStaffLevel,
           isActive: controller.overchargedStaffEnabled,
@@ -3317,7 +3317,7 @@ class _OverchargedStaffShopTile extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // Compact Horizontal Row of 4 Speed Pills (1x, 2x, 5x, 10x)
+          // Compact Horizontal Row of 6 Speed Pills (1x, 2x, 5x, 10x, 20x, 30x)
           AnimatedOpacity(
             key: const ValueKey('overcharged_staff_speed_row_opacity'),
             opacity: isActive ? 1.0 : 0.45,
@@ -3342,7 +3342,7 @@ class _OverchargedStaffShopTile extends StatelessWidget {
                   for (int i = 0;
                       i < GameController.overchargedStaffSpeedOptions.length;
                       i++) ...[
-                    if (i > 0) const SizedBox(width: 4),
+                    if (i > 0) const SizedBox(width: 3),
                     Expanded(
                       child: _buildSpeedPill(
                         speed: GameController.overchargedStaffSpeedOptions[i],
@@ -3357,7 +3357,7 @@ class _OverchargedStaffShopTile extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // Next-Level Upgrade Row (Lv. 2..4) or MAX Badge
+          // Next-Level Upgrade Row (Lv. 2..6) or MAX Badge
           if (!isMaxLevel && nextCost != null)
             Wrap(
               spacing: 6,
@@ -3503,7 +3503,7 @@ class _OverchargedStaffShopTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(7.5),
             child: Container(
               height: 28,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(7.5),
@@ -3518,16 +3518,16 @@ class _OverchargedStaffShopTile extends StatelessWidget {
                     if (!isTierUnlocked) ...[
                       Icon(
                         Icons.lock_rounded,
-                        size: 10.5,
+                        size: 9.5,
                         color: textColor,
                       ),
-                      const SizedBox(width: 2.5),
+                      const SizedBox(width: 1.5),
                     ],
                     Text(
                       '${speed}x',
                       maxLines: 1,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         fontWeight:
                             isSelected ? FontWeight.w800 : FontWeight.w700,
                         color: textColor,

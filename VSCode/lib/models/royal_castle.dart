@@ -107,7 +107,7 @@ enum ShopUpgradeArtifact {
   });
 
   static String overchargedStaffRelicId(int level) =>
-      'overcharged_staff:${level.clamp(1, 4)}';
+      'overcharged_staff:${level.clamp(1, 6)}';
 
   static int? parseOverchargedStaffLevel(String id) {
     final trimmed = id.trim();
@@ -116,7 +116,7 @@ enum ShopUpgradeArtifact {
       final rawLevel = trimmed.substring(overchargedStaff.id.length + 1);
       final parsed = int.tryParse(rawLevel);
       if (parsed == null) return 1;
-      return parsed.clamp(1, 4);
+      return parsed.clamp(1, 6);
     }
     return null;
   }

@@ -156,9 +156,9 @@ class GameController extends ChangeNotifier {
     metal: 1200,
   );
 
-  // Overcharged Staff Tiered Upgrade Constants (Levels 1..4)
-  static const int overchargedStaffMaxLevel = 4;
-  static const List<int> overchargedStaffSpeedOptions = [1, 2, 5, 10];
+  // Overcharged Staff Tiered Upgrade Constants (Levels 1..6)
+  static const int overchargedStaffMaxLevel = 6;
+  static const List<int> overchargedStaffSpeedOptions = [1, 2, 5, 10, 20, 30];
   static const int overchargedStaffHoldThresholdMs = 250;
   static const int overchargedStaffCriticalHpLimit = 5;
 
@@ -186,6 +186,20 @@ class GameController extends ChangeNotifier {
     earth: 500,
     metal: 500,
   );
+  static const ElementalCost costOverchargedStaffLv5 = ElementalCost(
+    fire: 2000,
+    water: 2000,
+    wood: 2000,
+    earth: 1000,
+    metal: 1000,
+  );
+  static const ElementalCost costOverchargedStaffLv6 = ElementalCost(
+    fire: 3500,
+    water: 3500,
+    wood: 3500,
+    earth: 2000,
+    metal: 2000,
+  );
 
   static ElementalCost overchargedStaffCostForLevel(int level) {
     switch (level) {
@@ -197,6 +211,10 @@ class GameController extends ChangeNotifier {
         return costOverchargedStaffLv3;
       case 4:
         return costOverchargedStaffLv4;
+      case 5:
+        return costOverchargedStaffLv5;
+      case 6:
+        return costOverchargedStaffLv6;
       default:
         return costOverchargedStaffLv1;
     }
@@ -212,6 +230,10 @@ class GameController extends ChangeNotifier {
         return 3;
       case 10:
         return 4;
+      case 20:
+        return 5;
+      case 30:
+        return 6;
       default:
         return 1;
     }
@@ -227,6 +249,10 @@ class GameController extends ChangeNotifier {
         return 5;
       case 4:
         return 10;
+      case 5:
+        return 20;
+      case 6:
+        return 30;
       default:
         return 1;
     }
@@ -242,6 +268,10 @@ class GameController extends ChangeNotifier {
         return 150;
       case 10:
         return 75;
+      case 20:
+        return 38;
+      case 30:
+        return 25;
       default:
         return 750;
     }
@@ -2060,7 +2090,7 @@ class GameController extends ChangeNotifier {
       }
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDraw(vibrate: !isRapidFire);
+      audio.playDraw(vibrate: !isRapidFire, throttleSfx: isRapidFire);
     } else if (roundOutcome == RoundWinner.user) {
       lastWinner = RoundWinner.user;
       userScore += 1;
@@ -2087,7 +2117,7 @@ class GameController extends ChangeNotifier {
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeDefeatedElements(decreeDefeatedElements.toList());
 
-      audio.playWin(vibrate: !isRapidFire);
+      audio.playWin(vibrate: !isRapidFire, throttleSfx: isRapidFire);
     } else {
       lastWinner = RoundWinner.computer;
       pcScore += 1;
@@ -2100,7 +2130,7 @@ class GameController extends ChangeNotifier {
       }
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDefeat(vibrate: !isRapidFire);
+      audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
     }
 
     if (isRapidFire) {

@@ -187,7 +187,9 @@ class _GameScreenState extends State<GameScreen>
       return true;
     }
     if (controller.remainingMana <= 0 ||
-        controller.totalRounds >= controller.playerMaxMana) {
+        controller.totalRounds >= controller.playerMaxMana ||
+        controller.isDeathAlertPending ||
+        controller.is100RoundsAlertPending) {
       return true;
     }
     if (_isDeathSequenceActive ||

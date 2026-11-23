@@ -575,11 +575,11 @@ class StorageService {
 
   int get overchargedStaffLevel {
     final val = _prefs.getInt(overchargedStaffLevelKey) ?? 0;
-    return val.clamp(0, 4);
+    return val.clamp(0, 6);
   }
 
   Future<void> setOverchargedStaffLevel(int val) =>
-      _prefs.setInt(overchargedStaffLevelKey, val.clamp(0, 4));
+      _prefs.setInt(overchargedStaffLevelKey, val.clamp(0, 6));
 
   bool get overchargedStaffEnabled =>
       _prefs.getBool(overchargedStaffEnabledKey) ?? false;
@@ -589,12 +589,26 @@ class StorageService {
 
   int get overchargedStaffSelectedSpeed {
     final val = _prefs.getInt(overchargedStaffSelectedSpeedKey) ?? 1;
-    if (val == 1 || val == 2 || val == 5 || val == 10) return val;
+    if (val == 1 ||
+        val == 2 ||
+        val == 5 ||
+        val == 10 ||
+        val == 20 ||
+        val == 30) {
+      return val;
+    }
     return 1;
   }
 
   Future<void> setOverchargedStaffSelectedSpeed(int val) {
-    final sanitized = (val == 1 || val == 2 || val == 5 || val == 10) ? val : 1;
+    final sanitized = (val == 1 ||
+            val == 2 ||
+            val == 5 ||
+            val == 10 ||
+            val == 20 ||
+            val == 30)
+        ? val
+        : 1;
     return _prefs.setInt(overchargedStaffSelectedSpeedKey, sanitized);
   }
 
