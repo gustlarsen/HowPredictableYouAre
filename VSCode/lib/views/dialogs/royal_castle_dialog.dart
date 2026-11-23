@@ -77,7 +77,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           surfaceTintColor: palette.isDark ? null : Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 14,
-            vertical: 16,
+            vertical: 14,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -89,9 +89,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             ),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 720),
+            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 740),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -100,7 +100,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(7),
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
                           color: palette.amberBorder.withValues(
                             alpha: palette.isDark ? 0.18 : 0.14,
@@ -110,7 +110,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                             color: palette.amberBorder.withValues(alpha: 0.55),
                           ),
                         ),
-                        child: const RoyalCastleIcon(size: 24),
+                        child: const RoyalCastleIcon(size: 32),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -168,13 +168,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
 
                   // 6 Compact Vertical Navigation Tabs in a Single Row
                   _buildWingTabBar(context, palette, loc),
 
                   Divider(
-                    height: 14,
+                    height: 12,
                     color: palette.isDark ? null : palette.divider,
                   ),
 
@@ -190,7 +190,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                           ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -242,9 +242,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.throneRoom,
         key: const ValueKey('castle_tab_throne'),
-        iconBuilder: (isSelected) => ThroneCrownIcon(
+        iconBuilder: (_) => const ThroneCrownIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_throne_short', fallback: 'Throne'),
         hasDot: false,
@@ -252,9 +252,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.library,
         key: const ValueKey('castle_tab_library'),
-        iconBuilder: (isSelected) => LibraryTomeIcon(
+        iconBuilder: (_) => const LibraryTomeIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_library_short', fallback: 'Library'),
         hasDot: false,
@@ -262,9 +262,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.treasury,
         key: const ValueKey('castle_tab_treasury'),
-        iconBuilder: (isSelected) => TreasuryChestIcon(
+        iconBuilder: (_) => const TreasuryChestIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_treasury_short', fallback: 'Treasury'),
         hasDot: controller.isTreasuryFull,
@@ -272,9 +272,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.relicChamber,
         key: const ValueKey('castle_tab_relics'),
-        iconBuilder: (isSelected) => RelicsSwordIcon(
+        iconBuilder: (_) => const RelicsSwordIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_relics_short', fallback: 'Relics'),
         hasDot: controller.hasAvailableRelicChamberUpgrades,
@@ -282,9 +282,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.spoilsOfWar,
         key: const ValueKey('castle_tab_spoils'),
-        iconBuilder: (isSelected) => SpoilsPouchIcon(
+        iconBuilder: (_) => const SpoilsPouchIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_spoils_short', fallback: 'Spoils'),
         hasDot: controller.hasSpoilsOfWarOrbs,
@@ -292,9 +292,9 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       (
         wing: CastleWing.hallOfHeroes,
         key: const ValueKey('castle_tab_hall_of_heroes'),
-        iconBuilder: (isSelected) => HeroesHelmIcon(
+        iconBuilder: (_) => const HeroesHelmIcon(
           size: 20,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('castle_tab_heroes_short', fallback: 'Heroes'),
         hasDot: controller.hasHallOfHeroesBlessings,
@@ -399,11 +399,11 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             color: palette.primaryText,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // Current Story Status Banner
         Container(
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: statusAccent.withValues(alpha: palette.isDark ? 0.12 : 0.10),
             borderRadius: BorderRadius.circular(14),
@@ -419,7 +419,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   statusMessage,
                   style: TextStyle(
                     fontSize: 12.5,
-                    height: 1.4,
+                    height: 1.35,
                     color: palette.primaryText,
                   ),
                 ),
@@ -427,7 +427,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         // Campaign Milestones
         Text(
@@ -438,7 +438,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             color: palette.amberText,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _MilestoneTile(
           key: const ValueKey('throne_milestone_week_1'),
           title: loc.t(
@@ -453,7 +453,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           isReached: week >= 1,
           accentColor: palette.successText,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _MilestoneTile(
           key: const ValueKey('throne_milestone_week_10'),
           title: loc.t(
@@ -468,7 +468,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           isReached: week >= 10,
           accentColor: palette.orangeAccent,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _MilestoneTile(
           key: const ValueKey('throne_milestone_week_40'),
           title: loc.t(
@@ -484,7 +484,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           accentColor: palette.dangerText,
           leadingIcon: const GoldenHourglassIcon(size: 24),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Royal Decrees (Optional Mini-Quests)
         Row(
@@ -2452,23 +2452,32 @@ class _CompactVerticalTabPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const goldFill = _RoyalCastleDialogState._goldFill;
-    const goldDarkInk = _RoyalCastleDialogState._goldDarkInk;
     const alertRed = _RoyalCastleDialogState._alertRed;
 
+    final baseSurface = palette.dialogCardSurface;
     final bgColor = selected
-        ? goldFill
-        : (palette.isDark
-              ? const Color(0xFF1F1C16)
-              : palette.dialogCardSurface);
+        ? Color.alphaBlend(
+            (palette.isDark
+                    ? const Color(0xFFF5C22B)
+                    : const Color(0xFFD99B00))
+                .withValues(alpha: 0.14),
+            baseSurface,
+          )
+        : baseSurface;
     final borderColor = selected
-        ? goldFill
-        : palette.amberBorder.withValues(alpha: palette.isDark ? 0.45 : 0.6);
-    final textColor = selected
-        ? goldDarkInk
+        ? (palette.isDark
+              ? const Color(0xFFFFD54F)
+              : const Color(0xFFC88A00))
         : (palette.isDark
-              ? Colors.white.withValues(alpha: 0.88)
-              : palette.primaryText);
+              ? Colors.white.withValues(alpha: 0.16)
+              : const Color(0xFFC8961E).withValues(alpha: 0.45));
+    final textColor = selected
+        ? (palette.isDark
+              ? const Color(0xFFFFD54F)
+              : const Color(0xFF7A4E00))
+        : (palette.isDark
+              ? Colors.white70
+              : const Color(0xFF5C4934));
 
     return Stack(
       clipBehavior: Clip.none,
@@ -2480,14 +2489,26 @@ class _CompactVerticalTabPill extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+              padding: EdgeInsets.symmetric(
+                horizontal: selected ? 1.8 : 3.0,
+                vertical: selected ? 4.8 : 6.0,
+              ),
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: borderColor,
-                  width: selected ? 1.4 : 1.0,
+                  width: selected ? 2.2 : 1.0,
                 ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFF5C22B).withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          spreadRadius: 0.5,
+                        ),
+                      ]
+                    : null,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2615,7 +2636,7 @@ class _MilestoneTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isReached
             ? palette.dialogCardSurface

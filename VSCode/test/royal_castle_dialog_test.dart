@@ -854,13 +854,15 @@ void main() {
           findsNothing,
         );
 
-        // Modal header badge renders RoyalCastleIcon while Throne tab renders ThroneCrownIcon
+        // Modal header badge renders RoyalCastleIcon at 32x32 while Throne tab renders ThroneCrownIcon
+        final headerCastleFinder = find.descendant(
+          of: dialogFinder,
+          matching: find.byType(RoyalCastleIcon),
+        );
+        expect(headerCastleFinder, findsOneWidget);
         expect(
-          find.descendant(
-            of: dialogFinder,
-            matching: find.byType(RoyalCastleIcon),
-          ),
-          findsOneWidget,
+          tester.getSize(headerCastleFinder),
+          equals(const Size(32.0, 32.0)),
         );
 
         final throneTab = find.byKey(const ValueKey('castle_tab_throne'));
@@ -871,10 +873,10 @@ void main() {
         expect(throneIconFinder, findsOneWidget);
         expect(
           tester.widget<ThroneCrownIcon>(throneIconFinder).isOnGoldBackground,
-          isTrue,
+          isFalse,
         );
 
-        // Switch to Library tab -> Throne tab switches to inactive palette
+        // Switch to Library tab -> Throne tab icon stays colorful (isOnGoldBackground: false)
         await tester.tap(find.byKey(const ValueKey('castle_tab_library')));
         await tester.pumpAndSettle();
         expect(
@@ -1052,21 +1054,117 @@ void main() {
             expect(tester.getSize(finder), equals(const Size(20.0, 20.0)));
           }
 
-          // Wing 1 (Throne) active by default -> high contrast on gold; others inactive
-          expect(tester.widget<ThroneCrownIcon>(crownFinder).isOnGoldBackground, isTrue);
+          // Header RoyalCastleIcon badge renders at 32x32
+          expect(
+            tester.getSize(find.byType(RoyalCastleIcon)),
+            equals(const Size(32.0, 32.0)),
+          );
+
+          // Helper to verify active/inactive glowing gold border tab pill styling
+          void expectCastleTabStyling(
+            Finder tabFinder, {
+            required bool active,
+          }) {
+            final pillContainer = tester.widget<Container>(
+              find.descendant(
+                of: tabFinder,
+                matching: find.byWidgetPredicate(
+                  (w) =>
+                      w is Container &&
+                      w.decoration is BoxDecoration &&
+                      (w.decoration! as BoxDecoration).borderRadius ==
+                          BorderRadius.circular(12),
+                ),
+              ),
+            );
+            final decor = pillContainer.decoration! as BoxDecoration;
+            final border = decor.border! as Border;
+            final baseSurface = isDark
+                ? const Color(0xFF1C202B)
+                : const Color(0xFFF5EFE2);
+            if (active) {
+              final expectedTint =
+                  (isDark ? const Color(0xFFF5C22B) : const Color(0xFFD99B00))
+                      .withValues(alpha: 0.14);
+              expect(
+                decor.color,
+                equals(Color.alphaBlend(expectedTint, baseSurface)),
+              );
+              expect(decor.color, isNot(equals(const Color(0xFFF5C22B))));
+              expect(border.top.width, equals(2.2));
+              expect(
+                border.top.color,
+                equals(
+                  isDark ? const Color(0xFFFFD54F) : const Color(0xFFC88A00),
+                ),
+              );
+              expect(decor.boxShadow, isNotNull);
+              expect(decor.boxShadow!.length, equals(1));
+              expect(decor.boxShadow!.first.blurRadius, equals(8.0));
+              expect(decor.boxShadow!.first.spreadRadius, equals(0.5));
+            } else {
+              expect(decor.color, equals(baseSurface));
+              expect(border.top.width, equals(1.0));
+              expect(decor.boxShadow, isNull);
+            }
+          }
+
+          // Wing 1 (Throne) active by default -> all icons stay 100% colorful (isOnGoldBackground: false)
+          expect(tester.widget<ThroneCrownIcon>(crownFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<HeroesHelmIcon>(helmFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(throneTab, active: true);
+          expectCastleTabStyling(libraryTab, active: false);
+          expectCastleTabStyling(treasuryTab, active: false);
+          expectCastleTabStyling(relicsTab, active: false);
+          expectCastleTabStyling(spoilsTab, active: false);
+          expectCastleTabStyling(heroesTab, active: false);
           expect(find.byType(GoldenHourglassIcon), findsOneWidget);
           expect(find.byType(RoyalScrollIcon), findsOneWidget);
+
+          // Verify Week 40 — The Final Deadline milestone renders full description without text truncation
+          final week40Finder = find.byKey(
+            const ValueKey('throne_milestone_week_40'),
+          );
+          final week40Title = tester.widget<Text>(
+            find.descendant(
+              of: week40Finder,
+              matching: find.text('Week 40 — The Final Deadline'),
+            ),
+          );
+          final week40Desc = tester.widget<Text>(
+            find.descendant(
+              of: week40Finder,
+              matching: find.text(
+                "The Kingdom's 40-week defense horizon—stand ready for the ultimate battle of minds.",
+              ),
+            ),
+          );
+          expect(week40Title.maxLines, isNull);
+          expect(week40Desc.maxLines, isNull);
+          expect(week40Desc.overflow, isNull);
+          await tester.ensureVisible(week40Finder);
+          await tester.pumpAndSettle();
+          final scrollViewportBottom = tester
+              .getBottomLeft(
+                find.byKey(const ValueKey('castle_wing_scroll_throneRoom')),
+              )
+              .dy;
+          expect(
+            tester.getBottomLeft(week40Finder).dy,
+            lessThanOrEqualTo(scrollViewportBottom),
+          );
 
           // Wing 2 (Library)
           await tester.tap(libraryTab);
           await tester.pumpAndSettle();
           expect(tester.widget<ThroneCrownIcon>(crownFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(throneTab, active: false);
+          expectCastleTabStyling(libraryTab, active: true);
           expect(find.byType(LaurelWreathIcon), findsOneWidget);
           expect(find.byType(AutomatonHeadIcon), findsOneWidget);
 
@@ -1074,7 +1172,9 @@ void main() {
           await tester.tap(treasuryTab);
           await tester.pumpAndSettle();
           expect(tester.widget<LibraryTomeIcon>(tomeFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(libraryTab, active: false);
+          expectCastleTabStyling(treasuryTab, active: true);
           expect(find.byType(TreasuryChestIcon), findsOneWidget);
           expect(
             find.byKey(const ValueKey('treasury_vault_level_pill')),
@@ -1085,21 +1185,27 @@ void main() {
           await tester.tap(relicsTab);
           await tester.pumpAndSettle();
           expect(tester.widget<TreasuryChestIcon>(chestFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(treasuryTab, active: false);
+          expectCastleTabStyling(relicsTab, active: true);
           expect(find.byType(RunicShieldIcon), findsOneWidget);
 
           // Wing 5 (Spoils)
           await tester.tap(spoilsTab);
           await tester.pumpAndSettle();
           expect(tester.widget<RelicsSwordIcon>(swordFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(relicsTab, active: false);
+          expectCastleTabStyling(spoilsTab, active: true);
           expect(find.byType(WarBannerIcon), findsOneWidget);
 
           // Wing 6 (Hall of Heroes)
           await tester.tap(heroesTab);
           await tester.pumpAndSettle();
           expect(tester.widget<SpoilsPouchIcon>(pouchFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<HeroesHelmIcon>(helmFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<HeroesHelmIcon>(helmFinder).isOnGoldBackground, isFalse);
+          expectCastleTabStyling(spoilsTab, active: false);
+          expectCastleTabStyling(heroesTab, active: true);
           expect(find.byType(HeroesHelmIcon), findsNWidgets(2));
           expect(find.byType(RubyHeartIcon), findsOneWidget);
           expect(find.byType(ManaCrystalIcon), findsOneWidget);

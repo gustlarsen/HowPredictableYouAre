@@ -395,9 +395,13 @@ void main() {
             );
           }
 
-          // Active tab has solid gold (#F5C22B) fill and #1E1B16 dark charcoal text
+          // Active tab uses bold luminous gold text (Dark: #FFD54F, Light: #7A4E00)
           final activeLabel = tester.widget<Text>(find.text('Consagration'));
-          expect(activeLabel.style?.color, const Color(0xFF1E1B16));
+          expect(
+            activeLabel.style?.color,
+            isDark ? const Color(0xFFFFD54F) : const Color(0xFF7A4E00),
+          );
+          expect(activeLabel.style?.fontWeight, FontWeight.w800);
 
           // Navigate every wing and ensure persistent 5-orb bar stays visible
           for (int i = 0; i < tabKeys.length; i++) {
@@ -1107,12 +1111,66 @@ void main() {
             expect(tester.getSize(finder), equals(const Size(28.0, 28.0)));
           }
 
-          // Wing 1 (Consagration) active by default
-          expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isTrue);
+          // Helper to verify active/inactive glowing gold border tab pill styling
+          void expectTempleTabStyling(
+            Finder tabFinder, {
+            required bool active,
+          }) {
+            final pillContainer = tester.widget<Container>(
+              find.descendant(
+                of: tabFinder,
+                matching: find.byWidgetPredicate(
+                  (w) =>
+                      w is Container &&
+                      w.decoration is BoxDecoration &&
+                      (w.decoration! as BoxDecoration).borderRadius ==
+                          BorderRadius.circular(12),
+                ),
+              ),
+            );
+            final decor = pillContainer.decoration! as BoxDecoration;
+            final border = decor.border! as Border;
+            final baseSurface = isDark
+                ? const Color(0xFF1C202B)
+                : const Color(0xFFF5EFE2);
+            if (active) {
+              final expectedTint =
+                  (isDark ? const Color(0xFFF5C22B) : const Color(0xFFD99B00))
+                      .withValues(alpha: 0.14);
+              expect(
+                decor.color,
+                equals(Color.alphaBlend(expectedTint, baseSurface)),
+              );
+              expect(decor.color, isNot(equals(const Color(0xFFF5C22B))));
+              expect(border.top.width, equals(2.2));
+              expect(
+                border.top.color,
+                equals(
+                  isDark ? const Color(0xFFFFD54F) : const Color(0xFFC88A00),
+                ),
+              );
+              expect(decor.boxShadow, isNotNull);
+              expect(decor.boxShadow!.length, equals(1));
+              expect(decor.boxShadow!.first.blurRadius, equals(8.0));
+              expect(decor.boxShadow!.first.spreadRadius, equals(0.5));
+            } else {
+              expect(decor.color, equals(baseSurface));
+              expect(border.top.width, equals(1.0));
+              expect(decor.boxShadow, isNull);
+            }
+          }
+
+          // Wing 1 (Consagration) active by default -> all icons stay 100% colorful (isOnGoldBackground: false)
+          expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isFalse);
+          expectTempleTabStyling(consagrationTab, active: true);
+          expectTempleTabStyling(offeringsTab, active: false);
+          expectTempleTabStyling(transmuteTab, active: false);
+          expectTempleTabStyling(adorationTab, active: false);
+          expectTempleTabStyling(prayerTab, active: false);
           expect(find.byType(VitalityHeartIcon), findsOneWidget);
           expect(find.byType(ManaDropIcon), findsOneWidget);
           expect(
@@ -1128,21 +1186,27 @@ void main() {
           await tester.tap(offeringsTab);
           await tester.pumpAndSettle();
           expect(tester.widget<ConsagrationChaliceIcon>(chaliceFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
+          expectTempleTabStyling(consagrationTab, active: false);
+          expectTempleTabStyling(offeringsTab, active: true);
           expect(find.byType(SacredRelicIcon), findsOneWidget);
 
           // Wing 3 (Transformation)
           await tester.tap(transmuteTab);
           await tester.pumpAndSettle();
           expect(tester.widget<OfferingsAltarIcon>(altarFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isFalse);
+          expectTempleTabStyling(offeringsTab, active: false);
+          expectTempleTabStyling(transmuteTab, active: true);
           expect(find.byType(TransformationMiracleIcon), findsOneWidget);
 
           // Wing 4 (Adoration)
           await tester.tap(adorationTab);
           await tester.pumpAndSettle();
           expect(tester.widget<HolyTransformationIcon>(transformationFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
+          expectTempleTabStyling(transmuteTab, active: false);
+          expectTempleTabStyling(adorationTab, active: true);
           expect(find.byType(ReliquaryBundleIcon), findsOneWidget);
           expect(find.byType(ElementalCrystalIcon), findsOneWidget);
 
@@ -1150,7 +1214,9 @@ void main() {
           await tester.tap(prayerTab);
           await tester.pumpAndSettle();
           expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
-          expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isTrue);
+          expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isFalse);
+          expectTempleTabStyling(adorationTab, active: false);
+          expectTempleTabStyling(prayerTab, active: true);
           expect(find.byType(VowOfSilenceIcon), findsOneWidget);
           expect(
             tester.widget<VowOfSilenceIcon>(find.byType(VowOfSilenceIcon)).isActive,

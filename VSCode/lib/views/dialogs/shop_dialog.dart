@@ -736,45 +736,45 @@ class _ShopDialogState extends State<ShopDialog> {
       (
         wing: TempleWing.consagration,
         key: const ValueKey('temple_tab_consagration'),
-        iconBuilder: (isSelected) => ConsagrationChaliceIcon(
+        iconBuilder: (_) => const ConsagrationChaliceIcon(
           size: 28,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_consagration', fallback: 'Consagration'),
       ),
       (
         wing: TempleWing.offerings,
         key: const ValueKey('temple_tab_offerings'),
-        iconBuilder: (isSelected) => OfferingsAltarIcon(
+        iconBuilder: (_) => const OfferingsAltarIcon(
           size: 28,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_offerings', fallback: 'Offerings'),
       ),
       (
         wing: TempleWing.transmute,
         key: const ValueKey('temple_tab_transmute'),
-        iconBuilder: (isSelected) => HolyTransformationIcon(
+        iconBuilder: (_) => const HolyTransformationIcon(
           size: 28,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_transmute', fallback: 'Transform'),
       ),
       (
         wing: TempleWing.adoration,
         key: const ValueKey('temple_tab_adoration'),
-        iconBuilder: (isSelected) => AdorationHarpIcon(
+        iconBuilder: (_) => const AdorationHarpIcon(
           size: 28,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_adoration', fallback: 'Adoration'),
       ),
       (
         wing: TempleWing.prayer,
         key: const ValueKey('temple_tab_prayer'),
-        iconBuilder: (isSelected) => PrayerHandsIcon(
+        iconBuilder: (_) => const PrayerHandsIcon(
           size: 28,
-          isOnGoldBackground: isSelected,
+          isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_prayer', fallback: 'Prayer'),
       ),
@@ -3074,22 +3074,30 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const goldFill = _ShopDialogState._goldFill;
-    const goldDarkInk = _ShopDialogState._goldDarkInk;
-
+    final baseSurface = palette.dialogCardSurface;
     final bgColor = selected
-        ? goldFill
-        : (palette.isDark
-              ? const Color(0xFF1F1C16)
-              : palette.dialogCardSurface);
+        ? Color.alphaBlend(
+            (palette.isDark
+                    ? const Color(0xFFF5C22B)
+                    : const Color(0xFFD99B00))
+                .withValues(alpha: 0.14),
+            baseSurface,
+          )
+        : baseSurface;
     final borderColor = selected
-        ? goldFill
-        : palette.amberBorder.withValues(alpha: palette.isDark ? 0.45 : 0.6);
-    final textColor = selected
-        ? goldDarkInk
+        ? (palette.isDark
+              ? const Color(0xFFFFD54F)
+              : const Color(0xFFC88A00))
         : (palette.isDark
-              ? Colors.white.withValues(alpha: 0.88)
-              : palette.primaryText);
+              ? Colors.white.withValues(alpha: 0.16)
+              : const Color(0xFFC8961E).withValues(alpha: 0.45));
+    final textColor = selected
+        ? (palette.isDark
+              ? const Color(0xFFFFD54F)
+              : const Color(0xFF7A4E00))
+        : (palette.isDark
+              ? Colors.white70
+              : const Color(0xFF5C4934));
 
     return Material(
       color: Colors.transparent,
@@ -3098,14 +3106,26 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: selected ? 1.8 : 3.0,
+            vertical: selected ? 4.8 : 6.0,
+          ),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: borderColor,
-              width: selected ? 1.4 : 1.0,
+              width: selected ? 2.2 : 1.0,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFF5C22B).withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      spreadRadius: 0.5,
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
