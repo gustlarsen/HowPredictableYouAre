@@ -15,6 +15,8 @@ import 'package:how_predictable/services/billing_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/theme/app_theme.dart';
+import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
@@ -1809,4 +1811,233 @@ void main() {
       },
     );
   });
+
+  group('Standardized Modal Height & Locked Scroll Architecture', () {
+    testWidgets(
+      'SacredTempleDialog locks top Y, tab bar Y, orb bar Y, and Ok button Y across all 5 wings, matches RoyalCastleDialog height, resets scroll offset, and scopes Scrollbar',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createTempleHarness(
+          prefs: {'orbs_fire': 30, 'orbs_water': 15},
+        );
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: ValueKey('temple_lock_theme_$isDark'),
+                  controller: controller,
+                  initialWing: TempleWing.offerings,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final frameFinder = find.byKey(
+            const ValueKey('sacred_temple_dialog_frame'),
+          );
+          final tabBarFinder = find.byKey(
+            const ValueKey('sacred_temple_tab_bar'),
+          );
+          final orbBarFinder = find.byKey(
+            const ValueKey('shop_orb_summary_bar'),
+          );
+          final okButtonFinder = find.byKey(
+            const ValueKey('shop_close_button'),
+          );
+
+          final offeringsFrameRect = tester.getRect(frameFinder);
+          final offeringsTabBarRect = tester.getRect(tabBarFinder);
+          final offeringsOrbBarRect = tester.getRect(orbBarFinder);
+          final offeringsOkRect = tester.getRect(okButtonFinder);
+
+          expect(
+            offeringsFrameRect.height,
+            closeTo((844.0 * 0.84).clamp(480.0, 760.0), 0.01),
+          );
+
+          // Scrollbar sits strictly inside Expanded wing area (below orb bar, above Ok)
+          final offeringsScrollbarFinder = find.byKey(
+            const ValueKey('temple_wing_scrollbar_offerings'),
+          );
+          expect(offeringsScrollbarFinder, findsOneWidget);
+          final offeringsScrollbarRect = tester.getRect(
+            offeringsScrollbarFinder,
+          );
+          expect(
+            offeringsScrollbarRect.top,
+            greaterThanOrEqualTo(offeringsOrbBarRect.bottom),
+          );
+          expect(
+            offeringsScrollbarRect.bottom,
+            lessThanOrEqualTo(offeringsOkRect.top),
+          );
+
+          // Offerings overflows vertically; scrolling keeps tabs, orb bar, and Ok stationary
+          final offeringsWingFinder = find.byKey(
+            const ValueKey('temple_wing_offerings'),
+          );
+          final offeringsScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: offeringsWingFinder,
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(
+            offeringsScrollState.position.maxScrollExtent,
+            greaterThan(0.0),
+          );
+
+          await tester.drag(offeringsWingFinder, const Offset(0, -220));
+          await tester.pumpAndSettle();
+          expect(offeringsScrollState.position.pixels, greaterThan(0.0));
+          expect(tester.getRect(frameFinder), equals(offeringsFrameRect));
+          expect(tester.getRect(tabBarFinder), equals(offeringsTabBarRect));
+          expect(tester.getRect(orbBarFinder), equals(offeringsOrbBarRect));
+          expect(tester.getRect(okButtonFinder), equals(offeringsOkRect));
+
+          // Switch to short Transform tab -> all anchored coordinates remain identical
+          await tester.tap(find.byKey(const ValueKey('temple_tab_transmute')));
+          await tester.pumpAndSettle();
+          expect(tester.getRect(frameFinder), equals(offeringsFrameRect));
+          expect(tester.getRect(tabBarFinder), equals(offeringsTabBarRect));
+          expect(tester.getRect(orbBarFinder), equals(offeringsOrbBarRect));
+          expect(tester.getRect(okButtonFinder), equals(offeringsOkRect));
+
+          // Transform fits without overflowing -> maxScrollExtent is 0 (no scrollbar rendered)
+          final transmuteScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: find.byKey(const ValueKey('temple_wing_transmute')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(transmuteScrollState.position.maxScrollExtent, equals(0.0));
+
+          // Switch back to Offerings -> scroll offset auto-resets to 0.0
+          await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+          await tester.pumpAndSettle();
+          final resetOfferingsScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: find.byKey(const ValueKey('temple_wing_offerings')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(resetOfferingsScrollState.position.pixels, equals(0.0));
+
+          // Switch across remaining tabs and verify identical coordinates
+          for (final tabKey in const [
+            ValueKey('temple_tab_consagration'),
+            ValueKey('temple_tab_adoration'),
+            ValueKey('temple_tab_prayer'),
+          ]) {
+            await tester.tap(find.byKey(tabKey));
+            await tester.pumpAndSettle();
+            expect(tester.getRect(frameFinder), equals(offeringsFrameRect));
+            expect(tester.getRect(tabBarFinder), equals(offeringsTabBarRect));
+            expect(tester.getRect(orbBarFinder), equals(offeringsOrbBarRect));
+            expect(tester.getRect(okButtonFinder), equals(offeringsOkRect));
+            expect(tester.takeException(), isNull);
+          }
+
+          // Cross-modal standardization: RoyalCastleDialog matches SacredTempleDialog height & Ok Y
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: RoyalCastleDialog(
+                  key: ValueKey('castle_parity_$isDark'),
+                  controller: controller,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final castleFrameRect = tester.getRect(
+            find.byKey(const ValueKey('royal_castle_dialog_frame')),
+          );
+          final castleOkRect = tester.getRect(
+            find.byKey(const ValueKey('royal_castle_close_button')),
+          );
+          expect(castleFrameRect, equals(offeringsFrameRect));
+          expect(castleOkRect.top, equals(offeringsOkRect.top));
+          expect(castleOkRect.bottom, equals(offeringsOkRect.bottom));
+        }
+      },
+    );
+
+    testWidgets(
+      'SacredTempleDialog clamps fixed height safely on very short viewports without RenderFlex overflow',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 460);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createTempleHarness();
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: SacredTempleDialog(
+                controller: controller,
+                fromTemple: true,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        final frameRect = tester.getRect(
+          find.byKey(const ValueKey('sacred_temple_dialog_frame')),
+        );
+        expect(
+          frameRect.height,
+          closeTo(460.0 - HubModalSizing.insetPadding.vertical, 0.01),
+        );
+
+        for (final tabKey in const [
+          ValueKey('temple_tab_offerings'),
+          ValueKey('temple_tab_transmute'),
+          ValueKey('temple_tab_adoration'),
+          ValueKey('temple_tab_prayer'),
+          ValueKey('temple_tab_consagration'),
+        ]) {
+          await tester.tap(find.byKey(tabKey));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  });
 }
+

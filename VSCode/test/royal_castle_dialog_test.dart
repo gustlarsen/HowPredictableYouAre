@@ -1826,5 +1826,210 @@ void main() {
       },
     );
   });
+
+  group('Standardized Modal Height & Locked Scroll Architecture', () {
+    testWidgets(
+      'RoyalCastleDialog locks top Y, tab bar Y, and Ok button Y identically across Throne, Treasury, and all 6 wings, resets scroll offset, and scopes Scrollbar to content',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {
+            'current_week': 10,
+            'treasury_orbs_fire': 45,
+            'spoils_orbs_water': 12,
+            'unlockedPredictability': true,
+            'unlockedReset': true,
+          },
+        );
+        addTearDown(controller.dispose);
+        await controller.applyPermadeathReset();
+
+        for (final isDark in [true, false]) {
+          controller.darkMode = isDark;
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: RoyalCastleDialog(
+                  key: ValueKey('castle_lock_theme_$isDark'),
+                  controller: controller,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final frameFinder = find.byKey(
+            const ValueKey('royal_castle_dialog_frame'),
+          );
+          final tabBarFinder = find.byKey(
+            const ValueKey('royal_castle_tab_bar'),
+          );
+          final okButtonFinder = find.byKey(
+            const ValueKey('royal_castle_close_button'),
+          );
+
+          final throneFrameRect = tester.getRect(frameFinder);
+          final throneTabBarRect = tester.getRect(tabBarFinder);
+          final throneOkRect = tester.getRect(okButtonFinder);
+          final throneWingTop = tester
+              .getTopLeft(find.byKey(const ValueKey('castle_wing_throne_room')))
+              .dy;
+
+          expect(
+            throneFrameRect.height,
+            closeTo((844.0 * 0.84).clamp(480.0, 760.0), 0.01),
+          );
+
+          // Scrollbar sits strictly inside the Expanded wing area (never overlapping tabs or Ok)
+          final throneScrollbarFinder = find.byKey(
+            const ValueKey('castle_wing_scrollbar_throneRoom'),
+          );
+          expect(throneScrollbarFinder, findsOneWidget);
+          final throneScrollbarRect = tester.getRect(throneScrollbarFinder);
+          expect(
+            throneScrollbarRect.top,
+            greaterThanOrEqualTo(throneTabBarRect.bottom),
+          );
+          expect(
+            throneScrollbarRect.bottom,
+            lessThanOrEqualTo(throneOkRect.top),
+          );
+
+          // Throne overflows vertically; scrolling keeps tabs and Ok stationary
+          final throneScrollFinder = find.byKey(
+            const ValueKey('castle_wing_scroll_throneRoom'),
+          );
+          final throneScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: throneScrollFinder,
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(throneScrollState.position.maxScrollExtent, greaterThan(0.0));
+
+          await tester.drag(throneScrollFinder, const Offset(0, -180));
+          await tester.pumpAndSettle();
+          expect(throneScrollState.position.pixels, greaterThan(0.0));
+          expect(tester.getRect(frameFinder), equals(throneFrameRect));
+          expect(tester.getRect(tabBarFinder), equals(throneTabBarRect));
+          expect(tester.getRect(okButtonFinder), equals(throneOkRect));
+
+          // Switch to short Treasury tab -> frame, tab bar, and Ok stay at exact same Y
+          await tester.tap(find.byKey(const ValueKey('castle_tab_treasury')));
+          await tester.pumpAndSettle();
+
+          expect(tester.getRect(frameFinder), equals(throneFrameRect));
+          expect(tester.getRect(tabBarFinder), equals(throneTabBarRect));
+          expect(tester.getRect(okButtonFinder), equals(throneOkRect));
+
+          // Treasury card stays cleanly top-aligned directly beneath the tabs
+          final treasuryCardTop = tester
+              .getTopLeft(find.byKey(const ValueKey('treasury_vault_card')))
+              .dy;
+          expect(treasuryCardTop, closeTo(throneWingTop, 1.0));
+
+          // Treasury does not overflow -> Scrollbar maxScrollExtent is 0 (no scrollbar rendered)
+          final treasuryScrollFinder = find.byKey(
+            const ValueKey('castle_wing_scroll_treasury'),
+          );
+          final treasuryScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: treasuryScrollFinder,
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(treasuryScrollState.position.maxScrollExtent, equals(0.0));
+
+          // Switch back to Throne -> scroll position auto-resets to 0.0
+          await tester.tap(find.byKey(const ValueKey('castle_tab_throne')));
+          await tester.pumpAndSettle();
+          final resetThroneScrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: find.byKey(const ValueKey('castle_wing_scroll_throneRoom')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          expect(resetThroneScrollState.position.pixels, equals(0.0));
+
+          // Check all remaining wings preserve identical modal frame, tab bar, and Ok coordinates
+          for (final tabKey in const [
+            ValueKey('castle_tab_library'),
+            ValueKey('castle_tab_relics'),
+            ValueKey('castle_tab_spoils'),
+            ValueKey('castle_tab_hall_of_heroes'),
+          ]) {
+            await tester.tap(find.byKey(tabKey));
+            await tester.pumpAndSettle();
+            expect(tester.getRect(frameFinder), equals(throneFrameRect));
+            expect(tester.getRect(tabBarFinder), equals(throneTabBarRect));
+            expect(tester.getRect(okButtonFinder), equals(throneOkRect));
+            expect(tester.takeException(), isNull);
+          }
+        }
+      },
+    );
+
+    testWidgets(
+      'RoyalCastleDialog clamps fixed height safely on very short viewports without RenderFlex overflow',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 460);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          loadJsonStrings: true,
+          prefs: {'current_week': 5},
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: RoyalCastleDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        final frameRect = tester.getRect(
+          find.byKey(const ValueKey('royal_castle_dialog_frame')),
+        );
+        expect(
+          frameRect.height,
+          closeTo(460.0 - HubModalSizing.insetPadding.vertical, 0.01),
+        );
+
+        for (final tabKey in const [
+          ValueKey('castle_tab_library'),
+          ValueKey('castle_tab_treasury'),
+          ValueKey('castle_tab_relics'),
+          ValueKey('castle_tab_spoils'),
+          ValueKey('castle_tab_hall_of_heroes'),
+          ValueKey('castle_tab_throne'),
+        ]) {
+          await tester.tap(find.byKey(tabKey));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  });
 }
+
 

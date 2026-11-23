@@ -66,6 +66,7 @@ class _ShopDialogState extends State<ShopDialog> {
   GameController get controller => widget.controller;
 
   late TempleWing _selectedWing;
+  final ScrollController _wingScrollController = ScrollController();
   late HandMove _transmuteSource;
   late HandMove _transmuteTarget;
   _TransmuteBatchOption _selectedBatchOption = _TransmuteBatchOption.x1;
@@ -99,8 +100,20 @@ class _ShopDialogState extends State<ShopDialog> {
   void dispose() {
     _stopHoldTransmute();
     _transmuteConfirmationTimer?.cancel();
+    _wingScrollController.dispose();
     controller.billingService.removeEventListener(_onBillingEvent);
     super.dispose();
+  }
+
+  void _selectWing(TempleWing wing) {
+    _stopHoldTransmute();
+    controller.audio.playTapVibrate();
+    if (_wingScrollController.hasClients) {
+      _wingScrollController.jumpTo(0.0);
+    }
+    if (_selectedWing != wing) {
+      setState(() => _selectedWing = wing);
+    }
   }
 
   String _titleForProductId(String productId) {
@@ -544,12 +557,13 @@ class _ShopDialogState extends State<ShopDialog> {
     final palette = AppPalette.of(context);
     final week = controller.currentWeek;
     final weekLabel = loc.t('map_week_label', fallback: 'Week');
+    final fixedHeight = HubModalSizing.fixedHeightFor(context);
 
     return Dialog(
       key: const ValueKey('sacred_temple_dialog'),
       backgroundColor: palette.dialogSurface,
       surfaceTintColor: palette.isDark ? null : Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 16.0),
+      insetPadding: HubModalSizing.insetPadding,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
         side: BorderSide(
@@ -560,14 +574,19 @@ class _ShopDialogState extends State<ShopDialog> {
         ),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 720),
+        key: const ValueKey('sacred_temple_dialog_frame'),
+        constraints: BoxConstraints(
+          maxWidth: HubModalSizing.maxWidth,
+          minHeight: fixedHeight,
+          maxHeight: fixedHeight,
+        ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14.0, 14.0, 14.0, 10.0),
+          padding: const EdgeInsets.fromLTRB(14.0, 12.0, 14.0, 10.0),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Sacred Temple Header (matching RoyalCastleDialog)
+              // 1. Fixed Top Header, Navigation Tabs & Orb Balance Bar (Never Scrolls)
               Row(
                 children: [
                   Container(
@@ -638,7 +657,7 @@ class _ShopDialogState extends State<ShopDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
               // 5 Compact Vertical Navigation Tab Pills in a Single Row
               _buildTempleTabBar(context, palette, loc),
@@ -648,16 +667,33 @@ class _ShopDialogState extends State<ShopDialog> {
               _buildOrbSummaryBar(context),
 
               Divider(
-                height: 14,
-                color: palette.isDark ? null : palette.divider,
+                height: 12,
+                thickness: 1,
+                color: palette.divider,
               ),
 
-              // Active Temple Wing Content
+              // 2. Scrollable Wing Content Area Only (Expanded)
               Expanded(
-                child: _buildSelectedWing(context, palette, loc),
+                child: ClipRect(
+                  child: Scrollbar(
+                    key: ValueKey(
+                      'temple_wing_scrollbar_${_selectedWing.name}',
+                    ),
+                    controller: _wingScrollController,
+                    thumbVisibility: true,
+                    thickness: 4,
+                    radius: const Radius.circular(8),
+                    child: _buildSelectedWing(context, palette, loc),
+                  ),
+                ),
               ),
 
-              const SizedBox(height: 8),
+              // 3. Pinned Bottom Footer (Restore Purchases & Ok Button — Never Scrolls)
+              Divider(
+                height: 12,
+                thickness: 1,
+                color: palette.divider,
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -792,13 +828,7 @@ class _ShopDialogState extends State<ShopDialog> {
               label: tabs[i].label,
               selected: _selectedWing == tabs[i].wing,
               palette: palette,
-              onTap: () {
-                if (_selectedWing != TempleWing.transmute) {
-                  _stopHoldTransmute();
-                }
-                controller.audio.playTapVibrate();
-                setState(() => _selectedWing = tabs[i].wing);
-              },
+              onTap: () => _selectWing(tabs[i].wing),
             ),
           ),
         ],
@@ -843,97 +873,74 @@ class _ShopDialogState extends State<ShopDialog> {
           )
         : loc.t('temple_consagration_watch_ad_btn', fallback: 'Watch Ad: +1 Lv');
 
-    return ListView(
+    return SingleChildScrollView(
       key: const ValueKey('temple_wing_consagration'),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                loc.t(
-                  'temple_wing_consagration_title',
-                  fallback: 'Consagration Room',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: palette.primaryText,
-                ),
-              ),
-            ),
-            if (!isRemoveAds)
-              Container(
-                key: const ValueKey('consagration_weekly_ad_counter'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: palette.rewardedAdCardSurface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: palette.amberBorder.withValues(alpha: 0.45),
-                  ),
-                ),
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
                 child: Text(
-                  '$remainingAds / ${GameController.maxWeeklyAdConsagrations} ${loc.t('temple_consagration_weekly_left', fallback: 'Ad Lv/Wk')}',
+                  loc.t(
+                    'temple_wing_consagration_title',
+                    fallback: 'Consagration Room',
+                  ),
                   style: TextStyle(
-                    fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: palette.amberText,
+                    fontSize: 15,
+                    color: palette.primaryText,
                   ),
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _InfiniteStatUpgradeTile(
-          cardKey: const ValueKey('shop_upgrade_max_hp_card'),
-          buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
-          adButtonKey: const ValueKey('consagration_hp_watch_ad_button'),
-          iconWidget: const VitalityHeartIcon(size: 46),
-          title: loc.t('upgrade_max_hp_title', fallback: '+1 Max HP'),
-          subtitle: loc.t(
-            'upgrade_max_hp_desc',
-            fallback:
-                "Permanently raises your Cleric's maximum HP by +1 for this campaign.",
+              if (!isRemoveAds)
+                Container(
+                  key: const ValueKey('consagration_weekly_ad_counter'),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: palette.rewardedAdCardSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Text(
+                    '$remainingAds / ${GameController.maxWeeklyAdConsagrations} ${loc.t('temple_consagration_weekly_left', fallback: 'Ad Lv/Wk')}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: palette.amberText,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          statusText:
-              'Lv. ${controller.hpUpgradeLevel} • ${controller.playerMaxHp} → ${controller.playerMaxHp + 1} HP',
-          actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
-          cost: controller.nextMaxHpUpgradeCost,
-          showAdButton: !isRemoveAds,
-          adButtonLabel: adButtonLabel,
-          canWatchAd: canWatchAd,
-          onPurchase: () {
-            final ok = controller.upgradeMaxHp();
-            if (ok) {
-              controller.audio.playWinVibrate();
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${loc.t('upgrade_max_hp_title', fallback: '+1 Max HP')}: ${controller.playerMaxHp} HP (Lv. ${controller.hpUpgradeLevel})',
-                    ),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-            } else {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      loc.t('string79', fallback: 'Not enough Elemental Orbs'),
-                    ),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-            }
-          },
-          onWatchAd: () {
-            controller.watchAdToUpgradeMaxHp(
-              onUpgraded: () {
-                if (!context.mounted) return;
+          const SizedBox(height: 6),
+          _InfiniteStatUpgradeTile(
+            cardKey: const ValueKey('shop_upgrade_max_hp_card'),
+            buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
+            adButtonKey: const ValueKey('consagration_hp_watch_ad_button'),
+            iconWidget: const VitalityHeartIcon(size: 46),
+            title: loc.t('upgrade_max_hp_title', fallback: '+1 Max HP'),
+            subtitle: loc.t(
+              'upgrade_max_hp_desc',
+              fallback:
+                  "Permanently raises your Cleric's maximum HP by +1 for this campaign.",
+            ),
+            statusText:
+                'Lv. ${controller.hpUpgradeLevel} • ${controller.playerMaxHp} → ${controller.playerMaxHp + 1} HP',
+            actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
+            cost: controller.nextMaxHpUpgradeCost,
+            showAdButton: !isRemoveAds,
+            adButtonLabel: adButtonLabel,
+            canWatchAd: canWatchAd,
+            onPurchase: () {
+              final ok = controller.upgradeMaxHp();
+              if (ok) {
+                controller.audio.playWinVibrate();
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
@@ -944,59 +951,59 @@ class _ShopDialogState extends State<ShopDialog> {
                       duration: const Duration(seconds: 2),
                     ),
                   );
-              },
-            );
-          },
-        ),
-        _InfiniteStatUpgradeTile(
-          cardKey: const ValueKey('shop_upgrade_max_mana_card'),
-          buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
-          adButtonKey: const ValueKey('consagration_mana_watch_ad_button'),
-          iconWidget: const ManaDropIcon(size: 46),
-          title: loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool'),
-          subtitle: loc.t(
-            'upgrade_max_mana_desc',
-            fallback:
-                "Permanently expands your Cleric's maximum Mana Pool by +1 turn per battle.",
+              } else {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+              }
+            },
+            onWatchAd: () {
+              controller.watchAdToUpgradeMaxHp(
+                onUpgraded: () {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${loc.t('upgrade_max_hp_title', fallback: '+1 Max HP')}: ${controller.playerMaxHp} HP (Lv. ${controller.hpUpgradeLevel})',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                },
+              );
+            },
           ),
-          statusText:
-              'Lv. ${controller.manaUpgradeLevel} • ${controller.playerMaxMana} → ${controller.playerMaxMana + 1} ${loc.t('mana_label', fallback: 'Mana')}',
-          actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
-          cost: controller.nextMaxManaUpgradeCost,
-          showAdButton: !isRemoveAds,
-          adButtonLabel: adButtonLabel,
-          canWatchAd: canWatchAd,
-          onPurchase: () {
-            final ok = controller.upgradeMaxMana();
-            if (ok) {
-              controller.audio.playWinVibrate();
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool')}: ${controller.playerMaxMana} ${loc.t('mana_label', fallback: 'Mana')} (Lv. ${controller.manaUpgradeLevel})',
-                    ),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-            } else {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      loc.t('string79', fallback: 'Not enough Elemental Orbs'),
-                    ),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-            }
-          },
-          onWatchAd: () {
-            controller.watchAdToUpgradeMaxMana(
-              onUpgraded: () {
-                if (!context.mounted) return;
+          _InfiniteStatUpgradeTile(
+            cardKey: const ValueKey('shop_upgrade_max_mana_card'),
+            buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
+            adButtonKey: const ValueKey('consagration_mana_watch_ad_button'),
+            iconWidget: const ManaDropIcon(size: 46),
+            title: loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool'),
+            subtitle: loc.t(
+              'upgrade_max_mana_desc',
+              fallback:
+                  "Permanently expands your Cleric's maximum Mana Pool by +1 turn per battle.",
+            ),
+            statusText:
+                'Lv. ${controller.manaUpgradeLevel} • ${controller.playerMaxMana} → ${controller.playerMaxMana + 1} ${loc.t('mana_label', fallback: 'Mana')}',
+            actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
+            cost: controller.nextMaxManaUpgradeCost,
+            showAdButton: !isRemoveAds,
+            adButtonLabel: adButtonLabel,
+            canWatchAd: canWatchAd,
+            onPurchase: () {
+              final ok = controller.upgradeMaxMana();
+              if (ok) {
+                controller.audio.playWinVibrate();
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(
@@ -1007,48 +1014,76 @@ class _ShopDialogState extends State<ShopDialog> {
                       duration: const Duration(seconds: 2),
                     ),
                   );
-              },
-            );
-          },
-        ),
-        if (!isRemoveAds) ...[
-          const SizedBox(height: 8),
-          Container(
-            key: const ValueKey('consagration_ad_disclosure_box'),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
-              color: palette.rewardedAdCardSurface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: palette.rewardedAdCardBorder),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.ondemand_video_rounded,
-                  size: 16,
-                  color: palette.amberIcon,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    loc.t(
-                      'temple_consagration_ad_disclosure',
-                      fallback:
-                          'Rewarded Video Ad: watch an ad to gain +1 permanent Max HP or Max Mana level (up to 3 per campaign week).',
+              } else {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+                      ),
+                      duration: const Duration(seconds: 2),
                     ),
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.35,
-                      color: palette.secondaryText,
+                  );
+              }
+            },
+            onWatchAd: () {
+              controller.watchAdToUpgradeMaxMana(
+                onUpgraded: () {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool')}: ${controller.playerMaxMana} ${loc.t('mana_label', fallback: 'Mana')} (Lv. ${controller.manaUpgradeLevel})',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                },
+              );
+            },
+          ),
+          if (!isRemoveAds) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const ValueKey('consagration_ad_disclosure_box'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: palette.rewardedAdCardSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.rewardedAdCardBorder),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.ondemand_video_rounded,
+                    size: 16,
+                    color: palette.amberIcon,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.t(
+                        'temple_consagration_ad_disclosure',
+                        fallback:
+                            'Rewarded Video Ad: watch an ad to gain +1 permanent Max HP or Max Mana level (up to 3 per campaign week).',
+                      ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: palette.secondaryText,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -1065,6 +1100,8 @@ class _ShopDialogState extends State<ShopDialog> {
 
     return ListView(
       key: const ValueKey('temple_wing_offerings'),
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
       cacheExtent: 1000,
       children: [
         Padding(
@@ -1570,10 +1607,7 @@ class _ShopDialogState extends State<ShopDialog> {
           child: InkWell(
             key: const ValueKey('offerings_remove_ads_prayer_hint'),
             borderRadius: BorderRadius.circular(10),
-            onTap: () {
-              controller.audio.playTapVibrate();
-              setState(() => _selectedWing = TempleWing.prayer);
-            },
+            onTap: () => _selectWing(TempleWing.prayer),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
@@ -1642,6 +1676,8 @@ class _ShopDialogState extends State<ShopDialog> {
 
     return SingleChildScrollView(
       key: const ValueKey('temple_wing_transmute'),
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2118,177 +2154,182 @@ class _ShopDialogState extends State<ShopDialog> {
     final selectedProductId =
         BillingService.consumableProductIdForMove(_selectedBulkElement);
 
-    return ListView(
+    return SingleChildScrollView(
       key: const ValueKey('temple_wing_adoration'),
-      children: [
-        Text(
-          loc.t('temple_adoration_title', fallback: 'Adoration Room'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: palette.primaryText,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          loc.t(
-            'temple_adoration_subtitle',
-            fallback:
-                'Support the Sanctuary and replenish Elemental Orbs immediately.',
-          ),
-          style: TextStyle(fontSize: 11.5, color: palette.amberSubtitle),
-        ),
-        if (showOfflineBanner) ...[
-          const SizedBox(height: 8),
-          Container(
-            key: const ValueKey('adoration_store_unavailable_banner'),
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            decoration: BoxDecoration(
-              color: palette.rewardedAdCardSurface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: palette.rewardedAdCardBorder),
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            loc.t('temple_adoration_title', fallback: 'Adoration Room'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: palette.primaryText,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.cloud_off_rounded,
-                  size: 16,
-                  color: palette.amberIcon,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    loc.t(
-                      'temple_store_offline_notice',
-                      fallback:
-                          'Google Play Billing is offline or packs are unconfigured. Connect to Google Play to view live prices.',
-                    ),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: palette.secondaryText,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            loc.t(
+              'temple_adoration_subtitle',
+              fallback:
+                  'Support the Sanctuary and replenish Elemental Orbs immediately.',
+            ),
+            style: TextStyle(fontSize: 11.5, color: palette.amberSubtitle),
+          ),
+          if (showOfflineBanner) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: const ValueKey('adoration_store_unavailable_banner'),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              decoration: BoxDecoration(
+                color: palette.rewardedAdCardSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.rewardedAdCardBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    size: 16,
+                    color: palette.amberIcon,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.t(
+                        'temple_store_offline_notice',
+                        fallback:
+                            'Google Play Billing is offline or packs are unconfigured. Connect to Google Play to view live prices.',
+                      ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: palette.secondaryText,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-
-        Row(
-          children: [
-            const ReliquaryBundleIcon(size: 22),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                loc.t(
-                  'temple_adoration_bundles_header',
-                  fallback: 'All-Element Orb Bundles',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12.5,
-                  color: palette.amberText,
-                ),
+                ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 6),
-        for (final bundle in ConsumableOrbBundle.values)
+          const SizedBox(height: 10),
+
+          Row(
+            children: [
+              const ReliquaryBundleIcon(size: 22),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  loc.t(
+                    'temple_adoration_bundles_header',
+                    fallback: 'All-Element Orb Bundles',
+                  ),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                    color: palette.amberText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final bundle in ConsumableOrbBundle.values)
+            _ConsumableBundleTile(
+              cardKey: ValueKey('adoration_bundle_${bundle.productId}'),
+              buttonKey: ValueKey('real_money_unlock_${bundle.productId}'),
+              icon: bundle.icon,
+              title: loc.t(bundle.titleKey, fallback: bundle.fallbackTitle),
+              subtitle: loc.t(bundle.descKey, fallback: bundle.fallbackDesc),
+              amountPerElement: bundle.amountPerElement,
+              localizedPrice: billing.getLocalizedPrice(bundle.productId),
+              unavailableLabel: loc.t(
+                'temple_price_unavailable',
+                fallback: 'Unavailable',
+              ),
+              isPurchasePending: billing.isPurchasePending(bundle.productId),
+              isLoadingStore: billing.isLoadingProducts,
+              onBuy: () => controller.buyWithRealMoney(bundle.productId),
+              showAllElements: true,
+            ),
+
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const ElementalCrystalIcon(size: 22),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  loc.t(
+                    'temple_adoration_single_header',
+                    fallback: 'Single-Element Bulk Pack (+1,500)',
+                  ),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                    color: palette.amberText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Element selector row for +1,500 single-element pack
+          Row(
+            key: const ValueKey('adoration_single_element_selector_row'),
+            children: [
+              for (int i = 0; i < HandMove.values.length; i++) ...[
+                if (i > 0) const SizedBox(width: 5),
+                Expanded(
+                  child: _AdorationElementChip(
+                    key: ValueKey(
+                      'adoration_element_selector_${HandMove.values[i].orbKey}',
+                    ),
+                    move: HandMove.values[i],
+                    label: _shortElementTitle(HandMove.values[i], loc),
+                    selected: _selectedBulkElement == HandMove.values[i],
+                    palette: palette,
+                    onTap: () {
+                      controller.audio.playTapVibrate();
+                      setState(() => _selectedBulkElement = HandMove.values[i]);
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
           _ConsumableBundleTile(
-            cardKey: ValueKey('adoration_bundle_${bundle.productId}'),
-            buttonKey: ValueKey('real_money_unlock_${bundle.productId}'),
-            icon: bundle.icon,
-            title: loc.t(bundle.titleKey, fallback: bundle.fallbackTitle),
-            subtitle: loc.t(bundle.descKey, fallback: bundle.fallbackDesc),
-            amountPerElement: bundle.amountPerElement,
-            localizedPrice: billing.getLocalizedPrice(bundle.productId),
+            cardKey: const ValueKey('adoration_single_element_card'),
+            buttonKey: ValueKey('real_money_unlock_$selectedProductId'),
+            icon: _selectedBulkElement.elementalIcon,
+            title:
+                '+1,500 ${_selectedBulkElement.elementalOrbName(loc)}',
+            subtitle: loc
+                .t(
+                  'temple_single_pack_desc',
+                  fallback: 'Adds +1,500 {element} Orbs to your backpack',
+                )
+                .replaceAll(
+                  '{element}',
+                  _shortElementTitle(_selectedBulkElement, loc),
+                ),
+            amountPerElement: GameController.singleElementBulkPackBonus,
+            localizedPrice: billing.getLocalizedPrice(selectedProductId),
             unavailableLabel: loc.t(
               'temple_price_unavailable',
               fallback: 'Unavailable',
             ),
-            isPurchasePending: billing.isPurchasePending(bundle.productId),
+            isPurchasePending: billing.isPurchasePending(selectedProductId),
             isLoadingStore: billing.isLoadingProducts,
-            onBuy: () => controller.buyWithRealMoney(bundle.productId),
-            showAllElements: true,
+            onBuy: () => controller.buyWithRealMoney(selectedProductId),
+            showAllElements: false,
+            singleMove: _selectedBulkElement,
           ),
-
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            const ElementalCrystalIcon(size: 22),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                loc.t(
-                  'temple_adoration_single_header',
-                  fallback: 'Single-Element Bulk Pack (+1,500)',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12.5,
-                  color: palette.amberText,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-
-        // Element selector row for +1,500 single-element pack
-        Row(
-          key: const ValueKey('adoration_single_element_selector_row'),
-          children: [
-            for (int i = 0; i < HandMove.values.length; i++) ...[
-              if (i > 0) const SizedBox(width: 5),
-              Expanded(
-                child: _AdorationElementChip(
-                  key: ValueKey(
-                    'adoration_element_selector_${HandMove.values[i].orbKey}',
-                  ),
-                  move: HandMove.values[i],
-                  label: _shortElementTitle(HandMove.values[i], loc),
-                  selected: _selectedBulkElement == HandMove.values[i],
-                  palette: palette,
-                  onTap: () {
-                    controller.audio.playTapVibrate();
-                    setState(() => _selectedBulkElement = HandMove.values[i]);
-                  },
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 6),
-        _ConsumableBundleTile(
-          cardKey: const ValueKey('adoration_single_element_card'),
-          buttonKey: ValueKey('real_money_unlock_$selectedProductId'),
-          icon: _selectedBulkElement.elementalIcon,
-          title:
-              '+1,500 ${_selectedBulkElement.elementalOrbName(loc)}',
-          subtitle: loc
-              .t(
-                'temple_single_pack_desc',
-                fallback: 'Adds +1,500 {element} Orbs to your backpack',
-              )
-              .replaceAll(
-                '{element}',
-                _shortElementTitle(_selectedBulkElement, loc),
-              ),
-          amountPerElement: GameController.singleElementBulkPackBonus,
-          localizedPrice: billing.getLocalizedPrice(selectedProductId),
-          unavailableLabel: loc.t(
-            'temple_price_unavailable',
-            fallback: 'Unavailable',
-          ),
-          isPurchasePending: billing.isPurchasePending(selectedProductId),
-          isLoadingStore: billing.isLoadingProducts,
-          onBuy: () => controller.buyWithRealMoney(selectedProductId),
-          showAllElements: false,
-          singleMove: _selectedBulkElement,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -2326,132 +2367,120 @@ class _ShopDialogState extends State<ShopDialog> {
       );
     }
 
-    return ListView(
+    return SingleChildScrollView(
       key: const ValueKey('temple_wing_prayer'),
-      children: [
-        Text(
-          loc.t('temple_prayer_title', fallback: 'Prayer Room'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: palette.primaryText,
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            loc.t('temple_prayer_title', fallback: 'Prayer Room'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: palette.primaryText,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
 
-        // Pinned at the very top of Prayer Room so toggling never shifts its vertical position
-        _buildVowOfSilenceCard(context, palette, loc),
-        const SizedBox(height: 8),
+          // Pinned at the very top of Prayer Room so toggling never shifts its vertical position
+          _buildVowOfSilenceCard(context, palette, loc),
+          const SizedBox(height: 8),
 
-        // Meditation for Free Orbs (Watch Ad +50 Orbs), smoothly collapses when Vow of Silence is ON
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: !isRemoveAds
-                ? Padding(
-                    key: const ValueKey('shop_rewarded_ad_pinned'),
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildRewardedAdCard(context),
-                  )
-                : const SizedBox.shrink(
-                    key: ValueKey('shop_rewarded_ad_hidden'),
+          // Meditation for Free Orbs (Watch Ad +50 Orbs), smoothly collapses when Vow of Silence is ON
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: !isRemoveAds
+                  ? Padding(
+                      key: const ValueKey('shop_rewarded_ad_pinned'),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildRewardedAdCard(context),
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('shop_rewarded_ad_hidden'),
+                    ),
+            ),
+          ),
+
+          // Pre-Battle Sacred Blessings Section
+          Row(
+            children: [
+              const SacredBlessingIcon(size: 24),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  loc.t('temple_blessings_section_title', fallback: 'Sacred Blessings'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                    color: palette.amberText,
                   ),
-          ),
-        ),
-
-        // Pre-Battle Sacred Blessings Section
-        Row(
-          children: [
-            const SacredBlessingIcon(size: 24),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                loc.t('temple_blessings_section_title', fallback: 'Sacred Blessings'),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                  color: palette.amberText,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          key: const ValueKey('prayer_blessing_status_banner'),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: pendingBlessing != null
-                ? palette.successText.withValues(alpha: 0.12)
-                : palette.rewardedAdCardSurface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
+            ],
+          ),
+          const SizedBox(height: 4),
+          Container(
+            key: const ValueKey('prayer_blessing_status_banner'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
               color: pendingBlessing != null
-                  ? palette.successText.withValues(alpha: 0.45)
-                  : palette.rewardedAdCardBorder,
+                  ? palette.successText.withValues(alpha: 0.12)
+                  : palette.rewardedAdCardSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: pendingBlessing != null
+                    ? palette.successText.withValues(alpha: 0.45)
+                    : palette.rewardedAdCardBorder,
+              ),
+            ),
+            child: Text(
+              statusMessage,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: pendingBlessing != null
+                    ? palette.successText
+                    : palette.amberText,
+              ),
             ),
           ),
-          child: Text(
-            statusMessage,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: pendingBlessing != null
-                  ? palette.successText
-                  : palette.amberText,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
 
-        for (final blessing in SacredBlessing.values)
-          _SacredBlessingCard(
-            key: ValueKey('temple_blessing_card_${blessing.id}'),
-            buttonKey: ValueKey('temple_blessing_pray_button_${blessing.id}'),
-            blessing: blessing,
-            title: loc.t(blessing.titleKey, fallback: blessing.fallbackTitle),
-            description: loc.t(blessing.descKey, fallback: blessing.fallbackDesc),
-            isThisActive: pendingBlessing == blessing,
-            hasAnotherActive:
-                pendingBlessing != null && pendingBlessing != blessing,
-            canFreePray: canFreePray,
-            canAdPray: canAdPray,
-            isRemoveAds: isRemoveAds,
-            activeLabel: loc.t(
-              'temple_blessing_active_badge',
-              fallback: 'Active',
-            ),
-            freePrayLabel: isRemoveAds
-                ? loc.t('temple_blessing_pray_perk', fallback: 'Bless (Perk)')
-                : loc.t('temple_blessing_pray_free', fallback: 'Pray (Free)'),
-            adPrayLabel: loc.t(
-              'temple_blessing_pray_ad',
-              fallback: 'Watch Ad: Pray',
-            ),
-            palette: palette,
-            onTap: () {
-              if (canFreePray) {
-                final ok = controller.activateSacredBlessingFree(blessing);
-                if (ok && context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                }
-              } else if (canAdPray) {
-                controller.watchAdToActivateSacredBlessing(
-                  blessing,
-                  onActivated: () {
-                    if (!context.mounted) return;
+          for (final blessing in SacredBlessing.values)
+            _SacredBlessingCard(
+              key: ValueKey('temple_blessing_card_${blessing.id}'),
+              buttonKey: ValueKey('temple_blessing_pray_button_${blessing.id}'),
+              blessing: blessing,
+              title: loc.t(blessing.titleKey, fallback: blessing.fallbackTitle),
+              description: loc.t(blessing.descKey, fallback: blessing.fallbackDesc),
+              isThisActive: pendingBlessing == blessing,
+              hasAnotherActive:
+                  pendingBlessing != null && pendingBlessing != blessing,
+              canFreePray: canFreePray,
+              canAdPray: canAdPray,
+              isRemoveAds: isRemoveAds,
+              activeLabel: loc.t(
+                'temple_blessing_active_badge',
+                fallback: 'Active',
+              ),
+              freePrayLabel: isRemoveAds
+                  ? loc.t('temple_blessing_pray_perk', fallback: 'Bless (Perk)')
+                  : loc.t('temple_blessing_pray_free', fallback: 'Pray (Free)'),
+              adPrayLabel: loc.t(
+                'temple_blessing_pray_ad',
+                fallback: 'Watch Ad: Pray',
+              ),
+              palette: palette,
+              onTap: () {
+                if (canFreePray) {
+                  final ok = controller.activateSacredBlessingFree(blessing);
+                  if (ok && context.mounted) {
                     ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
                       ..showSnackBar(
@@ -2462,24 +2491,41 @@ class _ShopDialogState extends State<ShopDialog> {
                           duration: const Duration(seconds: 2),
                         ),
                       );
-                  },
-                );
-              }
-            },
-          ),
-        if (!isRemoveAds && !canFreePray && pendingBlessing == null) ...[
-          const SizedBox(height: 6),
-          Text(
-            loc.t(
-              'temple_blessing_ad_disclosure',
-              fallback:
-                  'Rewarded Video Ad: watch an ad to activate 1 temporary blessing for your next battle.',
+                  }
+                } else if (canAdPray) {
+                  controller.watchAdToActivateSacredBlessing(
+                    blessing,
+                    onActivated: () {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                    },
+                  );
+                }
+              },
             ),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10.5, color: palette.mutedText),
-          ),
+          if (!isRemoveAds && !canFreePray && pendingBlessing == null) ...[
+            const SizedBox(height: 6),
+            Text(
+              loc.t(
+                'temple_blessing_ad_disclosure',
+                fallback:
+                    'Rewarded Video Ad: watch an ad to activate 1 temporary blessing for your next battle.',
+              ),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10.5, color: palette.mutedText),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

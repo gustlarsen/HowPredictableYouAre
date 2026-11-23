@@ -44,6 +44,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   static const Color _alertRed = Color(0xFFE53935);
 
   late CastleWing _selectedWing;
+  final ScrollController _wingScrollController = ScrollController();
 
   GameController get controller => widget.controller;
 
@@ -51,6 +52,41 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   void initState() {
     super.initState();
     _selectedWing = widget.initialWing;
+  }
+
+  @override
+  void dispose() {
+    _wingScrollController.dispose();
+    super.dispose();
+  }
+
+  void _selectWing(CastleWing wing) {
+    controller.audio.playTapVibrate();
+    if (_wingScrollController.hasClients) {
+      _wingScrollController.jumpTo(0.0);
+    }
+    if (_selectedWing != wing) {
+      setState(() => _selectedWing = wing);
+    }
+  }
+
+  Widget _buildScrollableWing({
+    required Key key,
+    required Widget child,
+  }) {
+    return Scrollbar(
+      key: ValueKey('castle_wing_scrollbar_${_selectedWing.name}'),
+      controller: _wingScrollController,
+      thumbVisibility: true,
+      thickness: 4,
+      radius: const Radius.circular(8),
+      child: SingleChildScrollView(
+        key: key,
+        controller: _wingScrollController,
+        padding: const EdgeInsets.only(top: 2, bottom: 4),
+        child: child,
+      ),
+    );
   }
 
   String _shortElementTitle(HandMove move, LocalizationService loc) {
@@ -70,15 +106,13 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         final palette = AppPalette.of(context);
         final week = controller.currentWeek;
         final weekLabel = loc.t('map_week_label', fallback: 'Week');
+        final fixedHeight = HubModalSizing.fixedHeightFor(context);
 
         return Dialog(
           key: const ValueKey('royal_castle_dialog'),
           backgroundColor: palette.dialogSurface,
           surfaceTintColor: palette.isDark ? null : Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 14,
-          ),
+          insetPadding: HubModalSizing.insetPadding,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
             side: BorderSide(
@@ -89,14 +123,19 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
             ),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 740),
+            key: const ValueKey('royal_castle_dialog_frame'),
+            constraints: BoxConstraints(
+              maxWidth: HubModalSizing.maxWidth,
+              minHeight: fixedHeight,
+              maxHeight: fixedHeight,
+            ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Royal Castle Header
+                  // 1. Fixed Top Header & Navigation Tabs (Never Scrolls)
                   Row(
                     children: [
                       Container(
@@ -134,7 +173,8 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                                 'castle_hub_subtitle',
                                 fallback: 'Kingdom Hub & Royal Wings',
                               ),
-                              maxLines: 2,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11.5,
                                 height: 1.2,
@@ -175,48 +215,58 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 
                   Divider(
                     height: 12,
-                    color: palette.isDark ? null : palette.divider,
+                    thickness: 1,
+                    color: palette.divider,
                   ),
 
-                  // Active Wing Content
-                  Flexible(
-                    child: _selectedWing == CastleWing.relicChamber
-                        ? _buildRelicChamberWing(context, palette, loc)
-                        : SingleChildScrollView(
-                            key: ValueKey(
-                              'castle_wing_scroll_${_selectedWing.name}',
+                  // 2. Scrollable Wing Content Area Only (Expanded)
+                  Expanded(
+                    child: ClipRect(
+                      child: _selectedWing == CastleWing.relicChamber
+                          ? _buildRelicChamberWing(context, palette, loc)
+                          : _buildScrollableWing(
+                              key: ValueKey(
+                                'castle_wing_scroll_${_selectedWing.name}',
+                              ),
+                              child: _buildSelectedWing(context, palette, loc),
                             ),
-                            child: _buildSelectedWing(context, palette, loc),
-                          ),
+                    ),
                   ),
 
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      key: const ValueKey('royal_castle_close_button'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: palette.amberText,
-                        backgroundColor: palette.isDark
-                            ? palette.amberBorder.withValues(alpha: 0.16)
-                            : palette.rewardedAdCardSurface,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: palette.amberBorder.withValues(alpha: 0.45),
+                  // 3. Pinned Bottom Footer (Ok Button — Never Scrolls)
+                  Divider(
+                    height: 12,
+                    thickness: 1,
+                    color: palette.divider,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('royal_castle_close_button'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: palette.amberText,
+                          backgroundColor: palette.isDark
+                              ? palette.amberBorder.withValues(alpha: 0.16)
+                              : palette.rewardedAdCardSurface,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: palette.amberBorder.withValues(alpha: 0.45),
+                            ),
                           ),
                         ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(
+                          loc.t('string36', fallback: 'Ok'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        loc.t('string36', fallback: 'Ok'),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -314,10 +364,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
               selected: _selectedWing == tabs[i].wing,
               showDot: tabs[i].hasDot,
               palette: palette,
-              onTap: () {
-                controller.audio.playTapVibrate();
-                setState(() => _selectedWing = tabs[i].wing);
-              },
+              onTap: () => _selectWing(tabs[i].wing),
             ),
           ),
         ],
@@ -1120,7 +1167,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     }
 
     if (artifacts.isEmpty) {
-      return SingleChildScrollView(
+      return _buildScrollableWing(
         key: const ValueKey('castle_wing_scroll_relicChamber'),
         child: Column(
           key: const ValueKey('castle_wing_relic_chamber'),
@@ -1217,7 +1264,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
 
     return Column(
       key: const ValueKey('castle_wing_relic_chamber'),
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Pinned Full-Width Golden Restore Relics Button at the Top
@@ -1347,94 +1394,96 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         const SizedBox(height: 8),
 
         // 3. Scrollable List of Archived Relics with Active/Inactive Badges
-        Flexible(
-          child: SingleChildScrollView(
-            key: const ValueKey('castle_wing_scroll_relicChamber'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final artifact in artifacts) ...[
-                  Builder(
-                    builder: (context) {
-                      final isStoredActive =
-                          controller.isRelicStoredEnabled(artifact);
-                      final isStaff =
-                          artifact == ShopUpgradeArtifact.overchargedStaff &&
-                          controller.storedRelicOverchargedStaffLevel > 0;
-                      final titleText = isStaff
-                          ? '${loc.t(artifact.titleKey, fallback: artifact.fallbackTitle)} (${loc.t('overcharged_staff_level_prefix', fallback: 'Lv.')} ${controller.storedRelicOverchargedStaffLevel})'
-                          : loc.t(
-                              artifact.titleKey,
-                              fallback: artifact.fallbackTitle,
-                            );
-                      return Container(
-                        key: ValueKey('relic_chamber_item_${artifact.id}'),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.dialogCardSurface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: palette.amberBorder.withValues(alpha: 0.45),
+        Expanded(
+          child: ClipRect(
+            child: _buildScrollableWing(
+              key: const ValueKey('castle_wing_scroll_relicChamber'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final artifact in artifacts) ...[
+                    Builder(
+                      builder: (context) {
+                        final isStoredActive =
+                            controller.isRelicStoredEnabled(artifact);
+                        final isStaff =
+                            artifact == ShopUpgradeArtifact.overchargedStaff &&
+                            controller.storedRelicOverchargedStaffLevel > 0;
+                        final titleText = isStaff
+                            ? '${loc.t(artifact.titleKey, fallback: artifact.fallbackTitle)} (${loc.t('overcharged_staff_level_prefix', fallback: 'Lv.')} ${controller.storedRelicOverchargedStaffLevel})'
+                            : loc.t(
+                                artifact.titleKey,
+                                fallback: artifact.fallbackTitle,
+                              );
+                        return Container(
+                          key: ValueKey('relic_chamber_item_${artifact.id}'),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              artifact.icon,
-                              color: palette.amberIcon,
-                              size: 20,
+                          decoration: BoxDecoration(
+                            color: palette.dialogCardSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: palette.amberBorder.withValues(alpha: 0.45),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    titleText,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: palette.primaryText,
-                                    ),
-                                  ),
-                                  if (isStaff) ...[
-                                    const SizedBox(height: 2),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                artifact.icon,
+                                color: palette.amberIcon,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
                                     Text(
-                                      '${loc.t('overcharged_staff_speed_label', fallback: 'Fire Speed')}: ${controller.storedRelicOverchargedStaffSpeed}x',
-                                      key: const ValueKey(
-                                        'relic_chamber_staff_speed',
-                                      ),
+                                      titleText,
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: palette.amberSubtitle,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: palette.primaryText,
                                       ),
                                     ),
+                                    if (isStaff) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${loc.t('overcharged_staff_speed_label', fallback: 'Fire Speed')}: ${controller.storedRelicOverchargedStaffSpeed}x',
+                                        key: const ValueKey(
+                                          'relic_chamber_staff_speed',
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: palette.amberSubtitle,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            _RelicStatusBadge(
-                              key: ValueKey(
-                                'relic_chamber_status_${artifact.id}',
+                              const SizedBox(width: 8),
+                              _RelicStatusBadge(
+                                key: ValueKey(
+                                  'relic_chamber_status_${artifact.id}',
+                                ),
+                                isActive: isStoredActive,
+                                label: isStoredActive ? activeLabel : inactiveLabel,
+                                palette: palette,
                               ),
-                              isActive: isStoredActive,
-                              label: isStoredActive ? activeLabel : inactiveLabel,
-                              palette: palette,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

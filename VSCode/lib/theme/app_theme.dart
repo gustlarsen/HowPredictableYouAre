@@ -143,3 +143,33 @@ class AppPalette {
     return elementalText(move).withValues(alpha: locked ? 0.32 : 0.55);
   }
 }
+
+/// Shared fixed modal dimensions for hub dialogs so both
+/// `RoyalCastleDialog` and `SacredTempleDialog` (`ShopDialog`) occupy the
+/// exact same screen coordinates across every wing/tab and viewport size.
+abstract final class HubModalSizing {
+  static const EdgeInsets insetPadding = EdgeInsets.symmetric(
+    horizontal: 14.0,
+    vertical: 14.0,
+  );
+  static const double maxWidth = 460.0;
+  static const double minFixedHeight = 480.0;
+  static const double maxFixedHeight = 760.0;
+  static const double viewportHeightFraction = 0.84;
+
+  /// Computes the strict fixed modal height clamped safely within the
+  /// available viewport height minus [insetPadding] and any [viewInsets].
+  static double fixedHeightFor(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final availableHeight =
+        (size.height - insetPadding.vertical - viewInsets.vertical)
+            .clamp(0.0, double.infinity);
+    final targetHeight = (size.height * viewportHeightFraction).clamp(
+      minFixedHeight,
+      maxFixedHeight,
+    );
+    return targetHeight <= availableHeight ? targetHeight : availableHeight;
+  }
+}
+
