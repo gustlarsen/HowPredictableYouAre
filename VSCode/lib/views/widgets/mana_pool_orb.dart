@@ -12,9 +12,8 @@ import '../../services/localization_service.dart';
 /// - Smoothly draining, continuously animated sine-wave liquid surface
 ///   (`#01579B` -> `#0288D1` -> `#00E5FF`) with a glowing white-cyan meniscus
 ///   highlight crest and rising mana bubble particles.
-/// - 3D glass sphere specular highlight, inner vignette depth, crisp white
-///   remaining-turn counter + localized `MANA` label, and floating `-1` drain
-///   indicator.
+/// - 3D glass sphere specular highlight, inner vignette depth, and crisp white
+///   remaining-turn counter + localized `MANA` label.
 class ManaPoolOrb extends StatefulWidget {
   final int remainingMana;
   final int maxMana;
@@ -39,9 +38,7 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
     with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
-  late final AnimationController _drainIndicatorController;
   late final AnimationController _waveController;
-  int _lastDrainAmount = 1;
 
   @override
   void initState() {
@@ -52,10 +49,6 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
     );
     _pulseAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-    _drainIndicatorController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 550),
     );
     _waveController = AnimationController(
       vsync: this,
@@ -97,11 +90,6 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
         _pulseController.stop();
         _pulseController.reset();
       }
-      if (_drainIndicatorController.isAnimating ||
-          _drainIndicatorController.value != 0.0) {
-        _drainIndicatorController.stop();
-        _drainIndicatorController.reset();
-      }
       if (_waveController.isAnimating || _waveController.value != 0.0) {
         _waveController.stop();
         _waveController.reset();
@@ -128,24 +116,12 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
           _waveController.reset();
         }
       }
-
-      if (newClamped < oldClamped && newSafeMax == oldSafeMax) {
-        _lastDrainAmount = oldClamped - newClamped;
-        _drainIndicatorController.forward(from: 0.0);
-      } else if (newClamped > oldClamped || newSafeMax != oldSafeMax) {
-        if (_drainIndicatorController.isAnimating ||
-            _drainIndicatorController.value != 0.0) {
-          _drainIndicatorController.stop();
-          _drainIndicatorController.reset();
-        }
-      }
     }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _drainIndicatorController.dispose();
     _waveController.dispose();
     super.dispose();
   }
@@ -347,67 +323,6 @@ class _ManaPoolOrbState extends State<ManaPoolOrb>
                       ),
                     ),
                   ],
-                ),
-              );
-            },
-          ),
-
-          // Subtle cyan -1 floating indicator positioned at upper-right of the bezel
-          AnimatedBuilder(
-            animation: _drainIndicatorController,
-            builder: (context, _) {
-              if (!_drainIndicatorController.isAnimating ||
-                  _drainIndicatorController.value >= 1.0) {
-                return const SizedBox.shrink();
-              }
-              final scale = (widget.size / 46.0).clamp(0.8, 1.5);
-              final t = _drainIndicatorController.value;
-              final drift = 18.0 * Curves.easeOut.transform(t);
-              final opacity = (1.0 - t).clamp(0.0, 1.0);
-              return Positioned(
-                top: -2.0 * scale - drift,
-                right: -10.0 * scale,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: opacity,
-                    child: Container(
-                      key: const ValueKey('mana_drain_indicator'),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 5 * scale,
-                        vertical: 1.2 * scale,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF061624).withValues(alpha: 0.88),
-                        borderRadius: BorderRadius.circular(6 * scale),
-                        border: Border.all(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.78),
-                          width: 0.9,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF00E5FF)
-                                .withValues(alpha: 0.45),
-                            blurRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        '-$_lastDrainAmount',
-                        style: TextStyle(
-                          color: const Color(0xFF64F5FF),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10.5 * scale,
-                          height: 1.1,
-                          shadows: const [
-                            Shadow(
-                              color: Colors.black,
-                              blurRadius: 3,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               );
             },

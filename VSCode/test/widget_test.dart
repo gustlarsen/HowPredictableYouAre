@@ -3500,7 +3500,7 @@ void main() {
   );
 
   testWidgets(
-    'Draw consumes 1 Mana (100 -> 99) with -1 indicator and 0 HP damage, keeps ScoreHeader Gauge fair, and reaches 0 at 100 total rounds',
+    'Draw consumes 1 Mana (100 -> 99) with 0 HP damage and no floating -1 mana indicator, keeps ScoreHeader Gauge fair, and reaches 0 at 100 total rounds',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
         'has_seen_story_intro': true,
@@ -3533,7 +3533,7 @@ void main() {
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
       final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
 
-      // Round 1 (Draw): Mana decrements 100 -> 99, floating -1 indicator appears, Player HP stays 50, Gauge = 0.0%
+      // Round 1 (Draw): Mana decrements 100 -> 99, no floating -1 indicator appears, Player HP stays 50, Gauge = --%
       controller.crystalBallMove = HandMove.rock;
       await tester.tap(rockBtnFinder);
       await tester.pump();
@@ -3553,11 +3553,11 @@ void main() {
           of: manaOrbFinder,
           matching: find.byKey(const ValueKey('mana_drain_indicator')),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('-1')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: find.byType(ScoreHeader), matching: find.text('--%')),
@@ -3580,7 +3580,7 @@ void main() {
         findsOneWidget,
       );
 
-      // Round 3 (Draw): Mana decrements 98 -> 97, floating -1 shows, HP unchanged, Gauge stays 100.0% (not penalized)
+      // Round 3 (Draw): Mana decrements 98 -> 97, no floating -1 shows, HP unchanged, Gauge stays 100.0% (not penalized)
       controller.crystalBallMove = HandMove.rock;
       await tester.tap(rockBtnFinder);
       await tester.pump();
@@ -3599,7 +3599,11 @@ void main() {
           of: manaOrbFinder,
           matching: find.byKey(const ValueKey('mana_drain_indicator')),
         ),
-        findsOneWidget,
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: manaOrbFinder, matching: find.text('-1')),
+        findsNothing,
       );
       expect(
         find.descendant(of: find.byType(ScoreHeader), matching: find.text('100.0%')),

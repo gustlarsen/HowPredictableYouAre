@@ -102,7 +102,7 @@ void main() {
     );
 
     testWidgets(
-      'ManaPoolOrb smoothly drains wavy liquid over 300ms, advances wave phase, and shows floating cyan -1 indicator when Mana decreases',
+      'ManaPoolOrb smoothly drains wavy liquid over 300ms, advances wave phase, and does not show floating -1 indicator when Mana decreases',
       (WidgetTester tester) async {
         final localization = LocalizationService();
 
@@ -128,6 +128,7 @@ void main() {
         );
         await tester.pump();
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
+        expect(find.text('-1'), findsNothing);
         final initialWavePhase = readLiquidPainter().wavePhase;
 
         // Advance 200ms: continuous sine-wave motion advances wavePhase smoothly
@@ -150,34 +151,24 @@ void main() {
         );
         await tester.pump();
 
-        // Advance 150ms into the ~300ms drain & 550ms floating -1 indicator
+        // Advance 150ms into the ~300ms liquid drain; no floating -1 indicator is shown
         await tester.pump(const Duration(milliseconds: 150));
         expect(find.text('99'), findsOneWidget);
-        expect(find.byKey(const ValueKey('mana_drain_indicator')), findsOneWidget);
-        expect(find.text('-1'), findsOneWidget);
+        expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
+        expect(find.text('-1'), findsNothing);
 
-        final earlyY = tester
-            .getTopLeft(find.byKey(const ValueKey('mana_drain_indicator')))
-            .dy;
         final midFill = readLiquidPainter().fillRatio;
         expect(midFill, greaterThan(0.99));
         expect(midFill, lessThan(1.0));
 
-        // Advance another 150ms (total 300ms): liquid finishes draining, -1 drifts higher upward
+        // Advance another 150ms (total 300ms): liquid finishes draining
         await tester.pump(const Duration(milliseconds: 150));
-        final laterY = tester
-            .getTopLeft(find.byKey(const ValueKey('mana_drain_indicator')))
-            .dy;
-        expect(laterY, lessThan(earlyY));
-
         final settledFill = readLiquidPainter().fillRatio;
         expect(settledFill, closeTo(0.99, 1e-4));
-
-        // Finish 550ms indicator fade-out animation (300ms + 300ms = 600ms)
-        await tester.pump(const Duration(milliseconds: 300));
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
+        expect(find.text('-1'), findsNothing);
 
-        // Resetting Mana back up to 100 does NOT trigger a -1 indicator
+        // Resetting Mana back up to 100 does NOT trigger any indicator either
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
@@ -193,6 +184,7 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 150));
         expect(find.byKey(const ValueKey('mana_drain_indicator')), findsNothing);
+        expect(find.text('-1'), findsNothing);
       },
     );
 
