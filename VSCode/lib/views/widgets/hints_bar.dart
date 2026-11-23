@@ -22,14 +22,14 @@ class HintsBar extends StatelessWidget {
   static const Color warmGoldValue = Color(0xFFF3E2B8);
 
   String _formatMoves(List<HandMove> moves, {required int poolSize}) {
-    if (moves.isEmpty || moves.length >= poolSize) {
+    if (moves.isEmpty || (poolSize > 1 && moves.length >= poolSize)) {
       return '?';
     }
     return moves.map((m) => m.emoji).join(' ');
   }
 
   List<HandMove> _visibleMoves(List<HandMove> moves, {required int poolSize}) {
-    if (moves.isEmpty || moves.length >= poolSize) {
+    if (moves.isEmpty || (poolSize > 1 && moves.length >= poolSize)) {
       return const [];
     }
     return moves;

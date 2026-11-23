@@ -104,6 +104,9 @@ void main() {
         'musicEnabled': false,
         'animationsEnabled': false,
         'current_week': 10,
+        'enemy_stage': 2,
+        'enemy_max_hp': 200,
+        'pcHp': 200,
       });
       final storage = StorageService();
       await storage.init();
@@ -179,6 +182,9 @@ void main() {
         'musicEnabled': false,
         'animationsEnabled': false,
         'current_week': 10,
+        'enemy_stage': 2,
+        'enemy_max_hp': 200,
+        'pcHp': 200,
         'orbs_fire': 10,
         'orbs_water': 10,
         'orbs_wood': 10,
@@ -240,6 +246,9 @@ void main() {
         'musicEnabled': false,
         'animationsEnabled': false,
         'current_week': 10,
+        'enemy_stage': 2,
+        'enemy_max_hp': 200,
+        'pcHp': 200,
         'unlockedYourPrediction': true,
         'showYourPrediction': true,
         'unlockedNextMove': true,
@@ -293,6 +302,9 @@ void main() {
         'musicEnabled': false,
         'animationsEnabled': false,
         'current_week': 10,
+        'enemy_stage': 2,
+        'enemy_max_hp': 200,
+        'pcHp': 200,
         'orbs_earth': 50,
         'orbs_metal': 50,
       });

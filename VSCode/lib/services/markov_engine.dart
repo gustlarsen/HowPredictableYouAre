@@ -19,6 +19,7 @@ class MarkovEngine {
   final Random _random;
   final bool enableExtendedHands;
   bool enableEnemyExtendedHands;
+  List<HandMove>? _enemyAllowedMoves;
   bool enableElementalMode;
 
   late List<List<int>> _matrix;
@@ -27,10 +28,17 @@ class MarkovEngine {
 
   MarkovEngine({
     this.enableExtendedHands = false,
-    this.enableEnemyExtendedHands = false,
+    bool? enableEnemyExtendedHands,
+    List<HandMove>? enemyAllowedMoves,
     this.enableElementalMode = false,
     Random? random,
-  }) : _random = random ?? Random() {
+  }) : enableEnemyExtendedHands =
+           enableEnemyExtendedHands ?? enableExtendedHands,
+       _enemyAllowedMoves =
+           (enemyAllowedMoves == null || enemyAllowedMoves.isEmpty)
+           ? null
+           : List.unmodifiable(enemyAllowedMoves),
+       _random = random ?? Random() {
     _initMatrix();
   }
 
@@ -43,8 +51,16 @@ class MarkovEngine {
 
   List<List<int>> get matrix => _matrix;
   List<HandMove> get activeMoves => _activeMoves;
+
+  List<HandMove>? get enemyAllowedMoves => _enemyAllowedMoves;
+
+  set enemyAllowedMoves(List<HandMove>? moves) {
+    _enemyAllowedMoves =
+        (moves == null || moves.isEmpty) ? null : List.unmodifiable(moves);
+  }
+
   List<HandMove> get enemyMoves =>
-      (enableExtendedHands || enableEnemyExtendedHands) ? _allMoves : _baseMoves;
+      _enemyAllowedMoves ?? (enableEnemyExtendedHands ? _allMoves : _baseMoves);
   int get size => _activeMoves.length;
   int get enemySize => enemyMoves.length;
 
@@ -185,11 +201,13 @@ class MarkovEngine {
   }
 
   List<HandMove> _countersForPredictedMoves(List<HandMove> predictedMoves) {
+    final pool = enemyMoves;
+    if (pool.length == 1) {
+      return List<HandMove>.from(pool);
+    }
     if (predictedMoves.isEmpty) {
       return [];
     }
-
-    final pool = enemyMoves;
     final List<HandMove> choices = [];
     for (final predicted in predictedMoves) {
       final winningCounters = pool

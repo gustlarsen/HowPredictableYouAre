@@ -888,11 +888,57 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  static const List<HandMove> basicElementPool = [
+    HandMove.fire,
+    HandMove.water,
+    HandMove.wood,
+  ];
+
+  static const List<HandMove> allElementPool = [
+    HandMove.fire,
+    HandMove.water,
+    HandMove.wood,
+    HandMove.earth,
+    HandMove.metal,
+  ];
+
   bool get isWeekPhase2 => currentWeek >= phase2StartWeek;
 
   bool get isPhase2 => isWeekPhase2 || enemyStage >= 2;
 
-  bool get enemyUses5Elements => enemyStage >= 2 || isWeekPhase2;
+  /// True only for bosses whose element pool spans all 5 elements
+  /// (Stage 2 Robot Archmage & Stage 4 Baby Mage Robot).
+  /// Stage 1 Guardian Robot strictly uses [Fire, Water, Wood] and
+  /// Stage 3 Metal Wizard strictly uses [Metal].
+  bool get enemyUses5Elements => enemyStage == 2 || enemyStage == 4;
+
+  /// Player's currently active element pool (3 basic elements by default,
+  /// or all 5 elements when Earth & Metal is unlocked and enabled).
+  List<HandMove> get playerAllowedMoves =>
+      showNewHands ? allElementPool : basicElementPool;
+
+  /// Active boss's allowed element pool, strictly decoupled from the player's
+  /// unlocked elements:
+  /// - Stage 1 (Guardian Robot, 100 HP): [Fire, Water, Wood] ONLY.
+  /// - Stage 2 (Robot Archmage, 200 HP): All 5 elements.
+  /// - Stage 3 (Metal Wizard, 300 HP): [Metal] ONLY.
+  /// - Stage 4 (Baby Mage Robot, 400 HP): All 5 elements.
+  List<HandMove> get bossAllowedMoves {
+    switch (enemyStage) {
+      case 2:
+      case 4:
+        return allElementPool;
+      case 3:
+        return const [HandMove.metal];
+      default:
+        return basicElementPool;
+    }
+  }
+
+  void _syncEngineEnemyPool() {
+    _engine.enableEnemyExtendedHands = enemyUses5Elements;
+    _engine.enemyAllowedMoves = bossAllowedMoves;
+  }
 
   bool get isGuardianBoss => enemyStage == 1;
 
@@ -1053,7 +1099,7 @@ class GameController extends ChangeNotifier {
     giftBoxUnlocked = storage.giftBoxUnlocked;
     overchargedStaffLevel = storage.overchargedStaffLevel.clamp(0, overchargedStaffMaxLevel);
 
-    enemyPhase = storage.enemyPhase.clamp(1, 3);
+    enemyPhase = storage.enemyPhase.clamp(1, 4);
     enemyMaxHp = storage.enemyMaxHpRaw ?? maxHpForEnemyPhase(enemyPhase);
 
     showReset = storage.showReset;
@@ -1146,6 +1192,7 @@ class GameController extends ChangeNotifier {
     _engine = MarkovEngine(
       enableExtendedHands: showNewHands,
       enableEnemyExtendedHands: enemyUses5Elements,
+      enemyAllowedMoves: bossAllowedMoves,
       enableElementalMode: isElementalMode,
     );
     final savedMatrix = storage.getMarkovMatrix(_engine.size);
@@ -1161,11 +1208,10 @@ class GameController extends ChangeNotifier {
           currentUserMove == HandMove.spock) {
         currentUserMove = null;
       }
-      if (!enemyUses5Elements &&
-          (currentComputerMove == HandMove.lizard ||
-              currentComputerMove == HandMove.spock)) {
-        currentComputerMove = null;
-      }
+    }
+    if (currentComputerMove != null &&
+        !bossAllowedMoves.contains(currentComputerMove)) {
+      currentComputerMove = null;
     }
     if (currentUserMove == null || currentComputerMove == null) {
       currentUserMove = null;
@@ -2059,7 +2105,7 @@ class GameController extends ChangeNotifier {
       return;
     }
     turnCount++;
-    _engine.enableEnemyExtendedHands = enemyUses5Elements;
+    _syncEngineEnemyPool();
     final previousMove = lastUserMove;
     currentUserMove = userChoice;
 
@@ -2184,6 +2230,7 @@ class GameController extends ChangeNotifier {
   }
 
   HandMove _chooseComputerMoveForCurrentPhase(HandMove? previousMove) {
+    _syncEngineEnemyPool();
     if (enemyStage == 4) {
       // Stage 4 Baby Mage Robot: pure uniform random (1/5 per element).
       return _engine.getRandomEnemyMove();
@@ -2199,7 +2246,8 @@ class GameController extends ChangeNotifier {
       }
       return _engine.getRandomEnemyMove();
     }
-    // Stage 1 Guardian Robot: standard cumulative Markov prediction.
+    // Stage 1 Guardian Robot: standard cumulative Markov prediction,
+    // strictly restricted to [Fire, Water, Wood].
     if (_engine.hasPrediction(previousMove)) {
       return _engine.computeSmartChoice(previousMove);
     }
@@ -2318,7 +2366,7 @@ class GameController extends ChangeNotifier {
   }
 
   void _computeNextHints() {
-    _engine.enableEnemyExtendedHands = enemyUses5Elements;
+    _syncEngineEnemyPool();
     crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
 
     if (enemyStage == 4) {
@@ -2388,7 +2436,7 @@ class GameController extends ChangeNotifier {
     isBossVictoryPending = false;
     pendingBossVictoryStage = null;
     pendingBossVictoryWeek = null;
-    _engine.enableEnemyExtendedHands = enemyUses5Elements;
+    _syncEngineEnemyPool();
     _engine.reset();
 
     storage.clearGameStats(
@@ -3782,6 +3830,7 @@ class GameController extends ChangeNotifier {
     _engine = MarkovEngine(
       enableExtendedHands: val,
       enableEnemyExtendedHands: enemyUses5Elements,
+      enemyAllowedMoves: bossAllowedMoves,
       enableElementalMode: isElementalMode,
     );
     _resetBattleState();
