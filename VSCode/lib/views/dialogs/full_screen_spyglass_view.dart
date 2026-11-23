@@ -1,22 +1,35 @@
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../widgets/watchtower_cell_shader_view.dart';
+import '../widgets/watchtower_forge_view.dart';
+import 'metal_wizard_spyglass_dialog.dart';
 
-/// Full-screen interactive Spyglass exploration view displaying the entire 9:16
-/// animated dungeon cell with pinch-to-zoom, drag/pan, and double-tap zoom.
+enum SpyglassTarget { princessCell, metalWizard }
+
+/// Full-screen interactive Spyglass exploration view displaying either the
+/// animated 9:16 dungeon cell or the Metal Wizard's underground forge with
+/// pinch-to-zoom, drag/pan, and double-tap zoom.
 class FullScreenSpyglassView extends StatefulWidget {
   final GameController controller;
+  final SpyglassTarget target;
 
-  const FullScreenSpyglassView({super.key, required this.controller});
+  const FullScreenSpyglassView({
+    super.key,
+    required this.controller,
+    this.target = SpyglassTarget.princessCell,
+  });
 
   /// Pushes [FullScreenSpyglassView] using a smooth scale + fade transition.
-  static Route<void> route({required GameController controller}) {
+  static Route<void> route({
+    required GameController controller,
+    SpyglassTarget target = SpyglassTarget.princessCell,
+  }) {
     return PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 250),
       reverseTransitionDuration: const Duration(milliseconds: 220),
       opaque: true,
       pageBuilder: (context, animation, secondaryAnimation) =>
-          FullScreenSpyglassView(controller: controller),
+          FullScreenSpyglassView(controller: controller, target: target),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
           parent: animation,
@@ -41,6 +54,7 @@ class FullScreenSpyglassView extends StatefulWidget {
 class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
     with SingleTickerProviderStateMixin {
   static const double _dungeonAspect = 576.0 / 1024.0;
+  static const double _forgeAspect = 1024.0 / 764.0;
   static const double _doubleTapScale = 2.2;
 
   final TransformationController _transformationController =
@@ -116,6 +130,8 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
   @override
   Widget build(BuildContext context) {
     final loc = widget.controller.localization;
+    final isMetalWizard = widget.target == SpyglassTarget.metalWizard;
+    final aspect = isMetalWizard ? _forgeAspect : _dungeonAspect;
 
     return Scaffold(
       key: const ValueKey('full_screen_spyglass_view'),
@@ -123,7 +139,7 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Full-screen interactive 9:16 animated dungeon room
+          // Full-screen interactive animated scene
           LayoutBuilder(
             builder: (context, constraints) {
               _viewportSize = Size(
@@ -148,12 +164,22 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
                     height: constraints.maxHeight,
                     child: Center(
                       child: AspectRatio(
-                        aspectRatio: _dungeonAspect,
-                        child: WatchtowerCellShaderView(
-                          isFullScreen: true,
-                          animationsEnabled:
-                              widget.controller.animationsEnabled,
-                        ),
+                        aspectRatio: aspect,
+                        child: isMetalWizard
+                            ? WatchtowerForgeView(
+                                isFullScreen: true,
+                                animationsEnabled:
+                                    widget.controller.animationsEnabled,
+                                isCoolingDown:
+                                    MetalWizardSpyglassDialog.isForgeCoolingDown(
+                                      widget.controller,
+                                    ),
+                              )
+                            : WatchtowerCellShaderView(
+                                isFullScreen: true,
+                                animationsEnabled:
+                                    widget.controller.animationsEnabled,
+                              ),
                       ),
                     ),
                   ),
@@ -161,6 +187,53 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
               );
             },
           ),
+
+          // Subtle bordered RPG lore box along the bottom for Metal Wizard's Forge
+          if (isMetalWizard)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 14,
+              child: SafeArea(
+                top: false,
+                child: IgnorePointer(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Container(
+                        key: const ValueKey('full_screen_metal_wizard_lore_box'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0B1018).withValues(alpha: 0.78),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFFB300)
+                                .withValues(alpha: 0.55),
+                            width: 1.1,
+                          ),
+                        ),
+                        child: Text(
+                          MetalWizardSpyglassDialog.resolveNarrativeCaption(
+                            widget.controller,
+                          ),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
+                            color: const Color(0xFFFFECB3)
+                                .withValues(alpha: 0.94),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Minimal floating top controls
           SafeArea(

@@ -443,9 +443,13 @@ class GameController extends ChangeNotifier {
   // Post-Week-0 Scream Warning Modal State (per-campaign)
   bool hasShownWeek0ScreamWarning = false;
   bool pendingWeek0ScreamWarning = false;
+  bool hasInspectedPrincessCellAfterScream = false;
 
   bool get shouldShowWeek0ScreamWarning =>
       pendingWeek0ScreamWarning && !hasShownWeek0ScreamWarning;
+
+  bool get shouldShowPrincessCellScreamBadge =>
+      hasShownWeek0ScreamWarning && !hasInspectedPrincessCellAfterScream;
 
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
   int adConsagrationsThisWeek = 0;
@@ -1086,6 +1090,8 @@ class GameController extends ChangeNotifier {
     currentWeek = storage.currentWeek;
     hasShownWeek0ScreamWarning = storage.hasShownWeek0ScreamWarning;
     pendingWeek0ScreamWarning = storage.pendingWeek0ScreamWarning;
+    hasInspectedPrincessCellAfterScream =
+        storage.hasInspectedPrincessCellAfterScream;
     if (storage.userHpRaw != null) {
       userHp = storage.userHp.clamp(0, effectivePlayerMaxHp);
     } else {
@@ -2486,6 +2492,7 @@ class GameController extends ChangeNotifier {
       battleBonusTempHp = 0;
       hasShownWeek0ScreamWarning = false;
       pendingWeek0ScreamWarning = false;
+      hasInspectedPrincessCellAfterScream = false;
       storage.setEnemyStage(1);
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(0);
@@ -2494,6 +2501,7 @@ class GameController extends ChangeNotifier {
       storage.setBattleBonusTempHp(0);
       storage.setHasShownWeek0ScreamWarning(false);
       storage.setPendingWeek0ScreamWarning(false);
+      storage.setHasInspectedPrincessCellAfterScream(false);
       _refreshCompletedDecreesAndResetBattleTrackers();
       _resetBattleState();
       recordTurn0OrbSnapshot();
@@ -2684,6 +2692,19 @@ class GameController extends ChangeNotifier {
     _triggerCloudSave();
     notifyListeners();
     return true;
+  }
+
+  /// Marks the Princess's Cell spyglass as inspected after the Week 0 scream
+  /// warning has been shown, clearing the Watch Tower `"!"` alert badge for
+  /// the remainder of the current run.
+  void markPrincessCellInspectedAfterScream() {
+    if (!hasShownWeek0ScreamWarning || hasInspectedPrincessCellAfterScream) {
+      return;
+    }
+    hasInspectedPrincessCellAfterScream = true;
+    storage.setHasInspectedPrincessCellAfterScream(true);
+    _triggerCloudSave();
+    notifyListeners();
   }
 
   /// Advances the campaign calendar by +1 Week upon exiting a battle via

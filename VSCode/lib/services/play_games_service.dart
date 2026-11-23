@@ -192,6 +192,7 @@ class CloudSaveData {
   final int enemyMaxHp;
   final int currentWeek;
   final bool hasShownWeek0ScreamWarning;
+  final bool hasInspectedPrincessCellAfterScream;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -334,6 +335,7 @@ class CloudSaveData {
     this.enemyMaxHp = 100,
     this.currentWeek = 0,
     this.hasShownWeek0ScreamWarning = false,
+    this.hasInspectedPrincessCellAfterScream = false,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -634,6 +636,10 @@ class CloudSaveData {
       hasShownWeek0ScreamWarning: currentWeek == local.currentWeek
           ? (hasShownWeek0ScreamWarning || local.hasShownWeek0ScreamWarning)
           : hasShownWeek0ScreamWarning,
+      hasInspectedPrincessCellAfterScream: currentWeek == local.currentWeek
+          ? (hasInspectedPrincessCellAfterScream ||
+              local.hasInspectedPrincessCellAfterScream)
+          : hasInspectedPrincessCellAfterScream,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -792,6 +798,8 @@ class CloudSaveData {
       enemyMaxHp: storage.enemyMaxHp,
       currentWeek: storage.currentWeek,
       hasShownWeek0ScreamWarning: storage.hasShownWeek0ScreamWarning,
+      hasInspectedPrincessCellAfterScream:
+          storage.hasInspectedPrincessCellAfterScream,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -920,6 +928,9 @@ class CloudSaveData {
     await storage.setEnemyMaxHp(enemyMaxHp);
     await storage.setCurrentWeek(currentWeek);
     await storage.setHasShownWeek0ScreamWarning(hasShownWeek0ScreamWarning);
+    await storage.setHasInspectedPrincessCellAfterScream(
+      hasInspectedPrincessCellAfterScream,
+    );
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
     await storage.setPendingBattleBlessing(pendingBattleBlessing);
     await storage.setActiveBattleBlessing(activeBattleBlessing);
@@ -1157,6 +1168,8 @@ class CloudSaveData {
       'enemyMaxHp': enemyMaxHp,
       'currentWeek': currentWeek,
       'hasShownWeek0ScreamWarning': hasShownWeek0ScreamWarning,
+      'hasInspectedPrincessCellAfterScream':
+          hasInspectedPrincessCellAfterScream,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -1491,6 +1504,8 @@ class CloudSaveData {
           : ((map['currentWeek'] as num?)?.toInt() ?? 0),
       hasShownWeek0ScreamWarning:
           map['hasShownWeek0ScreamWarning'] as bool? ?? false,
+      hasInspectedPrincessCellAfterScream:
+          map['hasInspectedPrincessCellAfterScream'] as bool? ?? false,
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

@@ -621,11 +621,15 @@ void main() {
         expect(
           tester.getSize(
             find.descendant(
-              of: find.byKey(const ValueKey('observatory_spy_dungeon_button')),
+              of: find.byKey(const ValueKey('observatory_spy_princess_button')),
               matching: find.byType(WatchTowerIcon),
             ),
           ),
-          equals(const Size(20.0, 20.0)),
+          equals(const Size(18.0, 18.0)),
+        );
+        expect(
+          find.byKey(const ValueKey('observatory_spy_wizard_button')),
+          findsOneWidget,
         );
         expect(find.text("Star-Gazer's Strategy Hints"), findsOneWidget);
         expect(find.text('Markov Insight'), findsOneWidget);

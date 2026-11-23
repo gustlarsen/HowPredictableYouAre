@@ -326,6 +326,8 @@ class StorageService {
       'has_shown_week0_scream_warning';
   static const String pendingWeek0ScreamWarningKey =
       'pending_week0_scream_warning';
+  static const String hasInspectedPrincessCellAfterScreamKey =
+      'has_inspected_princess_cell_after_scream';
 
   bool get hasShownWeek0ScreamWarning =>
       _prefs.getBool(hasShownWeek0ScreamWarningKey) ?? false;
@@ -336,6 +338,11 @@ class StorageService {
       _prefs.getBool(pendingWeek0ScreamWarningKey) ?? false;
   Future<void> setPendingWeek0ScreamWarning(bool val) =>
       _prefs.setBool(pendingWeek0ScreamWarningKey, val);
+
+  bool get hasInspectedPrincessCellAfterScream =>
+      _prefs.getBool(hasInspectedPrincessCellAfterScreamKey) ?? false;
+  Future<void> setHasInspectedPrincessCellAfterScream(bool val) =>
+      _prefs.setBool(hasInspectedPrincessCellAfterScreamKey, val);
 
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Sacred Blessings
   static const String _adConsagrationsThisWeekKey =
@@ -1252,6 +1259,7 @@ class StorageService {
       setCurrentWeek(0),
       setHasShownWeek0ScreamWarning(false),
       setPendingWeek0ScreamWarning(false),
+      setHasInspectedPrincessCellAfterScream(false),
       setAdConsagrationsThisWeek(0),
       setPendingBattleBlessing(null),
       setActiveBattleBlessing(null),
