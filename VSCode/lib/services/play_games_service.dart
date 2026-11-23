@@ -220,7 +220,11 @@ class CloudSaveData {
   final bool showNextMove;
   final bool showSuggestion;
   final bool removeAdsEnabled;
+  final bool hasExplicitRemoveAdsEnabled;
   final bool showCrystalBall;
+
+  bool get isRemoveAdsOwned => unlockedAds;
+  bool get isRemoveAdsEnabled => removeAdsEnabled;
   final bool showCrystalBallPlus;
   final bool crystalBallPlusSavedState;
   final bool showMarkovRecalibrator;
@@ -348,6 +352,7 @@ class CloudSaveData {
     this.showNextMove = false,
     this.showSuggestion = false,
     bool? removeAdsEnabled,
+    bool? hasExplicitRemoveAdsEnabled,
     this.showCrystalBall = false,
     this.showCrystalBallPlus = false,
     this.crystalBallPlusSavedState = false,
@@ -416,7 +421,9 @@ class CloudSaveData {
     this.lastFreeDailyPrayerDate,
     this.updatedAtMillis = 0,
   }) : enemyStage = enemyStage ?? enemyPhase,
-       removeAdsEnabled = removeAdsEnabled ?? unlockedAds;
+       removeAdsEnabled = removeAdsEnabled ?? unlockedAds,
+       hasExplicitRemoveAdsEnabled =
+           hasExplicitRemoveAdsEnabled ?? (removeAdsEnabled != null);
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -573,6 +580,20 @@ class CloudSaveData {
   /// Merges [this] cloud save over [local] when cloud has higher progression or orbs,
   /// preserving any locally unlocked items or seen story chapters.
   CloudSaveData mergeOverLocal(CloudSaveData local) {
+    final mergedUnlockedAds = unlockedAds || local.unlockedAds;
+    final bool mergedRemoveAdsEnabled;
+    final bool mergedHasExplicitRemoveAdsEnabled;
+    if (local.unlockedAds || local.hasExplicitRemoveAdsEnabled) {
+      mergedRemoveAdsEnabled = local.removeAdsEnabled;
+      mergedHasExplicitRemoveAdsEnabled = true;
+    } else if (unlockedAds) {
+      mergedRemoveAdsEnabled = removeAdsEnabled;
+      mergedHasExplicitRemoveAdsEnabled = true;
+    } else {
+      mergedRemoveAdsEnabled = false;
+      mergedHasExplicitRemoveAdsEnabled = false;
+    }
+
     return CloudSaveData(
       fireOrbs: fireOrbs,
       waterOrbs: waterOrbs,
@@ -604,7 +625,7 @@ class CloudSaveData {
           unlockedYourPrediction || local.unlockedYourPrediction,
       unlockedNextMove: unlockedNextMove || local.unlockedNextMove,
       unlockedSuggestion: unlockedSuggestion || local.unlockedSuggestion,
-      unlockedAds: unlockedAds || local.unlockedAds,
+      unlockedAds: mergedUnlockedAds,
       unlockedNewSkin: unlockedNewSkin || local.unlockedNewSkin,
       unlockedCrystalBall: unlockedCrystalBall || local.unlockedCrystalBall,
       unlockedCrystalBallPlus:
@@ -623,7 +644,8 @@ class CloudSaveData {
       showYourPrediction: showYourPrediction,
       showNextMove: showNextMove,
       showSuggestion: showSuggestion,
-      removeAdsEnabled: removeAdsEnabled,
+      removeAdsEnabled: mergedRemoveAdsEnabled,
+      hasExplicitRemoveAdsEnabled: mergedHasExplicitRemoveAdsEnabled,
       showCrystalBall: showCrystalBall,
       showCrystalBallPlus: showCrystalBallPlus,
       crystalBallPlusSavedState: crystalBallPlusSavedState,
@@ -767,6 +789,7 @@ class CloudSaveData {
       showNextMove: storage.showNextMove,
       showSuggestion: storage.showSuggestion,
       removeAdsEnabled: storage.removeAdsEnabled,
+      hasExplicitRemoveAdsEnabled: storage.hasRemoveAdsEnabledPreference,
       showCrystalBall: storage.showCrystalBall,
       showCrystalBallPlus: storage.showCrystalBallPlus,
       crystalBallPlusSavedState: storage.crystalBallPlusSavedState,
@@ -946,7 +969,11 @@ class CloudSaveData {
     await storage.setShowYourPrediction(showYourPrediction);
     await storage.setShowNextMove(showNextMove);
     await storage.setShowSuggestion(showSuggestion);
-    await storage.setRemoveAdsEnabled(removeAdsEnabled);
+    if (unlockedAds || hasExplicitRemoveAdsEnabled) {
+      await storage.setRemoveAdsEnabled(removeAdsEnabled);
+    } else {
+      await storage.clearRemoveAdsEnabledPreference();
+    }
     await storage.setShowCrystalBall(showCrystalBall);
     await storage.setShowCrystalBallPlus(showCrystalBallPlus);
     await storage.setCrystalBallPlusSavedState(crystalBallPlusSavedState);
@@ -1087,6 +1114,7 @@ class CloudSaveData {
       'unlockedNextMove': unlockedNextMove,
       'unlockedSuggestion': unlockedSuggestion,
       'unlockedAds': unlockedAds,
+      'isRemoveAdsOwned': unlockedAds,
       'unlockedNewSkin': unlockedNewSkin,
       'unlockedCrystalBall': unlockedCrystalBall,
       'unlockedCrystalBallPlus': unlockedCrystalBallPlus,
@@ -1103,6 +1131,7 @@ class CloudSaveData {
       'showNextMove': showNextMove,
       'showSuggestion': showSuggestion,
       'removeAdsEnabled': removeAdsEnabled,
+      'isRemoveAdsEnabled': removeAdsEnabled,
       'showCrystalBall': showCrystalBall,
       'showCrystalBallPlus': showCrystalBallPlus,
       'crystalBallPlusSavedState': crystalBallPlusSavedState,
@@ -1361,7 +1390,9 @@ class CloudSaveData {
       unlockedYourPrediction: map['unlockedYourPrediction'] as bool? ?? false,
       unlockedNextMove: map['unlockedNextMove'] as bool? ?? false,
       unlockedSuggestion: map['unlockedSuggestion'] as bool? ?? false,
-      unlockedAds: map['unlockedAds'] as bool? ?? false,
+      unlockedAds: (map['unlockedAds'] as bool?) ??
+          (map['isRemoveAdsOwned'] as bool?) ??
+          false,
       unlockedNewSkin: map['unlockedNewSkin'] as bool? ?? false,
       unlockedCrystalBall: map['unlockedCrystalBall'] as bool? ?? false,
       unlockedCrystalBallPlus: map['unlockedCrystalBallPlus'] as bool? ?? false,
@@ -1379,8 +1410,13 @@ class CloudSaveData {
       showYourPrediction: map['showYourPrediction'] as bool? ?? false,
       showNextMove: map['showNextMove'] as bool? ?? false,
       showSuggestion: map['showSuggestion'] as bool? ?? false,
-      removeAdsEnabled:
-          map['removeAdsEnabled'] as bool? ?? (map['unlockedAds'] as bool? ?? false),
+      removeAdsEnabled: (map['removeAdsEnabled'] as bool?) ??
+          (map['isRemoveAdsEnabled'] as bool?) ??
+          ((map['unlockedAds'] as bool?) ??
+              (map['isRemoveAdsOwned'] as bool?) ??
+              false),
+      hasExplicitRemoveAdsEnabled: map.containsKey('removeAdsEnabled') ||
+          map.containsKey('isRemoveAdsEnabled'),
       showCrystalBall: map['showCrystalBall'] as bool? ?? false,
       showCrystalBallPlus: map['showCrystalBallPlus'] as bool? ?? false,
       crystalBallPlusSavedState:
@@ -1842,6 +1878,7 @@ class PlayGamesService extends ChangeNotifier {
         await storage.clearGameplayProgress(
           includeSettings: true,
           includeCastleMeta: true,
+          preserveRemoveAds: false,
         );
         onCloudDataRestored?.call();
         await loadAndResolveCloudSave(isAccountSwitch: true);
@@ -1892,9 +1929,10 @@ class PlayGamesService extends ChangeNotifier {
               _playerName = fetchedName.trim();
             }
             await storage.clearGameplayProgress(
-          includeSettings: true,
-          includeCastleMeta: true,
-        );
+              includeSettings: true,
+              includeCastleMeta: true,
+              preserveRemoveAds: false,
+            );
             onCloudDataRestored?.call();
           }
         }
@@ -1923,6 +1961,12 @@ class PlayGamesService extends ChangeNotifier {
         if (cloudData != null) {
           if (cloudData.hasClaimedQaBonus && !storage.hasClaimedQaBonus) {
             await storage.setHasClaimedQaBonus(true);
+          }
+          if (cloudData.unlockedAds && !storage.unlockedAds) {
+            await storage.setUnlockedAds(true);
+            if (!storage.hasRemoveAdsEnabledPreference) {
+              await storage.setRemoveAdsEnabled(cloudData.removeAdsEnabled);
+            }
           }
           await cloudData.mergeLifetimeChroniclesIntoStorage(storage);
           onCloudDataRestored?.call();

@@ -709,6 +709,8 @@ class GameController extends ChangeNotifier {
 
   /// True when the Remove Ads shop upgrade (`unlock_remove_ads` / `unlockedAds`) is owned.
   bool get unlockedRemoveAds => unlockedAds;
+  bool get isRemoveAdsOwned => unlockedAds;
+  bool get isRemoveAdsEnabled => removeAdsEnabled;
 
   /// True when Remove Ads is both owned (`unlockedAds`) and actively enabled (`removeAdsEnabled`).
   bool get isRemoveAdsActive => unlockedAds && removeAdsEnabled;
@@ -721,8 +723,9 @@ class GameController extends ChangeNotifier {
       adService.isRewardedAdReady && !isRewardedAdOnCooldown;
 
   /// True when a Rewarded Video ad is preloaded and ready for death revival
-  /// (unaffected by the +50 Orbs anti-spam cooldown).
-  bool get isReviveAdReady => adService.isRewardedAdReady;
+  /// (unaffected by the +50 Orbs anti-spam cooldown, and muted when Vow of Silence is ON).
+  bool get isReviveAdReady =>
+      !isRemoveAdsActive && adService.isRewardedAdReady;
 
   /// True when advancing +1 Week from the current campaign week exceeds [maxCampaignWeeks] (40)
   /// and enters [siegeInvasionWeek] (Week 41).
@@ -1451,7 +1454,11 @@ class GameController extends ChangeNotifier {
     final seen = <ShopUpgradeArtifact>{};
     for (final id in relicChamberStoredUpgrades) {
       final artifact = ShopUpgradeArtifact.fromId(id);
-      if (artifact == null || !seen.add(artifact)) continue;
+      if (artifact == null ||
+          artifact == ShopUpgradeArtifact.removeAds ||
+          !seen.add(artifact)) {
+        continue;
+      }
       if (artifact == ShopUpgradeArtifact.overchargedStaff) {
         if (storedRelicOverchargedStaffLevel > overchargedStaffLevel) {
           result.add(artifact);
@@ -2634,9 +2641,19 @@ class GameController extends ChangeNotifier {
       NarrativeEnding.kingdomFall.id,
     }.toList();
 
+    final preservedRemoveAdsOwned = unlockedAds || storage.unlockedAds;
+    final preservedRemoveAdsEnabled = preservedRemoveAdsOwned
+        ? (storage.hasRemoveAdsEnabledPreference
+              ? storage.removeAdsEnabled
+              : removeAdsEnabled)
+        : false;
+    final preservedHasExplicitRemoveAdsToggle =
+        preservedRemoveAdsOwned || storage.hasRemoveAdsEnabledPreference;
+
     await storage.clearGameplayProgress(
       includeSettings: false,
       includeCastleMeta: false,
+      preserveRemoveAds: true,
     );
     await storage.clearBattleDecreeProgress();
     await storage.setAllSpoilsOrbs(
@@ -2665,6 +2682,12 @@ class GameController extends ChangeNotifier {
     await storage.setCurrentWeek(0);
     if (preservedHasSeenIntro) {
       await storage.setHasSeenStoryIntro(true);
+    }
+    if (preservedRemoveAdsOwned) {
+      await storage.setUnlockedAds(true);
+      if (preservedHasExplicitRemoveAdsToggle) {
+        await storage.setRemoveAdsEnabled(preservedRemoveAdsEnabled);
+      }
     }
 
     turnCount = 0;
@@ -2695,6 +2718,7 @@ class GameController extends ChangeNotifier {
   List<String> _collectLostRelicIds(Set<String> verifiedPaidIds) {
     final lostUpgrades = <String>[];
     for (final artifact in ShopUpgradeArtifact.values) {
+      if (artifact == ShopUpgradeArtifact.removeAds) continue;
       if (!isUpgradeArtifactUnlocked(artifact)) continue;
       final productId = _productIdForArtifact(artifact);
       if (productId != null && verifiedPaidIds.contains(productId)) {
@@ -2719,7 +2743,7 @@ class GameController extends ChangeNotifier {
     int maxStaffLevel = 0;
     for (final raw in [...existing, ...incoming]) {
       final clean = raw.trim();
-      if (clean.isEmpty) continue;
+      if (clean.isEmpty || clean == ShopUpgradeArtifact.removeAds.id) continue;
       final staffLvl = ShopUpgradeArtifact.parseOverchargedStaffLevel(clean);
       if (staffLvl != null) {
         if (staffLvl > maxStaffLevel) maxStaffLevel = staffLvl;
@@ -2738,8 +2762,9 @@ class GameController extends ChangeNotifier {
   /// HP/Mana stat levels into the Hall of Heroes (never lowering a previously
   /// achieved peak), then resets the campaign back to Week 0 / Turn 0 while
   /// preserving global account data (unlocked story cutscenes, Library endings
-  /// & bestiary, Hall of Heroes records, Royal Treasury, verified real-money
-  /// IAPs such as Remove Ads, and UI settings) and syncing with Cloud Save.
+  /// & bestiary, Hall of Heroes records, Royal Treasury, Vow of Silence /
+  /// Remove Ads ownership & toggle state, verified real-money IAPs, and UI
+  /// settings) and syncing with Cloud Save.
   Future<void> resetAllProgress() async {
     _giftTimer?.cancel();
     _giftTimer = null;
@@ -2754,6 +2779,14 @@ class GameController extends ChangeNotifier {
       ...storage.purchasedIapProductIds,
       ...billingService.verifiedPurchasedProductIds,
     };
+    final preservedRemoveAdsOwned = unlockedAds || storage.unlockedAds;
+    final preservedRemoveAdsEnabled = preservedRemoveAdsOwned
+        ? (storage.hasRemoveAdsEnabledPreference
+              ? storage.removeAdsEnabled
+              : removeAdsEnabled)
+        : false;
+    final preservedHasExplicitRemoveAdsToggle =
+        preservedRemoveAdsOwned || storage.hasRemoveAdsEnabledPreference;
 
     // 1. Archive active Elemental Orbs into Spoils of War (Double-Reset Guard)
     final hasActiveOrbs = totalOrbs > 0;
@@ -2763,7 +2796,7 @@ class GameController extends ChangeNotifier {
     final updatedSpoilsEarth = spoilsEarthOrbs + earthOrbs;
     final updatedSpoilsMetal = spoilsMetalOrbs + metalOrbs;
 
-    // 2. Archive owned shop artifacts & power-ups into Relic Chamber (excluding paid IAPs)
+    // 2. Archive owned shop artifacts & power-ups into Relic Chamber (excluding paid IAPs & Remove Ads)
     //    (Double-Reset Guard: only update if active run has owned artifacts)
     final lostUpgrades = _collectLostRelicIds(verifiedPaidIds);
     final nextRelicUpgrades = lostUpgrades.isNotEmpty
@@ -2780,6 +2813,7 @@ class GameController extends ChangeNotifier {
       includeSettings: false,
       includeCastleMeta: false,
       preserveStoryFlags: true,
+      preserveRemoveAds: true,
     );
     await storage.clearBattleDecreeProgress();
 
@@ -2802,6 +2836,12 @@ class GameController extends ChangeNotifier {
     await storage.setForfeitRunCount(nextForfeitRuns);
     await storage.setPurchasedIapProductIds(verifiedPaidIds);
     await storage.setCurrentWeek(0);
+    if (preservedRemoveAdsOwned) {
+      await storage.setUnlockedAds(true);
+      if (preservedHasExplicitRemoveAdsToggle) {
+        await storage.setRemoveAdsEnabled(preservedRemoveAdsEnabled);
+      }
+    }
 
     turnCount = 0;
     lastCollectedOrbMove = null;
@@ -3226,6 +3266,10 @@ class GameController extends ChangeNotifier {
   }
 
   bool unlockAds() {
+    if (unlockedAds) {
+      audio.playVibrate();
+      return false;
+    }
     return purchaseWithOrbs(
       cost: costRemoveAds,
       onUnlock: () {
@@ -3233,7 +3277,7 @@ class GameController extends ChangeNotifier {
         removeAdsEnabled = true;
         storage.setUnlockedAds(true);
         storage.setRemoveAdsEnabled(true);
-        adService.setAdsRemoved(true);
+        adService.setAdsRemoved(isRemoveAdsActive);
       },
     );
   }
@@ -3460,11 +3504,14 @@ class GameController extends ChangeNotifier {
         }
         break;
       case BillingService.productRemoveAds:
+        final wasPreviouslyOwned = unlockedAds || storage.unlockedAds;
         unlockedAds = true;
-        removeAdsEnabled = true;
         storage.setUnlockedAds(true);
-        storage.setRemoveAdsEnabled(true);
-        adService.setAdsRemoved(true);
+        if (!wasPreviouslyOwned) {
+          removeAdsEnabled = true;
+          storage.setRemoveAdsEnabled(true);
+        }
+        adService.setAdsRemoved(isRemoveAdsActive);
         break;
       case BillingService.productCrystalBall:
         if (!unlockedCrystalBall) {

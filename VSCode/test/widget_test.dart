@@ -2192,12 +2192,18 @@ void main() {
     await tester.pumpAndSettle();
 
     final balanceBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
+    final vowCardFinder = find.byKey(const ValueKey('vow_of_silence_card'));
     final adCardFinder = find.byKey(const ValueKey('shop_rewarded_ad_card'));
+    expect(vowCardFinder, findsOneWidget);
     expect(adCardFinder, findsOneWidget);
     final initialAdRect = tester.getRect(adCardFinder);
     expect(
       initialAdRect.top,
       greaterThan(tester.getRect(balanceBarFinder).bottom),
+    );
+    expect(
+      initialAdRect.top,
+      greaterThan(tester.getRect(vowCardFinder).bottom),
     );
 
     // Unlock Remove Ads while inside ShopDialog -> card smoothly collapses and hides
@@ -2205,11 +2211,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(adCardFinder, findsNothing);
 
-    // Toggle Remove Ads OFF -> card expands back into Prayer Room top position
+    // Toggle Remove Ads OFF -> card expands back directly beneath the owned Vow of Silence card
     controller.toggleRemoveAds(false);
     await tester.pumpAndSettle();
     expect(adCardFinder, findsOneWidget);
-    expect(tester.getRect(adCardFinder), equals(initialAdRect));
+    final reexpandedRect = tester.getRect(adCardFinder);
+    expect(reexpandedRect.size, equals(initialAdRect.size));
+    expect(
+      reexpandedRect.top,
+      greaterThan(tester.getRect(vowCardFinder).bottom),
+    );
+
+    // Subsequent ON -> OFF toggle preserves exact card position
+    controller.toggleRemoveAds(true);
+    await tester.pumpAndSettle();
+    expect(adCardFinder, findsNothing);
+    controller.toggleRemoveAds(false);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(adCardFinder), equals(reexpandedRect));
   });
 
   testWidgets('7-tap QA shortcut on Backpack icon grants +100,000 of each Elemental Orb in UI', (WidgetTester tester) async {

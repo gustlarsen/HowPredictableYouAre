@@ -123,7 +123,10 @@ class _ShopDialogState extends State<ShopDialog> {
       case BillingService.productSuggestion:
         return loc.t('string43', fallback: 'Optimal Suggestion');
       case BillingService.productRemoveAds:
-        return loc.t('string44', fallback: 'Remove Ads');
+        return loc.t(
+          'vow_of_silence_title',
+          fallback: 'Vow of Silence — Remove Ads',
+        );
       case BillingService.productCrystalBall:
         return loc.t('string80', fallback: 'Crystal Ball');
       case BillingService.productConsumableSmall:
@@ -1417,37 +1420,6 @@ class _ShopDialogState extends State<ShopDialog> {
         ),
         _buildShopItem(
           context: context,
-          title: loc.t('string44', fallback: 'Remove Ads'),
-          subtitle: loc.t(
-            'remove_ads_desc',
-            fallback:
-                'Removes all banner and video ad prompts across the entire app',
-          ),
-          cost: GameController.costRemoveAds,
-          productId: BillingService.productRemoveAds,
-          isUnlocked: controller.unlockedAds,
-          isActive: controller.isRemoveAdsActive,
-          enabledLabel: 'Ads Removed',
-          disabledLabel: 'Not Active',
-          onUnlock: () {
-            final ok = controller.unlockAds();
-            _handleUnlock(
-              context,
-              loc.t('string44', fallback: 'Remove Ads'),
-              ok,
-            );
-          },
-          onToggle: (val) {
-            controller.toggleRemoveAds(val);
-            _handleToggle(
-              context,
-              loc.t('string44', fallback: 'Remove Ads'),
-              val,
-            );
-          },
-        ),
-        _buildShopItem(
-          context: context,
           title: loc.t('new_skin', fallback: 'New Skin'),
           subtitle: loc.t(
             'new_skin_desc',
@@ -1593,6 +1565,54 @@ class _ShopDialogState extends State<ShopDialog> {
               );
             },
           ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 4),
+          child: InkWell(
+            key: const ValueKey('offerings_remove_ads_prayer_hint'),
+            borderRadius: BorderRadius.circular(10),
+            onTap: () {
+              controller.audio.playTapVibrate();
+              setState(() => _selectedWing = TempleWing.prayer);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: palette.rewardedAdCardSurface.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.30 : 0.45,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  VowOfSilenceIcon(
+                    size: 20,
+                    isActive: controller.isRemoveAdsActive,
+                  ),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      loc.t(
+                        'temple_offerings_vow_hint',
+                        fallback:
+                            'Looking for Remove Ads? Visit the Prayer Room →',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: palette.amberText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -2319,7 +2339,11 @@ class _ShopDialogState extends State<ShopDialog> {
         ),
         const SizedBox(height: 6),
 
-        // Meditation for Free Orbs (Watch Ad +50 Orbs), hidden when Remove Ads is active
+        // Pinned at the very top of Prayer Room so toggling never shifts its vertical position
+        _buildVowOfSilenceCard(context, palette, loc),
+        const SizedBox(height: 8),
+
+        // Meditation for Free Orbs (Watch Ad +50 Orbs), smoothly collapses when Vow of Silence is ON
         AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
@@ -2456,6 +2480,377 @@ class _ShopDialogState extends State<ShopDialog> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildVowOfSilenceCard(
+    BuildContext context,
+    AppPalette palette,
+    LocalizationService loc,
+  ) {
+    final isOwned = controller.isRemoveAdsOwned;
+    final isSilenceOn = controller.isRemoveAdsActive;
+    final billing = controller.billingService;
+    const productId = BillingService.productRemoveAds;
+    final localizedPrice = billing.getLocalizedPrice(productId);
+    final hasRealMoneyPrice =
+        localizedPrice != null && localizedPrice.trim().isNotEmpty;
+    final isPending = billing.isPurchasePending(productId);
+    final isLoadingStore = billing.isLoadingProducts;
+    final title = loc.t(
+      'vow_of_silence_title',
+      fallback: 'Vow of Silence — Remove Ads',
+    );
+    final activeColor = palette.successIcon;
+    final inactiveColor = palette.isDark ? Colors.grey : palette.mutedText;
+
+    void handleOrbUnlock() {
+      final ok = controller.unlockAds();
+      _handleUnlock(context, title, ok);
+    }
+
+    void handleToggle(bool val) {
+      controller.toggleRemoveAds(val);
+      _handleToggle(context, title, val);
+    }
+
+    return Container(
+      key: const ValueKey('vow_of_silence_card'),
+      decoration: BoxDecoration(
+        color: palette.isDark
+            ? const Color(0xFF1E222B)
+            : palette.shopTileSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isOwned && isSilenceOn
+              ? activeColor.withValues(alpha: palette.isDark ? 0.55 : 0.65)
+              : palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.35 : 0.55,
+                ),
+          width: isOwned && isSilenceOn ? 1.3 : 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: isOwned ? () => handleToggle(!isSilenceOn) : handleOrbUnlock,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: isOwned
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isSilenceOn
+                              ? activeColor.withValues(
+                                  alpha: palette.isDark ? 0.16 : 0.12,
+                                )
+                              : palette.amberBorder.withValues(
+                                  alpha: palette.isDark ? 0.12 : 0.14,
+                                ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSilenceOn
+                                ? activeColor.withValues(alpha: 0.45)
+                                : palette.amberBorder.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: VowOfSilenceIcon(
+                          size: 28,
+                          isActive: isSilenceOn,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                                Container(
+                                  key: const ValueKey(
+                                    'vow_of_silence_permanent_badge',
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _goldFill.withValues(
+                                      alpha: palette.isDark ? 0.22 : 0.32,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _goldFill.withValues(alpha: 0.75),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    loc.t(
+                                      'vow_of_silence_permanent_badge',
+                                      fallback: 'Permanent',
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: palette.isDark
+                                          ? _goldFill
+                                          : const Color(0xFF6B4700),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 1.5),
+                                  child: Icon(
+                                    isSilenceOn
+                                        ? Icons.check_circle
+                                        : Icons.pause_circle_outline_rounded,
+                                    size: 13,
+                                    color: isSilenceOn
+                                        ? activeColor
+                                        : inactiveColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    isSilenceOn
+                                        ? loc.t(
+                                            'vow_of_silence_status_on',
+                                            fallback:
+                                                'Sanctuary in Silence — All ad prompts muted',
+                                          )
+                                        : loc.t(
+                                            'vow_of_silence_status_off',
+                                            fallback:
+                                                'Silence Paused — Ad prompts active',
+                                          ),
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSilenceOn
+                                          ? activeColor
+                                          : inactiveColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Switch(
+                        key: const ValueKey('vow_of_silence_switch'),
+                        value: isSilenceOn,
+                        onChanged: handleToggle,
+                        activeTrackColor: activeColor,
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: palette.amberBorder.withValues(
+                                alpha: palette.isDark ? 0.14 : 0.16,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: palette.amberBorder.withValues(
+                                  alpha: 0.40,
+                                ),
+                              ),
+                            ),
+                            child: const VowOfSilenceIcon(
+                              size: 28,
+                              isActive: false,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  loc.t(
+                                    'vow_of_silence_locked_desc',
+                                    fallback:
+                                        'Permanently silences all banner and video ad prompts across the entire app. Never resets across journeys.',
+                                  ),
+                                  softWrap: true,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: palette.amberSubtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            loc.t(
+                              'overcharged_staff_unlock_action',
+                              fallback: 'Unlock',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: palette.isDark
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                              color: palette.isDark
+                                  ? Colors.grey
+                                  : palette.secondaryText,
+                            ),
+                          ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                key: const ValueKey(
+                                  'diamond_unlock_${BillingService.productRemoveAds}',
+                                ),
+                                onPressed:
+                                    isPending ? null : handleOrbUnlock,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: palette.isDark
+                                      ? null
+                                      : palette.dialogSurface,
+                                  elevation: palette.isDark ? null : 1,
+                                  side: palette.isDark
+                                      ? null
+                                      : BorderSide(
+                                          color: palette.sandCardBorder,
+                                        ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  minimumSize: const Size(52, 30),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: _ElementalCostPillRow(
+                                  entries: GameController
+                                      .costRemoveAds.nonZeroEntries,
+                                  palette: palette,
+                                ),
+                              ),
+                              OutlinedButton(
+                                key: const ValueKey(
+                                  'real_money_unlock_${BillingService.productRemoveAds}',
+                                ),
+                                onPressed: (!isPending &&
+                                        !isLoadingStore &&
+                                        hasRealMoneyPrice)
+                                    ? () => controller.buyWithRealMoney(
+                                          productId,
+                                        )
+                                    : null,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: palette.isDark
+                                      ? null
+                                      : palette.primaryText,
+                                  disabledForegroundColor: palette.isDark
+                                      ? null
+                                      : palette.mutedText,
+                                  backgroundColor: palette.isDark
+                                      ? null
+                                      : palette.dialogSurface,
+                                  side: palette.isDark
+                                      ? null
+                                      : BorderSide(
+                                          color: palette.amberBorder
+                                              .withValues(alpha: 0.65),
+                                        ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  minimumSize: const Size(52, 30),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: (isPending || isLoadingStore)
+                                    ? const SizedBox(
+                                        key: ValueKey(
+                                          'purchase_loading_indicator',
+                                        ),
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        hasRealMoneyPrice
+                                            ? localizedPrice
+                                            : loc.t(
+                                                'temple_price_unavailable',
+                                                fallback: 'Unavailable',
+                                              ),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
     );
   }
 

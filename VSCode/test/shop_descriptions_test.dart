@@ -11,7 +11,7 @@ import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const expectedEnDescriptions = <String, String>{
+  const expectedEnOfferingsDescriptions = <String, String>{
     'predictability_score_desc':
         'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
     'reset_button_desc':
@@ -30,8 +30,6 @@ void main() {
         'Unlocks a periodic 🎁 gift chest on the top bar granting +5 Fire, Water & Wood orbs',
     'suggestion_desc':
         "Recommends the optimal counter-move(s) to beat the AI's next play",
-    'remove_ads_desc':
-        'Removes all banner and video ad prompts across the entire app',
     'new_skin_desc': 'Hands Theme (Rock, Paper, Scissors)',
     'crystal_ball_desc':
         'Reveals the exact next move the AI will play before you choose',
@@ -39,8 +37,13 @@ void main() {
         'Upgrades Crystal Ball to guarantee 100% foresight on every single round',
   };
 
+  const expectedEnPrayerDescriptions = <String, String>{
+    'vow_of_silence_locked_desc':
+        'Permanently silences all banner and video ad prompts across the entire app. Never resets across journeys.',
+  };
+
   testWidgets(
-    'All 13 ShopDialog items display warm amber/gold descriptive subtitles in locked and unlocked states across en, pt, es, and de without mid-word breaks',
+    'All Sacred Temple Offerings & Vow of Silence items display warm amber/gold descriptive subtitles across en, pt, es, and de without mid-word breaks',
     (WidgetTester tester) async {
       tester.view.physicalSize = const Size(360, 740);
       tester.view.devicePixelRatio = 1.0;
@@ -71,17 +74,25 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      // 1. Verify all 13 keys exist and are non-empty translations in all 4 languages
+      // 1. Verify all keys exist and are non-empty translations in all 4 languages
+      final allExpectedEn = {
+        ...expectedEnOfferingsDescriptions,
+        ...expectedEnPrayerDescriptions,
+      };
       for (final lang in LocalizationService.supportedLanguages) {
         localization.setLanguage(lang);
-        for (final key in expectedEnDescriptions.keys) {
+        for (final key in allExpectedEn.keys) {
           final translated = localization.t(key);
           expect(translated, isNotEmpty, reason: 'Missing $lang $key');
-          expect(translated, isNot(key), reason: 'Fallback key returned for $lang $key');
+          expect(
+            translated,
+            isNot(key),
+            reason: 'Fallback key returned for $lang $key',
+          );
           if (lang != 'en') {
             expect(
               translated,
-              isNot(expectedEnDescriptions[key]),
+              isNot(allExpectedEn[key]),
               reason: 'Untranslated $lang $key',
             );
           }
@@ -99,22 +110,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final scrollableFinder = find.descendant(
-        of: find.byType(Dialog),
-        matching: find.byType(Scrollable),
-      );
-
-      // Helper to verify every shop subtitle in the current language renders,
-      // uses amber/gold color + softWrap, and never splits a token mid-word.
-      Future<void> verifyAllSubtitlesForLanguage(String lang) async {
-        controller.setLanguage(lang);
-        await tester.pumpAndSettle();
-
-        // Reset scroll to top before scanning downward
+      Future<void> verifyTextSubtitles(
+        String lang,
+        Iterable<String> keys,
+      ) async {
+        final scrollableFinder = find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
+        );
         tester.state<ScrollableState>(scrollableFinder).position.jumpTo(0);
         await tester.pumpAndSettle();
 
-        for (final key in expectedEnDescriptions.keys) {
+        for (final key in keys) {
           final expectedText = localization.t(key);
           final textFinder = find.text(expectedText);
 
@@ -148,7 +155,10 @@ void main() {
             expect(start, greaterThanOrEqualTo(0));
             searchOffset = start + segment.length;
             final boxes = paragraph.getBoxesForSelection(
-              TextSelection(baseOffset: start, extentOffset: start + segment.length),
+              TextSelection(
+                baseOffset: start,
+                extentOffset: start + segment.length,
+              ),
             );
             final lineTops = boxes.map((b) => b.top.round()).toSet();
             expect(
@@ -162,18 +172,34 @@ void main() {
       }
 
       // Check English exact strings and layout
-      for (final entry in expectedEnDescriptions.entries) {
+      for (final entry in allExpectedEn.entries) {
         expect(localization.t(entry.key), entry.value);
       }
 
       for (final lang in LocalizationService.supportedLanguages) {
-        await verifyAllSubtitlesForLanguage(lang);
+        controller.setLanguage(lang);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+        await tester.pumpAndSettle();
+        await verifyTextSubtitles(lang, expectedEnOfferingsDescriptions.keys);
+
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
+        await verifyTextSubtitles(lang, expectedEnPrayerDescriptions.keys);
       }
 
       // 2. Also verify Crystal Ball (which is unlocked above) displays its subtitle in unlocked state
       controller.setLanguage('en');
       await tester.pumpAndSettle();
-      final cbFinder = find.text(expectedEnDescriptions['crystal_ball_desc']!);
+      await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+      await tester.pumpAndSettle();
+      final scrollableFinder = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(Scrollable),
+      );
+      final cbFinder = find.text(
+        expectedEnOfferingsDescriptions['crystal_ball_desc']!,
+      );
       await tester.scrollUntilVisible(cbFinder, 180, scrollable: scrollableFinder);
       await tester.pumpAndSettle();
       expect(cbFinder, findsOneWidget);

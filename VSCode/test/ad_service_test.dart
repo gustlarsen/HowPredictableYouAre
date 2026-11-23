@@ -661,6 +661,8 @@ void main() {
         );
 
         // Tap the Shop rewarded ad button -> grants +50 Fire/Water/Wood in Phase 1 and enters 2m cooldown
+        await tester.ensureVisible(shopAdBtnFinder);
+        await tester.pumpAndSettle();
         await tester.tap(shopAdBtnFinder);
         await tester.pump();
 

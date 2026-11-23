@@ -483,10 +483,15 @@ class StorageService {
     await _prefs.setBool('unlock_remove_ads', val);
   }
 
+  bool get hasRemoveAdsEnabledPreference =>
+      _prefs.containsKey('removeAdsEnabled');
+
   bool get removeAdsEnabled =>
       _prefs.getBool('removeAdsEnabled') ?? unlockedAds;
   Future<void> setRemoveAdsEnabled(bool val) =>
       _prefs.setBool('removeAdsEnabled', val);
+  Future<void> clearRemoveAdsEnabledPreference() =>
+      _prefs.remove('removeAdsEnabled');
 
   bool get unlockedNewSkin => _prefs.getBool('unlockedNewSkin') ?? false;
   Future<void> setUnlockedNewSkin(bool val) =>
@@ -1100,7 +1105,9 @@ class StorageService {
     bool includeSettings = false,
     bool includeCastleMeta = false,
     bool preserveStoryFlags = false,
+    bool? preserveRemoveAds,
   }) {
+    final shouldPreserveRemoveAds = preserveRemoveAds ?? !includeCastleMeta;
     return Future.wait([
       if (includeSettings) resetSettingsToDefault(),
       if (includeCastleMeta) clearAllCastleData(),
@@ -1131,8 +1138,10 @@ class StorageService {
       setUnlockedYourPrediction(false),
       setUnlockedNextMove(false),
       setUnlockedSuggestion(false),
-      setUnlockedAds(false),
-      setRemoveAdsEnabled(false),
+      if (!shouldPreserveRemoveAds) ...[
+        setUnlockedAds(false),
+        clearRemoveAdsEnabledPreference(),
+      ],
       setUnlockedNewSkin(false),
       setUnlockedCrystalBall(false),
       setUnlockedCrystalBallPlus(false),

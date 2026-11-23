@@ -13,6 +13,7 @@ import 'package:how_predictable/services/ad_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/billing_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
+import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
@@ -94,6 +95,7 @@ class _TempleBillingClient implements InAppPurchaseClient {
 
   _TempleBillingClient({
     this.available = true,
+    this.restoredProductIds = const [],
     Map<String, String>? prices,
   }) : prices = prices ??
             {
@@ -150,9 +152,29 @@ class _TempleBillingClient implements InAppPurchaseClient {
     );
   }
 
+  final List<String> restoredProductIds;
+
   @override
-  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async =>
-      true;
+  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async {
+    emitPurchase(purchaseParam.productDetails.id, PurchaseStatus.purchased);
+    return true;
+  }
+
+  void emitPurchase(String productId, PurchaseStatus status) {
+    _purchaseController.add([
+      PurchaseDetails(
+        purchaseID: 'temple_order_${DateTime.now().microsecondsSinceEpoch}',
+        productID: productId,
+        verificationData: PurchaseVerificationData(
+          localVerificationData: 'local_$productId',
+          serverVerificationData: 'server_$productId',
+          source: 'google_play',
+        ),
+        transactionDate: DateTime.now().millisecondsSinceEpoch.toString(),
+        status: status,
+      )..pendingCompletePurchase = true,
+    ]);
+  }
 
   @override
   Future<bool> buyConsumable({
@@ -185,22 +207,73 @@ class _TempleBillingClient implements InAppPurchaseClient {
   }
 
   @override
-  Future<void> restorePurchases({String? applicationUserName}) async {}
+  Future<void> restorePurchases({String? applicationUserName}) async {
+    for (final id in restoredProductIds) {
+      emitPurchase(id, PurchaseStatus.restored);
+    }
+  }
 
   void dispose() {
     _purchaseController.close();
   }
 }
 
+class _TemplePlayGamesClient implements PlayGamesClient {
+  String mockPlayerId;
+  final String mockPlayerName = 'TempleHero';
+  final Map<String, String?> _saves = {};
+  int saveCount = 0;
+
+  _TemplePlayGamesClient({
+    this.mockPlayerId = 'temple_player_1',
+    String? initialPayload,
+  }) {
+    if (initialPayload != null) {
+      _saves[mockPlayerId] = initialPayload;
+    }
+  }
+
+  String? get savedPayload => _saves[mockPlayerId];
+  void setCloudSave(String playerId, String? payload) {
+    _saves[playerId] = payload;
+  }
+
+  @override
+  Future<String?> signIn() async => 'success';
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => mockPlayerId;
+
+  @override
+  Future<String?> saveGame({
+    required String data,
+    required String name,
+  }) async {
+    saveCount++;
+    _saves[mockPlayerId] = data;
+    return 'success';
+  }
+
+  @override
+  Future<String?> loadGame({required String name}) async =>
+      _saves[mockPlayerId];
+}
+
 Future<({
   GameController controller,
   _TempleAdMobClient adClient,
   _TempleBillingClient billingClient,
+  StorageService storage,
 })> _createTempleHarness({
   Map<String, Object> prefs = const {},
   bool storeAvailable = true,
   bool shouldEarnRewardOnShow = true,
   String language = 'en',
+  List<String> restoredProductIds = const [],
+  PlayGamesClient? playGamesClient,
 }) async {
   SharedPreferences.setMockInitialValues({
     'has_seen_story_intro': true,
@@ -220,11 +293,22 @@ Future<({
     shouldEarnRewardOnShow: shouldEarnRewardOnShow,
   );
   final adService = AdService(client: adClient);
-  await adService.initialize();
+  await adService.initialize(
+    adsRemoved: storage.unlockedAds && storage.removeAdsEnabled,
+  );
 
-  final billingClient = _TempleBillingClient(available: storeAvailable);
+  final billingClient = _TempleBillingClient(
+    available: storeAvailable,
+    restoredProductIds: restoredProductIds,
+  );
   final billingService = BillingService(client: billingClient);
   await billingService.initialize();
+
+  PlayGamesService? playGames;
+  if (playGamesClient != null) {
+    playGames = PlayGamesService(storage: storage, client: playGamesClient);
+    await playGames.signIn();
+  }
 
   final controller = GameController(
     storage: storage,
@@ -232,11 +316,13 @@ Future<({
     audio: AudioService(),
     adService: adService,
     billingService: billingService,
+    playGames: playGames,
   );
   return (
     controller: controller,
     adClient: adClient,
     billingClient: billingClient,
+    storage: storage,
   );
 }
 
@@ -741,11 +827,17 @@ void main() {
           find.byKey(const ValueKey('shop_rewarded_ad_card')),
           findsOneWidget,
         );
-        expect(find.text('Pray (Free)'), findsNWidgets(2));
         final prayerScrollable = find.descendant(
           of: find.byType(SacredTempleDialog),
           matching: find.byType(Scrollable),
         );
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('temple_blessing_card_clairvoyance')),
+          120,
+          scrollable: prayerScrollable,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Pray (Free)'), findsWidgets);
         final harvestCard = find.byKey(
           const ValueKey('temple_blessing_card_harvest'),
         );
@@ -923,6 +1015,9 @@ void main() {
           const ElementalCrystalIcon(size: 22),
           const MeditationHaloIcon(size: 24),
           const SacredBlessingIcon(size: 24),
+          const VowOfSilenceIcon(size: 28, isActive: true),
+          const VowOfSilenceIcon(size: 28, isActive: false),
+          const VowOfSilenceIcon(size: 28, isActive: true, isOnGoldBackground: true),
         ];
         for (final icon in allPainters) {
           await tester.pumpWidget(
@@ -1056,7 +1151,21 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.widget<AdorationHarpIcon>(harpFinder).isOnGoldBackground, isFalse);
           expect(tester.widget<PrayerHandsIcon>(handsFinder).isOnGoldBackground, isTrue);
+          expect(find.byType(VowOfSilenceIcon), findsOneWidget);
+          expect(
+            tester.widget<VowOfSilenceIcon>(find.byType(VowOfSilenceIcon)).isActive,
+            isFalse,
+          );
           expect(find.byType(MeditationHaloIcon), findsOneWidget);
+          await tester.scrollUntilVisible(
+            find.byType(SacredBlessingIcon),
+            120,
+            scrollable: find.descendant(
+              of: find.byType(SacredTempleDialog),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.pumpAndSettle();
           expect(find.byType(SacredBlessingIcon), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
@@ -1142,6 +1251,495 @@ void main() {
           ),
           findsOneWidget,
         );
+      },
+    );
+
+    testWidgets(
+      'Vow of Silence is absent from Offerings, pinned at top of Prayer Room with VowOfSilenceIcon, and Offerings hint switches to Prayer across locales',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        for (final locale in ['en', 'pt', 'es', 'de']) {
+          final harness = await _createTempleHarness(language: locale);
+          final controller = harness.controller;
+          addTearDown(() {
+            controller.dispose();
+            harness.billingClient.dispose();
+          });
+
+          await tester.pumpWidget(
+            ChangeNotifierProvider.value(
+              value: controller,
+              child: MaterialApp(
+                theme: ThemeData.dark(useMaterial3: true),
+                home: Scaffold(
+                  body: SacredTempleDialog(
+                    key: ValueKey('vow_redirect_$locale'),
+                    controller: controller,
+                    initialWing: TempleWing.offerings,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          // 1. Offerings tab has no Vow of Silence / Remove Ads card
+          expect(
+            find.byKey(const ValueKey('vow_of_silence_card')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('diamond_unlock_unlock_remove_ads')),
+            findsNothing,
+          );
+
+          // 2. Scroll to Offerings footer hint & verify localized text
+          final hintFinder = find.byKey(
+            const ValueKey('offerings_remove_ads_prayer_hint'),
+          );
+          final scrollable = find.descendant(
+            of: find.byType(SacredTempleDialog),
+            matching: find.byType(Scrollable),
+          );
+          await tester.scrollUntilVisible(
+            hintFinder,
+            240,
+            scrollable: scrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(hintFinder, findsOneWidget);
+          final expectedHint =
+              controller.localization.t('temple_offerings_vow_hint');
+          expect(expectedHint, isNotEmpty);
+          expect(find.text(expectedHint), findsOneWidget);
+          if (locale == 'en') {
+            expect(
+              expectedHint,
+              'Looking for Remove Ads? Visit the Prayer Room →',
+            );
+          }
+
+          // 3. Tapping hint switches active wing directly to Prayer with Vow of Silence pinned at top
+          await tester.tap(hintFinder);
+          await tester.pumpAndSettle();
+
+          expect(
+            find.byKey(const ValueKey('temple_wing_prayer')),
+            findsOneWidget,
+          );
+          final vowCardFinder = find.byKey(const ValueKey('vow_of_silence_card'));
+          final rewardedCardFinder =
+              find.byKey(const ValueKey('shop_rewarded_ad_card'));
+          expect(vowCardFinder, findsOneWidget);
+          expect(rewardedCardFinder, findsOneWidget);
+          expect(
+            find.descendant(
+              of: vowCardFinder,
+              matching: find.byType(VowOfSilenceIcon),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            tester.getTopLeft(vowCardFinder).dy,
+            lessThan(tester.getTopLeft(rewardedCardFinder).dy),
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'Acquiring Vow of Silence via Orbs or IAP enables silence, stays pinned during switch toggle, smoothly collapses Free Elemental Orbs, and hides/shows GameScreen ad pill',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Acquire via Elemental Orbs
+        final orbHarness = await _createTempleHarness(
+          prefs: {
+            'orbs_fire': 2000,
+            'orbs_water': 2000,
+            'orbs_wood': 2000,
+            'orbs_earth': 1500,
+            'orbs_metal': 1500,
+          },
+        );
+        final orbCtrl = orbHarness.controller;
+        addTearDown(() {
+          orbCtrl.dispose();
+          orbHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: orbCtrl,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  controller: orbCtrl,
+                  initialWing: TempleWing.prayer,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(orbCtrl.isRemoveAdsOwned, isFalse);
+        expect(orbCtrl.isRemoveAdsActive, isFalse);
+        expect(orbCtrl.shouldShowBannerAd, isTrue);
+        expect(find.byKey(const ValueKey('shop_rewarded_ad_card')), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('diamond_unlock_unlock_remove_ads')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(orbCtrl.isRemoveAdsOwned, isTrue);
+        expect(orbCtrl.isRemoveAdsEnabled, isTrue);
+        expect(orbCtrl.isRemoveAdsActive, isTrue);
+        expect(orbCtrl.shouldShowBannerAd, isFalse);
+        expect(orbCtrl.fireOrbs, 0);
+        expect(orbCtrl.metalOrbs, 0);
+        expect(
+          find.byKey(const ValueKey('vow_of_silence_permanent_badge')),
+          findsOneWidget,
+        );
+        expect(find.text('Permanent'), findsOneWidget);
+        expect(
+          find.text('Sanctuary in Silence — All ad prompts muted'),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<VowOfSilenceIcon>(find.byType(VowOfSilenceIcon)).isActive,
+          isTrue,
+        );
+        expect(find.byKey(const ValueKey('shop_rewarded_ad_card')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('shop_rewarded_ad_hidden')),
+          findsOneWidget,
+        );
+
+        // Record card top dy before toggling OFF; toggling must not shift card vertically
+        final vowCardTopWhenOn =
+            tester.getTopLeft(find.byKey(const ValueKey('vow_of_silence_card'))).dy;
+        await tester.tap(find.byKey(const ValueKey('vow_of_silence_switch')));
+        await tester.pumpAndSettle();
+
+        final vowCardTopWhenOff =
+            tester.getTopLeft(find.byKey(const ValueKey('vow_of_silence_card'))).dy;
+        expect(vowCardTopWhenOff, equals(vowCardTopWhenOn));
+        expect(orbCtrl.isRemoveAdsOwned, isTrue);
+        expect(orbCtrl.isRemoveAdsEnabled, isFalse);
+        expect(orbCtrl.isRemoveAdsActive, isFalse);
+        expect(orbCtrl.shouldShowBannerAd, isTrue);
+        expect(find.text('Silence Paused — Ad prompts active'), findsOneWidget);
+        expect(
+          tester.widget<VowOfSilenceIcon>(find.byType(VowOfSilenceIcon)).isActive,
+          isFalse,
+        );
+        expect(find.byKey(const ValueKey('shop_rewarded_ad_card')), findsOneWidget);
+
+        // 2. Acquire via IAP on GameScreen & verify top-bar rewarded ad pill toggles smoothly
+        final iapHarness = await _createTempleHarness();
+        final iapCtrl = iapHarness.controller;
+        addTearDown(() {
+          iapCtrl.dispose();
+          iapHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: iapCtrl,
+            child: const HowPredictableApp(home: GameScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsOneWidget,
+        );
+
+        // Open Sacred Temple -> Prayer Room over GameScreen and buy via Google Play Billing
+        showDialog<void>(
+          context: tester.element(find.byType(GameScreen)),
+          builder: (_) => SacredTempleDialog(
+            controller: iapCtrl,
+            initialWing: TempleWing.prayer,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(
+            const ValueKey(
+              'real_money_unlock_${BillingService.productRemoveAds}',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(iapCtrl.isRemoveAdsOwned, isTrue);
+        expect(iapCtrl.isRemoveAdsEnabled, isTrue);
+
+        // Close dialog -> top-bar rewarded ad pill should be hidden
+        Navigator.of(tester.element(find.byType(SacredTempleDialog))).pop();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsNothing,
+        );
+
+        // Re-open Prayer Room, toggle Vow of Silence OFF, close -> top-bar pill reappears
+        showDialog<void>(
+          context: tester.element(find.byType(GameScreen)),
+          builder: (_) => SacredTempleDialog(
+            controller: iapCtrl,
+            initialWing: TempleWing.prayer,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('vow_of_silence_switch')));
+        await tester.pumpAndSettle();
+        Navigator.of(tester.element(find.byType(SacredTempleDialog))).pop();
+        await tester.pumpAndSettle();
+
+        expect(iapCtrl.isRemoveAdsEnabled, isFalse);
+        expect(
+          find.byKey(const ValueKey('watch_rewarded_ad_button')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    test(
+      'Vow of Silence is immune to 0 HP death, Week 40 defeat, and Forfeit Run, preserves exact toggle state, and never enters Relic Chamber',
+      () async {
+        final harness = await _createTempleHarness(
+          prefs: {
+            'orbs_fire': 5000,
+            'orbs_water': 5000,
+            'orbs_wood': 5000,
+            'orbs_earth': 5000,
+            'orbs_metal': 5000,
+          },
+        );
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        // Buy another Offering upgrade alongside orb-bought Vow of Silence
+        expect(controller.unlockAds(), isTrue);
+        expect(controller.unlockPredictability(), isTrue);
+        expect(controller.unlockedPredictability, isTrue);
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isTrue);
+
+        // 1. 0 HP death: Offerings reset, Vow of Silence stays owned + ON, absent from Relic Chamber
+        await controller.applyPermadeathReset();
+        expect(controller.unlockedPredictability, isFalse);
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isTrue);
+        expect(
+          controller.availableRelicChamberArtifacts.any((a) => a.id == 'remove_ads'),
+          isFalse,
+        );
+        expect(
+          controller.relicChamberStoredUpgrades.contains('remove_ads'),
+          isFalse,
+        );
+
+        // 2. Toggle OFF explicitly, then trigger Week 40 defeat -> remains owned + OFF
+        controller.toggleRemoveAds(false);
+        controller.currentWeek = 40;
+        await controller.applyPermadeathReset();
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isFalse);
+        expect(
+          controller.relicChamberStoredUpgrades.contains('remove_ads'),
+          isFalse,
+        );
+
+        // 3. Forfeit Run while OFF -> remains owned + OFF
+        await controller.resetAllProgress();
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isFalse);
+        expect(
+          controller.relicChamberStoredUpgrades.contains('remove_ads'),
+          isFalse,
+        );
+
+        // 4. Toggle ON explicitly, then Forfeit Run -> remains owned + ON
+        controller.toggleRemoveAds(true);
+        await controller.resetAllProgress();
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isTrue);
+        expect(
+          controller.relicChamberStoredUpgrades.contains('remove_ads'),
+          isFalse,
+        );
+      },
+    );
+
+    testWidgets(
+      'Offline SharedPreferences, Cloud Save JSON/merge, and Restore Purchases preserve Vow of Silence ownership and manual toggle',
+      (WidgetTester tester) async {
+        // 1. Offline SharedPreferences persistence across fresh StorageService + GameController
+        final h1 = await _createTempleHarness(
+          prefs: {
+            'unlockedAds': true,
+            'removeAdsEnabled': false,
+          },
+        );
+        expect(h1.controller.isRemoveAdsOwned, isTrue);
+        expect(h1.controller.isRemoveAdsEnabled, isFalse);
+        h1.controller.dispose();
+        h1.billingClient.dispose();
+
+        // Reload without resetting SharedPreferences
+        final reloadedStorage = StorageService();
+        await reloadedStorage.init();
+        final reloadedLoc = LocalizationService();
+        await reloadedLoc.load();
+        final reloadedAds = AdService(client: _TempleAdMobClient());
+        await reloadedAds.initialize(
+          adsRemoved: reloadedStorage.unlockedAds && reloadedStorage.removeAdsEnabled,
+        );
+        final reloadedBilling = BillingService(client: _TempleBillingClient());
+        await reloadedBilling.initialize();
+        final reloadedCtrl = GameController(
+          storage: reloadedStorage,
+          localization: reloadedLoc,
+          audio: AudioService(),
+          adService: reloadedAds,
+          billingService: reloadedBilling,
+        );
+        addTearDown(() {
+          reloadedCtrl.dispose();
+          reloadedBilling.dispose();
+        });
+        expect(reloadedCtrl.isRemoveAdsOwned, isTrue);
+        expect(reloadedCtrl.isRemoveAdsEnabled, isFalse);
+
+        // 2. CloudSaveData JSON serialization & merge preserves cloudOwned || localOwned without clobbering manual toggle
+        final cloudOn = CloudSaveData(
+          currentWeek: 5,
+          unlockedAds: true,
+          removeAdsEnabled: true,
+        );
+        final jsonMap = cloudOn.toJson();
+        expect(jsonMap['isRemoveAdsOwned'], isTrue);
+        expect(jsonMap['isRemoveAdsEnabled'], isTrue);
+        final parsedCloud = CloudSaveData.fromJson(jsonMap);
+        expect(parsedCloud.isRemoveAdsOwned, isTrue);
+        expect(parsedCloud.isRemoveAdsEnabled, isTrue);
+
+        final localManualOff = CloudSaveData(
+          currentWeek: 2,
+          unlockedAds: true,
+          removeAdsEnabled: false,
+          hasExplicitRemoveAdsEnabled: true,
+        );
+        final merged = parsedCloud.mergeOverLocal(localManualOff);
+        expect(merged.isRemoveAdsOwned, isTrue);
+        expect(merged.isRemoveAdsEnabled, isFalse);
+
+        // Multi-account switch isolates ownership via last_player_id
+        final pgClient = _TemplePlayGamesClient(mockPlayerId: 'player_B');
+        final accountHarness = await _createTempleHarness(
+          prefs: {
+            'last_player_id': 'player_A',
+            'unlockedAds': true,
+            'removeAdsEnabled': true,
+          },
+          playGamesClient: pgClient,
+        );
+        addTearDown(() {
+          accountHarness.controller.dispose();
+          accountHarness.billingClient.dispose();
+        });
+        expect(accountHarness.storage.unlockedAds, isFalse);
+
+        // 3a. Restore Purchases when NOT previously owned locally -> sets owned = true & defaults enabled = true
+        final restoreNewHarness = await _createTempleHarness(
+          prefs: {
+            'unlockedAds': false,
+            'removeAdsEnabled': false,
+          },
+          restoredProductIds: [BillingService.productRemoveAds],
+        );
+        addTearDown(() {
+          restoreNewHarness.controller.dispose();
+          restoreNewHarness.billingClient.dispose();
+        });
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: restoreNewHarness.controller,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: const ValueKey('restore_new_dialog'),
+                  controller: restoreNewHarness.controller,
+                  initialWing: TempleWing.prayer,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('shop_restore_purchases_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(restoreNewHarness.controller.isRemoveAdsOwned, isTrue);
+        expect(restoreNewHarness.controller.isRemoveAdsEnabled, isTrue);
+
+        // 3b. Restore Purchases when ALREADY owned locally with user toggle OFF -> preserves toggle = false
+        final restorePreservedHarness = await _createTempleHarness(
+          prefs: {
+            'unlockedAds': true,
+            'removeAdsEnabled': false,
+          },
+          restoredProductIds: [BillingService.productRemoveAds],
+        );
+        addTearDown(() {
+          restorePreservedHarness.controller.dispose();
+          restorePreservedHarness.billingClient.dispose();
+        });
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: restorePreservedHarness.controller,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: const ValueKey('restore_preserved_dialog'),
+                  controller: restorePreservedHarness.controller,
+                  initialWing: TempleWing.prayer,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('shop_restore_purchases_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(restorePreservedHarness.controller.isRemoveAdsOwned, isTrue);
+        expect(restorePreservedHarness.controller.isRemoveAdsEnabled, isFalse);
       },
     );
   });

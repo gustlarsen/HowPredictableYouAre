@@ -220,6 +220,9 @@ class BillingService extends ChangeNotifier {
     if (trimmed == 'Suggestion') {
       return productSuggestion;
     }
+    if (trimmed == 'Vow of Silence — Remove Ads') {
+      return productRemoveAds;
+    }
     return null;
   }
 
@@ -438,21 +441,25 @@ class BillingService extends ChangeNotifier {
 
   /// Restores previously purchased non-consumable items from Google Play
   /// so players who reinstall the app or switch devices recover their items.
-  Future<bool> restorePurchases() async {
+  Future<bool> restorePurchases({bool silent = false}) async {
     if (!_isAvailable) {
-      _emitEvent(
-        const BillingPurchaseEvent(
-          productId: '',
-          type: BillingEventType.error,
-          message: 'Google Play Billing is currently unavailable.',
-        ),
-      );
-      notifyListeners();
+      if (!silent) {
+        _emitEvent(
+          const BillingPurchaseEvent(
+            productId: '',
+            type: BillingEventType.error,
+            message: 'Google Play Billing is currently unavailable.',
+          ),
+        );
+        notifyListeners();
+      }
       return false;
     }
 
-    _isRestoring = true;
-    notifyListeners();
+    if (!silent) {
+      _isRestoring = true;
+      notifyListeners();
+    }
 
     try {
       await _client.restorePurchases();
@@ -461,13 +468,15 @@ class BillingService extends ChangeNotifier {
       return true;
     } catch (_) {
       _isRestoring = false;
-      _emitEvent(
-        const BillingPurchaseEvent(
-          productId: '',
-          type: BillingEventType.error,
-          message: 'Failed to restore purchases.',
-        ),
-      );
+      if (!silent) {
+        _emitEvent(
+          const BillingPurchaseEvent(
+            productId: '',
+            type: BillingEventType.error,
+            message: 'Failed to restore purchases.',
+          ),
+        );
+      }
       notifyListeners();
       return false;
     }

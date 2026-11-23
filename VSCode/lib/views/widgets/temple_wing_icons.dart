@@ -2333,3 +2333,277 @@ class _SacredBlessingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_SacredBlessingPainter oldDelegate) => false;
 }
+
+/// Wing 5 — `Vow of Silence — Remove Ads`: Minimalist "Shh" silence gesture
+/// featuring stylized warm rose-terracotta lips behind a centrally raised
+/// vertical index finger, outlined in `#263238` with golden silence sparkles
+/// and muted-wave accents when active.
+class VowOfSilenceIcon extends StatelessWidget {
+  final double size;
+  final bool isActive;
+  final bool isOnGoldBackground;
+
+  const VowOfSilenceIcon({
+    super.key,
+    this.size = 28.0,
+    this.isActive = true,
+    this.isOnGoldBackground = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: _VowOfSilencePainter(
+        isActive: isActive,
+        isOnGoldBackground: isOnGoldBackground,
+      ),
+    );
+  }
+}
+
+class _VowOfSilencePainter extends CustomPainter {
+  final bool isActive;
+  final bool isOnGoldBackground;
+
+  const _VowOfSilencePainter({
+    required this.isActive,
+    required this.isOnGoldBackground,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+
+    const charcoalOutline = Color(0xFF263238);
+    final outline = Paint()
+      ..color = charcoalOutline
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.85, 1.15 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    final detail = Paint()
+      ..color = charcoalOutline.withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.60, 0.78 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    // Warm rose-terracotta / muted bronze lips palette
+    final lipLight = isActive
+        ? const Color(0xFFD98872)
+        : const Color(0xFFB38B7D);
+    final lipMid = isActive
+        ? const Color(0xFFB8654F)
+        : const Color(0xFF8F6A5E);
+    final lipDark = isActive
+        ? const Color(0xFF8C4636)
+        : const Color(0xFF6B4C42);
+
+    // Finger warm ivory-gold when active, muted slate-ivory when inactive
+    final fingerHighlight = isActive
+        ? (isOnGoldBackground ? const Color(0xFFFFF8E1) : const Color(0xFFFFF0D4))
+        : const Color(0xFFECEFF1);
+    final fingerMid = isActive
+        ? (isOnGoldBackground ? const Color(0xFFFFE0B2) : const Color(0xFFFFE0B2))
+        : const Color(0xFFCFD8DC);
+    final fingerShadow = isActive
+        ? (isOnGoldBackground ? const Color(0xFFD7A05B) : const Color(0xFFFFD54F))
+        : const Color(0xFF90A4AE);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Stylized gently curved lips / mouth behind the finger (x: 0.22..0.78, y: 0.53..0.74)
+    final upperLip = Path()
+      ..moveTo(s * 0.22, s * 0.625)
+      ..cubicTo(s * 0.30, s * 0.555, s * 0.41, s * 0.535, s * 0.50, s * 0.570)
+      ..cubicTo(s * 0.59, s * 0.535, s * 0.70, s * 0.555, s * 0.78, s * 0.625)
+      ..quadraticBezierTo(s * 0.50, s * 0.648, s * 0.22, s * 0.625)
+      ..close();
+    canvas.drawPath(
+      upperLip,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [lipLight, lipMid],
+        ).createShader(Rect.fromLTRB(s * 0.22, s * 0.53, s * 0.78, s * 0.65)),
+    );
+    canvas.drawPath(upperLip, outline);
+
+    final lowerLip = Path()
+      ..moveTo(s * 0.24, s * 0.628)
+      ..quadraticBezierTo(s * 0.50, s * 0.646, s * 0.76, s * 0.628)
+      ..cubicTo(s * 0.70, s * 0.730, s * 0.59, s * 0.750, s * 0.50, s * 0.750)
+      ..cubicTo(s * 0.41, s * 0.750, s * 0.30, s * 0.730, s * 0.24, s * 0.628)
+      ..close();
+    canvas.drawPath(
+      lowerLip,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [lipMid, lipDark],
+        ).createShader(Rect.fromLTRB(s * 0.24, s * 0.62, s * 0.76, s * 0.75)),
+    );
+    canvas.drawPath(lowerLip, outline);
+
+    // Subtle lip parting seam
+    final lipLine = Path()
+      ..moveTo(s * 0.25, s * 0.626)
+      ..quadraticBezierTo(s * 0.50, s * 0.645, s * 0.75, s * 0.626);
+    canvas.drawPath(lipLine, detail);
+
+    // 2. Subtle golden silence sparkles & muted-wave accents flanking the finger
+    if (isActive) {
+      final wavePaint = Paint()
+        ..color = isOnGoldBackground
+            ? charcoalOutline.withValues(alpha: 0.70)
+            : const Color(0xFFFFD54F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.9, 1.15 * scale)
+        ..strokeCap = StrokeCap.round;
+      final waveOutline = Paint()
+        ..color = charcoalOutline.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.6, 1.9 * scale)
+        ..strokeCap = StrokeCap.round;
+
+      // Left muted-wave arc
+      final leftWave = Path()
+        ..addArc(
+          Rect.fromCenter(
+            center: Offset(s * 0.35, s * 0.36),
+            width: s * 0.30,
+            height: s * 0.28,
+          ),
+          math.pi * 0.74,
+          math.pi * 0.46,
+        );
+      // Right muted-wave arc
+      final rightWave = Path()
+        ..addArc(
+          Rect.fromCenter(
+            center: Offset(s * 0.65, s * 0.36),
+            width: s * 0.30,
+            height: s * 0.28,
+          ),
+          -math.pi * 0.20,
+          math.pi * 0.46,
+        );
+      for (final wave in [leftWave, rightWave]) {
+        if (!isOnGoldBackground) {
+          canvas.drawPath(wave, waveOutline);
+        }
+        canvas.drawPath(wave, wavePaint);
+      }
+
+      // Flanking 4-point golden silence sparkles
+      void drawSparkle(Offset center, double r) {
+        final star = Path()
+          ..moveTo(center.dx, center.dy - r)
+          ..quadraticBezierTo(
+            center.dx + r * 0.15,
+            center.dy - r * 0.15,
+            center.dx + r,
+            center.dy,
+          )
+          ..quadraticBezierTo(
+            center.dx + r * 0.15,
+            center.dy + r * 0.15,
+            center.dx,
+            center.dy + r,
+          )
+          ..quadraticBezierTo(
+            center.dx - r * 0.15,
+            center.dy + r * 0.15,
+            center.dx - r,
+            center.dy,
+          )
+          ..quadraticBezierTo(
+            center.dx - r * 0.15,
+            center.dy - r * 0.15,
+            center.dx,
+            center.dy - r,
+          )
+          ..close();
+        canvas.drawPath(
+          star,
+          Paint()
+            ..color = isOnGoldBackground
+                ? const Color(0xFFFFF8E1)
+                : const Color(0xFFFFD54F),
+        );
+        canvas.drawPath(
+          star,
+          Paint()
+            ..color = charcoalOutline
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(0.55, 0.70 * scale)
+            ..strokeJoin = StrokeJoin.round,
+        );
+      }
+
+      drawSparkle(Offset(s * 0.20, s * 0.24), s * 0.085);
+      drawSparkle(Offset(s * 0.80, s * 0.28), s * 0.075);
+    }
+
+    // 3. Vertical index finger raised centrally over the lips (x: 0.415..0.585, y: 0.14..0.89)
+    final fingerRect = RRect.fromRectAndCorners(
+      Rect.fromLTRB(s * 0.415, s * 0.14, s * 0.585, s * 0.89),
+      topLeft: Radius.circular(s * 0.085),
+      topRight: Radius.circular(s * 0.085),
+      bottomLeft: Radius.circular(s * 0.070),
+      bottomRight: Radius.circular(s * 0.070),
+    );
+    canvas.drawRRect(
+      fingerRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [fingerHighlight, fingerMid, fingerShadow],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(fingerRect.outerRect),
+    );
+    canvas.drawRRect(fingerRect, outline);
+
+    // Subtle fingernail oval at the fingertip
+    final nailRect = RRect.fromRectAndCorners(
+      Rect.fromLTRB(s * 0.445, s * 0.175, s * 0.555, s * 0.275),
+      topLeft: Radius.circular(s * 0.055),
+      topRight: Radius.circular(s * 0.055),
+      bottomLeft: Radius.circular(s * 0.025),
+      bottomRight: Radius.circular(s * 0.025),
+    );
+    canvas.drawRRect(
+      nailRect,
+      Paint()..color = Colors.white.withValues(alpha: isActive ? 0.55 : 0.35),
+    );
+    canvas.drawRRect(nailRect, detail);
+
+    // Subtle knuckle contour lines below the lips
+    canvas.drawLine(
+      Offset(s * 0.45, s * 0.77),
+      Offset(s * 0.55, s * 0.77),
+      detail,
+    );
+    canvas.drawLine(
+      Offset(s * 0.455, s * 0.825),
+      Offset(s * 0.545, s * 0.825),
+      detail,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_VowOfSilencePainter oldDelegate) =>
+      oldDelegate.isActive != isActive ||
+      oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+

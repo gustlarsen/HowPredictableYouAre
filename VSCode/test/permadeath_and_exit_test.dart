@@ -530,11 +530,18 @@ void main() {
         expect(controller.turn0EarthOrbs, 0);
         expect(controller.turn0MetalOrbs, 0);
 
-        // Orb-bought upgrades locked, HP/Mana 100, Markov cleared
+        // Orb-bought Offerings upgrades locked, HP/Mana 50/100, Markov cleared;
+        // Vow of Silence (Remove Ads) remains permanently untouched
         expect(controller.unlockedReset, isFalse);
         expect(controller.unlockedAlgorithm, isFalse);
-        expect(controller.unlockedAds, isFalse);
-        expect(controller.isRemoveAdsActive, isFalse);
+        expect(controller.unlockedAds, isTrue);
+        expect(controller.isRemoveAdsOwned, isTrue);
+        expect(controller.isRemoveAdsEnabled, isTrue);
+        expect(controller.isRemoveAdsActive, isTrue);
+        expect(
+          controller.relicChamberStoredUpgrades,
+          isNot(contains('remove_ads')),
+        );
         expect(controller.unlockedNewSkin, isFalse);
         expect(controller.giftBoxUnlocked, isFalse);
         expect(controller.userHp, GameController.maxHp);

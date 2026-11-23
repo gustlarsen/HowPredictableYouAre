@@ -41,7 +41,14 @@ void main() async {
     billingService: billingService,
     updateService: updateService,
   );
-  unawaited(billingService.initialize());
+  unawaited(() async {
+    await billingService.initialize();
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        billingService.isAvailable) {
+      await billingService.restorePurchases(silent: true);
+    }
+  }());
 
   runApp(
     ChangeNotifierProvider.value(
@@ -51,7 +58,7 @@ void main() async {
   );
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(adService.initialize(adsRemoved: controller.unlockedAds));
+    unawaited(adService.initialize(adsRemoved: controller.isRemoveAdsActive));
     unawaited(playGames.initialize());
   });
 }
