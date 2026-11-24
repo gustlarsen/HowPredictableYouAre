@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/elemental_matchup_diagram.dart';
 
 class HelpDialog extends StatelessWidget {
   final LocalizationService localization;
+  final bool initialFiveElements;
 
-  const HelpDialog({super.key, required this.localization});
+  const HelpDialog({
+    super.key,
+    required this.localization,
+    this.initialFiveElements = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -13,22 +19,22 @@ class HelpDialog extends StatelessWidget {
     final palette = AppPalette.of(context);
     final helpText = localization.t(
       'string34',
-      fallback: 'See How Predictable You Are !!\n'
-          'Play Rock Paper Scissors Game and try to defeat the Artificial Intelligence (AI) Machine.\n'
-          'Understand the Algorithm that Master Hand uses to Predict you.\n'
-          'Reverse Engineer the Algorithm to beat the Master Hand.\n'
-          'Earn Diamonds every won round.\n'
-          'Unlock upgrades to help your path.',
+      fallback:
+          'Channel Elemental Orbs as a Cleric (Fire, Water, Wood — plus Earth & Metal once unlocked) to defeat the Metal Wizard\'s predictive automatons.\n'
+          'Understand and reverse-engineer their Markov pattern to outsmart every prediction.\n'
+          'Earn Elemental Orbs from defeated elements on every won round.\n'
+          'Spend your Orbs on blessings and arcane upgrades at the Sacred Temple\'s Altar of Offerings.',
     );
 
     return Dialog(
       backgroundColor: palette.isDark ? null : palette.dialogSurface,
       surfaceTintColor: palette.isDark ? null : Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(18.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,17 +43,19 @@ class HelpDialog extends StatelessWidget {
                 children: [
                   Icon(Icons.help_outline, color: palette.amberIcon),
                   const SizedBox(width: 8),
-                  Text(
-                    localization.t('string35', fallback: 'How It Works'),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: palette.primaryText,
+                  Expanded(
+                    child: Text(
+                      localization.t('string35', fallback: 'How It Works'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: palette.primaryText,
+                      ),
                     ),
                   ),
                 ],
               ),
               Divider(
-                height: 20,
+                height: 18,
                 color: palette.isDark ? null : palette.divider,
               ),
               Flexible(
@@ -58,13 +66,19 @@ class HelpDialog extends StatelessWidget {
                       Text(
                         helpText,
                         style: TextStyle(
-                          height: 1.5,
+                          height: 1.48,
                           fontSize: 13,
                           color: palette.primaryText,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+                      ElementalMatchupDiagram(
+                        localization: localization,
+                        initialFiveElements: initialFiveElements,
+                      ),
+                      const SizedBox(height: 14),
                       Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: palette.rewardedAdCardSurface,
@@ -79,7 +93,10 @@ class HelpDialog extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '💡 Pro Tip: The Markov Model',
+                              localization.t(
+                                'help_pro_tip_title',
+                                fallback: '💡 Pro Tip: The Markov Model',
+                              ),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: palette.amberText,
@@ -88,8 +105,12 @@ class HelpDialog extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'The AI tracks your transitions (what you play right after Rock, Paper, or Scissors). '
-                              'To outsmart it, avoid repetitive patterns or unlock the Markov Transition Matrix from the shop to see what it expects!',
+                              localization.t(
+                                'help_pro_tip_body',
+                                fallback:
+                                    'The automaton tracks your transitions (which element you channel right after Fire, Water, Wood, Earth, or Metal). '
+                                    'To outsmart it, avoid repetitive patterns or unlock the Markov Transition Matrix at the Sacred Temple to see what it expects!',
+                              ),
                               style: TextStyle(
                                 fontSize: 12,
                                 height: 1.4,
@@ -103,7 +124,7 @@ class HelpDialog extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(

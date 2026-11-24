@@ -660,7 +660,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                             controller.audio.playTapVibrate();
                             showDialog(
                               context: context,
-                              builder: (_) => HelpDialog(localization: loc),
+                              builder: (_) => HelpDialog(
+                                localization: loc,
+                                initialFiveElements: controller.showNewHands,
+                              ),
                             );
                           },
                           icon: const Icon(

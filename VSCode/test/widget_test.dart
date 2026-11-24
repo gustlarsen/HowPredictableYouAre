@@ -2028,9 +2028,13 @@ void main() {
     await tester.tap(helpBtn);
     await tester.pumpAndSettle();
 
-    // HelpDialog is displayed
+    // HelpDialog is displayed with interactive elemental matchup diagram and updated copy
     expect(find.text('How It Works'), findsOneWidget);
     expect(find.text('💡 Pro Tip: The Markov Model'), findsOneWidget);
+    expect(find.byKey(const ValueKey('elemental_matchup_diagram')), findsOneWidget);
+    expect(find.textContaining('wined'), findsNothing);
+    expect(find.textContaining('Rock Paper Scissors'), findsNothing);
+    expect(find.textContaining('Master Hand'), findsNothing);
   });
 
   testWidgets('ShopDialog renders titles without mid-word breaks and displays Rewarded Ad text horizontally on narrow mobile screens', (WidgetTester tester) async {

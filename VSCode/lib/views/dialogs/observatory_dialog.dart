@@ -511,8 +511,10 @@ class ObservatoryDialog extends StatelessWidget {
                           controller.audio.playTapVibrate();
                           showDialog(
                             context: context,
-                            builder: (_) =>
-                                HelpDialog(localization: loc),
+                            builder: (_) => HelpDialog(
+                              localization: loc,
+                              initialFiveElements: controller.showNewHands,
+                            ),
                           );
                         },
                         icon: const Icon(Icons.help_outline, size: 18),
