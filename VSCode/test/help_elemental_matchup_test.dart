@@ -8,6 +8,7 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/help_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/widgets/elemental_matchup_diagram.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 
 Future<GameController> _createController({
   Map<String, Object> prefs = const {},
@@ -280,6 +281,64 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
         }
+      },
+    );
+
+    testWidgets(
+      'ElementalMatchupDiagram positions Fire label above top orb, Earth/Wood labels outward-left/right in 5-element mode, and bottom labels below orbs',
+      (WidgetTester tester) async {
+        final loc = LocalizationService();
+        await loc.load();
+        loc.setLanguage('en');
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: ElementalMatchupDiagram(
+                    localization: loc,
+                    initialFiveElements: true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        Offset orbCenter(String orbKey) => tester.getCenter(
+              find.descendant(
+                of: find.byKey(ValueKey('matchup_orb_$orbKey')),
+                matching: find.byType(ElementalSymbolIcon),
+              ),
+            );
+
+        Offset labelCenter(String label) => tester.getCenter(find.text(label));
+
+        // 5-Element Pentagon:
+        // Fire label is ABOVE Fire orb
+        expect(labelCenter('Fire').dy, lessThan(orbCenter('fire').dy));
+        // Earth label is OUTER-LEFT & below Earth orb
+        expect(labelCenter('Earth').dx, lessThan(orbCenter('earth').dx));
+        expect(labelCenter('Earth').dy, greaterThan(orbCenter('earth').dy));
+        // Wood label is OUTER-RIGHT & below Wood orb
+        expect(labelCenter('Wood').dx, greaterThan(orbCenter('wood').dx));
+        expect(labelCenter('Wood').dy, greaterThan(orbCenter('wood').dy));
+        // Metal & Water labels are BELOW their orbs
+        expect(labelCenter('Metal').dy, greaterThan(orbCenter('metal').dy));
+        expect(labelCenter('Water').dy, greaterThan(orbCenter('water').dy));
+
+        // Switch to 3-Element Triangle:
+        await tester.tap(find.byKey(const ValueKey('matchup_mode_3_button')));
+        await tester.pumpAndSettle();
+
+        expect(labelCenter('Fire').dy, lessThan(orbCenter('fire').dy));
+        expect(labelCenter('Water').dy, greaterThan(orbCenter('water').dy));
+        expect(labelCenter('Wood').dy, greaterThan(orbCenter('wood').dy));
+        expect(tester.takeException(), isNull);
       },
     );
   });

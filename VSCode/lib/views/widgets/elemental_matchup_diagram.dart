@@ -6,6 +6,13 @@ import '../../theme/app_theme.dart';
 import 'elemental_energy_sphere.dart';
 import 'elemental_symbol_icon.dart';
 
+enum _LabelPlacement {
+  top,
+  bottom,
+  bottomLeftOutward,
+  bottomRightOutward,
+}
+
 /// Interactive elemental matchup diagram displaying either the 3-element
 /// cycle (Fire, Wood, Water) or the 5-element Wu Xing cycle (Fire, Wood,
 /// Water, Metal, Earth) with directional victory arrows derived from
@@ -41,7 +48,11 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
   ];
 
   static const double _orbSize = 36.0;
+  static const double _ringPadding = 3.0;
+  static const double _ringSize = _orbSize + _ringPadding * 2; // 42.0
   static const double _labelWidth = 72.0;
+  static const double _sideLabelWidth = 54.0;
+  static const double _sideOutwardReach = 52.0;
   static const double _labelHeight = 16.0;
   static const double _labelGap = 3.0;
 
@@ -97,6 +108,15 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
     return raw[0].toUpperCase() + raw.substring(1).toLowerCase();
   }
 
+  _LabelPlacement _placementFor(HandMove move) {
+    if (move == HandMove.fire) return _LabelPlacement.top;
+    if (_isFiveElements) {
+      if (move == HandMove.earth) return _LabelPlacement.bottomLeftOutward;
+      if (move == HandMove.wood) return _LabelPlacement.bottomRightOutward;
+    }
+    return _LabelPlacement.bottom;
+  }
+
   String _buildMatchupSummary(HandMove selected, List<HandMove> activeMoves) {
     final loc = widget.localization;
     final conjunction = loc.t('help_matchup_conjunction', fallback: ' & ');
@@ -138,9 +158,8 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
         isDark ? const Color(0xFFFFD54F) : const Color(0xFFD97706);
     final loseArrowColor =
         isDark ? const Color(0xFFFF6B6B) : const Color(0xFFD32F2F);
-    final baseArrowColor = isDark
-        ? Colors.amber.shade200
-        : const Color(0xFF6B5335);
+    final baseArrowColor =
+        isDark ? const Color(0xFFD4AF37) : const Color(0xFF7A5A1E);
 
     return Container(
       key: const ValueKey('elemental_matchup_diagram'),
@@ -182,23 +201,26 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
               final sinBound = _isFiveElements
                   ? math.sin(2 * math.pi / 5)
                   : math.sin(2 * math.pi / 3);
-              final maxRadiusX = (width - (_labelWidth + 4.0)) / (2 * sinBound);
+              final horizontalReserve = _isFiveElements
+                  ? (_sideOutwardReach * 2 + 4.0)
+                  : (_labelWidth + 4.0);
+              final maxRadiusX = (width - horizontalReserve) / (2 * sinBound);
               final radius = maxRadiusX.clamp(
                 54.0,
-                _isFiveElements ? 82.0 : 74.0,
+                _isFiveElements ? 82.0 : 76.0,
               );
               final centerX = width * 0.5;
-              final centerY = radius + 24.0;
+              // Reserve room above the top orb for its outward "Fire" label.
+              final topMargin =
+                  (_ringSize * 0.5) + _labelGap + _labelHeight + 4.0;
+              final centerY = radius + topMargin;
               final bottomFactor = _isFiveElements
                   ? math.cos(math.pi / 5)
                   : 0.5;
+              final bottomMargin =
+                  (_ringSize * 0.5) + _labelGap + _labelHeight + 4.0;
               final canvasHeight =
-                  centerY +
-                  radius * bottomFactor +
-                  (_orbSize * 0.5) +
-                  _labelGap +
-                  _labelHeight +
-                  4.0;
+                  centerY + radius * bottomFactor + bottomMargin;
 
               final positions = <HandMove, Offset>{};
               for (int i = 0; i < activeMoves.length; i++) {
@@ -236,6 +258,7 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
                       _buildElementNode(
                         move: move,
                         center: positions[move]!,
+                        placement: _placementFor(move),
                         palette: palette,
                         isSelected: _selectedElement == move,
                       ),
@@ -342,123 +365,228 @@ class _ElementalMatchupDiagramState extends State<ElementalMatchupDiagram> {
   Widget _buildElementNode({
     required HandMove move,
     required Offset center,
+    required _LabelPlacement placement,
+    required AppPalette palette,
+    required bool isSelected,
+  }) {
+    final orbWidget = _buildOrbWidget(
+      move: move,
+      palette: palette,
+      isSelected: isSelected,
+    );
+    final labelWidget = _buildLabelWidget(
+      move: move,
+      palette: palette,
+      isSelected: isSelected,
+      width: (placement == _LabelPlacement.bottomLeftOutward ||
+              placement == _LabelPlacement.bottomRightOutward)
+          ? _sideLabelWidth
+          : _labelWidth,
+      alignment: switch (placement) {
+        _LabelPlacement.bottomLeftOutward => Alignment.centerRight,
+        _LabelPlacement.bottomRightOutward => Alignment.centerLeft,
+        _ => Alignment.center,
+      },
+    );
+
+    final double left;
+    final double top;
+    final double width;
+    final double height;
+    final Widget child;
+
+    switch (placement) {
+      case _LabelPlacement.top:
+        width = _labelWidth;
+        height = _labelHeight + _labelGap + _ringSize;
+        left = center.dx - width * 0.5;
+        top = center.dy - (_ringSize * 0.5) - _labelGap - _labelHeight;
+        child = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            labelWidget,
+            const SizedBox(height: _labelGap),
+            orbWidget,
+          ],
+        );
+      case _LabelPlacement.bottom:
+        width = _labelWidth;
+        height = _ringSize + _labelGap + _labelHeight;
+        left = center.dx - width * 0.5;
+        top = center.dy - (_ringSize * 0.5);
+        child = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            orbWidget,
+            const SizedBox(height: _labelGap),
+            labelWidget,
+          ],
+        );
+      case _LabelPlacement.bottomLeftOutward:
+        width = _sideOutwardReach + (_ringSize * 0.5);
+        height = _ringSize + _labelGap + _labelHeight;
+        left = center.dx - _sideOutwardReach;
+        top = center.dy - (_ringSize * 0.5);
+        child = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: 0,
+              top: 0,
+              child: orbWidget,
+            ),
+            Positioned(
+              left: 0,
+              top: _ringSize + _labelGap,
+              child: labelWidget,
+            ),
+          ],
+        );
+      case _LabelPlacement.bottomRightOutward:
+        width = (_ringSize * 0.5) + _sideOutwardReach;
+        height = _ringSize + _labelGap + _labelHeight;
+        left = center.dx - (_ringSize * 0.5);
+        top = center.dy - (_ringSize * 0.5);
+        child = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              child: orbWidget,
+            ),
+            Positioned(
+              right: 0,
+              top: _ringSize + _labelGap,
+              child: labelWidget,
+            ),
+          ],
+        );
+    }
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      child: GestureDetector(
+        key: ValueKey('matchup_orb_${move.orbKey}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _toggleElement(move),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildOrbWidget({
+    required HandMove move,
     required AppPalette palette,
     required bool isSelected,
   }) {
     final primary = move.elementalPrimaryColor;
     final secondary = move.elementalSecondaryColor;
     final isDark = palette.isDark;
-    final nodeWidth = _labelWidth;
-    final nodeHeight = _orbSize + _labelGap + _labelHeight + 6;
-    final left = center.dx - nodeWidth * 0.5;
-    final top = center.dy - _orbSize * 0.5 - 3;
 
-    return Positioned(
-      left: left,
-      top: top,
-      width: nodeWidth,
-      height: nodeHeight,
-      child: GestureDetector(
-        key: ValueKey('matchup_orb_${move.orbKey}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _toggleElement(move),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: _orbSize + 6,
-              height: _orbSize + 6,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: isSelected
-                    ? Border.all(
-                        color: isDark ? Colors.amberAccent : palette.amberBorder,
-                        width: 2.2,
-                      )
-                    : Border.all(color: Colors.transparent, width: 2.2),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: primary.withValues(alpha: isDark ? 0.65 : 0.45),
-                          blurRadius: 11,
-                          spreadRadius: 1.5,
-                        ),
-                        BoxShadow(
-                          color: Colors.amber.withValues(
-                            alpha: isDark ? 0.50 : 0.35,
-                          ),
-                          blurRadius: 7,
-                          spreadRadius: 0.5,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Container(
-                width: _orbSize,
-                height: _orbSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    center: const Alignment(-0.28, -0.32),
-                    radius: 0.90,
-                    colors: [
-                      Color.lerp(primary, Colors.white, 0.25)!,
-                      secondary,
-                    ],
-                    stops: const [0.10, 1.0],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      width: _ringSize,
+      height: _ringSize,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: isSelected
+            ? Border.all(
+                color: isDark ? Colors.amberAccent : palette.amberBorder,
+                width: 2.2,
+              )
+            : Border.all(color: Colors.transparent, width: 2.2),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: primary.withValues(alpha: isDark ? 0.65 : 0.45),
+                  blurRadius: 11,
+                  spreadRadius: 1.5,
+                ),
+                BoxShadow(
+                  color: Colors.amber.withValues(
+                    alpha: isDark ? 0.50 : 0.35,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primary.withValues(alpha: isDark ? 0.35 : 0.22),
-                      blurRadius: 5,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.2),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1.5),
-                    ),
-                  ],
+                  blurRadius: 7,
+                  spreadRadius: 0.5,
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ElementalEnergySphere(
-                      size: _orbSize,
-                      primaryColor: primary,
-                      secondaryColor: secondary,
-                      isDark: isDark,
-                    ),
-                    ElementalSymbolIcon(
-                      move: move,
-                      size: _orbSize * 0.56,
-                    ),
-                  ],
-                ),
-              ),
+              ]
+            : null,
+      ),
+      child: Container(
+        width: _orbSize,
+        height: _orbSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            center: const Alignment(-0.28, -0.32),
+            radius: 0.90,
+            colors: [
+              Color.lerp(primary, Colors.white, 0.25)!,
+              secondary,
+            ],
+            stops: const [0.10, 1.0],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: primary.withValues(alpha: isDark ? 0.35 : 0.22),
+              blurRadius: 5,
             ),
-            const SizedBox(height: _labelGap - 3),
-            SizedBox(
-              width: _labelWidth,
-              height: _labelHeight,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  _elementName(move),
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                    color: isSelected
-                        ? (isDark ? Colors.amberAccent : palette.amberText)
-                        : palette.elementalText(move),
-                  ),
-                ),
-              ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.2),
+              blurRadius: 3,
+              offset: const Offset(0, 1.5),
             ),
           ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ElementalEnergySphere(
+              size: _orbSize,
+              primaryColor: primary,
+              secondaryColor: secondary,
+              isDark: isDark,
+            ),
+            ElementalSymbolIcon(
+              move: move,
+              size: _orbSize * 0.56,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabelWidget({
+    required HandMove move,
+    required AppPalette palette,
+    required bool isSelected,
+    required double width,
+    required Alignment alignment,
+  }) {
+    final isDark = palette.isDark;
+    return SizedBox(
+      width: width,
+      height: _labelHeight,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: alignment,
+        child: Text(
+          _elementName(move),
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+            color: isSelected
+                ? (isDark ? Colors.amberAccent : palette.amberText)
+                : palette.elementalText(move),
+          ),
         ),
       ),
     );
@@ -652,11 +780,9 @@ class _MatchupArrowsPainter extends CustomPainter {
     }
 
     final baseAlpha = selected == null
-        ? (isFiveElements ? (isDark ? 0.24 : 0.28) : (isDark ? 0.65 : 0.72))
-        : (isDark ? 0.10 : 0.12);
-    final baseStroke = selected == null
-        ? (isFiveElements ? 1.4 : 2.0)
-        : 1.1;
+        ? (isFiveElements ? (isDark ? 0.48 : 0.42) : (isDark ? 0.68 : 0.64))
+        : (isDark ? 0.14 : 0.16);
+    final baseStroke = selected == null ? 2.1 : 1.2;
 
     for (final edge in unrelated) {
       _drawArrow(
@@ -665,8 +791,8 @@ class _MatchupArrowsPainter extends CustomPainter {
         edge.to,
         color: baseColor.withValues(alpha: baseAlpha),
         strokeWidth: baseStroke,
-        headLen: isFiveElements ? 6.5 : 7.8,
-        headHalfW: isFiveElements ? 3.2 : 3.9,
+        headLen: selected == null ? 8.5 : 7.5,
+        headHalfW: selected == null ? 4.3 : 3.7,
       );
     }
 
@@ -675,11 +801,11 @@ class _MatchupArrowsPainter extends CustomPainter {
         canvas,
         edge.from,
         edge.to,
-        color: loseColor.withValues(alpha: 0.92),
-        glowColor: loseColor.withValues(alpha: isDark ? 0.26 : 0.18),
-        strokeWidth: 2.3,
-        headLen: 8.5,
-        headHalfW: 4.3,
+        color: loseColor.withValues(alpha: 0.94),
+        glowColor: loseColor.withValues(alpha: isDark ? 0.28 : 0.20),
+        strokeWidth: 2.8,
+        headLen: 9.2,
+        headHalfW: 4.7,
       );
     }
 
@@ -690,10 +816,10 @@ class _MatchupArrowsPainter extends CustomPainter {
         edge.to,
         color: winColor,
         gradientStart: winGlowColor,
-        glowColor: winGlowColor.withValues(alpha: isDark ? 0.28 : 0.20),
-        strokeWidth: 2.7,
-        headLen: 9.0,
-        headHalfW: 4.5,
+        glowColor: winGlowColor.withValues(alpha: isDark ? 0.30 : 0.22),
+        strokeWidth: 3.0,
+        headLen: 9.5,
+        headHalfW: 4.9,
       );
     }
   }
@@ -715,7 +841,7 @@ class _MatchupArrowsPainter extends CustomPainter {
 
     final delta = p2 - p1;
     final dist = delta.distance;
-    final trim = orbRadius + 5.5;
+    final trim = orbRadius + 6.5;
     if (dist <= trim * 2 + 4) return;
 
     final dir = delta / dist;
@@ -766,6 +892,9 @@ class _MatchupArrowsPainter extends CustomPainter {
     return oldDelegate.selected != selected ||
         oldDelegate.isFiveElements != isFiveElements ||
         oldDelegate.isDark != isDark ||
-        oldDelegate.positions != positions;
+        oldDelegate.positions != positions ||
+        oldDelegate.baseColor != baseColor ||
+        oldDelegate.winColor != winColor ||
+        oldDelegate.loseColor != loseColor;
   }
 }
