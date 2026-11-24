@@ -359,6 +359,24 @@ class AudioService with WidgetsBindingObserver {
     }
   }
 
+  /// Plays haptic and soft chime feedback for Consagration upgrades,
+  /// throttled to ~120ms intervals during continuous press-and-hold.
+  Future<void> playConsagrationTick({bool throttle = false}) async {
+    if (throttle) {
+      playRapidFireHaptic();
+    } else {
+      playWinVibrate();
+    }
+    if (!_consumeRapidFireSfxSlot(throttleSfx: throttle)) return;
+    onSfxTriggeredForTest?.call();
+    try {
+      await _sfxPlayer?.stop();
+      await _sfxPlayer?.play(AssetSource('audio/chime.wav'));
+    } catch (error) {
+      debugPrint('Could not play consagration sound: $error');
+    }
+  }
+
   Future<void> startMusic() async {
     if (_isDisposed || !musicEnabled) return;
     if (_isAppInBackground) {

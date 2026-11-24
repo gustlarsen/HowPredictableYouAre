@@ -313,6 +313,47 @@ class StorageService {
   Future<void> setHallOfHeroesClaimAvailable(bool val) =>
       _prefs.setBool(_hallOfHeroesClaimAvailableKey, val);
 
+  /// Atomically persists all modified orb balances, Turn 0 baselines, stat
+  /// upgrade levels, historical peaks, and optional out-of-combat HP in a
+  /// single batched `Future.wait` write.
+  Future<void> persistStatUpgradeBatch({
+    required int fire,
+    required int water,
+    required int wood,
+    required int earth,
+    required int metal,
+    required int turn0Fire,
+    required int turn0Water,
+    required int turn0Wood,
+    required int turn0Earth,
+    required int turn0Metal,
+    int? hpUpgradeLevel,
+    int? peakHpUpgradeLevel,
+    int? manaUpgradeLevel,
+    int? peakManaUpgradeLevel,
+    int? userHp,
+  }) {
+    return Future.wait([
+      setFireOrbs(fire),
+      setWaterOrbs(water),
+      setWoodOrbs(wood),
+      setEarthOrbs(earth),
+      setMetalOrbs(metal),
+      setTurn0FireOrbs(turn0Fire),
+      setTurn0WaterOrbs(turn0Water),
+      setTurn0WoodOrbs(turn0Wood),
+      setTurn0EarthOrbs(turn0Earth),
+      setTurn0MetalOrbs(turn0Metal),
+      if (hpUpgradeLevel != null) setHpUpgradeLevel(hpUpgradeLevel),
+      if (peakHpUpgradeLevel != null)
+        setPeakHpUpgradeLevel(peakHpUpgradeLevel),
+      if (manaUpgradeLevel != null) setManaUpgradeLevel(manaUpgradeLevel),
+      if (peakManaUpgradeLevel != null)
+        setPeakManaUpgradeLevel(peakManaUpgradeLevel),
+      if (userHp != null) setUserHp(userHp),
+    ]);
+  }
+
   // Campaign Week Calendar (always starts at Week 0)
   static const String currentWeekKey = 'current_week';
   int get currentWeek {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -9,6 +10,7 @@ import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/temple_wing_icons.dart';
+import 'royal_castle_dialog.dart';
 import 'story_dialog.dart';
 
 /// Identifies the 5 wings inside the Sacred Temple ([ShopDialog] / [SacredTempleDialog]) hub.
@@ -39,6 +41,25 @@ enum _TransmuteBatchOption {
   }
 }
 
+enum _ConsagrationBatchOption {
+  x1(1, 'consagration_batch_1x'),
+  x10(10, 'consagration_batch_10x'),
+  x100(100, 'consagration_batch_100x'),
+  max(null, 'consagration_batch_max');
+
+  final int? fixedMultiplier;
+  final String keyName;
+
+  const _ConsagrationBatchOption(this.fixedMultiplier, this.keyName);
+
+  String label(LocalizationService loc) {
+    if (fixedMultiplier != null) {
+      return '${fixedMultiplier}x';
+    }
+    return loc.t('castle_alchemy_max', fallback: 'MAX');
+  }
+}
+
 /// Alias so callers can refer to the 5-tab Sacred Temple Hub as [SacredTempleDialog]
 /// or [ShopDialog].
 typedef SacredTempleDialog = ShopDialog;
@@ -59,7 +80,7 @@ class ShopDialog extends StatefulWidget {
   State<ShopDialog> createState() => _ShopDialogState();
 }
 
-class _ShopDialogState extends State<ShopDialog> {
+class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   static const Color _goldFill = Color(0xFFF5C22B);
   static const Color _goldDarkInk = Color(0xFF1E1B16);
 
@@ -74,6 +95,20 @@ class _ShopDialogState extends State<ShopDialog> {
   Timer? _transmuteConfirmationTimer;
   Timer? _holdStartTimer;
   Timer? _holdRepeatTimer;
+
+  // Consagration Room batch upgrade state, hold timers, and visual feedback
+  _ConsagrationBatchOption _selectedConsagrationBatch =
+      _ConsagrationBatchOption.x1;
+  bool _showInsufficientOrbsInlinePrompt = false;
+  Timer? _consagrationHoldStartTimer;
+  Timer? _consagrationHoldRepeatTimer;
+  bool _consagrationHoldIsHp = true;
+  bool _didTriggerConsagrationHold = false;
+  int _consagrationHoldTickCount = 0;
+  late final AnimationController _hpFeedbackController;
+  late final AnimationController _manaFeedbackController;
+  String? _hpFloatingGainText;
+  String? _manaFloatingGainText;
 
   HandMove _selectedBulkElement = HandMove.rock;
 
@@ -93,12 +128,31 @@ class _ShopDialogState extends State<ShopDialog> {
     _transmuteTarget = _transmuteSource == HandMove.paper
         ? HandMove.rock
         : HandMove.paper;
+    _hpFeedbackController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 680),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _hpFloatingGainText = null);
+        }
+      });
+    _manaFeedbackController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 680),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _manaFloatingGainText = null);
+        }
+      });
     controller.billingService.addEventListener(_onBillingEvent);
   }
 
   @override
   void dispose() {
     _stopHoldTransmute();
+    _stopHoldConsagration();
+    _hpFeedbackController.dispose();
+    _manaFeedbackController.dispose();
     _transmuteConfirmationTimer?.cancel();
     _wingScrollController.dispose();
     controller.billingService.removeEventListener(_onBillingEvent);
@@ -107,12 +161,18 @@ class _ShopDialogState extends State<ShopDialog> {
 
   void _selectWing(TempleWing wing) {
     _stopHoldTransmute();
+    _stopHoldConsagration();
     controller.audio.playTapVibrate();
     if (_wingScrollController.hasClients) {
       _wingScrollController.jumpTo(0.0);
     }
     if (_selectedWing != wing) {
-      setState(() => _selectedWing = wing);
+      setState(() {
+        _selectedWing = wing;
+        if (wing != TempleWing.consagration) {
+          _showInsufficientOrbsInlinePrompt = false;
+        }
+      });
     }
   }
 
@@ -856,8 +916,974 @@ class _ShopDialogState extends State<ShopDialog> {
   }
 
   // ---------------------------------------------------------------------------
-  // WING 1: CONSAGRATION ROOM (+1 Max HP & +1 Max Mana Pool via Orbs or Ad)
+  // WING 1: CONSAGRATION ROOM (1x/10x/100x/MAX Batch, Hero Peak Guard, Hold & Ad)
   // ---------------------------------------------------------------------------
+  String _formatGroupedInt(int value, LocalizationService loc) {
+    final sep = loc.currentLanguage == 'en' ? ',' : '.';
+    final str = value.toString();
+    if (str.length <= 3) return str;
+    return str.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}$sep',
+    );
+  }
+
+  void _stopHoldConsagration() {
+    _consagrationHoldStartTimer?.cancel();
+    _consagrationHoldStartTimer = null;
+    _consagrationHoldRepeatTimer?.cancel();
+    _consagrationHoldRepeatTimer = null;
+    _consagrationHoldTickCount = 0;
+  }
+
+  bool _canHoldConsagration(bool isHp) {
+    final mult = _selectedConsagrationBatch.fixedMultiplier;
+    if (mult != 1 && mult != 10) return false;
+    final isBelowPeak = isHp
+        ? controller.isHpBelowUnclaimedHeroPeak
+        : controller.isManaBelowUnclaimedHeroPeak;
+    if (isBelowPeak) return false;
+    return isHp
+        ? controller.canAffordMaxHpLevels(mult!)
+        : controller.canAffordMaxManaLevels(mult!);
+  }
+
+  void _startHoldConsagration(bool isHp) {
+    _stopHoldConsagration();
+    _didTriggerConsagrationHold = false;
+    _consagrationHoldIsHp = isHp;
+    _consagrationHoldTickCount = 0;
+    if (!_canHoldConsagration(isHp)) return;
+    _consagrationHoldStartTimer = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        if (!mounted || !_canHoldConsagration(_consagrationHoldIsHp)) return;
+        _didTriggerConsagrationHold = true;
+        _runHoldConsagrationStep();
+      },
+    );
+  }
+
+  void _runHoldConsagrationStep() {
+    if (!mounted || !_canHoldConsagration(_consagrationHoldIsHp)) {
+      _stopHoldConsagration();
+      return;
+    }
+    final batchSize = _selectedConsagrationBatch.fixedMultiplier;
+    if (batchSize != 1 && batchSize != 10) {
+      _stopHoldConsagration();
+      return;
+    }
+    _consagrationHoldTickCount += 1;
+    final ok = _executeConsagrationPurchase(
+      isHp: _consagrationHoldIsHp,
+      levels: batchSize!,
+      isHoldTick: true,
+    );
+    if (!ok || !_canHoldConsagration(_consagrationHoldIsHp)) {
+      _stopHoldConsagration();
+      return;
+    }
+    final nextDelayMs = _consagrationHoldTickCount <= 3
+        ? 180
+        : (_consagrationHoldTickCount <= 8 ? 130 : 90);
+    _consagrationHoldRepeatTimer = Timer(
+      Duration(milliseconds: nextDelayMs),
+      _runHoldConsagrationStep,
+    );
+  }
+
+  void _stepDownConsagrationBatchIfNeeded() {
+    final fixed = _selectedConsagrationBatch.fixedMultiplier;
+    if (fixed == null || fixed == 1) return;
+    final can100 =
+        controller.canAffordMaxHpLevels(100) ||
+        controller.canAffordMaxManaLevels(100);
+    final can10 =
+        controller.canAffordMaxHpLevels(10) ||
+        controller.canAffordMaxManaLevels(10);
+    if (fixed == 100 && !can100) {
+      _selectedConsagrationBatch =
+          can10 ? _ConsagrationBatchOption.x10 : _ConsagrationBatchOption.x1;
+    } else if (fixed == 10 && !can10) {
+      _selectedConsagrationBatch = _ConsagrationBatchOption.x1;
+    }
+  }
+
+  void _triggerConsagrationVisualFeedback({
+    required bool isHp,
+    required int levelsGained,
+  }) {
+    if (!mounted) return;
+    final loc = controller.localization;
+    final formattedCount = _formatGroupedInt(levelsGained, loc);
+    final floatingText = loc
+        .t(
+          isHp
+              ? 'consagration_floating_hp_gain'
+              : 'consagration_floating_mana_gain',
+          fallback: isHp ? '+{count} HP!' : '+{count} Mana!',
+        )
+        .replaceAll('{count}', formattedCount);
+
+    setState(() {
+      if (isHp) {
+        _hpFloatingGainText = floatingText;
+      } else {
+        _manaFloatingGainText = floatingText;
+      }
+    });
+    if (isHp) {
+      _hpFeedbackController.forward(from: 0.0);
+    } else {
+      _manaFeedbackController.forward(from: 0.0);
+    }
+  }
+
+  void _switchToTransmuteFromConsagration() {
+    _stopHoldConsagration();
+    // Smartly pre-select surplus Earth/Metal orb -> lowest basic orb if helpful
+    HandMove? surplus;
+    int bestBalance = 2;
+    for (final candidate in const [
+      HandMove.earth,
+      HandMove.metal,
+      HandMove.fire,
+      HandMove.water,
+      HandMove.wood,
+    ]) {
+      final bal = controller.orbsFor(candidate);
+      if (bal > bestBalance) {
+        bestBalance = bal;
+        surplus = candidate;
+      }
+    }
+    if (surplus != null) {
+      HandMove lowestMain = HandMove.fire;
+      int lowestVal = controller.orbsFor(HandMove.fire);
+      for (final target in const [
+        HandMove.fire,
+        HandMove.water,
+        HandMove.wood,
+      ]) {
+        if (target == surplus) continue;
+        final val = controller.orbsFor(target);
+        if (val < lowestVal || lowestMain == surplus) {
+          lowestVal = val;
+          lowestMain = target;
+        }
+      }
+      _transmuteSource = surplus;
+      _transmuteTarget = lowestMain == surplus
+          ? (surplus == HandMove.fire ? HandMove.water : HandMove.fire)
+          : lowestMain;
+      _stepDownFixedMultiplierIfNeeded();
+    }
+    _selectWing(TempleWing.transmute);
+  }
+
+  void _navigateToHallOfHeroes() {
+    _stopHoldConsagration();
+    controller.audio.playTapVibrate();
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+    }
+    showDialog<void>(
+      context: nav.context,
+      builder: (_) => RoyalCastleDialog(
+        controller: controller,
+        initialWing: CastleWing.hallOfHeroes,
+      ),
+    );
+  }
+
+  void _showInsufficientOrbsPrompt(LocalizationService loc) {
+    controller.audio.playVibrate();
+    if (!_showInsufficientOrbsInlinePrompt && mounted) {
+      setState(() => _showInsufficientOrbsInlinePrompt = true);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+          ),
+          action: SnackBarAction(
+            label: loc.t(
+              'consagration_transform_orbs_btn',
+              fallback: 'Transform Orbs',
+            ),
+            onPressed: () {
+              if (!mounted) return;
+              _switchToTransmuteFromConsagration();
+            },
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  Future<String?> _showHeroPeakGuardDialog({required bool isHp}) {
+    final loc = controller.localization;
+    final palette = AppPalette.of(context);
+    final peakLevel = isHp
+        ? controller.peakHpUpgradeLevel
+        : controller.peakManaUpgradeLevel;
+    final statName = isHp
+        ? loc.t('consagration_max_hp_stat_name', fallback: 'Max HP')
+        : loc.t('consagration_max_mana_stat_name', fallback: 'Max Mana Pool');
+    final bodyText = loc
+        .t(
+          'consagration_heroes_guard_body',
+          fallback:
+              'Your Hall of Heroes blessing restores {stat} up to Lv. {peak} for free. Levels bought below Lv. {peak} will not stack once the blessing is restored.',
+        )
+        .replaceAll('{stat}', statName)
+        .replaceAll('{peak}', _formatGroupedInt(peakLevel, loc));
+
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('consagration_heroes_guard_dialog'),
+        backgroundColor: palette.dialogSurface,
+        surfaceTintColor: palette.isDark ? null : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: palette.amberBorder.withValues(alpha: 0.6),
+            width: 1.3,
+          ),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: palette.amberIcon,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'consagration_heroes_guard_title',
+                  fallback: 'Unclaimed Peak Blessing!',
+                ),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: palette.primaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          bodyText,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: palette.secondaryText,
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('consagration_heroes_guard_buy_anyway_button'),
+            onPressed: () => Navigator.of(dialogContext).pop('buy_anyway'),
+            child: Text(
+              loc.t(
+                'consagration_heroes_guard_buy_anyway',
+                fallback: 'Buy Anyway',
+              ),
+              style: TextStyle(
+                color: palette.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            key: const ValueKey('consagration_heroes_guard_go_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _goldFill,
+              foregroundColor: _goldDarkInk,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop('go_heroes'),
+            child: Text(
+              loc.t(
+                'consagration_heroes_guard_go_cta',
+                fallback: 'Go to Hall of Heroes',
+              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showBatchUpgradeConfirmDialog({
+    required bool isHp,
+    required int levels,
+    required ElementalCost totalCost,
+  }) async {
+    final loc = controller.localization;
+    final palette = AppPalette.of(context);
+
+    final statName = isHp
+        ? loc.t('consagration_max_hp_stat_name', fallback: 'Max HP')
+        : loc.t('consagration_max_mana_stat_name', fallback: 'Max Mana Pool');
+    final beforeLv =
+        isHp ? controller.hpUpgradeLevel : controller.manaUpgradeLevel;
+    final afterLv = beforeLv + levels;
+    final beforeStat =
+        isHp ? controller.playerMaxHp : controller.playerMaxMana;
+    final afterStat = beforeStat + levels;
+    final unitWord = isHp ? 'HP' : loc.t('mana_label', fallback: 'MANA');
+    final levelsGainedText = loc
+        .t('consagration_confirm_levels_gained', fallback: '+{count} Levels')
+        .replaceAll('{count}', _formatGroupedInt(levels, loc));
+    final summaryText =
+        '$levelsGainedText • Lv. ${_formatGroupedInt(beforeLv, loc)} → Lv. ${_formatGroupedInt(afterLv, loc)} • ${_formatGroupedInt(beforeStat, loc)} → ${_formatGroupedInt(afterStat, loc)} $unitWord';
+
+    final remainingFire = math.max(0, controller.fireOrbs - totalCost.fire);
+    final remainingWater = math.max(0, controller.waterOrbs - totalCost.water);
+    final remainingWood = math.max(0, controller.woodOrbs - totalCost.wood);
+
+    Widget buildOrbBreakdownRow(
+      Key rowKey,
+      List<(HandMove move, int amount)> items,
+    ) {
+      return Container(
+        key: rowKey,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: palette.summaryBarSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: palette.amberBorder.withValues(alpha: 0.35),
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                if (i > 0) const SizedBox(width: 14),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElementalEnergySphere(
+                      size: 16,
+                      primaryColor: items[i].$1.elementalPrimaryColor,
+                      secondaryColor: items[i].$1.elementalSecondaryColor,
+                      isDark: palette.isDark,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatGroupedInt(items[i].$2, loc),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: palette.elementalText(items[i].$1),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('consagration_confirm_dialog'),
+        backgroundColor: palette.dialogSurface,
+        surfaceTintColor: palette.isDark ? null : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: palette.amberBorder.withValues(alpha: 0.65),
+            width: 1.4,
+          ),
+        ),
+        title: Row(
+          children: [
+            const ConsagrationChaliceIcon(size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'consagration_confirm_title',
+                  fallback: 'Confirm Batch Upgrade',
+                ),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: palette.primaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: palette.rewardedAdCardSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    statName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    summaryText,
+                    key: const ValueKey('consagration_confirm_summary'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: palette.amberText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              loc.t(
+                'consagration_confirm_total_cost',
+                fallback: 'Total Orb Cost',
+              ),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: palette.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            buildOrbBreakdownRow(
+              const ValueKey('consagration_confirm_cost'),
+              [
+                (HandMove.fire, totalCost.fire),
+                (HandMove.water, totalCost.water),
+                (HandMove.wood, totalCost.wood),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              loc.t(
+                'consagration_confirm_remaining_balance',
+                fallback: 'Remaining After Purchase',
+              ),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: palette.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            buildOrbBreakdownRow(
+              const ValueKey('consagration_confirm_remaining'),
+              [
+                (HandMove.fire, remainingFire),
+                (HandMove.water, remainingWater),
+                (HandMove.wood, remainingWood),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('consagration_confirm_cancel_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              loc.t('consagration_confirm_cancel', fallback: 'Cancel'),
+              style: TextStyle(color: palette.secondaryText),
+            ),
+          ),
+          ElevatedButton(
+            key: const ValueKey('consagration_confirm_submit_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _goldFill,
+              foregroundColor: _goldDarkInk,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              loc.t('consagration_confirm_action', fallback: 'Confirm Upgrade'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  ({int levels, ElementalCost totalCost, bool isAffordable})
+      _resolveConsagrationPreview({required bool isHp}) {
+    final fixed = _selectedConsagrationBatch.fixedMultiplier;
+    if (fixed == null) {
+      final maxRes = isHp
+          ? controller.maxAffordableHpUpgrade()
+          : controller.maxAffordableManaUpgrade();
+      if (maxRes.levels > 0) {
+        return (
+          levels: maxRes.levels,
+          totalCost: maxRes.totalCost,
+          isAffordable: true,
+        );
+      }
+      return (
+        levels: 0,
+        totalCost: isHp
+            ? controller.nextMaxHpUpgradeCost
+            : controller.nextMaxManaUpgradeCost,
+        isAffordable: false,
+      );
+    }
+    final totalCost = isHp
+        ? controller.costForMaxHpLevels(fixed)
+        : controller.costForMaxManaLevels(fixed);
+    return (
+      levels: fixed,
+      totalCost: totalCost,
+      isAffordable: controller.canAfford(totalCost),
+    );
+  }
+
+  Future<void> _handleConsagrationPurchaseTap({required bool isHp}) async {
+    if (_didTriggerConsagrationHold) {
+      _didTriggerConsagrationHold = false;
+      return;
+    }
+    _stopHoldConsagration();
+    final loc = controller.localization;
+    final preview = _resolveConsagrationPreview(isHp: isHp);
+    if (preview.levels <= 0 || !preview.isAffordable) {
+      _showInsufficientOrbsPrompt(loc);
+      return;
+    }
+
+    final isBelowPeak = isHp
+        ? controller.isHpBelowUnclaimedHeroPeak
+        : controller.isManaBelowUnclaimedHeroPeak;
+    if (isBelowPeak) {
+      final decision = await _showHeroPeakGuardDialog(isHp: isHp);
+      if (!mounted) return;
+      if (decision == 'go_heroes') {
+        _navigateToHallOfHeroes();
+        return;
+      }
+      if (decision != 'buy_anyway') {
+        return;
+      }
+    }
+
+    final needsConfirm =
+        _selectedConsagrationBatch == _ConsagrationBatchOption.x100 ||
+        _selectedConsagrationBatch == _ConsagrationBatchOption.max;
+    if (needsConfirm) {
+      final refreshed = _resolveConsagrationPreview(isHp: isHp);
+      if (refreshed.levels <= 0 || !refreshed.isAffordable) {
+        _showInsufficientOrbsPrompt(loc);
+        return;
+      }
+      final confirmed = await _showBatchUpgradeConfirmDialog(
+        isHp: isHp,
+        levels: refreshed.levels,
+        totalCost: refreshed.totalCost,
+      );
+      if (!mounted || !confirmed) return;
+      _executeConsagrationPurchase(
+        isHp: isHp,
+        levels: refreshed.levels,
+        isHoldTick: false,
+      );
+      return;
+    }
+
+    _executeConsagrationPurchase(
+      isHp: isHp,
+      levels: preview.levels,
+      isHoldTick: false,
+    );
+  }
+
+  bool _executeConsagrationPurchase({
+    required bool isHp,
+    required int levels,
+    bool isHoldTick = false,
+  }) {
+    final loc = controller.localization;
+    final ok = isHp
+        ? controller.upgradeMaxHpBatch(levels)
+        : controller.upgradeMaxManaBatch(levels);
+    if (!ok) {
+      if (!isHoldTick) {
+        _showInsufficientOrbsPrompt(loc);
+      }
+      return false;
+    }
+
+    if (mounted) {
+      setState(() {
+        _showInsufficientOrbsInlinePrompt = false;
+        _stepDownConsagrationBatchIfNeeded();
+      });
+    }
+    unawaited(controller.audio.playConsagrationTick(throttle: isHoldTick));
+    _triggerConsagrationVisualFeedback(isHp: isHp, levelsGained: levels);
+
+    if (!isHoldTick && mounted) {
+      final titleText = _consagrationCardTitle(
+        isHp: isHp,
+        levels: levels,
+        loc: loc,
+      );
+      final statStr = isHp
+          ? '${controller.playerMaxHp} HP (Lv. ${controller.hpUpgradeLevel})'
+          : '${controller.playerMaxMana} ${loc.t('mana_label', fallback: 'Mana')} (Lv. ${controller.manaUpgradeLevel})';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('$titleText: $statStr'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+    return true;
+  }
+
+  String _consagrationCardTitle({
+    required bool isHp,
+    required int levels,
+    required LocalizationService loc,
+  }) {
+    if (levels == 1) {
+      return isHp
+          ? loc.t('upgrade_max_hp_title', fallback: '+1 Max HP')
+          : loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool');
+    }
+    return loc
+        .t(
+          isHp ? 'upgrade_max_hp_batch_title' : 'upgrade_max_mana_batch_title',
+          fallback: isHp ? '+{count} Max HP' : '+{count} Max Mana Pool',
+        )
+        .replaceAll('{count}', _formatGroupedInt(levels, loc));
+  }
+
+  String _consagrationCardSubtitle({
+    required bool isHp,
+    required int levels,
+    required LocalizationService loc,
+  }) {
+    if (levels == 1) {
+      return isHp
+          ? loc.t(
+              'upgrade_max_hp_desc',
+              fallback:
+                  "Permanently raises your Cleric's maximum HP by +1 for this campaign.",
+            )
+          : loc.t(
+              'upgrade_max_mana_desc',
+              fallback:
+                  "Permanently expands your Cleric's maximum Mana Pool by +1 turn per battle.",
+            );
+    }
+    return loc
+        .t(
+          isHp ? 'upgrade_max_hp_batch_desc' : 'upgrade_max_mana_batch_desc',
+          fallback: isHp
+              ? "Permanently raises your Cleric's maximum HP by +{count} for this campaign."
+              : "Permanently expands your Cleric's maximum Mana Pool by +{count} turns per battle.",
+        )
+        .replaceAll('{count}', _formatGroupedInt(levels, loc));
+  }
+
+  String _consagrationStatusText({
+    required bool isHp,
+    required int levels,
+    required LocalizationService loc,
+  }) {
+    final currentLv =
+        isHp ? controller.hpUpgradeLevel : controller.manaUpgradeLevel;
+    final currentStat =
+        isHp ? controller.playerMaxHp : controller.playerMaxMana;
+    final unit = isHp ? 'HP' : loc.t('mana_label', fallback: 'MANA');
+    if (levels <= 0) {
+      return 'Lv. $currentLv • $currentStat $unit';
+    }
+    if (levels == 1) {
+      return 'Lv. $currentLv • $currentStat → ${currentStat + 1} $unit';
+    }
+    return 'Lv. $currentLv → ${currentLv + levels} • $currentStat → ${currentStat + levels} $unit';
+  }
+
+  Widget _buildConsagrationBatchSelector({
+    required AppPalette palette,
+    required LocalizationService loc,
+    required bool canAfford10xAny,
+    required bool canAfford100xAny,
+  }) {
+    final trackBg = palette.isDark
+        ? const Color(0xFF14171F)
+        : const Color(0xFFE9E0CD);
+    final trackBorder = palette.amberBorder.withValues(
+      alpha: palette.isDark ? 0.25 : 0.45,
+    );
+
+    bool isOptionEnabled(_ConsagrationBatchOption option) {
+      switch (option) {
+        case _ConsagrationBatchOption.x1:
+          return true;
+        case _ConsagrationBatchOption.x10:
+          return canAfford10xAny;
+        case _ConsagrationBatchOption.x100:
+          return canAfford100xAny;
+        case _ConsagrationBatchOption.max:
+          return true;
+      }
+    }
+
+    return Container(
+      key: const ValueKey('consagration_batch_selector'),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: trackBg,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: trackBorder, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < _ConsagrationBatchOption.values.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2.5),
+            _buildConsagrationBatchPill(
+              option: _ConsagrationBatchOption.values[i],
+              palette: palette,
+              loc: loc,
+              isEnabled: isOptionEnabled(_ConsagrationBatchOption.values[i]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConsagrationBatchPill({
+    required _ConsagrationBatchOption option,
+    required AppPalette palette,
+    required LocalizationService loc,
+    required bool isEnabled,
+  }) {
+    final isSelected = _selectedConsagrationBatch == option;
+
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+
+    if (isSelected) {
+      bgColor = isEnabled ? _goldFill : _goldFill.withValues(alpha: 0.45);
+      borderColor = bgColor;
+      textColor =
+          isEnabled ? _goldDarkInk : _goldDarkInk.withValues(alpha: 0.72);
+    } else if (isEnabled) {
+      bgColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : const Color(0xFFFAF6EE);
+      borderColor = palette.amberBorder.withValues(
+        alpha: palette.isDark ? 0.28 : 0.42,
+      );
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.90)
+          : palette.primaryText;
+    } else {
+      bgColor = Colors.transparent;
+      borderColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : palette.sandCardBorder.withValues(alpha: 0.55);
+      textColor = palette.isDark
+          ? Colors.white.withValues(alpha: 0.28)
+          : palette.mutedText.withValues(alpha: 0.42);
+    }
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      enabled: isEnabled,
+      label: option.label(loc),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey(option.keyName),
+          onTap: isEnabled
+              ? () {
+                  _stopHoldConsagration();
+                  controller.audio.playTapVibrate();
+                  setState(() {
+                    _selectedConsagrationBatch = option;
+                    _showInsufficientOrbsInlinePrompt = false;
+                  });
+                }
+              : null,
+          borderRadius: BorderRadius.circular(6.5),
+          child: Container(
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(6.5),
+              border: Border.all(color: borderColor, width: 0.9),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              option.label(loc),
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                color: textColor,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroesPeakWarningBanner(
+    AppPalette palette,
+    LocalizationService loc,
+  ) {
+    final hpBelow = controller.isHpBelowUnclaimedHeroPeak;
+    final manaBelow = controller.isManaBelowUnclaimedHeroPeak;
+    final String bodyText;
+    if (hpBelow && manaBelow) {
+      bodyText = loc
+          .t(
+            'consagration_heroes_banner_both',
+            fallback:
+                'Restore HP up to Lv. {hp} and Mana up to Lv. {mana} in the Royal Castle without spending orbs.',
+          )
+          .replaceAll('{hp}', '${controller.peakHpUpgradeLevel}')
+          .replaceAll('{mana}', '${controller.peakManaUpgradeLevel}');
+    } else if (hpBelow) {
+      bodyText = loc
+          .t(
+            'consagration_heroes_banner_hp',
+            fallback:
+                'Restore HP up to Lv. {hp} in the Royal Castle without spending orbs.',
+          )
+          .replaceAll('{hp}', '${controller.peakHpUpgradeLevel}');
+    } else {
+      bodyText = loc
+          .t(
+            'consagration_heroes_banner_mana',
+            fallback:
+                'Restore Mana up to Lv. {mana} in the Royal Castle without spending orbs.',
+          )
+          .replaceAll('{mana}', '${controller.peakManaUpgradeLevel}');
+    }
+
+    return Container(
+      key: const ValueKey('consagration_heroes_warning_banner'),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.rewardedAdCardSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.amberBorder.withValues(alpha: 0.65)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 18,
+            color: palette.amberIcon,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  loc.t(
+                    'consagration_heroes_banner_title',
+                    fallback: 'Unclaimed Hall of Heroes Blessing',
+                  ),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: palette.amberText,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  bodyText,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.25,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            key: const ValueKey('consagration_heroes_banner_button'),
+            onPressed: _navigateToHallOfHeroes,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _goldFill,
+              foregroundColor: _goldDarkInk,
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              loc.t('consagration_heroes_banner_cta', fallback: 'Hall of Heroes'),
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildConsagrationWing(
     BuildContext context,
     AppPalette palette,
@@ -873,6 +1899,25 @@ class _ShopDialogState extends State<ShopDialog> {
           )
         : loc.t('temple_consagration_watch_ad_btn', fallback: 'Watch Ad: +1 Lv');
 
+    final canAfford10xAny =
+        controller.canAffordMaxHpLevels(10) ||
+        controller.canAffordMaxManaLevels(10);
+    final canAfford100xAny =
+        controller.canAffordMaxHpLevels(100) ||
+        controller.canAffordMaxManaLevels(100);
+
+    final hpPreview = _resolveConsagrationPreview(isHp: true);
+    final manaPreview = _resolveConsagrationPreview(isHp: false);
+
+    final showTransformPrompt =
+        _showInsufficientOrbsInlinePrompt ||
+        (_selectedConsagrationBatch == _ConsagrationBatchOption.max &&
+            (hpPreview.levels == 0 || manaPreview.levels == 0));
+
+    final isHoldBatch =
+        _selectedConsagrationBatch == _ConsagrationBatchOption.x1 ||
+        _selectedConsagrationBatch == _ConsagrationBatchOption.x10;
+
     return SingleChildScrollView(
       key: const ValueKey('temple_wing_consagration'),
       controller: _wingScrollController,
@@ -881,92 +1926,153 @@ class _ShopDialogState extends State<ShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  loc.t(
-                    'temple_wing_consagration_title',
-                    fallback: 'Consagration Room',
-                  ),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: palette.primaryText,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    loc.t(
+                      'temple_wing_consagration_title',
+                      fallback: 'Consagration Room',
+                    ),
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: palette.primaryText,
+                    ),
                   ),
                 ),
               ),
-              if (!isRemoveAds)
-                Container(
-                  key: const ValueKey('consagration_weekly_ad_counter'),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: palette.rewardedAdCardSurface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: palette.amberBorder.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  child: Text(
-                    '$remainingAds / ${GameController.maxWeeklyAdConsagrations} ${loc.t('temple_consagration_weekly_left', fallback: 'Ad Lv/Wk')}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: palette.amberText,
-                    ),
+              const SizedBox(width: 8),
+              Flexible(
+                fit: FlexFit.loose,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: _buildConsagrationBatchSelector(
+                    palette: palette,
+                    loc: loc,
+                    canAfford10xAny: canAfford10xAny,
+                    canAfford100xAny: canAfford100xAny,
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
+          if (controller.hasUnclaimedHeroPeakWarning)
+            _buildHeroesPeakWarningBanner(palette, loc),
+          if (showTransformPrompt)
+            Container(
+              key: const ValueKey('consagration_transform_prompt'),
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: palette.summaryBarSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 15,
+                    color: palette.amberIcon,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      loc.t(
+                        'consagration_transform_orbs_hint',
+                        fallback:
+                            'Need Fire, Water, or Wood orbs? Convert surplus Earth & Metal orbs.',
+                      ),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    key: const ValueKey('consagration_transform_orbs_button'),
+                    style: TextButton.styleFrom(
+                      backgroundColor: _goldFill,
+                      foregroundColor: _goldDarkInk,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      minimumSize: const Size(0, 26),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: _switchToTransmuteFromConsagration,
+                    child: Text(
+                      loc.t(
+                        'consagration_transform_orbs_btn',
+                        fallback: 'Transform Orbs',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _InfiniteStatUpgradeTile(
             cardKey: const ValueKey('shop_upgrade_max_hp_card'),
             buttonKey: const ValueKey('shop_upgrade_max_hp_button'),
             adButtonKey: const ValueKey('consagration_hp_watch_ad_button'),
+            floatingGainKey: const ValueKey('consagration_hp_floating_gain'),
             iconWidget: const VitalityHeartIcon(size: 46),
-            title: loc.t('upgrade_max_hp_title', fallback: '+1 Max HP'),
-            subtitle: loc.t(
-              'upgrade_max_hp_desc',
-              fallback:
-                  "Permanently raises your Cleric's maximum HP by +1 for this campaign.",
+            title: _consagrationCardTitle(
+              isHp: true,
+              levels: hpPreview.levels,
+              loc: loc,
             ),
-            statusText:
-                'Lv. ${controller.hpUpgradeLevel} • ${controller.playerMaxHp} → ${controller.playerMaxHp + 1} HP',
+            subtitle: _consagrationCardSubtitle(
+              isHp: true,
+              levels: hpPreview.levels,
+              loc: loc,
+            ),
+            statusText: _consagrationStatusText(
+              isHp: true,
+              levels: hpPreview.levels,
+              loc: loc,
+            ),
             actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
-            cost: controller.nextMaxHpUpgradeCost,
+            cost: hpPreview.totalCost,
+            formatThousands: true,
+            numberLocale: loc.currentLanguage,
+            isAffordable: hpPreview.isAffordable,
             showAdButton: !isRemoveAds,
             adButtonLabel: adButtonLabel,
             canWatchAd: canWatchAd,
-            onPurchase: () {
-              final ok = controller.upgradeMaxHp();
-              if (ok) {
-                controller.audio.playWinVibrate();
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${loc.t('upgrade_max_hp_title', fallback: '+1 Max HP')}: ${controller.playerMaxHp} HP (Lv. ${controller.hpUpgradeLevel})',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-              } else {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        loc.t('string79', fallback: 'Not enough Elemental Orbs'),
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-              }
-            },
+            feedbackAnimation: _hpFeedbackController,
+            floatingGainText: _hpFloatingGainText,
+            onHoldStart: isHoldBatch && !controller.isHpBelowUnclaimedHeroPeak
+                ? () => _startHoldConsagration(true)
+                : null,
+            onHoldEnd: _stopHoldConsagration,
+            onPurchase: () => _handleConsagrationPurchaseTap(isHp: true),
             onWatchAd: () {
+              _stopHoldConsagration();
               controller.watchAdToUpgradeMaxHp(
                 onUpgraded: () {
+                  _triggerConsagrationVisualFeedback(
+                    isHp: true,
+                    levelsGained: 1,
+                  );
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
@@ -986,50 +2092,46 @@ class _ShopDialogState extends State<ShopDialog> {
             cardKey: const ValueKey('shop_upgrade_max_mana_card'),
             buttonKey: const ValueKey('shop_upgrade_max_mana_button'),
             adButtonKey: const ValueKey('consagration_mana_watch_ad_button'),
+            floatingGainKey: const ValueKey('consagration_mana_floating_gain'),
             iconWidget: const ManaDropIcon(size: 46),
-            title: loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool'),
-            subtitle: loc.t(
-              'upgrade_max_mana_desc',
-              fallback:
-                  "Permanently expands your Cleric's maximum Mana Pool by +1 turn per battle.",
+            title: _consagrationCardTitle(
+              isHp: false,
+              levels: manaPreview.levels,
+              loc: loc,
             ),
-            statusText:
-                'Lv. ${controller.manaUpgradeLevel} • ${controller.playerMaxMana} → ${controller.playerMaxMana + 1} ${loc.t('mana_label', fallback: 'Mana')}',
+            subtitle: _consagrationCardSubtitle(
+              isHp: false,
+              levels: manaPreview.levels,
+              loc: loc,
+            ),
+            statusText: _consagrationStatusText(
+              isHp: false,
+              levels: manaPreview.levels,
+              loc: loc,
+            ),
             actionLabel: loc.t('stat_upgrade_action_label', fallback: 'Upgrade'),
-            cost: controller.nextMaxManaUpgradeCost,
+            cost: manaPreview.totalCost,
+            formatThousands: true,
+            numberLocale: loc.currentLanguage,
+            isAffordable: manaPreview.isAffordable,
             showAdButton: !isRemoveAds,
             adButtonLabel: adButtonLabel,
             canWatchAd: canWatchAd,
-            onPurchase: () {
-              final ok = controller.upgradeMaxMana();
-              if (ok) {
-                controller.audio.playWinVibrate();
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${loc.t('upgrade_max_mana_title', fallback: '+1 Max Mana Pool')}: ${controller.playerMaxMana} ${loc.t('mana_label', fallback: 'Mana')} (Lv. ${controller.manaUpgradeLevel})',
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-              } else {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        loc.t('string79', fallback: 'Not enough Elemental Orbs'),
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-              }
-            },
+            feedbackAnimation: _manaFeedbackController,
+            floatingGainText: _manaFloatingGainText,
+            onHoldStart: isHoldBatch && !controller.isManaBelowUnclaimedHeroPeak
+                ? () => _startHoldConsagration(false)
+                : null,
+            onHoldEnd: _stopHoldConsagration,
+            onPurchase: () => _handleConsagrationPurchaseTap(isHp: false),
             onWatchAd: () {
+              _stopHoldConsagration();
               controller.watchAdToUpgradeMaxMana(
                 onUpgraded: () {
+                  _triggerConsagrationVisualFeedback(
+                    isHp: false,
+                    levelsGained: 1,
+                  );
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
@@ -1046,24 +2148,24 @@ class _ShopDialogState extends State<ShopDialog> {
             },
           ),
           if (!isRemoveAds) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Container(
               key: const ValueKey('consagration_ad_disclosure_box'),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
               decoration: BoxDecoration(
                 color: palette.rewardedAdCardSurface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: palette.rewardedAdCardBorder),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.ondemand_video_rounded,
                     size: 16,
                     color: palette.amberIcon,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Text(
                       loc.t(
@@ -1072,9 +2174,32 @@ class _ShopDialogState extends State<ShopDialog> {
                             'Rewarded Video Ad: watch an ad to gain +1 permanent Max HP or Max Mana level (up to 3 per campaign week).',
                       ),
                       style: TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
+                        fontSize: 10.5,
+                        height: 1.3,
                         color: palette.secondaryText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    key: const ValueKey('consagration_weekly_ad_counter'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.dialogSurface,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: palette.amberBorder.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Text(
+                      '$remainingAds / ${GameController.maxWeeklyAdConsagrations} ${loc.t('temple_consagration_weekly_left', fallback: 'Ad Lv/Wk')}',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: palette.amberText,
                       ),
                     ),
                   ),
@@ -4009,15 +5134,23 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
   final Key cardKey;
   final Key buttonKey;
   final Key adButtonKey;
+  final Key? floatingGainKey;
   final Widget iconWidget;
   final String title;
   final String subtitle;
   final String statusText;
   final String actionLabel;
   final ElementalCost cost;
+  final bool formatThousands;
+  final String numberLocale;
+  final bool isAffordable;
   final bool showAdButton;
   final String adButtonLabel;
   final bool canWatchAd;
+  final Animation<double>? feedbackAnimation;
+  final String? floatingGainText;
+  final VoidCallback? onHoldStart;
+  final VoidCallback? onHoldEnd;
   final VoidCallback onPurchase;
   final VoidCallback onWatchAd;
 
@@ -4025,15 +5158,23 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
     required this.cardKey,
     required this.buttonKey,
     required this.adButtonKey,
+    this.floatingGainKey,
     required this.iconWidget,
     required this.title,
     required this.subtitle,
     required this.statusText,
     required this.actionLabel,
     required this.cost,
+    this.formatThousands = false,
+    this.numberLocale = 'en',
+    this.isAffordable = true,
     required this.showAdButton,
     required this.adButtonLabel,
     required this.canWatchAd,
+    this.feedbackAnimation,
+    this.floatingGainText,
+    this.onHoldStart,
+    this.onHoldEnd,
     required this.onPurchase,
     required this.onWatchAd,
   });
@@ -4043,194 +5184,308 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final entries = cost.nonZeroEntries;
+    final baseBg = palette.isDark
+        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+        : palette.shopTileSurface;
+    final baseBorder = palette.isDark
+        ? palette.amberBorder.withValues(alpha: 0.32)
+        : palette.sandCardBorder;
 
-    return Container(
-      key: cardKey,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: palette.isDark
-            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-            : palette.shopTileSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: palette.isDark
-              ? palette.amberBorder.withValues(alpha: 0.32)
-              : palette.sandCardBorder,
-          width: 1.0,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
+    Widget buildCard(double flashStrength) {
+      final flashBg = flashStrength > 0
+          ? Color.lerp(
+              baseBg,
+              _ShopDialogState._goldFill.withValues(
+                alpha: palette.isDark ? 0.24 : 0.35,
+              ),
+              flashStrength,
+            )!
+          : baseBg;
+      final flashBorder = flashStrength > 0
+          ? Color.lerp(baseBorder, _ShopDialogState._goldFill, flashStrength)!
+          : baseBorder;
+
+      return Container(
+        key: cardKey,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: flashBg,
           borderRadius: BorderRadius.circular(12),
-          onTap: onPurchase,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+          border: Border.all(
+            color: flashBorder,
+            width: flashStrength > 0.1 ? 1.5 : 1.0,
+          ),
+        ),
+        child: Listener(
+          onPointerDown: onHoldStart != null ? (_) => onHoldStart!() : null,
+          onPointerUp: onHoldEnd != null ? (_) => onHoldEnd!() : null,
+          onPointerCancel: onHoldEnd != null ? (_) => onHoldEnd!() : null,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onPurchase,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    iconWidget,
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        iconWidget,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(
-                                flex: 4,
-                                child: Text(
-                                  title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: Text(
+                                      title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: palette.primaryText,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    flex: 6,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: palette.rewardedAdCardSurface,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: palette.amberBorder.withValues(
+                                            alpha: 0.45,
+                                          ),
+                                        ),
+                                      ),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: Text(
+                                          statusText,
+                                          maxLines: 1,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: palette.amberText,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (subtitle.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  subtitle,
+                                  softWrap: true,
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: palette.primaryText,
+                                    fontSize: 11,
+                                    height: 1.3,
+                                    color: palette.amberSubtitle,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    LayoutBuilder(
+                      builder: (context, constraints) => Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            actionLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: palette.isDark
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                              color: palette.isDark
+                                  ? Colors.grey
+                                  : palette.secondaryText,
+                            ),
+                          ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: constraints.maxWidth,
+                                ),
+                                child: ElevatedButton(
+                                  key: buttonKey,
+                                  onPressed: onPurchase,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: palette.isDark
+                                        ? null
+                                        : palette.dialogSurface,
+                                    elevation: palette.isDark ? null : 1,
+                                    side: isAffordable
+                                        ? (palette.isDark
+                                              ? null
+                                              : BorderSide(
+                                                  color: palette.sandCardBorder,
+                                                ))
+                                        : BorderSide(
+                                            color: palette.dangerText
+                                                .withValues(alpha: 0.55),
+                                          ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 5,
+                                    ),
+                                    minimumSize: const Size(52, 30),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: _ElementalCostPillRow(
+                                    entries: entries,
+                                    palette: palette,
+                                    formatThousands: formatThousands,
+                                    numberLocale: numberLocale,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                flex: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: palette.rewardedAdCardSurface,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: palette.amberBorder
-                                          .withValues(alpha: 0.45),
+                              if (showAdButton)
+                                Listener(
+                                  onPointerDown: onHoldEnd != null
+                                      ? (_) => onHoldEnd!()
+                                      : null,
+                                  child: ElevatedButton.icon(
+                                    key: adButtonKey,
+                                    onPressed: canWatchAd ? onWatchAd : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber,
+                                      foregroundColor: const Color(0xFF231F1A),
+                                      disabledBackgroundColor: Colors.amber
+                                          .withValues(alpha: 0.28),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 5,
+                                      ),
+                                      minimumSize: const Size(52, 30),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                  ),
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      statusText,
-                                      maxLines: 1,
-                                      style: TextStyle(
+                                    icon: const Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      size: 14,
+                                    ),
+                                    label: Text(
+                                      adButtonLabel,
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: palette.amberText,
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
-                          if (subtitle.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              subtitle,
-                              softWrap: true,
-                              style: TextStyle(
-                                fontSize: 11,
-                                height: 1.3,
-                                color: palette.amberSubtitle,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 9),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      actionLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: palette.isDark
-                            ? FontWeight.normal
-                            : FontWeight.w600,
-                        color: palette.isDark
-                            ? Colors.grey
-                            : palette.secondaryText,
-                      ),
-                    ),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      alignment: WrapAlignment.end,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        ElevatedButton(
-                          key: buttonKey,
-                          onPressed: onPurchase,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                palette.isDark ? null : palette.dialogSurface,
-                            elevation: palette.isDark ? null : 1,
-                            side: palette.isDark
-                                ? null
-                                : BorderSide(color: palette.sandCardBorder),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            minimumSize: const Size(52, 30),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: _ElementalCostPillRow(
-                            entries: entries,
-                            palette: palette,
-                          ),
-                        ),
-                        if (showAdButton)
-                          ElevatedButton.icon(
-                            key: adButtonKey,
-                            onPressed: canWatchAd ? onWatchAd : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber,
-                              foregroundColor: const Color(0xFF231F1A),
-                              disabledBackgroundColor:
-                                  Colors.amber.withValues(alpha: 0.28),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 5,
-                              ),
-                              minimumSize: const Size(52, 30),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            icon: const Icon(
-                              Icons.play_circle_fill_rounded,
-                              size: 14,
-                            ),
-                            label: Text(
-                              adButtonLabel,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      );
+    }
+
+    final anim = feedbackAnimation;
+    if (anim == null) {
+      return buildCard(0.0);
+    }
+
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (context, _) {
+        final t = anim.value;
+        final isActive =
+            t > 0.0 && anim.status != AnimationStatus.dismissed && t < 1.0;
+        final flashStrength = isActive ? (1.0 - t).clamp(0.0, 1.0) : 0.0;
+        final showFloating =
+            floatingGainText != null &&
+            (isActive || anim.status == AnimationStatus.forward);
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            buildCard(flashStrength),
+            if (showFloating)
+              Positioned(
+                top: 6,
+                right: 12,
+                child: IgnorePointer(
+                  child: Transform.translate(
+                    offset: Offset(0, -18.0 * t),
+                    child: Opacity(
+                      opacity: (1.0 - t * 0.85).clamp(0.0, 1.0),
+                      child: Container(
+                        key: floatingGainKey,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _ShopDialogState._goldFill,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          floatingGainText!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: _ShopDialogState._goldDarkInk,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -4620,11 +5875,25 @@ class _SacredBlessingCard extends StatelessWidget {
 class _ElementalCostPillRow extends StatelessWidget {
   final List<MapEntry<HandMove, int>> entries;
   final AppPalette palette;
+  final bool formatThousands;
+  final String numberLocale;
 
   const _ElementalCostPillRow({
     required this.entries,
     required this.palette,
+    this.formatThousands = false,
+    this.numberLocale = 'en',
   });
+
+  String _formatAmount(int value) {
+    final str = value.toString();
+    if (!formatThousands || str.length <= 3) return str;
+    final sep = numberLocale == 'en' ? ',' : '.';
+    return str.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}$sep',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4648,7 +5917,7 @@ class _ElementalCostPillRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 2.5),
                 Text(
-                  '${entries[i].value}',
+                  _formatAmount(entries[i].value),
                   style: TextStyle(
                     fontSize: 10.5,
                     color: palette.elementalText(entries[i].key),

@@ -177,6 +177,62 @@ class GameController extends ChangeNotifier {
     return ElementalCost(fire: perOrb, water: perOrb, wood: perOrb);
   }
 
+  /// Safe iteration ceiling for `MAX` batch searches so zero-cost edge cases
+  /// in tests can never spin indefinitely.
+  static const int maxBatchSearchLimit = 100000;
+
+  /// Sums exact level-by-level orb costs from [currentLevel] through
+  /// `currentLevel + levels - 1` using [costForLevel].
+  static ElementalCost calculateProgressiveUpgradeCost({
+    required int currentLevel,
+    required int levels,
+    required ElementalCost Function(int level) costForLevel,
+  }) {
+    if (levels <= 0) return const ElementalCost();
+    int fire = 0;
+    int water = 0;
+    int wood = 0;
+    int earth = 0;
+    int metal = 0;
+    for (int i = 0; i < levels; i++) {
+      final step = costForLevel(currentLevel + i);
+      fire += step.fire;
+      water += step.water;
+      wood += step.wood;
+      earth += step.earth;
+      metal += step.metal;
+    }
+    return ElementalCost(
+      fire: fire,
+      water: water,
+      wood: wood,
+      earth: earth,
+      metal: metal,
+    );
+  }
+
+  static ElementalCost maxHpBatchCost({
+    required int startLevel,
+    required int levels,
+  }) {
+    return calculateProgressiveUpgradeCost(
+      currentLevel: startLevel,
+      levels: levels,
+      costForLevel: maxHpUpgradeCostForLevel,
+    );
+  }
+
+  static ElementalCost maxManaBatchCost({
+    required int startLevel,
+    required int levels,
+  }) {
+    return calculateProgressiveUpgradeCost(
+      currentLevel: startLevel,
+      levels: levels,
+      costForLevel: maxManaUpgradeCostForLevel,
+    );
+  }
+
   // Shop Upgrade Elemental Orb Costs
   static const ElementalCost costPredictability = ElementalCost(
     fire: 15,
@@ -1725,6 +1781,15 @@ class GameController extends ChangeNotifier {
 
   int get hallOfHeroesTargetMaxHp => baseMaxHp + peakHpUpgradeLevel;
   int get hallOfHeroesTargetMaxMana => baseMaxMana + peakManaUpgradeLevel;
+
+  bool get isHpBelowUnclaimedHeroPeak =>
+      hallOfHeroesClaimAvailable && hpUpgradeLevel < peakHpUpgradeLevel;
+
+  bool get isManaBelowUnclaimedHeroPeak =>
+      hallOfHeroesClaimAvailable && manaUpgradeLevel < peakManaUpgradeLevel;
+
+  bool get hasUnclaimedHeroPeakWarning =>
+      isHpBelowUnclaimedHeroPeak || isManaBelowUnclaimedHeroPeak;
 
   bool get hasRoyalCastleNotification =>
       isTreasuryFull ||
@@ -3664,24 +3729,206 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  /// Infinitely upgrades the Cleric's Max HP by +1 using only Fire, Water, and
-  /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat
-  /// and tracking the all-time historical peak.
-  bool upgradeMaxHp() {
-    return purchaseWithOrbs(
-      cost: nextMaxHpUpgradeCost,
-      onUnlock: _applyMaxHpLevelGain,
+  /// Returns the exact progressive orb cost to upgrade Max HP by [levels]
+  /// starting from [fromLevel] (defaults to [hpUpgradeLevel]).
+  ElementalCost costForMaxHpLevels(int levels, {int? fromLevel}) =>
+      maxHpBatchCost(startLevel: fromLevel ?? hpUpgradeLevel, levels: levels);
+
+  /// Returns the exact progressive orb cost to upgrade Max Mana by [levels]
+  /// starting from [fromLevel] (defaults to [manaUpgradeLevel]).
+  ElementalCost costForMaxManaLevels(int levels, {int? fromLevel}) =>
+      maxManaBatchCost(
+        startLevel: fromLevel ?? manaUpgradeLevel,
+        levels: levels,
+      );
+
+  /// Iteratively computes the maximum affordable level count and exact summed
+  /// orb cost starting at [currentLevel] without exceeding current orb balances
+  /// (bounded by [maxBatchSearchLimit] against zero-cost edge cases).
+  ({int levels, ElementalCost totalCost}) calculateMaxAffordableUpgrade({
+    required int currentLevel,
+    required ElementalCost Function(int level) costForLevel,
+    int maxIterations = maxBatchSearchLimit,
+  }) {
+    int levels = 0;
+    int sumFire = 0;
+    int sumWater = 0;
+    int sumWood = 0;
+    int sumEarth = 0;
+    int sumMetal = 0;
+
+    final cap = maxIterations.clamp(0, maxBatchSearchLimit);
+    for (int k = 0; k < cap; k++) {
+      final step = costForLevel(currentLevel + k);
+      if (sumFire + step.fire > fireOrbs ||
+          sumWater + step.water > waterOrbs ||
+          sumWood + step.wood > woodOrbs ||
+          sumEarth + step.earth > earthOrbs ||
+          sumMetal + step.metal > metalOrbs) {
+        break;
+      }
+      sumFire += step.fire;
+      sumWater += step.water;
+      sumWood += step.wood;
+      sumEarth += step.earth;
+      sumMetal += step.metal;
+      levels += 1;
+    }
+
+    return (
+      levels: levels,
+      totalCost: ElementalCost(
+        fire: sumFire,
+        water: sumWater,
+        wood: sumWood,
+        earth: sumEarth,
+        metal: sumMetal,
+      ),
     );
   }
 
+  ({int levels, ElementalCost totalCost}) maxAffordableHpUpgrade() =>
+      calculateMaxAffordableUpgrade(
+        currentLevel: hpUpgradeLevel,
+        costForLevel: maxHpUpgradeCostForLevel,
+      );
+
+  ({int levels, ElementalCost totalCost}) maxAffordableManaUpgrade() =>
+      calculateMaxAffordableUpgrade(
+        currentLevel: manaUpgradeLevel,
+        costForLevel: maxManaUpgradeCostForLevel,
+      );
+
+  bool canAffordMaxHpLevels(int levels) =>
+      levels > 0 && canAfford(costForMaxHpLevels(levels));
+
+  bool canAffordMaxManaLevels(int levels) =>
+      levels > 0 && canAfford(costForMaxManaLevels(levels));
+
+  /// Atomically upgrades the Cleric's Max HP by [levels] using exact
+  /// progressive level-by-level orb summation, updating peaks and persisting
+  /// in a single write to [StorageService] and [PlayGamesService].
+  bool upgradeMaxHpBatch(int levels) {
+    if (levels <= 0) {
+      audio.playVibrate();
+      return false;
+    }
+    final totalCost = costForMaxHpLevels(levels);
+    if (!canAfford(totalCost)) {
+      audio.playVibrate();
+      return false;
+    }
+
+    fireOrbs -= totalCost.fire;
+    waterOrbs -= totalCost.water;
+    woodOrbs -= totalCost.wood;
+    earthOrbs -= totalCost.earth;
+    metalOrbs -= totalCost.metal;
+    turn0FireOrbs = math.max(0, turn0FireOrbs - totalCost.fire);
+    turn0WaterOrbs = math.max(0, turn0WaterOrbs - totalCost.water);
+    turn0WoodOrbs = math.max(0, turn0WoodOrbs - totalCost.wood);
+    turn0EarthOrbs = math.max(0, turn0EarthOrbs - totalCost.earth);
+    turn0MetalOrbs = math.max(0, turn0MetalOrbs - totalCost.metal);
+
+    hpUpgradeLevel += levels;
+    final int? updatedPeakHp;
+    if (hpUpgradeLevel > peakHpUpgradeLevel) {
+      peakHpUpgradeLevel = hpUpgradeLevel;
+      updatedPeakHp = peakHpUpgradeLevel;
+    } else {
+      updatedPeakHp = null;
+    }
+
+    int? updatedUserHp;
+    if (!hasGameStarted) {
+      userHp = effectivePlayerMaxHp;
+      updatedUserHp = userHp;
+    }
+
+    storage.persistStatUpgradeBatch(
+      fire: fireOrbs,
+      water: waterOrbs,
+      wood: woodOrbs,
+      earth: earthOrbs,
+      metal: metalOrbs,
+      turn0Fire: turn0FireOrbs,
+      turn0Water: turn0WaterOrbs,
+      turn0Wood: turn0WoodOrbs,
+      turn0Earth: turn0EarthOrbs,
+      turn0Metal: turn0MetalOrbs,
+      hpUpgradeLevel: hpUpgradeLevel,
+      peakHpUpgradeLevel: updatedPeakHp,
+      userHp: updatedUserHp,
+    );
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Atomically upgrades the Cleric's Max Mana Pool by [levels] using exact
+  /// progressive level-by-level orb summation, updating peaks and persisting
+  /// in a single write to [StorageService] and [PlayGamesService].
+  bool upgradeMaxManaBatch(int levels) {
+    if (levels <= 0) {
+      audio.playVibrate();
+      return false;
+    }
+    final totalCost = costForMaxManaLevels(levels);
+    if (!canAfford(totalCost)) {
+      audio.playVibrate();
+      return false;
+    }
+
+    fireOrbs -= totalCost.fire;
+    waterOrbs -= totalCost.water;
+    woodOrbs -= totalCost.wood;
+    earthOrbs -= totalCost.earth;
+    metalOrbs -= totalCost.metal;
+    turn0FireOrbs = math.max(0, turn0FireOrbs - totalCost.fire);
+    turn0WaterOrbs = math.max(0, turn0WaterOrbs - totalCost.water);
+    turn0WoodOrbs = math.max(0, turn0WoodOrbs - totalCost.wood);
+    turn0EarthOrbs = math.max(0, turn0EarthOrbs - totalCost.earth);
+    turn0MetalOrbs = math.max(0, turn0MetalOrbs - totalCost.metal);
+
+    manaUpgradeLevel += levels;
+    final int? updatedPeakMana;
+    if (manaUpgradeLevel > peakManaUpgradeLevel) {
+      peakManaUpgradeLevel = manaUpgradeLevel;
+      updatedPeakMana = peakManaUpgradeLevel;
+    } else {
+      updatedPeakMana = null;
+    }
+    if (totalRounds < playerMaxMana) {
+      is100RoundsAlertPending = false;
+    }
+
+    storage.persistStatUpgradeBatch(
+      fire: fireOrbs,
+      water: waterOrbs,
+      wood: woodOrbs,
+      earth: earthOrbs,
+      metal: metalOrbs,
+      turn0Fire: turn0FireOrbs,
+      turn0Water: turn0WaterOrbs,
+      turn0Wood: turn0WoodOrbs,
+      turn0Earth: turn0EarthOrbs,
+      turn0Metal: turn0MetalOrbs,
+      manaUpgradeLevel: manaUpgradeLevel,
+      peakManaUpgradeLevel: updatedPeakMana,
+    );
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Infinitely upgrades the Cleric's Max HP by +1 using only Fire, Water, and
+  /// Wood orbs (`2 + hpUpgradeLevel ~/ 2` each), updating current HP if out of combat
+  /// and tracking the all-time historical peak.
+  bool upgradeMaxHp() => upgradeMaxHpBatch(1);
+
   /// Infinitely upgrades the Cleric's Max Mana Pool by +1 using only Fire, Water,
   /// and Wood orbs (`3 + manaUpgradeLevel ~/ 2` each) and tracks the all-time peak.
-  bool upgradeMaxMana() {
-    return purchaseWithOrbs(
-      cost: nextMaxManaUpgradeCost,
-      onUnlock: _applyMaxManaLevelGain,
-    );
-  }
+  bool upgradeMaxMana() => upgradeMaxManaBatch(1);
 
   /// Displays a rewarded video ad to grant +1 permanent Max HP level for this
   /// campaign (capped at [maxWeeklyAdConsagrations] per campaign week).
