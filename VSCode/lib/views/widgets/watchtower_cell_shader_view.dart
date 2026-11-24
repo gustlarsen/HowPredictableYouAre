@@ -22,6 +22,13 @@ enum WatchtowerPrincessStage {
 /// when fragment shaders are unavailable (e.g. headless CI `flutter test`).
 class WatchtowerCellShaderView extends StatefulWidget {
   static const int maxProgressionWeek = 40;
+  static const String standingAsset = 'assets/images/princess_captive.png';
+  static const String cryingWeek1Asset =
+      'assets/images/princess_captive_crying.png';
+  static const String cryingOpenAsset =
+      'assets/images/princess_captive_crying_open.png';
+  static const String cryingPregAsset =
+      'assets/images/princess_captive_crying_preg.png';
 
   final bool animationsEnabled;
   final bool forceStaticFallback;
@@ -55,12 +62,34 @@ class WatchtowerCellShaderView extends StatefulWidget {
     return WatchtowerPrincessStage.standing;
   }
 
-  /// Normalized belly growth progress: `0.0` for Week 0–1, smoothly ramping
-  /// from `1/39` at Week 2 to `1.0` at Week 40.
+  /// Normalized abdomen/belly growth progress (`uAbdomenGrowth`): `0.0` for
+  /// Week 0–1, smoothly ramping from `1/39` at Week 2 to `1.0` at Week 40.
   double get bellyProgress {
     if (clampedWeek < 2) return 0.0;
     return ((clampedWeek - 1) / 39.0).clamp(0.0, 1.0);
   }
+
+  /// Alias matching the `uAbdomenGrowth` GLSL shader uniform (`0.0`..`1.0`).
+  double get abdomenGrowth => bellyProgress;
+
+  /// Primary pose texture (`uTextureA`) bound to the fragment shader.
+  String get primaryPrincessAsset {
+    switch (princessStage) {
+      case WatchtowerPrincessStage.standing:
+        return standingAsset;
+      case WatchtowerPrincessStage.cryingWeek1:
+        return cryingWeek1Asset;
+      case WatchtowerPrincessStage.cryingPregnant:
+        return cryingOpenAsset;
+    }
+  }
+
+  /// Secondary 9-month pose texture (`uTextureB`) blended across Week 2–40,
+  /// or `null` during early Week 0–1 stages.
+  String? get secondaryPrincessAsset =>
+      princessStage == WatchtowerPrincessStage.cryingPregnant
+          ? cryingPregAsset
+          : null;
 
   @override
   State<WatchtowerCellShaderView> createState() =>
@@ -71,11 +100,6 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
     with SingleTickerProviderStateMixin {
   static const String _shaderAsset = 'shaders/watchtower_prisoner.frag';
   static const String _bgAsset = 'assets/images/watchtower_dungeon_cell.jpeg';
-  static const String _princessAsset = 'assets/images/princess_captive.png';
-  static const String _princessCryingAsset =
-      'assets/images/princess_captive_crying.png';
-  static const String _princessCryingOpenAsset =
-      'assets/images/princess_captive_crying_open.png';
 
   final ValueNotifier<double> _timeSeconds = ValueNotifier<double>(0.0);
   late final Ticker _ticker;
@@ -83,23 +107,16 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   ui.FragmentProgram? _program;
   ui.FragmentShader? _shader;
   ui.Image? _bgImage;
-  ui.Image? _princessImage;
+  ui.Image? _princessImageA;
+  ui.Image? _princessImageB;
+  String? _loadedPrimaryAsset;
   bool _shaderFailed = false;
   bool _disposed = false;
   int _loadGeneration = 0;
 
-  static String _assetForStage(WatchtowerPrincessStage stage) {
-    switch (stage) {
-      case WatchtowerPrincessStage.standing:
-        return _princessAsset;
-      case WatchtowerPrincessStage.cryingWeek1:
-        return _princessCryingAsset;
-      case WatchtowerPrincessStage.cryingPregnant:
-        return _princessCryingOpenAsset;
-    }
-  }
-
-  String get _activePrincessAsset => _assetForStage(widget.princessStage);
+  bool get _hasRequiredTextures =>
+      _princessImageA != null &&
+      (widget.secondaryPrincessAsset == null || _princessImageB != null);
 
   @override
   void initState() {
@@ -118,8 +135,11 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   @override
   void didUpdateWidget(covariant WatchtowerCellShaderView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final assetChanged =
-        _assetForStage(oldWidget.princessStage) != _activePrincessAsset;
+    final primaryChanged =
+        oldWidget.primaryPrincessAsset != widget.primaryPrincessAsset;
+    final needsSecondary =
+        widget.secondaryPrincessAsset != null && _princessImageB == null;
+    final assetsChanged = primaryChanged || needsSecondary;
 
     if (oldWidget.animationsEnabled != widget.animationsEnabled) {
       _syncTicker();
@@ -134,51 +154,68 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
       } else if (_program == null) {
         _shaderFailed = false;
         unawaited(_loadAssets());
-      } else if (assetChanged) {
-        unawaited(_reloadPrincessAsset());
+      } else if (assetsChanged) {
+        unawaited(_reloadPrincessAssets());
+      } else {
+        setState(() {
+          _shaderFailed = false;
+        });
+        _syncTicker();
       }
-    } else if (assetChanged && !widget.forceStaticFallback && !_shaderFailed) {
+    } else if (assetsChanged && !widget.forceStaticFallback && !_shaderFailed) {
       if (_program == null) {
         unawaited(_loadAssets());
       } else {
-        unawaited(_reloadPrincessAsset());
+        unawaited(_reloadPrincessAssets());
       }
     }
   }
 
   Future<void> _loadAssets() async {
     final gen = ++_loadGeneration;
-    final princessAsset = _activePrincessAsset;
+    final primaryAsset = widget.primaryPrincessAsset;
+    final secondaryAsset = widget.secondaryPrincessAsset;
     try {
-      final results = await Future.wait<Object>([
+      final futures = <Future<Object>>[
         ui.FragmentProgram.fromAsset(_shaderAsset),
         _decodeAssetImage(_bgAsset),
-        _decodeAssetImage(princessAsset),
-      ]);
+        _decodeAssetImage(primaryAsset),
+        if (secondaryAsset != null) _decodeAssetImage(secondaryAsset),
+      ];
+      final results = await Future.wait<Object>(futures);
 
       final program = results[0] as ui.FragmentProgram;
       final bgImage = results[1] as ui.Image;
-      final princessImage = results[2] as ui.Image;
+      final princessImageA = results[2] as ui.Image;
+      final princessImageB =
+          secondaryAsset != null ? results[3] as ui.Image : null;
 
       if (_disposed || gen != _loadGeneration) {
         bgImage.dispose();
-        princessImage.dispose();
+        princessImageA.dispose();
+        princessImageB?.dispose();
         return;
       }
 
       final shader = program.fragmentShader();
       final oldBg = _bgImage;
-      final oldPrincess = _princessImage;
+      final oldPrincessA = _princessImageA;
+      final oldPrincessB = princessImageB != null ? _princessImageB : null;
       final oldShader = _shader;
       setState(() {
         _program = program;
         _shader = shader;
         _bgImage = bgImage;
-        _princessImage = princessImage;
+        _princessImageA = princessImageA;
+        if (princessImageB != null) {
+          _princessImageB = princessImageB;
+        }
+        _loadedPrimaryAsset = primaryAsset;
         _shaderFailed = false;
       });
       oldBg?.dispose();
-      oldPrincess?.dispose();
+      oldPrincessA?.dispose();
+      oldPrincessB?.dispose();
       oldShader?.dispose();
       _syncTicker();
     } catch (_) {
@@ -189,20 +226,50 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
     }
   }
 
-  Future<void> _reloadPrincessAsset() async {
+  Future<void> _reloadPrincessAssets() async {
     final gen = ++_loadGeneration;
-    final princessAsset = _activePrincessAsset;
+    final primaryAsset = widget.primaryPrincessAsset;
+    final secondaryAsset = widget.secondaryPrincessAsset;
+    final shouldLoadPrimary =
+        _princessImageA == null || _loadedPrimaryAsset != primaryAsset;
+    final shouldLoadSecondary =
+        secondaryAsset != null && _princessImageB == null;
+    if (!shouldLoadPrimary && !shouldLoadSecondary) {
+      _syncTicker();
+      return;
+    }
+
     try {
-      final princessImage = await _decodeAssetImage(princessAsset);
+      final results = await Future.wait<ui.Image?>([
+        shouldLoadPrimary
+            ? _decodeAssetImage(primaryAsset)
+            : Future<ui.Image?>.value(null),
+        shouldLoadSecondary
+            ? _decodeAssetImage(secondaryAsset)
+            : Future<ui.Image?>.value(null),
+      ]);
+      final newPrimary = results[0];
+      final newSecondary = results[1];
+
       if (_disposed || gen != _loadGeneration) {
-        princessImage.dispose();
+        newPrimary?.dispose();
+        newSecondary?.dispose();
         return;
       }
-      final oldPrincess = _princessImage;
+
+      final oldPrimary = newPrimary != null ? _princessImageA : null;
+      final oldSecondary = newSecondary != null ? _princessImageB : null;
       setState(() {
-        _princessImage = princessImage;
+        if (newPrimary != null) {
+          _princessImageA = newPrimary;
+          _loadedPrimaryAsset = primaryAsset;
+        }
+        if (newSecondary != null) {
+          _princessImageB = newSecondary;
+        }
       });
-      oldPrincess?.dispose();
+      oldPrimary?.dispose();
+      oldSecondary?.dispose();
       _syncTicker();
     } catch (_) {
       if (_disposed || gen != _loadGeneration) return;
@@ -232,7 +299,7 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
         !_shaderFailed &&
         _shader != null &&
         _bgImage != null &&
-        _princessImage != null;
+        _hasRequiredTextures;
     if (canAnimate && !_ticker.isActive) {
       _ticker.start();
     } else if (!canAnimate && _ticker.isActive) {
@@ -247,7 +314,11 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
     _timeSeconds.dispose();
     _shader?.dispose();
     _bgImage?.dispose();
-    _princessImage?.dispose();
+    _princessImageA?.dispose();
+    if (_princessImageB != null &&
+        !identical(_princessImageB, _princessImageA)) {
+      _princessImageB?.dispose();
+    }
     super.dispose();
   }
 
@@ -255,23 +326,28 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   Widget build(BuildContext context) {
     final shader = _shader;
     final bgImage = _bgImage;
-    final princessImage = _princessImage;
+    final textureA = _princessImageA;
+    final textureB = widget.secondaryPrincessAsset != null
+        ? _princessImageB
+        : _princessImageA;
 
     if (!_shaderFailed &&
         shader != null &&
         bgImage != null &&
-        princessImage != null) {
+        textureA != null &&
+        textureB != null) {
       return RepaintBoundary(
         child: CustomPaint(
           key: const ValueKey('watchtower_spyglass_shader_paint'),
           painter: _WatchtowerCellShaderPainter(
             shader: shader,
             bgImage: bgImage,
-            princessImage: princessImage,
+            textureA: textureA,
+            textureB: textureB,
             timeSeconds: _timeSeconds,
             isFullScreen: widget.isFullScreen,
             isCrying: widget.isCrying,
-            bellyProgress: widget.bellyProgress,
+            abdomenGrowth: widget.abdomenGrowth,
           ),
           child: const SizedBox.expand(),
         ),
@@ -281,6 +357,7 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
     return _StaticDungeonFallback(
       isFullScreen: widget.isFullScreen,
       stage: widget.princessStage,
+      clampedWeek: widget.clampedWeek,
     );
   }
 }
@@ -288,20 +365,22 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
 class _WatchtowerCellShaderPainter extends CustomPainter {
   final ui.FragmentShader shader;
   final ui.Image bgImage;
-  final ui.Image princessImage;
+  final ui.Image textureA;
+  final ui.Image textureB;
   final ValueNotifier<double> timeSeconds;
   final bool isFullScreen;
   final bool isCrying;
-  final double bellyProgress;
+  final double abdomenGrowth;
 
   _WatchtowerCellShaderPainter({
     required this.shader,
     required this.bgImage,
-    required this.princessImage,
+    required this.textureA,
+    required this.textureB,
     required this.timeSeconds,
     required this.isFullScreen,
     required this.isCrying,
-    required this.bellyProgress,
+    required this.abdomenGrowth,
   }) : super(repaint: timeSeconds);
 
   @override
@@ -313,9 +392,10 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     shader.setFloat(2, timeSeconds.value);
     shader.setFloat(3, isFullScreen ? 1.0 : 0.0);
     shader.setFloat(4, isCrying ? 1.0 : 0.0);
-    shader.setFloat(5, bellyProgress);
+    shader.setFloat(5, abdomenGrowth);
     shader.setImageSampler(0, bgImage);
-    shader.setImageSampler(1, princessImage);
+    shader.setImageSampler(1, textureA);
+    shader.setImageSampler(2, textureB);
 
     final paint = Paint()..shader = shader;
     canvas.drawRect(Offset.zero & size, paint);
@@ -325,10 +405,11 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
   bool shouldRepaint(covariant _WatchtowerCellShaderPainter oldDelegate) {
     return oldDelegate.shader != shader ||
         oldDelegate.bgImage != bgImage ||
-        oldDelegate.princessImage != princessImage ||
+        oldDelegate.textureA != textureA ||
+        oldDelegate.textureB != textureB ||
         oldDelegate.isFullScreen != isFullScreen ||
         oldDelegate.isCrying != isCrying ||
-        oldDelegate.bellyProgress != bellyProgress;
+        oldDelegate.abdomenGrowth != abdomenGrowth;
   }
 }
 
@@ -337,10 +418,12 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
 class _StaticDungeonFallback extends StatelessWidget {
   final bool isFullScreen;
   final WatchtowerPrincessStage stage;
+  final int clampedWeek;
 
   const _StaticDungeonFallback({
     required this.isFullScreen,
     required this.stage,
+    required this.clampedWeek,
   });
 
   static const double _texAspect = 576.0 / 1024.0;
@@ -354,14 +437,19 @@ class _StaticDungeonFallback extends StatelessWidget {
     final String imageKey;
     switch (stage) {
       case WatchtowerPrincessStage.standing:
-        princessAsset = _WatchtowerCellShaderViewState._princessAsset;
+        princessAsset = WatchtowerCellShaderView.standingAsset;
         imageKey = 'watchtower_spyglass_princess_standing_image';
       case WatchtowerPrincessStage.cryingWeek1:
-        princessAsset = _WatchtowerCellShaderViewState._princessCryingAsset;
+        princessAsset = WatchtowerCellShaderView.cryingWeek1Asset;
         imageKey = 'watchtower_spyglass_princess_crying_image';
       case WatchtowerPrincessStage.cryingPregnant:
-        princessAsset = _WatchtowerCellShaderViewState._princessCryingOpenAsset;
-        imageKey = 'watchtower_spyglass_princess_crying_open_image';
+        if (clampedWeek >= WatchtowerCellShaderView.maxProgressionWeek) {
+          princessAsset = WatchtowerCellShaderView.cryingPregAsset;
+          imageKey = 'watchtower_spyglass_princess_crying_preg_image';
+        } else {
+          princessAsset = WatchtowerCellShaderView.cryingOpenAsset;
+          imageKey = 'watchtower_spyglass_princess_crying_open_image';
+        }
     }
 
     return LayoutBuilder(

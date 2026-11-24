@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
@@ -892,7 +893,7 @@ void main() {
     );
 
     testWidgets(
-      'Three-stage Princess week progression (Week 0 -> Week 1 -> Week 2..40) selects correct sprite, bellyProgress, and renders cleanly in modal, full-screen, and fallback modes',
+      'Three-stage Princess week progression (Week 0 -> Week 1 -> Week 2..40) selects double-texture assets, abdomenGrowth, and renders cleanly in modal, full-screen, and fallback modes',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(412, 915);
         tester.view.devicePixelRatio = 1.0;
@@ -901,12 +902,25 @@ void main() {
           tester.view.resetDevicePixelRatio();
         });
 
-        // 1. Direct WatchtowerCellShaderView unit/widget checks across Week 0, 1, 2, 20, 40, and clamped >40
+        // 0. Verify both double-texture PNG assets are registered and loadable
+        final openBytes = await rootBundle.load(
+          WatchtowerCellShaderView.cryingOpenAsset,
+        );
+        final pregBytes = await rootBundle.load(
+          WatchtowerCellShaderView.cryingPregAsset,
+        );
+        expect(openBytes.lengthInBytes, greaterThan(1000));
+        expect(pregBytes.lengthInBytes, greaterThan(1000));
+
+        // 1. Direct WatchtowerCellShaderView unit/widget checks across Week 0, 1, 2, 20, 39, 40, and clamped >40
         final cases = <({
           int week,
           int expectedClamped,
           WatchtowerPrincessStage expectedStage,
           double expectedProgress,
+          String expectedPrimaryAsset,
+          String? expectedSecondaryAsset,
+          String expectedFallbackAsset,
           String expectedImageKey,
         })>[
           (
@@ -914,6 +928,9 @@ void main() {
             expectedClamped: 0,
             expectedStage: WatchtowerPrincessStage.standing,
             expectedProgress: 0.0,
+            expectedPrimaryAsset: WatchtowerCellShaderView.standingAsset,
+            expectedSecondaryAsset: null,
+            expectedFallbackAsset: WatchtowerCellShaderView.standingAsset,
             expectedImageKey: 'watchtower_spyglass_princess_standing_image',
           ),
           (
@@ -921,6 +938,9 @@ void main() {
             expectedClamped: 1,
             expectedStage: WatchtowerPrincessStage.cryingWeek1,
             expectedProgress: 0.0,
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingWeek1Asset,
+            expectedSecondaryAsset: null,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingWeek1Asset,
             expectedImageKey: 'watchtower_spyglass_princess_crying_image',
           ),
           (
@@ -928,6 +948,9 @@ void main() {
             expectedClamped: 2,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0 / 39.0,
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedSecondaryAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingOpenAsset,
             expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
           ),
           (
@@ -935,6 +958,19 @@ void main() {
             expectedClamped: 20,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 19.0 / 39.0,
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedSecondaryAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+          ),
+          (
+            week: 39,
+            expectedClamped: 39,
+            expectedStage: WatchtowerPrincessStage.cryingPregnant,
+            expectedProgress: 38.0 / 39.0,
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedSecondaryAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingOpenAsset,
             expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
           ),
           (
@@ -942,14 +978,20 @@ void main() {
             expectedClamped: 40,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0,
-            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedSecondaryAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_preg_image',
           ),
           (
             week: 41,
             expectedClamped: 40,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0,
-            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+            expectedPrimaryAsset: WatchtowerCellShaderView.cryingOpenAsset,
+            expectedSecondaryAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedFallbackAsset: WatchtowerCellShaderView.cryingPregAsset,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_preg_image',
           ),
         ];
 
@@ -979,17 +1021,26 @@ void main() {
             expect(view.clampedWeek, c.expectedClamped);
             expect(view.princessStage, c.expectedStage);
             expect(view.bellyProgress, closeTo(c.expectedProgress, 1e-6));
+            expect(view.abdomenGrowth, closeTo(c.expectedProgress, 1e-6));
+            expect(view.primaryPrincessAsset, c.expectedPrimaryAsset);
+            expect(view.secondaryPrincessAsset, c.expectedSecondaryAsset);
             expect(
               find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
               findsOneWidget,
             );
-            expect(find.byKey(ValueKey(c.expectedImageKey)), findsOneWidget);
+            final imgFinder = find.byKey(ValueKey(c.expectedImageKey));
+            expect(imgFinder, findsOneWidget);
+            final img = tester.widget<Image>(imgFinder);
+            expect(
+              (img.image as AssetImage).assetName,
+              c.expectedFallbackAsset,
+            );
             expect(tester.takeException(), isNull);
           }
         }
 
-        // 2. Animated shader lifecycle transitioning Week 0 -> Week 1 -> Week 2 -> Week 40
-        for (final week in [0, 1, 2, 20, 40]) {
+        // 2. Animated double-texture shader lifecycle transitioning Week 0 -> Week 1 -> Week 2 -> Week 20 -> Week 40
+        for (final week in [0, 1, 2, 10, 20, 30, 40]) {
           await tester.pumpWidget(
             MaterialApp(
               home: Scaffold(
@@ -1008,6 +1059,27 @@ void main() {
           expect(find.byType(WatchtowerCellShaderView), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
+
+        // Direct mount at Week 40 (initial double-texture load path) and clean dispose
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 320,
+                height: 320,
+                child: WatchtowerCellShaderView(
+                  animationsEnabled: true,
+                  currentWeek: 40,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 60));
+        expect(find.byType(WatchtowerCellShaderView), findsOneWidget);
+        expect(tester.takeException(), isNull);
 
         // 3. End-to-end GameController -> WatchtowerSpyglassDialog -> FullScreenSpyglassView
         //    verifying Week 0, Week 1, Week 2, and Week 40 with zoom controls preserved
