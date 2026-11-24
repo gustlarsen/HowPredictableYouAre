@@ -480,9 +480,6 @@ class _GameScreenState extends State<GameScreen>
     if (state != AppLifecycleState.resumed) {
       _stopOverchargedHold();
     }
-    if (ModalRoute.of(context)?.isCurrent == false) return;
-    final controller = context.read<GameController>();
-    controller.didChangeAppLifecycleState(state);
   }
 
   void _checkIntroStory(BuildContext context, GameController controller) {

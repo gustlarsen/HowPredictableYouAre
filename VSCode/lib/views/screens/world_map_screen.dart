@@ -117,12 +117,6 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!mounted) return;
-    if (ModalRoute.of(context)?.isCurrent == false) return;
-    context.read<GameController>().didChangeAppLifecycleState(state);
-  }
 
   void _checkQaBonusSnackBar(BuildContext context, GameController controller) {
     if (controller.pendingStoryChapter != null) return;

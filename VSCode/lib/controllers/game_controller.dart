@@ -1032,11 +1032,9 @@ class GameController extends ChangeNotifier {
       updateService.setAppForeground(true);
     }
 
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      audio.pauseMusic();
-    } else if (state == AppLifecycleState.resumed) {
-      audio.resumeMusic();
+    unawaited(audio.handleAppLifecycleState(state));
+
+    if (state == AppLifecycleState.resumed) {
       unawaited(playGames.handleAppResumed());
       unawaited(updateService.handleAppResumed());
       unawaited(adService.handleAppResumed());
@@ -1376,8 +1374,10 @@ class GameController extends ChangeNotifier {
     audio.soundEnabled = soundEnabled;
     audio.musicEnabled = musicEnabled;
     audio.vibrationEnabled = vibrationEnabled;
-    if (restartAudio && musicEnabled) {
-      audio.startMusic();
+    if (!musicEnabled) {
+      unawaited(audio.stopMusic());
+    } else if (restartAudio) {
+      unawaited(audio.startMusic());
     }
 
     _engine = MarkovEngine(

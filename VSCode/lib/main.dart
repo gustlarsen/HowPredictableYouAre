@@ -109,6 +109,11 @@ class _HowPredictableAppState extends State<HowPredictableApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (!mounted) return;
+    try {
+      context.read<GameController>().didChangeAppLifecycleState(state);
+    } catch (_) {
+      // Ignore if provider is absent in isolated widget tests.
+    }
     if (state == AppLifecycleState.resumed) {
       _applyEdgeToEdgeSystemUi();
       unawaited(_requestNativeViewportSync());
