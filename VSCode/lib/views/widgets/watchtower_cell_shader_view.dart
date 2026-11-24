@@ -12,12 +12,14 @@ class WatchtowerCellShaderView extends StatefulWidget {
   final bool animationsEnabled;
   final bool forceStaticFallback;
   final bool isFullScreen;
+  final bool isCrying;
 
   const WatchtowerCellShaderView({
     super.key,
     this.animationsEnabled = true,
     this.forceStaticFallback = false,
     this.isFullScreen = false,
+    this.isCrying = false,
   });
 
   @override
@@ -30,6 +32,8 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   static const String _shaderAsset = 'shaders/watchtower_prisoner.frag';
   static const String _bgAsset = 'assets/images/watchtower_dungeon_cell.jpeg';
   static const String _princessAsset = 'assets/images/princess_captive.png';
+  static const String _princessCryingAsset =
+      'assets/images/princess_captive_crying.png';
 
   final ValueNotifier<double> _timeSeconds = ValueNotifier<double>(0.0);
   late final Ticker _ticker;
@@ -40,6 +44,10 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   ui.Image? _princessImage;
   bool _shaderFailed = false;
   bool _disposed = false;
+  int _loadGeneration = 0;
+
+  String get _activePrincessAsset =>
+      widget.isCrying ? _princessCryingAsset : _princessAsset;
 
   @override
   void initState() {
@@ -63,6 +71,7 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
     }
     if (oldWidget.forceStaticFallback != widget.forceStaticFallback) {
       if (widget.forceStaticFallback) {
+        _loadGeneration++;
         _ticker.stop();
         setState(() {
           _shaderFailed = true;
@@ -70,29 +79,44 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
       } else if (_program == null) {
         _shaderFailed = false;
         unawaited(_loadAssets());
+      } else if (oldWidget.isCrying != widget.isCrying) {
+        unawaited(_reloadPrincessAsset());
+      }
+    } else if (oldWidget.isCrying != widget.isCrying &&
+        !widget.forceStaticFallback &&
+        !_shaderFailed) {
+      if (_program == null) {
+        unawaited(_loadAssets());
+      } else {
+        unawaited(_reloadPrincessAsset());
       }
     }
   }
 
   Future<void> _loadAssets() async {
+    final gen = ++_loadGeneration;
+    final princessAsset = _activePrincessAsset;
     try {
       final results = await Future.wait<Object>([
         ui.FragmentProgram.fromAsset(_shaderAsset),
         _decodeAssetImage(_bgAsset),
-        _decodeAssetImage(_princessAsset),
+        _decodeAssetImage(princessAsset),
       ]);
 
       final program = results[0] as ui.FragmentProgram;
       final bgImage = results[1] as ui.Image;
       final princessImage = results[2] as ui.Image;
 
-      if (_disposed) {
+      if (_disposed || gen != _loadGeneration) {
         bgImage.dispose();
         princessImage.dispose();
         return;
       }
 
       final shader = program.fragmentShader();
+      final oldBg = _bgImage;
+      final oldPrincess = _princessImage;
+      final oldShader = _shader;
       setState(() {
         _program = program;
         _shader = shader;
@@ -100,9 +124,35 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
         _princessImage = princessImage;
         _shaderFailed = false;
       });
+      oldBg?.dispose();
+      oldPrincess?.dispose();
+      oldShader?.dispose();
       _syncTicker();
     } catch (_) {
-      if (_disposed) return;
+      if (_disposed || gen != _loadGeneration) return;
+      setState(() {
+        _shaderFailed = true;
+      });
+    }
+  }
+
+  Future<void> _reloadPrincessAsset() async {
+    final gen = ++_loadGeneration;
+    final princessAsset = _activePrincessAsset;
+    try {
+      final princessImage = await _decodeAssetImage(princessAsset);
+      if (_disposed || gen != _loadGeneration) {
+        princessImage.dispose();
+        return;
+      }
+      final oldPrincess = _princessImage;
+      setState(() {
+        _princessImage = princessImage;
+      });
+      oldPrincess?.dispose();
+      _syncTicker();
+    } catch (_) {
+      if (_disposed || gen != _loadGeneration) return;
       setState(() {
         _shaderFailed = true;
       });
@@ -167,13 +217,17 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
             princessImage: princessImage,
             timeSeconds: _timeSeconds,
             isFullScreen: widget.isFullScreen,
+            isCrying: widget.isCrying,
           ),
           child: const SizedBox.expand(),
         ),
       );
     }
 
-    return _StaticDungeonFallback(isFullScreen: widget.isFullScreen);
+    return _StaticDungeonFallback(
+      isFullScreen: widget.isFullScreen,
+      isCrying: widget.isCrying,
+    );
   }
 }
 
@@ -183,6 +237,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
   final ui.Image princessImage;
   final ValueNotifier<double> timeSeconds;
   final bool isFullScreen;
+  final bool isCrying;
 
   _WatchtowerCellShaderPainter({
     required this.shader,
@@ -190,6 +245,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     required this.princessImage,
     required this.timeSeconds,
     required this.isFullScreen,
+    required this.isCrying,
   }) : super(repaint: timeSeconds);
 
   @override
@@ -200,6 +256,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     shader.setFloat(1, size.height);
     shader.setFloat(2, timeSeconds.value);
     shader.setFloat(3, isFullScreen ? 1.0 : 0.0);
+    shader.setFloat(4, isCrying ? 1.0 : 0.0);
     shader.setImageSampler(0, bgImage);
     shader.setImageSampler(1, princessImage);
 
@@ -212,7 +269,8 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     return oldDelegate.shader != shader ||
         oldDelegate.bgImage != bgImage ||
         oldDelegate.princessImage != princessImage ||
-        oldDelegate.isFullScreen != isFullScreen;
+        oldDelegate.isFullScreen != isFullScreen ||
+        oldDelegate.isCrying != isCrying;
   }
 }
 
@@ -220,11 +278,16 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
 /// in headless CI test environments without GPU shader support.
 class _StaticDungeonFallback extends StatelessWidget {
   final bool isFullScreen;
+  final bool isCrying;
 
-  const _StaticDungeonFallback({required this.isFullScreen});
+  const _StaticDungeonFallback({
+    required this.isFullScreen,
+    required this.isCrying,
+  });
 
   static const double _texAspect = 576.0 / 1024.0;
-  static const double _fgScale = 0.425;
+  static const double _standingFgScale = 0.425;
+  static const double _cryingFgScale = 0.365;
 
   @override
   Widget build(BuildContext context) {
@@ -254,15 +317,26 @@ class _StaticDungeonFallback extends StatelessWidget {
           offsetY = 0.0;
         }
 
-        final fgSizeW = sceneWidth * _fgScale;
-        final fgSizeH = sceneHeight * _fgScale;
-        final fgLeft = offsetX + sceneWidth * (0.485 - 0.5 * _fgScale);
-        final fgTop = offsetY + sceneHeight * (0.745 - 0.955 * _fgScale);
+        final fgScale = isCrying ? _cryingFgScale : _standingFgScale;
+        final fgSizeW = sceneWidth * fgScale;
+        final fgSizeH = sceneHeight * fgScale;
+        final fgLeft = offsetX +
+            sceneWidth *
+                (isCrying
+                    ? (0.520 - 0.495 * fgScale)
+                    : (0.485 - 0.5 * fgScale));
+        final fgTop = offsetY +
+            sceneHeight *
+                (isCrying
+                    ? (0.752 - 0.827 * fgScale)
+                    : (0.745 - 0.955 * fgScale));
 
-        final shadowW = sceneWidth * 0.11;
-        final shadowH = sceneHeight * 0.028;
-        final shadowLeft = offsetX + sceneWidth * 0.478 - shadowW * 0.5;
-        final shadowTop = offsetY + sceneHeight * 0.744 - shadowH * 0.5;
+        final shadowW = sceneWidth * (isCrying ? 0.24 : 0.11);
+        final shadowH = sceneHeight * (isCrying ? 0.044 : 0.028);
+        final shadowLeft =
+            offsetX + sceneWidth * (isCrying ? 0.510 : 0.478) - shadowW * 0.5;
+        final shadowTop =
+            offsetY + sceneHeight * (isCrying ? 0.742 : 0.744) - shadowH * 0.5;
 
         return ClipRect(
           child: Stack(
@@ -300,7 +374,14 @@ class _StaticDungeonFallback extends StatelessWidget {
                 width: fgSizeW,
                 height: fgSizeH,
                 child: Image.asset(
-                  _WatchtowerCellShaderViewState._princessAsset,
+                  isCrying
+                      ? _WatchtowerCellShaderViewState._princessCryingAsset
+                      : _WatchtowerCellShaderViewState._princessAsset,
+                  key: ValueKey(
+                    isCrying
+                        ? 'watchtower_spyglass_princess_crying_image'
+                        : 'watchtower_spyglass_princess_standing_image',
+                  ),
                   fit: BoxFit.fill,
                 ),
               ),

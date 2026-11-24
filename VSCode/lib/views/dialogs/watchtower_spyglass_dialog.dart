@@ -111,10 +111,16 @@ class WatchtowerSpyglassDialog extends StatelessWidget {
                                     );
                                   },
                                   child: SpyglassLensFrame(
-                                    child: WatchtowerCellShaderView(
-                                      isFullScreen: false,
-                                      animationsEnabled:
-                                          controller.animationsEnabled,
+                                    child: ListenableBuilder(
+                                      listenable: controller,
+                                      builder: (context, _) =>
+                                          WatchtowerCellShaderView(
+                                        isFullScreen: false,
+                                        animationsEnabled:
+                                            controller.animationsEnabled,
+                                        isCrying:
+                                            controller.hasDungeonScreamOccurred,
+                                      ),
                                     ),
                                   ),
                                 ),

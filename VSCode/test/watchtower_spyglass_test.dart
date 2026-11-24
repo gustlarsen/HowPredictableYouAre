@@ -657,32 +657,175 @@ void main() {
     );
 
     testWidgets(
-      'WatchtowerCellShaderView and WatchtowerForgeView render and dispose cleanly in animated and static modes',
+      'Post-Week-0 scream switches WatchtowerSpyglassDialog and FullScreenSpyglassView to crying pose while preserving zoom/pan/double-tap controls',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Pre-scream (Week 0): standing pose (isCrying: false)
+        final controller = await _createController(
+          currentWeek: 0,
+          animationsEnabled: false,
+          hasShownWeek0ScreamWarning: false,
+        );
+        addTearDown(controller.dispose);
+
+        expect(controller.hasDungeonScreamOccurred, isFalse);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: WatchtowerSpyglassDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          tester
+              .widget<WatchtowerCellShaderView>(
+                find.byType(WatchtowerCellShaderView),
+              )
+              .isCrying,
+          isFalse,
+        );
+
+        // 2. Trigger Week 0 scream via completeBattleWeek() (pending scream)
+        controller.completeBattleWeek();
+        await tester.pumpAndSettle();
+        expect(controller.pendingWeek0ScreamWarning, isTrue);
+        expect(controller.hasDungeonScreamOccurred, isTrue);
+        expect(
+          tester
+              .widget<WatchtowerCellShaderView>(
+                find.byType(WatchtowerCellShaderView),
+              )
+              .isCrying,
+          isTrue,
+        );
+
+        // 3. Consume warning & mark cell inspected -> princess stays crying for rest of run
+        expect(controller.consumePendingWeek0ScreamWarning(), isTrue);
+        controller.markPrincessCellInspectedAfterScream();
+        await tester.pumpAndSettle();
+        expect(controller.hasDungeonScreamOccurred, isTrue);
+        expect(
+          tester
+              .widget<WatchtowerCellShaderView>(
+                find.byType(WatchtowerCellShaderView),
+              )
+              .isCrying,
+          isTrue,
+        );
+
+        // 4. Open FullScreenSpyglassView -> isCrying: true, isFullScreen: true, zoom/pan active
+        await tester.tap(
+          find.byKey(const ValueKey('watchtower_spyglass_lens_tap')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FullScreenSpyglassView), findsOneWidget);
+        final viewerFinder = find.byKey(
+          const ValueKey('full_screen_spyglass_interactive_viewer'),
+        );
+        final fullShader = tester.widget<WatchtowerCellShaderView>(
+          find.descendant(
+            of: viewerFinder,
+            matching: find.byType(WatchtowerCellShaderView),
+          ),
+        );
+        expect(fullShader.isFullScreen, isTrue);
+        expect(fullShader.isCrying, isTrue);
+
+        final viewer = tester.widget<InteractiveViewer>(viewerFinder);
+        expect(viewer.minScale, 1.0);
+        expect(viewer.maxScale, 4.0);
+        expect(viewer.panEnabled, isTrue);
+        expect(viewer.scaleEnabled, isTrue);
+
+        // Double-tap zoom & Reset Zoom still work cleanly in crying state
+        final resetBtnFinder = find.byKey(
+          const ValueKey('full_screen_spyglass_reset_zoom_button'),
+        );
+        expect(resetBtnFinder, findsNothing);
+        final center = tester.getCenter(viewerFinder);
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(resetBtnFinder, findsOneWidget);
+
+        await tester.tap(resetBtnFinder);
+        await tester.pumpAndSettle();
+        expect(resetBtnFinder, findsNothing);
+
+        await tester.tap(
+          find.byKey(const ValueKey('full_screen_spyglass_close_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(FullScreenSpyglassView), findsNothing);
+
+        // 5. Reset campaign -> reverts back to pre-scream standing state
+        await controller.resetAllProgress();
+        await tester.pumpAndSettle();
+        expect(controller.hasDungeonScreamOccurred, isFalse);
+        expect(
+          tester
+              .widget<WatchtowerCellShaderView>(
+                find.byType(WatchtowerCellShaderView),
+              )
+              .isCrying,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'WatchtowerCellShaderView and WatchtowerForgeView render and dispose cleanly in animated and static modes (standing & crying)',
       (WidgetTester tester) async {
         for (final fullScreen in [false, true]) {
-          await tester.pumpWidget(
-            MaterialApp(
-              home: Scaffold(
-                body: SizedBox(
-                  width: 320,
-                  height: 320,
-                  child: WatchtowerCellShaderView(
-                    animationsEnabled: false,
-                    forceStaticFallback: true,
-                    isFullScreen: fullScreen,
+          for (final crying in [false, true]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: SizedBox(
+                    width: 320,
+                    height: 320,
+                    child: WatchtowerCellShaderView(
+                      animationsEnabled: false,
+                      forceStaticFallback: true,
+                      isFullScreen: fullScreen,
+                      isCrying: crying,
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-          await tester.pumpAndSettle();
+            );
+            await tester.pumpAndSettle();
 
-          expect(
-            find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
-            findsOneWidget,
-          );
-          expect(find.byType(Image), findsNWidgets(2));
-          expect(tester.takeException(), isNull);
+            expect(
+              find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
+              findsOneWidget,
+            );
+            expect(find.byType(Image), findsNWidgets(2));
+            expect(
+              find.byKey(
+                ValueKey(
+                  crying
+                      ? 'watchtower_spyglass_princess_crying_image'
+                      : 'watchtower_spyglass_princess_standing_image',
+                ),
+              ),
+              findsOneWidget,
+            );
+            expect(tester.takeException(), isNull);
+          }
 
           await tester.pumpWidget(
             MaterialApp(
@@ -707,19 +850,36 @@ void main() {
           expect(tester.takeException(), isNull);
         }
 
-        // Also test normal animated shader construction & disposal without crashing
+        // Also test normal animated shader construction & state transition without crashing
         await tester.pumpWidget(
           const MaterialApp(
             home: Scaffold(
               body: SizedBox(
                 width: 320,
                 height: 320,
-                child: WatchtowerCellShaderView(animationsEnabled: true),
+                child: WatchtowerCellShaderView(
+                  animationsEnabled: true,
+                  isCrying: false,
+                ),
               ),
             ),
           ),
         );
         await tester.pump(const Duration(milliseconds: 100));
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 320,
+                height: 320,
+                child: WatchtowerCellShaderView(
+                  animationsEnabled: true,
+                  isCrying: true,
+                ),
+              ),
+            ),
+          ),
+        );
         await tester.pump(const Duration(milliseconds: 100));
         expect(find.byType(WatchtowerCellShaderView), findsOneWidget);
         expect(tester.takeException(), isNull);

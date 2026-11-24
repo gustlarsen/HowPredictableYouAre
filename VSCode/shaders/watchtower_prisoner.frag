@@ -4,6 +4,7 @@
 uniform vec2 uResolution;
 uniform float uTime;
 uniform float uIsFullScreen;
+uniform float uIsCrying;
 
 uniform sampler2D uBackground;
 uniform sampler2D uPrincess;
@@ -33,11 +34,97 @@ float dustLayer(vec2 uv, float scale, float speed, float driftAmp, float thresho
   return smoothstep(size, 0.0, d) * twinkle;
 }
 
+float sdSegmentAspect(vec2 p, vec2 a, vec2 b, float aspect, out float segT) {
+  vec2 pa = (p - a) * vec2(aspect, 1.0);
+  vec2 ba = (b - a) * vec2(aspect, 1.0);
+  segT = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  return length(pa - ba * segT);
+}
+
+void evalPoly3(
+    vec2 p,
+    vec2 p0,
+    vec2 p1,
+    vec2 p2,
+    vec2 p3,
+    float aspect,
+    out float minDist,
+    out float pathT,
+    out vec2 tangentDir) {
+  float t0, t1, t2;
+  float d0 = sdSegmentAspect(p, p0, p1, aspect, t0);
+  float d1 = sdSegmentAspect(p, p1, p2, aspect, t1);
+  float d2 = sdSegmentAspect(p, p2, p3, aspect, t2);
+
+  minDist = d0;
+  pathT = t0 / 3.0;
+  tangentDir = normalize((p1 - p0) * vec2(aspect, 1.0));
+
+  if (d1 < minDist) {
+    minDist = d1;
+    pathT = (1.0 + t1) / 3.0;
+    tangentDir = normalize((p2 - p1) * vec2(aspect, 1.0));
+  }
+  if (d2 < minDist) {
+    minDist = d2;
+    pathT = (2.0 + t2) / 3.0;
+    tangentDir = normalize((p3 - p2) * vec2(aspect, 1.0));
+  }
+}
+
+vec2 samplePoly3(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
+  float u = clamp(t, 0.0, 1.0) * 3.0;
+  if (u < 1.0) return mix(p0, p1, u);
+  if (u < 2.0) return mix(p1, p2, u - 1.0);
+  return mix(p2, p3, u - 2.0);
+}
+
+vec3 evalTearDrop(
+    vec2 p,
+    vec2 center,
+    float radius,
+    float stretch,
+    float aspect,
+    out vec2 refractDir) {
+  vec2 d = (p - center) * vec2(aspect, 1.0);
+  float tail = clamp(-d.y / max(radius * stretch, 1e-5), 0.0, 1.0);
+  d.x /= mix(1.0, 0.34, tail * tail);
+  vec2 dNorm = d;
+  if (dNorm.y < 0.0) {
+    dNorm.y /= max(stretch, 1.0);
+  }
+  float dist = length(dNorm);
+  float body = 1.0 - smoothstep(radius * 0.45, radius, dist);
+  refractDir = (dist > 1e-5) ? (dNorm / dist) * body : vec2(0.0);
+
+  vec2 gPos = center + vec2(-0.22 * radius / aspect, -0.14 * radius);
+  float gDist = length((p - gPos) * vec2(aspect, 1.0));
+  float glint = 1.0 - smoothstep(radius * 0.14, radius * 0.46, gDist);
+
+  vec2 cPos = center + vec2(0.08 * radius / aspect, 0.36 * radius);
+  float cDist = length((p - cPos) * vec2(aspect, 1.0));
+  float caustic = (1.0 - smoothstep(radius * 0.16, radius * 0.56, cDist)) * body;
+
+  return vec3(body, glint, caustic);
+}
+
+float evalSplashRipple(vec2 p, vec2 center, float cycle, float startF, float endF, float aspect) {
+  if (cycle < startF || cycle > endF) return 0.0;
+  float imp = clamp((cycle - startF) / max(endF - startF, 1e-4), 0.0, 1.0);
+  float d = length((p - center) * vec2(aspect, 1.0));
+  float ringR = mix(0.0018, 0.0145, sqrt(imp));
+  float ringW = mix(0.0026, 0.0010, imp);
+  float ring = exp(-pow((d - ringR) / ringW, 2.0)) * (1.0 - imp);
+  float core = exp(-dot(d, d) / 0.000028) * pow(1.0 - imp, 1.9);
+  return ring * 0.85 + core * 0.95;
+}
+
 void main() {
   vec2 res = max(uResolution, vec2(1.0));
   vec2 uv = FlutterFragCoord().xy / res;
 
   float isFull = clamp(uIsFullScreen, 0.0, 1.0);
+  float isCry = step(0.5, uIsCrying);
   float viewAspect = res.x / res.y;
   vec2 centered = uv - 0.5;
 
@@ -110,96 +197,198 @@ void main() {
   bgCol += vec3(0.74, 0.88, 1.0) * wetStoneMask * (0.028 + 0.025 * wetWave) * cloudDrift;
   bgCol += vec3(1.0, 0.60, 0.24) * wetStoneMask * smoothstep(0.32, 0.68, sceneUv.x) * 0.040 * max(torchPulse, 0.0);
 
-  // Grounded contact shadow & soft directional cast shadow beneath the Princess's boots
-  vec2 shMain = (sceneUv - vec2(0.478, 0.744)) / vec2(0.052, 0.014);
-  float contactShadow = exp(-dot(shMain, shMain) * 1.4);
-  vec2 shBack = (sceneUv - vec2(0.512, 0.728)) / vec2(0.030, 0.010);
-  contactShadow = max(contactShadow, exp(-dot(shBack, shBack) * 1.6) * 0.75);
-  vec2 shCast = (sceneUv - vec2(0.452, 0.750)) / vec2(0.075, 0.022);
-  float castShadow = exp(-dot(shCast, shCast) * 1.3) * 0.35;
-  bgCol *= (1.0 - clamp(contactShadow * 0.62 + castShadow, 0.0, 0.72));
+  // Grounded contact shadow & soft directional cast shadow beneath the Princess
+  if (isCry < 0.5) {
+    vec2 shMain = (sceneUv - vec2(0.478, 0.744)) / vec2(0.052, 0.014);
+    float contactShadow = exp(-dot(shMain, shMain) * 1.4);
+    vec2 shBack = (sceneUv - vec2(0.512, 0.728)) / vec2(0.030, 0.010);
+    contactShadow = max(contactShadow, exp(-dot(shBack, shBack) * 1.6) * 0.75);
+    vec2 shCast = (sceneUv - vec2(0.452, 0.750)) / vec2(0.075, 0.022);
+    float castShadow = exp(-dot(shCast, shCast) * 1.3) * 0.35;
+    bgCol *= (1.0 - clamp(contactShadow * 0.62 + castShadow, 0.0, 0.72));
+  } else {
+    // Kneeling pose grounded contact shadows beneath knees, boots, and planted left hand
+    vec2 shKnees = (sceneUv - vec2(0.505, 0.746)) / vec2(0.088, 0.023);
+    float contactShadow = exp(-dot(shKnees, shKnees) * 1.35);
+    vec2 shBootL = (sceneUv - vec2(0.392, 0.733)) / vec2(0.045, 0.015);
+    contactShadow = max(contactShadow, exp(-dot(shBootL, shBootL) * 1.45) * 0.82);
+    vec2 shBootR = (sceneUv - vec2(0.640, 0.725)) / vec2(0.060, 0.018);
+    contactShadow = max(contactShadow, exp(-dot(shBootR, shBootR) * 1.40) * 0.80);
+    vec2 shCast = (sceneUv - vec2(0.472, 0.752)) / vec2(0.118, 0.032);
+    float castShadow = exp(-dot(shCast, shCast) * 1.25) * 0.36;
+    bgCol *= (1.0 - clamp(contactShadow * 0.64 + castShadow, 0.0, 0.74));
+  }
 
-  // Composite animated Princess full-body on the stone floor in realistic proportion
-  // to the bed, shackles, barred window, and corridor gate (original scale = 0.425)
-  const float fgScale = 0.425;
-  vec2 fgOrigin = vec2(0.485 - 0.5 * fgScale, 0.745 - 0.955 * fgScale);
+  // Composite animated Princess on the stone floor in realistic proportion
+  // to the bed, shackles, barred window, and corridor gate
+  float fgScale = mix(0.425, 0.365, isCry);
+  vec2 fgOrigin = mix(
+    vec2(0.485 - 0.5 * 0.425, 0.745 - 0.955 * 0.425),
+    vec2(0.520 - 0.495 * 0.365, 0.752 - 0.827 * 0.365),
+    isCry
+  );
   vec2 fgUv = (sceneUv - fgOrigin) / fgScale;
 
   vec3 compCol = bgCol;
-  float breath = sin(uTime * 1.65) * 0.5 + 0.5;
+  float breath = (isCry < 0.5)
+    ? (sin(uTime * 1.65) * 0.5 + 0.5)
+    : pow(0.5 + 0.5 * sin(uTime * 2.0944), 0.85); // ~3.0s emotional sobbing breath cycle
 
-  if (fgUv.x > 0.16 && fgUv.x < 0.84 && fgUv.y > 0.06 && fgUv.y < 0.985) {
-    // 1. Living Posture Micro-Sway (~7.5s balance shift anchored at planted boots)
-    float postureMask = smoothstep(0.88, 0.30, fgUv.y);
-    float postureSway = sin(uTime * 0.84) * 0.0016 * postureMask;
-    vec2 postureDisp = vec2(postureSway, -0.0005 * sin(uTime * 1.68) * postureMask);
+  bool inFgBounds = (isCry < 0.5)
+    ? (fgUv.x > 0.16 && fgUv.x < 0.84 && fgUv.y > 0.06 && fgUv.y < 0.985)
+    : (fgUv.x > 0.025 && fgUv.x < 0.975 && fgUv.y > 0.165 && fgUv.y < 0.850);
 
-    // 2. Subtle Corset / Bust Breathing (~3.8s cycle) + upward ribcage lift
-    vec2 bustL = vec2(0.385, 0.335);
-    vec2 bustR = vec2(0.505, 0.342);
-    vec2 dLa = vec2((fgUv.x - bustL.x) * texAspect, fgUv.y - bustL.y);
-    vec2 dRa = vec2((fgUv.x - bustR.x) * texAspect, fgUv.y - bustR.y);
-    float gL = exp(-dot(dLa, dLa) / 0.0014);
-    float gR = exp(-dot(dRa, dRa) / 0.0014);
-    float bustGate = smoothstep(0.275, 0.305, fgUv.y)
-                   * smoothstep(0.425, 0.380, fgUv.y)
-                   * smoothstep(0.305, 0.345, fgUv.x)
-                   * smoothstep(0.600, 0.555, fgUv.x);
-    vec2 expandDispA = (dLa * gL + dRa * gR) * (0.056 * breath * bustGate);
-    vec2 ribDispA = vec2(0.0, -0.0023 * breath * bustGate * clamp(gL + gR, 0.0, 1.0));
-    vec2 breathDisp = vec2((expandDispA.x + ribDispA.x) / texAspect, expandDispA.y + ribDispA.y);
+  if (inFgBounds) {
+    vec2 sampleUv = fgUv;
 
-    // 3. Gentle Head Tilt (~5.2s cycle, +/- 1.8 deg around neck base pivot)
-    float tiltAngle = sin(uTime * 1.2) * 0.032;
-    vec2 neckPivot = vec2(0.505, 0.252);
-    float headMask = (1.0 - smoothstep(0.205, 0.252, fgUv.y))
-                   * smoothstep(0.330, 0.400, fgUv.x)
-                   * smoothstep(0.700, 0.630, fgUv.x);
-    float theta = -tiltAngle * headMask;
-    vec2 relHead = vec2((fgUv.x - neckPivot.x) * texAspect, fgUv.y - neckPivot.y);
-    float ch = cos(theta);
-    float sh = sin(theta);
-    vec2 rotHead = vec2(relHead.x * ch - relHead.y * sh, relHead.x * sh + relHead.y * ch);
-    vec2 headUv = neckPivot + vec2(rotHead.x / texAspect, rotHead.y);
-    vec2 headDisp = fgUv - headUv;
+    if (isCry < 0.5) {
+      // --- STANDING PRINCESS ANIMATION (Pre-Scream) ---
+      // 1. Living Posture Micro-Sway (~7.5s balance shift anchored at planted boots)
+      float postureMask = smoothstep(0.88, 0.30, fgUv.y);
+      float postureSway = sin(uTime * 0.84) * 0.0016 * postureMask;
+      vec2 postureDisp = vec2(postureSway, -0.0005 * sin(uTime * 1.68) * postureMask);
 
-    // 4. Flowing Side Hair Sway (multi-harmonic draft on left & right hanging curls)
-    vec2 hairDL = (fgUv - vec2(0.322, 0.335)) / vec2(0.058, 0.085);
-    float hairMaskL = exp(-dot(hairDL, hairDL) * 1.5)
-                    * smoothstep(0.372, 0.332, fgUv.x)
-                    * smoothstep(0.225, 0.265, fgUv.y)
-                    * smoothstep(0.415, 0.370, fgUv.y);
-    vec2 hairDR = (fgUv - vec2(0.710, 0.325)) / vec2(0.088, 0.110);
-    float hairMaskR = exp(-dot(hairDR, hairDR) * 1.3)
-                    * smoothstep(0.632, 0.678, fgUv.x)
-                    * smoothstep(0.205, 0.250, fgUv.y)
-                    * smoothstep(0.440, 0.390, fgUv.y);
-    float phaseL = uTime * 1.45 - fgUv.y * 4.5;
-    float phaseR = uTime * 1.45 - fgUv.y * 4.5 + 0.85;
-    float gustL = sin(phaseL) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.2 + 0.4);
-    float gustR = sin(phaseR) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.2 + 1.3);
-    vec2 hairDisp = vec2(gustL * 0.0038, cos(phaseL) * 0.0012) * hairMaskL
-                  + vec2(gustR * 0.0044, cos(phaseR) * 0.0014) * hairMaskR;
+      // 2. Subtle Corset / Bust Breathing (~3.8s cycle) + upward ribcage lift
+      vec2 bustL = vec2(0.385, 0.335);
+      vec2 bustR = vec2(0.505, 0.342);
+      vec2 dLa = vec2((fgUv.x - bustL.x) * texAspect, fgUv.y - bustL.y);
+      vec2 dRa = vec2((fgUv.x - bustR.x) * texAspect, fgUv.y - bustR.y);
+      float gL = exp(-dot(dLa, dLa) / 0.0014);
+      float gR = exp(-dot(dRa, dRa) / 0.0014);
+      float bustGate = smoothstep(0.275, 0.305, fgUv.y)
+                     * smoothstep(0.425, 0.380, fgUv.y)
+                     * smoothstep(0.305, 0.345, fgUv.x)
+                     * smoothstep(0.600, 0.555, fgUv.x);
+      vec2 expandDispA = (dLa * gL + dRa * gR) * (0.056 * breath * bustGate);
+      vec2 ribDispA = vec2(0.0, -0.0023 * breath * bustGate * clamp(gL + gR, 0.0, 1.0));
+      vec2 breathDisp = vec2((expandDispA.x + ribDispA.x) / texAspect, expandDispA.y + ribDispA.y);
 
-    // 5. Subtle Draft Ripple on Satin Skirt Folds & Waist Ribbon Bow
-    vec2 skirtD = (fgUv - vec2(0.495, 0.565)) / vec2(0.115, 0.072);
-    float skirtMask = exp(-dot(skirtD, skirtD) * 1.4)
-                    * smoothstep(0.460, 0.505, fgUv.y)
-                    * smoothstep(0.658, 0.615, fgUv.y)
-                    * smoothstep(0.340, 0.385, fgUv.x)
-                    * smoothstep(0.655, 0.610, fgUv.x);
-    float skirtWave = sin(uTime * 1.35 - fgUv.x * 11.0 + fgUv.y * 6.0);
-    vec2 skirtDisp = vec2(skirtWave * 0.0016, cos(uTime * 1.35 + fgUv.x * 8.0) * 0.0005) * skirtMask;
+      // 3. Gentle Head Tilt (~5.2s cycle, +/- 1.8 deg around neck base pivot)
+      float tiltAngle = sin(uTime * 1.2) * 0.032;
+      vec2 neckPivot = vec2(0.505, 0.252);
+      float headMask = (1.0 - smoothstep(0.205, 0.252, fgUv.y))
+                     * smoothstep(0.330, 0.400, fgUv.x)
+                     * smoothstep(0.700, 0.630, fgUv.x);
+      float theta = -tiltAngle * headMask;
+      vec2 relHead = vec2((fgUv.x - neckPivot.x) * texAspect, fgUv.y - neckPivot.y);
+      float ch = cos(theta);
+      float sh = sin(theta);
+      vec2 rotHead = vec2(relHead.x * ch - relHead.y * sh, relHead.x * sh + relHead.y * ch);
+      vec2 headUv = neckPivot + vec2(rotHead.x / texAspect, rotHead.y);
+      vec2 headDisp = fgUv - headUv;
 
-    vec2 bowD = (fgUv - vec2(0.585, 0.405)) / vec2(0.032, 0.036);
-    float bowMask = exp(-dot(bowD, bowD) * 1.6)
-                  * smoothstep(0.555, 0.576, fgUv.x)
-                  * smoothstep(0.365, 0.385, fgUv.y)
-                  * smoothstep(0.445, 0.420, fgUv.y);
-    vec2 bowDisp = vec2(sin(uTime * 1.7 + 0.5) * 0.0024, cos(uTime * 1.7) * 0.0010) * bowMask;
+      // 4. Flowing Side Hair Sway (multi-harmonic draft on left & right hanging curls)
+      vec2 hairDL = (fgUv - vec2(0.322, 0.335)) / vec2(0.058, 0.085);
+      float hairMaskL = exp(-dot(hairDL, hairDL) * 1.5)
+                      * smoothstep(0.372, 0.332, fgUv.x)
+                      * smoothstep(0.225, 0.265, fgUv.y)
+                      * smoothstep(0.415, 0.370, fgUv.y);
+      vec2 hairDR = (fgUv - vec2(0.710, 0.325)) / vec2(0.088, 0.110);
+      float hairMaskR = exp(-dot(hairDR, hairDR) * 1.3)
+                      * smoothstep(0.632, 0.678, fgUv.x)
+                      * smoothstep(0.205, 0.250, fgUv.y)
+                      * smoothstep(0.440, 0.390, fgUv.y);
+      float phaseL = uTime * 1.45 - fgUv.y * 4.5;
+      float phaseR = uTime * 1.45 - fgUv.y * 4.5 + 0.85;
+      float gustL = sin(phaseL) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.2 + 0.4);
+      float gustR = sin(phaseR) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.2 + 1.3);
+      vec2 hairDisp = vec2(gustL * 0.0038, cos(phaseL) * 0.0012) * hairMaskL
+                    + vec2(gustR * 0.0044, cos(phaseR) * 0.0014) * hairMaskR;
 
-    // Combined continuous inverse UV sampling
-    vec2 sampleUv = fgUv - (postureDisp + breathDisp + headDisp + hairDisp + skirtDisp + bowDisp);
+      // 5. Subtle Draft Ripple on Satin Skirt Folds & Waist Ribbon Bow
+      vec2 skirtD = (fgUv - vec2(0.495, 0.565)) / vec2(0.115, 0.072);
+      float skirtMask = exp(-dot(skirtD, skirtD) * 1.4)
+                      * smoothstep(0.460, 0.505, fgUv.y)
+                      * smoothstep(0.658, 0.615, fgUv.y)
+                      * smoothstep(0.340, 0.385, fgUv.x)
+                      * smoothstep(0.655, 0.610, fgUv.x);
+      float skirtWave = sin(uTime * 1.35 - fgUv.x * 11.0 + fgUv.y * 6.0);
+      vec2 skirtDisp = vec2(skirtWave * 0.0016, cos(uTime * 1.35 + fgUv.x * 8.0) * 0.0005) * skirtMask;
+
+      vec2 bowD = (fgUv - vec2(0.585, 0.405)) / vec2(0.032, 0.036);
+      float bowMask = exp(-dot(bowD, bowD) * 1.6)
+                    * smoothstep(0.555, 0.576, fgUv.x)
+                    * smoothstep(0.365, 0.385, fgUv.y)
+                    * smoothstep(0.445, 0.420, fgUv.y);
+      vec2 bowDisp = vec2(sin(uTime * 1.7 + 0.5) * 0.0024, cos(uTime * 1.7) * 0.0010) * bowMask;
+
+      sampleUv = fgUv - (postureDisp + breathDisp + headDisp + hairDisp + skirtDisp + bowDisp);
+    } else {
+      // --- KNEELING CRYING PRINCESS ANIMATION (Post-Scream) ---
+      // Delicate sobbing shudder micro-motion synced to emotional breath peak
+      float shiver = sin(uTime * 19.5) * 0.55 + sin(uTime * 31.0 + 1.1) * 0.45;
+      float sobTremor = shiver * (0.35 + 0.65 * pow(breath, 1.4));
+
+      // 1. Kneeling Upper-Body Sobbing Sway (anchored at planted knees & boots)
+      float torsoAnchor = smoothstep(0.67, 0.34, fgUv.y);
+      vec2 shoulderDisp = vec2(
+        0.00055 * sobTremor + 0.0011 * sin(uTime * 1.05),
+        -0.0018 * breath - 0.00060 * sobTremor
+      ) * torsoAnchor;
+
+      // 2. Emotional Sobbing & Corset / Bust Breathing (~3.0s cycle)
+      vec2 bustL = vec2(0.415, 0.490);
+      vec2 bustR = vec2(0.545, 0.492);
+      vec2 dLa = vec2((fgUv.x - bustL.x) * texAspect, fgUv.y - bustL.y);
+      vec2 dRa = vec2((fgUv.x - bustR.x) * texAspect, fgUv.y - bustR.y);
+      float gL = exp(-dot(dLa, dLa) / 0.0022);
+      float gR = exp(-dot(dRa, dRa) / 0.0022);
+      float bustGate = smoothstep(0.415, 0.455, fgUv.y)
+                     * smoothstep(0.605, 0.545, fgUv.y)
+                     * smoothstep(0.305, 0.360, fgUv.x)
+                     * smoothstep(0.675, 0.620, fgUv.x);
+      vec2 expandDispC = (dLa * gL + dRa * gR) * (0.062 * breath * bustGate);
+      vec2 ribDispC = vec2(
+        0.0,
+        (-0.0028 * breath - 0.00055 * sobTremor) * bustGate * clamp(gL + gR, 0.0, 1.0)
+      );
+      vec2 breathDisp = vec2((expandDispC.x + ribDispC.x) / texAspect, expandDispC.y + ribDispC.y);
+
+      // 3. Gentle Sorrowful Head Tilt & Tremor around neck pivot above pearl necklace
+      float tiltAngle = -0.016 + sin(uTime * 1.15) * 0.022 + sobTremor * 0.0045;
+      vec2 neckPivot = vec2(0.510, 0.376);
+      float headMask = (1.0 - smoothstep(0.345, 0.378, fgUv.y))
+                     * smoothstep(0.330, 0.395, fgUv.x)
+                     * smoothstep(0.690, 0.625, fgUv.x);
+      float theta = -tiltAngle * headMask;
+      vec2 relHead = vec2((fgUv.x - neckPivot.x) * texAspect, fgUv.y - neckPivot.y);
+      float ch = cos(theta);
+      float sh = sin(theta);
+      vec2 rotHead = vec2(relHead.x * ch - relHead.y * sh, relHead.x * sh + relHead.y * ch);
+      vec2 headUv = neckPivot + vec2(rotHead.x / texAspect, rotHead.y);
+      vec2 headDisp = (fgUv - headUv) + vec2(0.0, 0.0010 * breath) * headMask;
+
+      // 4. Flowing Side Hair Pendulum Sway on hanging curls outside shoulders/arms
+      vec2 hairDL = (fgUv - vec2(0.308, 0.485)) / vec2(0.068, 0.115);
+      float hairMaskL = exp(-dot(hairDL, hairDL) * 1.25)
+                      * smoothstep(0.354, 0.316, fgUv.x)
+                      * smoothstep(0.355, 0.415, fgUv.y)
+                      * smoothstep(0.605, 0.555, fgUv.y);
+      vec2 hairDR = (fgUv - vec2(0.742, 0.478)) / vec2(0.088, 0.118);
+      float hairMaskR = exp(-dot(hairDR, hairDR) * 1.20)
+                      * smoothstep(0.686, 0.722, fgUv.x)
+                      * smoothstep(0.350, 0.410, fgUv.y)
+                      * smoothstep(0.610, 0.555, fgUv.y);
+      float phaseL = uTime * 1.45 - fgUv.y * 4.2;
+      float phaseR = uTime * 1.45 - fgUv.y * 4.2 + 0.85;
+      float gustL = sin(phaseL) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.0 + 0.4);
+      float gustR = sin(phaseR) + 0.32 * sin(uTime * 2.35 - fgUv.y * 7.0 + 1.3);
+      vec2 hairDisp = vec2(gustL * 0.0040, cos(phaseL) * 0.0012) * hairMaskL
+                    + vec2(gustR * 0.0044, cos(phaseR) * 0.0014) * hairMaskR;
+
+      // 5. Subtle Draft Motion on Torn Dress Hem & Lace
+      vec2 hemD = (fgUv - vec2(0.245, 0.745)) / vec2(0.095, 0.048);
+      float hemMask = exp(-dot(hemD, hemD) * 1.4)
+                    * smoothstep(0.675, 0.710, fgUv.y)
+                    * smoothstep(0.815, 0.785, fgUv.y)
+                    * smoothstep(0.115, 0.165, fgUv.x)
+                    * smoothstep(0.395, 0.345, fgUv.x);
+      float hemWave = sin(uTime * 1.40 - fgUv.x * 12.0 + fgUv.y * 6.5);
+      vec2 hemDisp = vec2(hemWave * 0.0018, cos(uTime * 1.40 + fgUv.x * 8.0) * 0.0006) * hemMask;
+
+      sampleUv = fgUv - (shoulderDisp + breathDisp + headDisp + hairDisp + hemDisp);
+    }
+
     if (sampleUv.x > 0.003 && sampleUv.x < 0.997 && sampleUv.y > 0.003 && sampleUv.y < 0.997) {
       vec4 fg = texture(uPrincess, sampleUv);
       if (fg.a > 0.004) {
@@ -213,11 +402,13 @@ void main() {
         float aD = texture(uPrincess, sampleUv + vec2(0.0, eps)).a;
 
         // Ambient dungeon shading so princess sits naturally in the stone cell
-        fgRgb *= mix(0.86, 0.97, smoothstep(0.92, 0.18, sampleUv.y));
+        float shadeMinY = mix(0.92, 0.82, isCry);
+        float shadeMaxY = mix(0.18, 0.22, isCry);
+        fgRgb *= mix(0.86, 0.97, smoothstep(shadeMinY, shadeMaxY, sampleUv.y));
 
         // Cool top-down daylight rim & soft fill (#CFE8FF) from barred window shafts
         float topRim = clamp(aD - aU, 0.0, 1.0) * smoothstep(0.85, 0.12, sampleUv.y);
-        float topFill = smoothstep(0.62, 0.10, sampleUv.y) * (0.068 + 0.018 * cloudDrift);
+        float topFill = smoothstep(0.70, 0.14, sampleUv.y) * (0.068 + 0.018 * cloudDrift);
         fgRgb += vec3(0.812, 0.910, 1.0) * (topRim * 0.30 + topFill);
 
         // Warm flickering torch bounce (#FF9E40) from right corridor dancing on her right contour
@@ -225,39 +416,281 @@ void main() {
         float rightBounce = smoothstep(0.45, 0.78, sampleUv.x) * 0.042;
         fgRgb += vec3(1.0, 0.620, 0.251) * (rightRim * 0.26 + rightBounce) * flicker;
 
-        // Delicate emerald iris catchlight shimmer in both eyes (0.4585,0.1976 & 0.5284,0.1940)
-        vec2 eyeLUv = vec2(0.4585, 0.1976);
-        vec2 eyeRUv = vec2(0.5284, 0.1940);
+        // Delicate emerald iris catchlight shimmer in both eyes
+        vec2 eyeLUv = mix(vec2(0.4585, 0.1976), vec2(0.4583, 0.3164), isCry);
+        vec2 eyeRUv = mix(vec2(0.5284, 0.1940), vec2(0.5451, 0.3125), isCry);
         float dEyeL = length((sampleUv - eyeLUv) * vec2(texAspect, 1.0));
         float dEyeR = length((sampleUv - eyeRUv) * vec2(texAspect, 1.0));
-        float irisMask = smoothstep(0.011, 0.002, min(dEyeL, dEyeR))
+        float irisMask = smoothstep(0.013, 0.002, min(dEyeL, dEyeR))
                        * smoothstep(0.03, 0.12, fgRgb.g - fgRgb.r);
         float eyeSparkle = 0.65 + 0.35 * sin(uTime * 2.1 + 0.7);
         fgRgb += vec3(0.65, 1.0, 0.90) * irisMask * eyeSparkle * 0.28;
 
         // Specular glints on silver tiara, pearl earrings & pearl necklace synced with breathing
         float lum = dot(fgRgb, vec3(0.299, 0.587, 0.114));
-        float tiaraZone = smoothstep(0.39, 0.43, sampleUv.x) * smoothstep(0.61, 0.57, sampleUv.x)
-                        * smoothstep(0.08, 0.10, sampleUv.y) * smoothstep(0.16, 0.135, sampleUv.y);
-        float pearlZone = smoothstep(0.45, 0.47, sampleUv.x) * smoothstep(0.58, 0.55, sampleUv.x)
-                        * smoothstep(0.245, 0.255, sampleUv.y) * smoothstep(0.295, 0.280, sampleUv.y);
-        float earL = exp(-dot((sampleUv - vec2(0.452, 0.228)) * vec2(texAspect, 1.0),
-                              (sampleUv - vec2(0.452, 0.228)) * vec2(texAspect, 1.0)) / 0.00018);
-        float earR = exp(-dot((sampleUv - vec2(0.570, 0.222)) * vec2(texAspect, 1.0),
-                              (sampleUv - vec2(0.570, 0.222)) * vec2(texAspect, 1.0)) / 0.00018);
+        float tiaraZone = (isCry < 0.5)
+          ? (smoothstep(0.39, 0.43, sampleUv.x) * smoothstep(0.61, 0.57, sampleUv.x)
+           * smoothstep(0.08, 0.10, sampleUv.y) * smoothstep(0.16, 0.135, sampleUv.y))
+          : (smoothstep(0.39, 0.43, sampleUv.x) * smoothstep(0.64, 0.59, sampleUv.x)
+           * smoothstep(0.18, 0.20, sampleUv.y) * smoothstep(0.26, 0.235, sampleUv.y));
+        float pearlZone = (isCry < 0.5)
+          ? (smoothstep(0.45, 0.47, sampleUv.x) * smoothstep(0.58, 0.55, sampleUv.x)
+           * smoothstep(0.245, 0.255, sampleUv.y) * smoothstep(0.295, 0.280, sampleUv.y))
+          : (smoothstep(0.46, 0.48, sampleUv.x) * smoothstep(0.59, 0.56, sampleUv.x)
+           * smoothstep(0.375, 0.390, sampleUv.y) * smoothstep(0.430, 0.412, sampleUv.y));
+        vec2 earLPos = mix(vec2(0.452, 0.228), vec2(0.450, 0.349), isCry);
+        vec2 earRPos = mix(vec2(0.570, 0.222), vec2(0.591, 0.344), isCry);
+        float earL = exp(-dot((sampleUv - earLPos) * vec2(texAspect, 1.0),
+                              (sampleUv - earLPos) * vec2(texAspect, 1.0)) / 0.00022);
+        float earR = exp(-dot((sampleUv - earRPos) * vec2(texAspect, 1.0),
+                              (sampleUv - earRPos) * vec2(texAspect, 1.0)) / 0.00022);
         float glintHighlight = smoothstep(0.58, 0.92, lum) * (tiaraZone + pearlZone + earL + earR);
         float glintWave = pow(breath, 1.6) * (0.60 + 0.40 * sin(sampleUv.x * 40.0 - uTime * 1.65));
         fgRgb += vec3(0.92, 0.97, 1.0) * glintHighlight * glintWave * 0.30;
 
         // Traveling satin highlight sheen across her lavender corset & dress folds
-        float satinZone = smoothstep(0.29, 0.35, sampleUv.y) * smoothstep(0.67, 0.58, sampleUv.y)
-                        * smoothstep(0.31, 0.38, sampleUv.x) * smoothstep(0.65, 0.58, sampleUv.x);
+        float satinZone = (isCry < 0.5)
+          ? (smoothstep(0.29, 0.35, sampleUv.y) * smoothstep(0.67, 0.58, sampleUv.y)
+           * smoothstep(0.31, 0.38, sampleUv.x) * smoothstep(0.65, 0.58, sampleUv.x))
+          : (smoothstep(0.45, 0.50, sampleUv.y) * smoothstep(0.78, 0.69, sampleUv.y)
+           * smoothstep(0.16, 0.25, sampleUv.x) * smoothstep(0.73, 0.65, sampleUv.x));
         float purpleSat = clamp(fgRgb.b - fgRgb.g * 0.72, 0.0, 1.0);
         float satinSheen = smoothstep(0.10, 0.28, purpleSat)
                          * smoothstep(0.42, 0.78, lum)
                          * satinZone;
         float sheenTravel = 0.5 + 0.5 * sin(sampleUv.y * 16.0 - uTime * 1.65 + sampleUv.x * 6.0);
         fgRgb += vec3(0.82, 0.88, 1.0) * satinSheen * sheenTravel * 0.11;
+
+        // --- PROCEDURAL GLSL CRYING TEAR ANIMATION (uIsCrying > 0.5) ---
+        // Stage 1: Shimmering Cheek Tear Streams
+        // Stage 2: Gravity-Accelerated Free-Falling Droplets (Face/Chin -> Upper Chest) + Splash Ripples
+        // Stage 3: Glistening Chest & Corset Trickling Rivulets (Upper Bust -> Cleavage & Corset)
+        if (isCry > 0.5 &&
+            sampleUv.x > 0.42 && sampleUv.x < 0.59 &&
+            sampleUv.y > 0.30 && sampleUv.y < 0.64) {
+          float tearWet = 0.0;
+          float tearHighlight = 0.0;
+          float tearCaustic = 0.0;
+          vec2 tearRefract = vec2(0.0);
+
+          // Stage 1A: Lower-eyelid watery tear pool glisten
+          float lidL = length((sampleUv - vec2(0.458, 0.324)) * vec2(texAspect, 2.2));
+          float lidR = length((sampleUv - vec2(0.545, 0.320)) * vec2(texAspect, 2.2));
+          float lidPool = smoothstep(0.011, 0.002, min(lidL, lidR));
+          tearHighlight += lidPool * (0.45 + 0.28 * sin(uTime * 3.2 + sampleUv.x * 80.0));
+
+          // Stage 1B: Cheek Tear Streams (Eyelids -> Flushed Cheeks -> Chin/Jawline)
+          float dCheekL, tCheekL;
+          vec2 dirCheekL;
+          evalPoly3(
+            sampleUv,
+            vec2(0.458, 0.324),
+            vec2(0.454, 0.340),
+            vec2(0.464, 0.354),
+            vec2(0.474, 0.365),
+            texAspect,
+            dCheekL,
+            tCheekL,
+            dirCheekL
+          );
+          float streamL = (1.0 - smoothstep(0.0008, 0.0025, dCheekL));
+          float flowWaveL = 0.42 + 0.58 * pow(0.5 + 0.5 * sin(tCheekL * 18.0 - uTime * 4.2), 2.0);
+          tearWet += streamL * 0.72;
+          tearHighlight += streamL * flowWaveL * 0.55;
+          tearRefract += dirCheekL * streamL * 0.35;
+
+          float dCheekR, tCheekR;
+          vec2 dirCheekR;
+          evalPoly3(
+            sampleUv,
+            vec2(0.545, 0.320),
+            vec2(0.548, 0.336),
+            vec2(0.538, 0.350),
+            vec2(0.530, 0.360),
+            texAspect,
+            dCheekR,
+            tCheekR,
+            dirCheekR
+          );
+          float streamR = (1.0 - smoothstep(0.0008, 0.0025, dCheekR));
+          float flowWaveR = 0.42 + 0.58 * pow(0.5 + 0.5 * sin(tCheekR * 18.0 - uTime * 3.9 + 1.4), 2.0);
+          tearWet += streamR * 0.72;
+          tearHighlight += streamR * flowWaveR * 0.55;
+          tearRefract += dirCheekR * streamR * 0.35;
+
+          // Sliding cheek tear beads
+          vec2 beadPosL = samplePoly3(
+            vec2(0.458, 0.324), vec2(0.454, 0.340), vec2(0.464, 0.354), vec2(0.474, 0.365),
+            fract(uTime * 0.42)
+          );
+          vec2 beadPosR = samplePoly3(
+            vec2(0.545, 0.320), vec2(0.548, 0.336), vec2(0.538, 0.350), vec2(0.530, 0.360),
+            fract(uTime * 0.37 + 0.52)
+          );
+          vec2 refDummy;
+          vec3 bL = evalTearDrop(sampleUv, beadPosL, 0.0038, 1.35, texAspect, refDummy);
+          vec3 bR = evalTearDrop(sampleUv, beadPosR, 0.0038, 1.35, texAspect, refDummy);
+          tearWet += bL.x + bR.x;
+          tearHighlight += bL.y * 0.90 + bR.y * 0.90;
+          tearCaustic += bL.z + bR.z;
+          tearRefract += refDummy * 0.6;
+
+          // Stage 2: Free-Falling Tear Droplets (Face/Chin -> Upper Chest) + Splash Ripples
+          // Drop A: Left Chin/Jaw -> Left Upper Bust Skin
+          float cycA = fract(uTime / 2.45 + 0.10);
+          vec2 dropStartA = vec2(0.474, 0.365);
+          vec2 dropEndA = vec2(0.468, 0.448);
+          if (cycA < 0.36) {
+            float u = cycA / 0.36;
+            vec2 posA = vec2(mix(dropStartA.x, dropEndA.x, u), mix(dropStartA.y, dropEndA.y, u * u));
+            float rA = 0.0052 * smoothstep(0.0, 0.14, u);
+            vec2 refA;
+            vec3 tdA = evalTearDrop(fgUv, posA, rA, mix(1.45, 2.25, u), texAspect, refA);
+            tearWet += tdA.x;
+            tearHighlight += tdA.y * 1.15;
+            tearCaustic += tdA.z * 0.95;
+            tearRefract += refA;
+          }
+          float ripA = evalSplashRipple(sampleUv, dropEndA, cycA, 0.35, 0.62, texAspect);
+
+          // Drop B: Chin Tip -> Upper Center Chest / Cleavage Top
+          float cycB = fract(uTime / 2.85 + 0.44);
+          vec2 dropStartB = vec2(0.502, 0.371);
+          vec2 dropEndB = vec2(0.494, 0.446);
+          if (cycB < 0.35) {
+            float u = cycB / 0.35;
+            vec2 posB = vec2(mix(dropStartB.x, dropEndB.x, u), mix(dropStartB.y, dropEndB.y, u * u));
+            float rB = 0.0055 * smoothstep(0.0, 0.14, u);
+            vec2 refB;
+            vec3 tdB = evalTearDrop(fgUv, posB, rB, mix(1.50, 2.35, u), texAspect, refB);
+            tearWet += tdB.x;
+            tearHighlight += tdB.y * 1.20;
+            tearCaustic += tdB.z * 0.95;
+            tearRefract += refB;
+          }
+          float ripB = evalSplashRipple(sampleUv, dropEndB, cycB, 0.34, 0.60, texAspect);
+
+          // Drop C: Right Cheek/Jaw -> Right Upper Bust Skin
+          float cycC = fract(uTime / 3.15 + 0.76);
+          vec2 dropStartC = vec2(0.530, 0.360);
+          vec2 dropEndC = vec2(0.530, 0.444);
+          if (cycC < 0.36) {
+            float u = cycC / 0.36;
+            vec2 posC = vec2(mix(dropStartC.x, dropEndC.x, u), mix(dropStartC.y, dropEndC.y, u * u));
+            float rC = 0.0050 * smoothstep(0.0, 0.14, u);
+            vec2 refC;
+            vec3 tdC = evalTearDrop(fgUv, posC, rC, mix(1.45, 2.25, u), texAspect, refC);
+            tearWet += tdC.x;
+            tearHighlight += tdC.y * 1.15;
+            tearCaustic += tdC.z * 0.95;
+            tearRefract += refC;
+          }
+          float ripC = evalSplashRipple(sampleUv, dropEndC, cycC, 0.35, 0.62, texAspect);
+
+          tearHighlight += (ripA + ripB + ripC) * 0.95;
+          tearWet += (ripA + ripB + ripC) * 0.55;
+
+          // Stage 3: Chest & Corset Trickling Rivulets (Upper Bust -> Cleavage -> Purple Corset)
+          // Rivulet 1: Left Upper Bust -> Cleavage -> Heart Trim -> Corset Center Seam
+          float dRiv1, tRiv1;
+          vec2 dirRiv1;
+          vec2 r1p0 = vec2(0.468, 0.448);
+          vec2 r1p1 = vec2(0.479, 0.474);
+          vec2 r1p2 = vec2(0.478, 0.518);
+          vec2 r1p3 = vec2(0.474, 0.618);
+          evalPoly3(sampleUv, r1p0, r1p1, r1p2, r1p3, texAspect, dRiv1, tRiv1, dirRiv1);
+          float rivMask1 = (1.0 - smoothstep(0.0006, 0.0022, dRiv1)) * smoothstep(0.0, 0.05, tRiv1) * smoothstep(1.0, 0.85, tRiv1);
+          float rivShimmer1 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv1 * 24.0 - uTime * 2.6), 2.0);
+          tearWet += rivMask1 * 0.62;
+          tearHighlight += rivMask1 * rivShimmer1 * 0.52;
+          tearRefract += dirRiv1 * rivMask1 * 0.32;
+
+          // Trickle beads on Rivulet 1
+          for (int i = 0; i < 2; i++) {
+            float fi = float(i);
+            float tBead = fract(uTime * 0.20 + fi * 0.50 + 0.12);
+            vec2 bPos = samplePoly3(r1p0, r1p1, r1p2, r1p3, tBead);
+            bPos.x += sin(tBead * 14.0 + fi) * 0.0014;
+            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
+            vec2 bRef;
+            vec3 td = evalTearDrop(sampleUv, bPos, 0.0044, 1.55, texAspect, bRef);
+            tearWet += td.x * fade;
+            tearHighlight += td.y * fade * 1.05;
+            tearCaustic += td.z * fade * 0.85;
+            tearRefract += bRef * fade * 0.7;
+          }
+
+          // Rivulet 2: Center Upper Chest -> Cleavage Crease -> Center Corset
+          float dRiv2, tRiv2;
+          vec2 dirRiv2;
+          vec2 r2p0 = vec2(0.494, 0.446);
+          vec2 r2p1 = vec2(0.483, 0.468);
+          vec2 r2p2 = vec2(0.479, 0.510);
+          vec2 r2p3 = vec2(0.477, 0.624);
+          evalPoly3(sampleUv, r2p0, r2p1, r2p2, r2p3, texAspect, dRiv2, tRiv2, dirRiv2);
+          float rivMask2 = (1.0 - smoothstep(0.0006, 0.0022, dRiv2)) * smoothstep(0.0, 0.05, tRiv2) * smoothstep(1.0, 0.85, tRiv2);
+          float rivShimmer2 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv2 * 22.0 - uTime * 2.3 + 1.1), 2.0);
+          tearWet += rivMask2 * 0.65;
+          tearHighlight += rivMask2 * rivShimmer2 * 0.55;
+          tearRefract += dirRiv2 * rivMask2 * 0.32;
+
+          for (int i = 0; i < 2; i++) {
+            float fi = float(i);
+            float tBead = fract(uTime * 0.17 + fi * 0.50 + 0.35);
+            vec2 bPos = samplePoly3(r2p0, r2p1, r2p2, r2p3, tBead);
+            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
+            vec2 bRef;
+            vec3 td = evalTearDrop(sampleUv, bPos, 0.0046, 1.60, texAspect, bRef);
+            tearWet += td.x * fade;
+            tearHighlight += td.y * fade * 1.10;
+            tearCaustic += td.z * fade * 0.85;
+            tearRefract += bRef * fade * 0.7;
+          }
+
+          // Rivulet 3: Right Upper Bust -> Right Corset Cup -> Right Corset Panel
+          float dRiv3, tRiv3;
+          vec2 dirRiv3;
+          vec2 r3p0 = vec2(0.530, 0.444);
+          vec2 r3p1 = vec2(0.525, 0.472);
+          vec2 r3p2 = vec2(0.518, 0.520);
+          vec2 r3p3 = vec2(0.509, 0.614);
+          evalPoly3(sampleUv, r3p0, r3p1, r3p2, r3p3, texAspect, dRiv3, tRiv3, dirRiv3);
+          float rivMask3 = (1.0 - smoothstep(0.0006, 0.0021, dRiv3)) * smoothstep(0.0, 0.05, tRiv3) * smoothstep(1.0, 0.85, tRiv3);
+          float rivShimmer3 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv3 * 22.0 - uTime * 2.4 + 2.3), 2.0);
+          tearWet += rivMask3 * 0.60;
+          tearHighlight += rivMask3 * rivShimmer3 * 0.50;
+          tearRefract += dirRiv3 * rivMask3 * 0.30;
+
+          for (int i = 0; i < 2; i++) {
+            float fi = float(i);
+            float tBead = fract(uTime * 0.185 + fi * 0.50 + 0.62);
+            vec2 bPos = samplePoly3(r3p0, r3p1, r3p2, r3p3, tBead);
+            bPos.x += sin(tBead * 12.0 + 0.7) * 0.0014;
+            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
+            vec2 bRef;
+            vec3 td = evalTearDrop(sampleUv, bPos, 0.0043, 1.55, texAspect, bRef);
+            tearWet += td.x * fade;
+            tearHighlight += td.y * fade * 1.05;
+            tearCaustic += td.z * fade * 0.85;
+            tearRefract += bRef * fade * 0.7;
+          }
+
+          // Composite subtle water refraction + crisp #E8F8FF sunbeam glints & warm torch sparkles
+          float wetAmt = clamp(tearWet, 0.0, 1.0);
+          if (wetAmt > 0.01) {
+            vec2 refUv = clamp(sampleUv - tearRefract * vec2(0.0024 / texAspect, 0.0024), 0.003, 0.997);
+            vec4 refFg = texture(uPrincess, refUv);
+            if (refFg.a > 0.05) {
+              vec3 refCol = clamp(refFg.rgb / refFg.a, 0.0, 1.0);
+              fgRgb = mix(fgRgb, refCol * vec3(0.95, 0.99, 1.03), wetAmt * 0.55);
+            }
+          }
+          // Crisp cool white-cyan tear specular (#E8F8FF) + subtle warm right-side torch glint
+          vec3 coolTearSpec = vec3(0.910, 0.973, 1.0);
+          vec3 warmTorchGlint = vec3(1.0, 0.82, 0.58) * (0.28 * flicker * smoothstep(0.45, 0.56, sampleUv.x));
+          fgRgb += coolTearSpec * clamp(tearHighlight, 0.0, 1.35) * 0.78;
+          fgRgb += (coolTearSpec * 0.72 + warmTorchGlint) * clamp(tearCaustic, 0.0, 1.0) * 0.65;
+        }
 
         compCol = mix(bgCol, clamp(fgRgb, 0.0, 1.0), fg.a);
       }

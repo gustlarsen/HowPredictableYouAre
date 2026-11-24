@@ -175,10 +175,16 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
                                       widget.controller,
                                     ),
                               )
-                            : WatchtowerCellShaderView(
-                                isFullScreen: true,
-                                animationsEnabled:
-                                    widget.controller.animationsEnabled,
+                            : ListenableBuilder(
+                                listenable: widget.controller,
+                                builder: (context, _) =>
+                                    WatchtowerCellShaderView(
+                                  isFullScreen: true,
+                                  animationsEnabled:
+                                      widget.controller.animationsEnabled,
+                                  isCrying:
+                                      widget.controller.hasDungeonScreamOccurred,
+                                ),
                               ),
                       ),
                     ),

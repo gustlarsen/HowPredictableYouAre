@@ -79,6 +79,7 @@ flutter:
     - assets/images/world_map_conquered.jpeg
     - assets/images/watchtower_dungeon_cell.jpeg
     - assets/images/princess_captive.png
+    - assets/images/princess_captive_crying.png
     - assets/images/story/
     - assets/data/
     - assets/audio/

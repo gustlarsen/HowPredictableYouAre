@@ -597,6 +597,9 @@ class GameController extends ChangeNotifier {
   bool get shouldShowPrincessCellScreamBadge =>
       hasShownWeek0ScreamWarning && !hasInspectedPrincessCellAfterScream;
 
+  bool get hasDungeonScreamOccurred =>
+      hasShownWeek0ScreamWarning || pendingWeek0ScreamWarning;
+
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
   int adConsagrationsThisWeek = 0;
   SacredBlessing? pendingBattleBlessing;
