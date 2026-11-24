@@ -5,22 +5,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+/// Visual progression stage of the captive Princess inside the Watch Tower cell.
+enum WatchtowerPrincessStage {
+  /// Week 0: Original standing pose with 0% belly growth.
+  standing,
+
+  /// Week 1: Kneeling crying pose (right hand on lap) with 0% belly growth.
+  cryingWeek1,
+
+  /// Week 2–40: Unobstructed kneeling crying pose with progressive belly growth.
+  cryingPregnant,
+}
+
 /// Renders the animated Watch Tower Dungeon Cell + captive Princess scene
 /// via `shaders/watchtower_prisoner.frag`, with a safe static [Stack] fallback
 /// when fragment shaders are unavailable (e.g. headless CI `flutter test`).
 class WatchtowerCellShaderView extends StatefulWidget {
+  static const int maxProgressionWeek = 40;
+
   final bool animationsEnabled;
   final bool forceStaticFallback;
   final bool isFullScreen;
-  final bool isCrying;
+  final int currentWeek;
+  final bool _isCryingOverride;
 
   const WatchtowerCellShaderView({
     super.key,
     this.animationsEnabled = true,
     this.forceStaticFallback = false,
     this.isFullScreen = false,
-    this.isCrying = false,
-  });
+    this.currentWeek = 0,
+    bool isCrying = false,
+  }) : _isCryingOverride = isCrying;
+
+  /// Campaign week clamped to the 0..40 spyglass progression range.
+  int get clampedWeek => currentWeek.clamp(0, maxProgressionWeek);
+
+  /// Whether the Princess is in a kneeling crying state (Week 1+ or post-scream).
+  bool get isCrying => clampedWeek >= 1 || _isCryingOverride;
+
+  /// Active three-stage progression (`Week 0` -> `Week 1` -> `Week 2..40`).
+  WatchtowerPrincessStage get princessStage {
+    if (clampedWeek >= 2) {
+      return WatchtowerPrincessStage.cryingPregnant;
+    }
+    if (clampedWeek >= 1 || _isCryingOverride) {
+      return WatchtowerPrincessStage.cryingWeek1;
+    }
+    return WatchtowerPrincessStage.standing;
+  }
+
+  /// Normalized belly growth progress: `0.0` for Week 0–1, smoothly ramping
+  /// from `1/39` at Week 2 to `1.0` at Week 40.
+  double get bellyProgress {
+    if (clampedWeek < 2) return 0.0;
+    return ((clampedWeek - 1) / 39.0).clamp(0.0, 1.0);
+  }
 
   @override
   State<WatchtowerCellShaderView> createState() =>
@@ -34,6 +74,8 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   static const String _princessAsset = 'assets/images/princess_captive.png';
   static const String _princessCryingAsset =
       'assets/images/princess_captive_crying.png';
+  static const String _princessCryingOpenAsset =
+      'assets/images/princess_captive_crying_open.png';
 
   final ValueNotifier<double> _timeSeconds = ValueNotifier<double>(0.0);
   late final Ticker _ticker;
@@ -46,8 +88,18 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   bool _disposed = false;
   int _loadGeneration = 0;
 
-  String get _activePrincessAsset =>
-      widget.isCrying ? _princessCryingAsset : _princessAsset;
+  static String _assetForStage(WatchtowerPrincessStage stage) {
+    switch (stage) {
+      case WatchtowerPrincessStage.standing:
+        return _princessAsset;
+      case WatchtowerPrincessStage.cryingWeek1:
+        return _princessCryingAsset;
+      case WatchtowerPrincessStage.cryingPregnant:
+        return _princessCryingOpenAsset;
+    }
+  }
+
+  String get _activePrincessAsset => _assetForStage(widget.princessStage);
 
   @override
   void initState() {
@@ -66,6 +118,9 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
   @override
   void didUpdateWidget(covariant WatchtowerCellShaderView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final assetChanged =
+        _assetForStage(oldWidget.princessStage) != _activePrincessAsset;
+
     if (oldWidget.animationsEnabled != widget.animationsEnabled) {
       _syncTicker();
     }
@@ -79,12 +134,10 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
       } else if (_program == null) {
         _shaderFailed = false;
         unawaited(_loadAssets());
-      } else if (oldWidget.isCrying != widget.isCrying) {
+      } else if (assetChanged) {
         unawaited(_reloadPrincessAsset());
       }
-    } else if (oldWidget.isCrying != widget.isCrying &&
-        !widget.forceStaticFallback &&
-        !_shaderFailed) {
+    } else if (assetChanged && !widget.forceStaticFallback && !_shaderFailed) {
       if (_program == null) {
         unawaited(_loadAssets());
       } else {
@@ -218,6 +271,7 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
             timeSeconds: _timeSeconds,
             isFullScreen: widget.isFullScreen,
             isCrying: widget.isCrying,
+            bellyProgress: widget.bellyProgress,
           ),
           child: const SizedBox.expand(),
         ),
@@ -226,7 +280,7 @@ class _WatchtowerCellShaderViewState extends State<WatchtowerCellShaderView>
 
     return _StaticDungeonFallback(
       isFullScreen: widget.isFullScreen,
-      isCrying: widget.isCrying,
+      stage: widget.princessStage,
     );
   }
 }
@@ -238,6 +292,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
   final ValueNotifier<double> timeSeconds;
   final bool isFullScreen;
   final bool isCrying;
+  final double bellyProgress;
 
   _WatchtowerCellShaderPainter({
     required this.shader,
@@ -246,6 +301,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     required this.timeSeconds,
     required this.isFullScreen,
     required this.isCrying,
+    required this.bellyProgress,
   }) : super(repaint: timeSeconds);
 
   @override
@@ -257,6 +313,7 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
     shader.setFloat(2, timeSeconds.value);
     shader.setFloat(3, isFullScreen ? 1.0 : 0.0);
     shader.setFloat(4, isCrying ? 1.0 : 0.0);
+    shader.setFloat(5, bellyProgress);
     shader.setImageSampler(0, bgImage);
     shader.setImageSampler(1, princessImage);
 
@@ -270,7 +327,8 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
         oldDelegate.bgImage != bgImage ||
         oldDelegate.princessImage != princessImage ||
         oldDelegate.isFullScreen != isFullScreen ||
-        oldDelegate.isCrying != isCrying;
+        oldDelegate.isCrying != isCrying ||
+        oldDelegate.bellyProgress != bellyProgress;
   }
 }
 
@@ -278,11 +336,11 @@ class _WatchtowerCellShaderPainter extends CustomPainter {
 /// in headless CI test environments without GPU shader support.
 class _StaticDungeonFallback extends StatelessWidget {
   final bool isFullScreen;
-  final bool isCrying;
+  final WatchtowerPrincessStage stage;
 
   const _StaticDungeonFallback({
     required this.isFullScreen,
-    required this.isCrying,
+    required this.stage,
   });
 
   static const double _texAspect = 576.0 / 1024.0;
@@ -291,6 +349,21 @@ class _StaticDungeonFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isKneeling = stage != WatchtowerPrincessStage.standing;
+    final String princessAsset;
+    final String imageKey;
+    switch (stage) {
+      case WatchtowerPrincessStage.standing:
+        princessAsset = _WatchtowerCellShaderViewState._princessAsset;
+        imageKey = 'watchtower_spyglass_princess_standing_image';
+      case WatchtowerPrincessStage.cryingWeek1:
+        princessAsset = _WatchtowerCellShaderViewState._princessCryingAsset;
+        imageKey = 'watchtower_spyglass_princess_crying_image';
+      case WatchtowerPrincessStage.cryingPregnant:
+        princessAsset = _WatchtowerCellShaderViewState._princessCryingOpenAsset;
+        imageKey = 'watchtower_spyglass_princess_crying_open_image';
+    }
+
     return LayoutBuilder(
       key: const ValueKey('watchtower_spyglass_fallback_stack'),
       builder: (context, constraints) {
@@ -317,26 +390,26 @@ class _StaticDungeonFallback extends StatelessWidget {
           offsetY = 0.0;
         }
 
-        final fgScale = isCrying ? _cryingFgScale : _standingFgScale;
+        final fgScale = isKneeling ? _cryingFgScale : _standingFgScale;
         final fgSizeW = sceneWidth * fgScale;
         final fgSizeH = sceneHeight * fgScale;
         final fgLeft = offsetX +
             sceneWidth *
-                (isCrying
+                (isKneeling
                     ? (0.520 - 0.495 * fgScale)
                     : (0.485 - 0.5 * fgScale));
         final fgTop = offsetY +
             sceneHeight *
-                (isCrying
+                (isKneeling
                     ? (0.752 - 0.827 * fgScale)
                     : (0.745 - 0.955 * fgScale));
 
-        final shadowW = sceneWidth * (isCrying ? 0.24 : 0.11);
-        final shadowH = sceneHeight * (isCrying ? 0.044 : 0.028);
+        final shadowW = sceneWidth * (isKneeling ? 0.24 : 0.11);
+        final shadowH = sceneHeight * (isKneeling ? 0.044 : 0.028);
         final shadowLeft =
-            offsetX + sceneWidth * (isCrying ? 0.510 : 0.478) - shadowW * 0.5;
+            offsetX + sceneWidth * (isKneeling ? 0.510 : 0.478) - shadowW * 0.5;
         final shadowTop =
-            offsetY + sceneHeight * (isCrying ? 0.742 : 0.744) - shadowH * 0.5;
+            offsetY + sceneHeight * (isKneeling ? 0.742 : 0.744) - shadowH * 0.5;
 
         return ClipRect(
           child: Stack(
@@ -374,14 +447,8 @@ class _StaticDungeonFallback extends StatelessWidget {
                 width: fgSizeW,
                 height: fgSizeH,
                 child: Image.asset(
-                  isCrying
-                      ? _WatchtowerCellShaderViewState._princessCryingAsset
-                      : _WatchtowerCellShaderViewState._princessAsset,
-                  key: ValueKey(
-                    isCrying
-                        ? 'watchtower_spyglass_princess_crying_image'
-                        : 'watchtower_spyglass_princess_standing_image',
-                  ),
+                  princessAsset,
+                  key: ValueKey(imageKey),
                   fit: BoxFit.fill,
                 ),
               ),

@@ -5,6 +5,7 @@ uniform vec2 uResolution;
 uniform float uTime;
 uniform float uIsFullScreen;
 uniform float uIsCrying;
+uniform float uBellyProgress;
 
 uniform sampler2D uBackground;
 uniform sampler2D uPrincess;
@@ -231,12 +232,121 @@ void evalChestStream(
   }
 }
 
+// --- PROGRESSIVE 9-MONTH VOLUMETRIC BELLY GROWTH HELPERS (Week 2..40) ---
+// Computes strictly C1-continuous anatomical dome height in [0, 1] confined to
+// the lower corset/abdomen corridor strictly below her bust and between her
+// outward-angled arms/white gloves so bust, neckline, face, arms, gloves, and
+// knees remain 100% undistorted even at 4.0x zoom.
+float evalBellyDomeHeight(vec2 uv, float p, float breathMod) {
+  if (p <= 0.0001) return 0.0;
+
+  float pSafe = max(p, 1e-5);
+  float grow = mix(pow(pSafe, 0.84), smoothstep(0.0, 1.0, p), 0.25);
+  float radGrow = mix(0.68, 1.0, pow(pSafe, 0.52));
+
+  float cx = 0.486;
+  float cy = mix(0.608, 0.606, grow);
+
+  // Trapezoidal safe corridor strictly inside her angled arms & white gloves
+  float armT = clamp((uv.y - 0.525) / 0.155, 0.0, 1.0);
+  float leftWall = mix(0.390, 0.302, armT);
+  float rightWall = mix(0.629, 0.678, armT);
+
+  float rxL = (cx - leftWall) * radGrow;
+  float rxR = (rightWall - cx) * radGrow;
+
+  // Anatomical vertical span: strictly below underbust crease and above knees
+  float underbustY = 0.522 + 0.004 * smoothstep(0.02, 0.09, abs(uv.x - cx));
+  float ryTop = (cy - underbustY) * mix(0.74, 1.0, pow(pSafe, 0.50));
+  float ryBot = (0.728 - cy) * mix(0.72, 1.0, pow(pSafe, 0.52));
+
+  vec2 d = uv - vec2(cx, cy);
+  float rx = (d.x < 0.0) ? rxL : rxR;
+  float ry = (d.y < 0.0) ? ryTop : ryBot;
+
+  vec2 q = vec2(d.x / max(rx, 1e-4), d.y / max(ry, 1e-4));
+  float r2 = dot(q, q);
+  if (r2 >= 1.0) return 0.0;
+
+  float r = sqrt(r2);
+  return sqrt(max(1.0 - r2, 0.0)) * smoothstep(1.0, 0.56, r) * (1.0 + breathMod * 0.032);
+}
+
+// Evaluates guaranteed-monotonic C1 UV displacement and outputs dome height & effective growth.
+vec2 evalBellyDeform(
+    vec2 uv,
+    float p,
+    float breath,
+    float sobTremor,
+    out float domeHeight,
+    out float effectiveGrow) {
+  domeHeight = 0.0;
+  effectiveGrow = 0.0;
+  if (p <= 0.0001) return vec2(0.0);
+
+  float pSafe = max(p, 1e-5);
+  float grow = mix(pow(pSafe, 0.84), smoothstep(0.0, 1.0, p), 0.25);
+  // Couple subtle breathing expansion & soft sobbing inertia with upper chest motion
+  float breathCouple = breath * 0.034 + sobTremor * 0.0035;
+  effectiveGrow = grow;
+  float growLive = clamp(grow * (1.0 + breathCouple), 0.0, 1.04);
+  float radGrow = mix(0.68, 1.0, pow(pSafe, 0.52));
+
+  float cx = 0.486;
+  float cy = mix(0.608, 0.606, grow);
+
+  float armT = clamp((uv.y - 0.525) / 0.155, 0.0, 1.0);
+  float leftWall = mix(0.390, 0.302, armT);
+  float rightWall = mix(0.629, 0.678, armT);
+
+  float rxL = (cx - leftWall) * radGrow;
+  float rxR = (rightWall - cx) * radGrow;
+
+  float underbustY = 0.522 + 0.004 * smoothstep(0.02, 0.09, abs(uv.x - cx));
+  float ryTop = (cy - underbustY) * mix(0.74, 1.0, pow(pSafe, 0.50));
+  float ryBot = (0.728 - cy) * mix(0.72, 1.0, pow(pSafe, 0.52));
+
+  vec2 d = uv - vec2(cx, cy);
+  float rx = (d.x < 0.0) ? rxL : rxR;
+  float ry = (d.y < 0.0) ? ryTop : ryBot;
+
+  vec2 q = vec2(d.x / max(rx, 1e-4), d.y / max(ry, 1e-4));
+  float r2 = dot(q, q);
+  if (r2 >= 1.0) return vec2(0.0);
+
+  float r = sqrt(r2);
+  float r3 = r2 * r;
+  float r4 = r2 * r2;
+
+  // Blended (1 - r^3)^2 / (1 - r^4)^2 envelope: crisp detail at 4.0x zoom, full spherical flanks,
+  // strictly monotonic (no folding/tearing), and C1 zero at boundary r = 1.
+  float env3 = (1.0 - r3) * (1.0 - r3);
+  float env4 = (1.0 - r4) * (1.0 - r4);
+  float envFull = mix(env3, env4, 0.55);
+  float envSoft = (1.0 - r2) * (1.0 - r2);
+
+  domeHeight = sqrt(max(1.0 - r2, 0.0)) * smoothstep(1.0, 0.56, r) * (1.0 + breathCouple);
+
+  float waistDiff = (uv.y - 0.580) / 0.052;
+  float waistRound = exp(-waistDiff * waistDiff);
+  float kx = (0.56 + 0.09 * waistRound) * growLive;
+  float ky = 0.34 * growLive;
+
+  // Natural forward/downward fullness of the lower belly resting into her lap
+  float sagY = 0.036 * growLive * envSoft * smoothstep(-0.68, 0.28, q.y);
+  // Harmonized subtle vertical abdominal heave synced with ribcage inhale
+  float breathLiftY = -0.0014 * breath * domeHeight * grow;
+
+  return vec2(d.x * kx * envFull, d.y * ky * envFull + sagY + breathLiftY);
+}
+
 void main() {
   vec2 res = max(uResolution, vec2(1.0));
   vec2 uv = FlutterFragCoord().xy / res;
 
   float isFull = clamp(uIsFullScreen, 0.0, 1.0);
   float isCry = step(0.5, uIsCrying);
+  float bellyP = clamp(uBellyProgress, 0.0, 1.0) * isCry;
   float viewAspect = res.x / res.y;
   vec2 centered = uv - 0.5;
 
@@ -352,6 +462,10 @@ void main() {
 
   if (inFgBounds) {
     vec2 sampleUv = fgUv;
+    vec2 bellyAnimUv = fgUv;
+    float bellyDome = 0.0;
+    float bellyGrow = 0.0;
+    float bellyBreathMod = 0.0;
 
     if (isCry < 0.5) {
       // --- STANDING PRINCESS ANIMATION (Pre-Scream) ---
@@ -426,10 +540,10 @@ void main() {
 
       sampleUv = fgUv - (postureDisp + breathDisp + headDisp + hairDisp + skirtDisp + bowDisp);
     } else {
-      // --- KNEELING CRYING PRINCESS ANIMATION (Post-Scream) ---
+      // --- KNEELING CRYING PRINCESS ANIMATION (Week 1 & Week 2..40) ---
       // Delicate sobbing shudder micro-motion synced to emotional breath peak
       float shiver = sin(uTime * 19.5) * 0.55 + sin(uTime * 31.0 + 1.1) * 0.45;
-      float sobTremor = shiver * (0.35 + 0.65 * pow(breath, 1.4));
+      float sobTremor = shiver * (0.35 + 0.65 * pow(max(breath, 1e-5), 1.4));
 
       // 1. Kneeling Upper-Body Sobbing Sway (anchored at planted knees & boots)
       float torsoAnchor = smoothstep(0.67, 0.34, fgUv.y);
@@ -498,7 +612,15 @@ void main() {
       float hemWave = sin(uTime * 1.40 - fgUv.x * 12.0 + fgUv.y * 6.5);
       vec2 hemDisp = vec2(hemWave * 0.0018, cos(uTime * 1.40 + fgUv.x * 8.0) * 0.0006) * hemMask;
 
-      sampleUv = fgUv - (shoulderDisp + breathDisp + headDisp + hairDisp + hemDisp);
+      bellyAnimUv = fgUv - (shoulderDisp + breathDisp + headDisp + hairDisp + hemDisp);
+      bellyBreathMod = breath + sobTremor * 0.10;
+
+      // 6. Progressive Volumetric Belly Growth (Week 2..40, strictly below bust & between arms)
+      vec2 bellyDisp = (bellyP > 0.0001)
+        ? evalBellyDeform(bellyAnimUv, bellyP, breath, sobTremor, bellyDome, bellyGrow)
+        : vec2(0.0);
+
+      sampleUv = bellyAnimUv - bellyDisp;
     }
 
     if (sampleUv.x > 0.003 && sampleUv.x < 0.997 && sampleUv.y > 0.003 && sampleUv.y < 0.997) {
@@ -557,7 +679,7 @@ void main() {
         float earR = exp(-dot((sampleUv - earRPos) * vec2(texAspect, 1.0),
                               (sampleUv - earRPos) * vec2(texAspect, 1.0)) / 0.00022);
         float glintHighlight = smoothstep(0.58, 0.92, lum) * (tiaraZone + pearlZone + earL + earR);
-        float glintWave = pow(breath, 1.6) * (0.60 + 0.40 * sin(sampleUv.x * 40.0 - uTime * 1.65));
+        float glintWave = pow(max(breath, 1e-5), 1.6) * (0.60 + 0.40 * sin(sampleUv.x * 40.0 - uTime * 1.65));
         fgRgb += vec3(0.92, 0.97, 1.0) * glintHighlight * glintWave * 0.30;
 
         // Traveling satin highlight sheen across her lavender corset & dress folds
@@ -572,6 +694,79 @@ void main() {
                          * satinZone;
         float sheenTravel = 0.5 + 0.5 * sin(sampleUv.y * 16.0 - uTime * 1.65 + sampleUv.x * 6.0);
         fgRgb += vec3(0.82, 0.88, 1.0) * satinSheen * sheenTravel * 0.11;
+
+        // --- PROCEDURAL 3D VOLUMETRIC BELLY SHADING & FABRIC TENSION (Week 2..40) ---
+        // Harmonized with barred-window skylight, right-corridor torchlight, and underside lap occlusion.
+        if (bellyP > 0.0001 &&
+            bellyAnimUv.y > 0.515 && bellyAnimUv.y < 0.760 &&
+            bellyAnimUv.x > 0.280 && bellyAnimUv.x < 0.700) {
+          float pSafe = max(bellyP, 1e-5);
+          float radGrow = mix(0.68, 1.0, pow(pSafe, 0.52));
+          float bEps = 0.003;
+          float dL = evalBellyDomeHeight(bellyAnimUv - vec2(bEps, 0.0), bellyP, bellyBreathMod);
+          float dR = evalBellyDomeHeight(bellyAnimUv + vec2(bEps, 0.0), bellyP, bellyBreathMod);
+          float dU = evalBellyDomeHeight(bellyAnimUv - vec2(0.0, bEps), bellyP, bellyBreathMod);
+          float dD = evalBellyDomeHeight(bellyAnimUv + vec2(0.0, bEps), bellyP, bellyBreathMod);
+
+          float zAmp = 0.165 * bellyGrow;
+          float dzdx = ((dR - dL) / (2.0 * bEps * texAspect)) * zAmp;
+          float dzdy = ((dD - dU) / (2.0 * bEps)) * zAmp;
+          vec3 bNormal = normalize(vec3(-dzdx, -dzdy, 1.0));
+
+          vec3 lightTop = normalize(vec3(-0.16, -0.86, 0.48));
+          vec3 lightTorch = normalize(vec3(0.86, -0.14, 0.49));
+          vec3 halfTop = normalize(lightTop + vec3(0.0, 0.0, 1.0));
+
+          float shadeW = smoothstep(0.03, 0.30, bellyDome) * bellyGrow;
+
+          // 1. Soft top-down barred-window skylight & stretched-satin specular on upper belly curve
+          float topBoost = max(0.0, dot(bNormal, lightTop) - lightTop.z);
+          float upperSlope = smoothstep(0.12, -0.35, bNormal.y);
+          float specTop = pow(max(dot(bNormal, halfTop), 1e-5), 10.0)
+                        * smoothstep(0.18, 0.65, bellyDome)
+                        * upperSlope;
+
+          // 2. Warm right-corridor torchlight wrap on right flank of the rounded belly
+          float torchBoost = max(0.0, dot(bNormal, lightTorch) - lightTorch.z);
+
+          // 3. Underside spherical self-shadow, flank curvature depth, and subtle underbust crease
+          float underCurve = smoothstep(0.05, 0.56, bNormal.y) * smoothstep(0.04, 0.44, bellyDome);
+          float sideCurve = smoothstep(0.24, 0.78, abs(bNormal.x)) * smoothstep(0.06, 0.42, bellyDome);
+          float ubDiff = (bellyAnimUv.y - 0.531) / 0.010;
+          float ubCrease = exp(-ubDiff * ubDiff) * smoothstep(0.08, 0.35, bellyDome) * 0.22;
+
+          // 4. Soft curved crescent cast shadow tucked beneath the lower belly onto her lap/skirt folds
+          float cySh = mix(0.608, 0.606, bellyGrow) + 0.088 * radGrow;
+          float shU = (bellyAnimUv.x - 0.486) / max(0.148 * radGrow, 1e-4);
+          float arcY = cySh - 0.025 * shU * shU;
+          float shV = (bellyAnimUv.y - arcY) / max(0.026 * radGrow, 1e-4);
+          float armTSh = clamp((bellyAnimUv.y - 0.525) / 0.155, 0.0, 1.0);
+          float lwSh = mix(0.390, 0.302, armTSh);
+          float rwSh = mix(0.629, 0.678, armTSh);
+          float corridorGuard = smoothstep(lwSh, lwSh + 0.028, bellyAnimUv.x)
+                              * smoothstep(rwSh, rwSh - 0.028, bellyAnimUv.x);
+          float castSh = exp(-(shU * shU * 1.15 + shV * shV * 2.1))
+                       * smoothstep(0.62, 0.672, bellyAnimUv.y)
+                       * smoothstep(0.745, 0.692, bellyAnimUv.y)
+                       * (1.0 - smoothstep(0.25, 0.68, bellyDome))
+                       * corridorGuard
+                       * bellyGrow;
+
+          float shadowAmt = clamp(
+            underCurve * 0.52 + sideCurve * 0.22 + castSh * 0.42 + ubCrease,
+            0.0,
+            0.62
+          ) * bellyGrow;
+          fgRgb *= mix(vec3(1.0), vec3(0.62, 0.57, 0.72), shadowAmt);
+
+          // Fabric-harmonized skylight catch (preserves lavender saturation without washing out)
+          float lightGain = (topBoost * 0.24 + specTop * 0.14) * shadeW * cloudDrift;
+          fgRgb = fgRgb * (1.0 + vec3(0.48, 0.52, 0.56) * lightGain)
+                + vec3(0.812, 0.910, 1.0) * (lightGain * 0.40);
+
+          // Subtle flickering warm torchlight catch on right curve
+          fgRgb += vec3(1.0, 0.620, 0.251) * (torchBoost * 0.11 * shadeW * flicker);
+        }
 
         // --- PROCEDURAL GLSL CRYING TEAR ANIMATION (uIsCrying > 0.5) ---
         // Stage 1: Shimmering Cheek Tear Streams (eyes -> cheeks -> chin/jawline)

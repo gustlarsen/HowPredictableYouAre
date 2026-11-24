@@ -118,6 +118,11 @@ class WatchtowerSpyglassDialog extends StatelessWidget {
                                         isFullScreen: false,
                                         animationsEnabled:
                                             controller.animationsEnabled,
+                                        currentWeek: controller.currentWeek
+                                            .clamp(
+                                              0,
+                                              GameController.maxCampaignWeeks,
+                                            ),
                                         isCrying:
                                             controller.hasDungeonScreamOccurred,
                                       ),

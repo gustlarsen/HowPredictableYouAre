@@ -182,6 +182,11 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
                                   isFullScreen: true,
                                   animationsEnabled:
                                       widget.controller.animationsEnabled,
+                                  currentWeek: widget.controller.currentWeek
+                                      .clamp(
+                                        0,
+                                        GameController.maxCampaignWeeks,
+                                      ),
                                   isCrying:
                                       widget.controller.hasDungeonScreamOccurred,
                                 ),

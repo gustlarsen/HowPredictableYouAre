@@ -890,5 +890,228 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets(
+      'Three-stage Princess week progression (Week 0 -> Week 1 -> Week 2..40) selects correct sprite, bellyProgress, and renders cleanly in modal, full-screen, and fallback modes',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Direct WatchtowerCellShaderView unit/widget checks across Week 0, 1, 2, 20, 40, and clamped >40
+        final cases = <({
+          int week,
+          int expectedClamped,
+          WatchtowerPrincessStage expectedStage,
+          double expectedProgress,
+          String expectedImageKey,
+        })>[
+          (
+            week: 0,
+            expectedClamped: 0,
+            expectedStage: WatchtowerPrincessStage.standing,
+            expectedProgress: 0.0,
+            expectedImageKey: 'watchtower_spyglass_princess_standing_image',
+          ),
+          (
+            week: 1,
+            expectedClamped: 1,
+            expectedStage: WatchtowerPrincessStage.cryingWeek1,
+            expectedProgress: 0.0,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_image',
+          ),
+          (
+            week: 2,
+            expectedClamped: 2,
+            expectedStage: WatchtowerPrincessStage.cryingPregnant,
+            expectedProgress: 1.0 / 39.0,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+          ),
+          (
+            week: 20,
+            expectedClamped: 20,
+            expectedStage: WatchtowerPrincessStage.cryingPregnant,
+            expectedProgress: 19.0 / 39.0,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+          ),
+          (
+            week: 40,
+            expectedClamped: 40,
+            expectedStage: WatchtowerPrincessStage.cryingPregnant,
+            expectedProgress: 1.0,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+          ),
+          (
+            week: 41,
+            expectedClamped: 40,
+            expectedStage: WatchtowerPrincessStage.cryingPregnant,
+            expectedProgress: 1.0,
+            expectedImageKey: 'watchtower_spyglass_princess_crying_open_image',
+          ),
+        ];
+
+        for (final c in cases) {
+          for (final fullScreen in [false, true]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: Scaffold(
+                  body: SizedBox(
+                    width: 320,
+                    height: 320,
+                    child: WatchtowerCellShaderView(
+                      animationsEnabled: false,
+                      forceStaticFallback: true,
+                      isFullScreen: fullScreen,
+                      currentWeek: c.week,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            final view = tester.widget<WatchtowerCellShaderView>(
+              find.byType(WatchtowerCellShaderView),
+            );
+            expect(view.clampedWeek, c.expectedClamped);
+            expect(view.princessStage, c.expectedStage);
+            expect(view.bellyProgress, closeTo(c.expectedProgress, 1e-6));
+            expect(
+              find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
+              findsOneWidget,
+            );
+            expect(find.byKey(ValueKey(c.expectedImageKey)), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+        }
+
+        // 2. Animated shader lifecycle transitioning Week 0 -> Week 1 -> Week 2 -> Week 40
+        for (final week in [0, 1, 2, 20, 40]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SizedBox(
+                  width: 320,
+                  height: 320,
+                  child: WatchtowerCellShaderView(
+                    animationsEnabled: true,
+                    currentWeek: week,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 60));
+          expect(find.byType(WatchtowerCellShaderView), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+
+        // 3. End-to-end GameController -> WatchtowerSpyglassDialog -> FullScreenSpyglassView
+        //    verifying Week 0, Week 1, Week 2, and Week 40 with zoom controls preserved
+        final controller = await _createController(
+          currentWeek: 0,
+          animationsEnabled: false,
+          hasShownWeek0ScreamWarning: false,
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: WatchtowerSpyglassDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        WatchtowerCellShaderView readDialogShader() =>
+            tester.widget<WatchtowerCellShaderView>(
+              find.byType(WatchtowerCellShaderView),
+            );
+
+        // Week 0: Standing, 0% belly growth
+        expect(readDialogShader().princessStage, WatchtowerPrincessStage.standing);
+        expect(readDialogShader().bellyProgress, 0.0);
+
+        // Week 1: Crying (right hand on lap), 0% belly growth
+        controller.completeBattleWeek();
+        await tester.pumpAndSettle();
+        expect(controller.currentWeek, 1);
+        expect(
+          readDialogShader().princessStage,
+          WatchtowerPrincessStage.cryingWeek1,
+        );
+        expect(readDialogShader().bellyProgress, 0.0);
+
+        // Week 2: Unobstructed crying pose + early belly growth (1/39)
+        controller.completeBattleWeek();
+        await tester.pumpAndSettle();
+        expect(controller.currentWeek, 2);
+        expect(
+          readDialogShader().princessStage,
+          WatchtowerPrincessStage.cryingPregnant,
+        );
+        expect(readDialogShader().bellyProgress, closeTo(1.0 / 39.0, 1e-6));
+
+        // Week 40: Full 9-month belly growth (1.0) inside both modal and FullScreenSpyglassView
+        controller.currentWeek = 40;
+        controller.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(
+          readDialogShader().princessStage,
+          WatchtowerPrincessStage.cryingPregnant,
+        );
+        expect(readDialogShader().bellyProgress, 1.0);
+
+        // Open FullScreenSpyglassView at Week 40 and verify 1.0x..4.0x InteractiveViewer & double-tap zoom
+        await tester.tap(
+          find.byKey(const ValueKey('watchtower_spyglass_lens_tap')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FullScreenSpyglassView), findsOneWidget);
+        final viewerFinder = find.byKey(
+          const ValueKey('full_screen_spyglass_interactive_viewer'),
+        );
+        final fullView = tester.widget<WatchtowerCellShaderView>(
+          find.descendant(
+            of: viewerFinder,
+            matching: find.byType(WatchtowerCellShaderView),
+          ),
+        );
+        expect(fullView.isFullScreen, isTrue);
+        expect(fullView.clampedWeek, 40);
+        expect(fullView.princessStage, WatchtowerPrincessStage.cryingPregnant);
+        expect(fullView.bellyProgress, 1.0);
+
+        final viewer = tester.widget<InteractiveViewer>(viewerFinder);
+        expect(viewer.minScale, 1.0);
+        expect(viewer.maxScale, 4.0);
+        expect(viewer.panEnabled, isTrue);
+        expect(viewer.scaleEnabled, isTrue);
+
+        final center = tester.getCenter(viewerFinder);
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('full_screen_spyglass_reset_zoom_button')),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('full_screen_spyglass_close_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(FullScreenSpyglassView), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
+
