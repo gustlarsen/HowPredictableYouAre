@@ -193,7 +193,7 @@ void main() {
       }
     });
 
-    testWidgets('Mid-session transition from Metal Wizard (stage 3) into Baby Mage Robot (stage 4) fades via AnimatedSwitcher (~400ms) into Sacred Temple and starts TempleAtmospherePainter', (WidgetTester tester) async {
+    testWidgets('Mid-session transition from Metal Wizard (stage 3) into Temple High Master (stage 5) and Baby Mage Robot (stage 4) fades via AnimatedSwitcher (~400ms) into Sacred Temple and starts TempleAtmospherePainter', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -233,13 +233,14 @@ void main() {
         findsOneWidget,
       );
 
-      // Simulate mid-session progression from Stage 3 (Metal Wizard) -> Stage 4 (Baby Mage Robot)
+      // Simulate mid-session progression from Stage 3 (Metal Wizard) -> Stage 5 (Temple High Master)
       controller.pendingBossVictoryStage = 3;
       controller.pendingBossVictoryWeek = 10;
       final cycleEnded = controller.advanceAfterBossVictory();
       expect(cycleEnded, isFalse);
-      expect(controller.enemyStage, 4);
-      expect(controller.isBabyMageBoss, isTrue);
+      expect(controller.enemyStage, 5);
+      expect(controller.isTempleMasterBoss, isTrue);
+      expect(controller.isSacredTempleArena, isTrue);
 
       // Advance past the 400ms AnimatedSwitcher fade transition
       await tester.pump();

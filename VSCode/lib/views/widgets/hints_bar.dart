@@ -75,15 +75,19 @@ class HintsBar extends StatelessWidget {
         _HintChip(
           iconType: HintMiniIconType.robot,
           label: loc.t('string13', fallback: 'PC\'s Choice:'),
-          value: _formatMoves(
-            controller.pcNextMoves,
-            poolSize: enemyPoolSize,
-          ),
+          value: controller.isBabyMageBoss && controller.pcNextMoves.length == 2
+              ? controller.pcNextMoves.map((m) => m.emoji).join(' + ')
+              : _formatMoves(
+                  controller.pcNextMoves,
+                  poolSize: enemyPoolSize,
+                ),
           moves: _visibleMoves(
             controller.pcNextMoves,
             poolSize: enemyPoolSize,
           ),
           elementalMode: elemental,
+          combinedDualSpells:
+              controller.isBabyMageBoss && controller.pcNextMoves.length == 2,
           color: palette.orangeAccent,
         ),
     ];
@@ -122,9 +126,14 @@ class HintsBar extends StatelessWidget {
         _HintChip(
           iconType: HintMiniIconType.crystalBall,
           label: loc.t('string81', fallback: 'Crystal Ball:'),
-          value: controller.crystalBallMoves.map((m) => m.emoji).join(' '),
+          value: controller.isBabyMageBoss &&
+                  controller.crystalBallMoves.length == 2
+              ? controller.crystalBallMoves.map((m) => m.emoji).join(' + ')
+              : controller.crystalBallMoves.map((m) => m.emoji).join(' '),
           moves: controller.crystalBallMoves,
           elementalMode: elemental,
+          combinedDualSpells: controller.isBabyMageBoss &&
+              controller.crystalBallMoves.length == 2,
           color: palette.purpleAccent,
         ),
     ];
@@ -157,6 +166,7 @@ class _HintChip extends StatelessWidget {
   final String value;
   final List<HandMove> moves;
   final bool elementalMode;
+  final bool combinedDualSpells;
   final Color color;
 
   const _HintChip({
@@ -165,6 +175,7 @@ class _HintChip extends StatelessWidget {
     required this.value,
     this.moves = const [],
     this.elementalMode = false,
+    this.combinedDualSpells = false,
     required this.color,
   });
 
@@ -240,7 +251,23 @@ class _HintChip extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         for (int i = 0; i < moves.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 2),
+                          if (i > 0)
+                            if (combinedDualSpells)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 2),
+                                child: Text(
+                                  '+',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.0,
+                                    fontWeight: FontWeight.w900,
+                                    color: valueColor,
+                                  ),
+                                ),
+                              )
+                            else
+                              const SizedBox(width: 2),
                           SizedBox(
                             width: iconSlotSize,
                             height: iconSlotSize,

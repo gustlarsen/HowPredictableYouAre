@@ -42,6 +42,8 @@ class VersusArena extends StatefulWidget {
 
   final HandMove? userMove;
   final HandMove? computerMove;
+  final HandMove? secondaryComputerMove;
+  final DualSpellMatchupResult? dualSpellResult;
   final RoundWinner? winner;
   final LocalizationService localization;
   final bool animationsEnabled;
@@ -66,6 +68,8 @@ class VersusArena extends StatefulWidget {
     super.key,
     required this.userMove,
     required this.computerMove,
+    this.secondaryComputerMove,
+    this.dualSpellResult,
     required this.winner,
     required this.localization,
     required this.animationsEnabled,
@@ -112,7 +116,21 @@ class _VersusArenaState extends State<VersusArena>
   late int displayedPcHp;
   int? _pendingPlayerHp;
   int? _pendingPcHp;
-  bool? _activeDamageIsUser;
+  bool _activeUserDamage = false;
+  bool _activePcDamage = false;
+
+  bool get _roundDealsPcDamage =>
+      widget.dualSpellResult != null
+          ? widget.dualSpellResult!.bossDamage > 0
+          : widget.winner == RoundWinner.user;
+
+  bool get _roundDealsUserDamage =>
+      widget.dualSpellResult != null
+          ? widget.dualSpellResult!.playerDamage > 0
+          : widget.winner == RoundWinner.computer;
+
+  bool get _roundHasAnyImpactDamage =>
+      _roundDealsPcDamage || _roundDealsUserDamage;
 
   @override
   void initState() {
@@ -133,7 +151,8 @@ class _VersusArenaState extends State<VersusArena>
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() {
-            _activeDamageIsUser = null;
+            _activeUserDamage = false;
+            _activePcDamage = false;
           });
         }
       });
@@ -202,13 +221,14 @@ class _VersusArenaState extends State<VersusArena>
     displayedPcHp = widget.computerHp;
 
     if (widget.roundId > 0 && widget.animationsEnabled) {
-      if (widget.winner == RoundWinner.user) {
+      if (_roundDealsPcDamage) {
         _pendingPcHp = widget.computerHp;
         displayedPcHp = math.min(
           widget.computerMaxHp,
           widget.computerHp + widget.computerDamageAmount,
         );
-      } else if (widget.winner == RoundWinner.computer) {
+      }
+      if (_roundDealsUserDamage) {
         _pendingPlayerHp = widget.userHp;
         displayedPlayerHp = math.min(
           widget.playerMaxHp,
@@ -252,12 +272,11 @@ class _VersusArenaState extends State<VersusArena>
     _didTriggerImpact = false;
     _resetBossAction();
     if (widget.animationsEnabled) {
-      if (widget.winner == RoundWinner.computer) {
+      if (_roundDealsUserDamage) {
         _bossActionType = _BossActionType.attack;
         _bossActionController.forward(from: 0.0);
       }
-      if (widget.winner == RoundWinner.user ||
-          widget.winner == RoundWinner.draw) {
+      if (_roundDealsPcDamage || widget.winner == RoundWinner.draw) {
         _playerActionType = _BossActionType.attack;
         _playerActionController.forward(from: 0.0);
       }
@@ -284,7 +303,8 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   void _resetDamageIndicator() {
-    _activeDamageIsUser = null;
+    _activeUserDamage = false;
+    _activePcDamage = false;
     if (_damageIndicatorController.isAnimating ||
         _damageIndicatorController.value != 0.0) {
       _damageIndicatorController.stop();
@@ -310,19 +330,21 @@ class _VersusArenaState extends State<VersusArena>
         displayedPcHp = _pendingPcHp!;
         _pendingPcHp = null;
       }
-      if (widget.winner == RoundWinner.computer) {
-        _activeDamageIsUser = true;
+      final dealsUser = _roundDealsUserDamage;
+      final dealsPc = _roundDealsPcDamage;
+      if (dealsUser || dealsPc) {
+        _activeUserDamage = dealsUser;
+        _activePcDamage = dealsPc;
         _damageIndicatorController.forward(from: 0.0);
         if (widget.animationsEnabled) {
-          _playerActionType = _BossActionType.hit;
-          _playerActionController.forward(from: 0.0);
-        }
-      } else if (widget.winner == RoundWinner.user) {
-        _activeDamageIsUser = false;
-        _damageIndicatorController.forward(from: 0.0);
-        if (widget.animationsEnabled) {
-          _bossActionType = _BossActionType.hit;
-          _bossActionController.forward(from: 0.0);
+          if (dealsUser) {
+            _playerActionType = _BossActionType.hit;
+            _playerActionController.forward(from: 0.0);
+          }
+          if (dealsPc) {
+            _bossActionType = _BossActionType.hit;
+            _bossActionController.forward(from: 0.0);
+          }
         }
       }
     });
@@ -333,7 +355,7 @@ class _VersusArenaState extends State<VersusArena>
         !widget.animationsEnabled ||
         _didTriggerImpact ||
         widget.winner == null ||
-        widget.winner == RoundWinner.draw) {
+        !_roundHasAnyImpactDamage) {
       return;
     }
     if (!_animController.isAnimating &&
@@ -358,7 +380,7 @@ class _VersusArenaState extends State<VersusArena>
     }
     final elapsedMs = _vfxController.value * VersusArena.vfxDurationMs;
     if (!_didTriggerImpactHaptic) {
-      final triggerThresholdMs = widget.winner == RoundWinner.draw
+      final triggerThresholdMs = !_roundHasAnyImpactDamage
           ? VersusArena.clashTimeMs.toDouble()
           : VersusArena.impactTimeMs.toDouble();
       if (elapsedMs >= triggerThresholdMs) {
@@ -367,7 +389,7 @@ class _VersusArenaState extends State<VersusArena>
       }
     }
     if (!_didTriggerImpact &&
-        widget.winner != RoundWinner.draw &&
+        _roundHasAnyImpactDamage &&
         elapsedMs >= VersusArena.impactTimeMs.toDouble()) {
       _didTriggerImpact = true;
       _commitImpact();
@@ -510,8 +532,9 @@ class _VersusArenaState extends State<VersusArena>
   }
 
   double? _calculateDamageProgress({required bool isUser}) {
+    final isActive = isUser ? _activeUserDamage : _activePcDamage;
     if (!widget.animationsEnabled ||
-        _activeDamageIsUser != isUser ||
+        !isActive ||
         !_damageIndicatorController.isAnimating) {
       return null;
     }
@@ -532,6 +555,13 @@ class _VersusArenaState extends State<VersusArena>
         return widget.localization
             .t('castle_bestiary_baby_name', fallback: 'BABY MAGE ROBOT')
             .toUpperCase();
+      case 5:
+        return widget.localization
+            .t(
+              'castle_bestiary_temple_master_name',
+              fallback: 'TEMPLE HIGH MASTER',
+            )
+            .toUpperCase();
       default:
         return widget.localization
             .t('castle_bestiary_guardian_name', fallback: 'GUARDIAN ROBOT')
@@ -539,18 +569,112 @@ class _VersusArenaState extends State<VersusArena>
     }
   }
 
+  String _formatDualSpellBattleDescription(DualSpellMatchupResult dual) {
+    final loc = widget.localization;
+    final pLabel = dual.playerMove.displayLabel(
+      elemental: widget.elementalMode,
+      localization: loc,
+    );
+    final aLabel = dual.spellA.displayLabel(
+      elemental: widget.elementalMode,
+      localization: loc,
+    );
+    final bLabel = dual.spellB.displayLabel(
+      elemental: widget.elementalMode,
+      localization: loc,
+    );
+
+    if (dual.defeatedEnemySpells.length == 2 && dual.playerDamage == 0) {
+      return loc
+          .t(
+            'battle_dual_beats_both',
+            fallback:
+                '{player} shatters both {spellA} + {spellB}! (-1 Boss HP, +2 Orbs)',
+          )
+          .replaceAll('{player}', pLabel)
+          .replaceAll('{spellA}', aLabel)
+          .replaceAll('{spellB}', bLabel);
+    }
+    if (dual.bossDamage > 0 && dual.playerDamage == 0) {
+      final beaten = dual.defeatedEnemySpells.first.displayLabel(
+        elemental: widget.elementalMode,
+        localization: loc,
+      );
+      final tied = (dual.defeatedEnemySpells.first == dual.spellA
+              ? dual.spellB
+              : dual.spellA)
+          .displayLabel(
+        elemental: widget.elementalMode,
+        localization: loc,
+      );
+      return loc
+          .t(
+            'battle_dual_win_tie',
+            fallback:
+                '{player} overcomes {beaten} and neutralizes {tied}! (-1 Boss HP)',
+          )
+          .replaceAll('{player}', pLabel)
+          .replaceAll('{beaten}', beaten)
+          .replaceAll('{tied}', tied);
+    }
+    if (dual.isSimultaneousClash) {
+      return loc
+          .t(
+            'battle_dual_simultaneous_clash',
+            fallback:
+                'Harmonic Clash! {player} vs {spellA} + {spellB} (-1 HP each)',
+          )
+          .replaceAll('{player}', pLabel)
+          .replaceAll('{spellA}', aLabel)
+          .replaceAll('{spellB}', bLabel);
+    }
+    if (dual.isDoubleLoss) {
+      return loc
+          .t(
+            'battle_dual_double_loss',
+            fallback:
+                'Twin Overload! {spellA} + {spellB} overwhelm {player} (-2 HP)',
+          )
+          .replaceAll('{player}', pLabel)
+          .replaceAll('{spellA}', aLabel)
+          .replaceAll('{spellB}', bLabel);
+    }
+    return loc
+        .t(
+          'battle_dual_tie_loss',
+          fallback: '{spellA} + {spellB} pierce {player}! (-1 HP)',
+        )
+        .replaceAll('{player}', pLabel)
+        .replaceAll('{spellA}', aLabel)
+        .replaceAll('{spellB}', bLabel);
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final winner = widget.winner;
+    final dualRes = widget.dualSpellResult;
 
     final userWins = winner == RoundWinner.user;
     final pcWins = winner == RoundWinner.computer;
     final isDraw = winner == RoundWinner.draw;
+    final userTakesDamage = _roundDealsUserDamage && widget.roundId > 0;
+    final pcTakesDamage = _roundDealsPcDamage && widget.roundId > 0;
 
     String battleDescription;
     Color battleDescColor;
-    if (widget.userMove != null && widget.computerMove != null) {
+    if (dualRes != null && widget.userMove != null) {
+      battleDescription = _formatDualSpellBattleDescription(dualRes);
+      if (dualRes.bossDamage > 0 && dualRes.playerDamage == 0) {
+        battleDescColor = widget.elementalMode
+            ? palette.elementalText(widget.userMove!)
+            : palette.successText;
+      } else if (dualRes.isSimultaneousClash) {
+        battleDescColor = palette.isDark ? Colors.amberAccent : palette.amberText;
+      } else {
+        battleDescColor = palette.dangerText;
+      }
+    } else if (widget.userMove != null && widget.computerMove != null) {
       if (userWins) {
         battleDescription = widget.userMove!.battleDescriptionAgainst(
               widget.computerMove!,
@@ -708,7 +832,8 @@ class _VersusArenaState extends State<VersusArena>
                           idlePulse: idlePulse,
                           clashPulse: clashPulse,
                           isDark: palette.isDark,
-                          suppressRunesGeometry: widget.enemyStage == 4,
+                          suppressRunesGeometry:
+                              widget.enemyStage == 4 || widget.enemyStage == 5,
                           leftCenterX: leftCenterX,
                           rightCenterX: rightCenterX,
                         ),
@@ -819,7 +944,7 @@ class _VersusArenaState extends State<VersusArena>
                       _damageIndicatorController,
                     ]),
                     builder: (context, _) {
-                      final isDamaged = pcWins && widget.roundId > 0;
+                      final isDamaged = userTakesDamage;
                       final pulseProgress = widget.animationsEnabled
                           ? (widget.elementalMode
                               ? (_vfxController.isAnimating
@@ -891,7 +1016,7 @@ class _VersusArenaState extends State<VersusArena>
                       _damageIndicatorController,
                     ]),
                     builder: (context, _) {
-                      final isDamaged = userWins && widget.roundId > 0;
+                      final isDamaged = pcTakesDamage;
                       final pulseProgress = widget.animationsEnabled
                           ? (widget.elementalMode
                               ? (_vfxController.isAnimating
@@ -906,6 +1031,7 @@ class _VersusArenaState extends State<VersusArena>
                           combatantNameKey:
                               const ValueKey('arena_boss_name_label'),
                           move: widget.computerMove,
+                          secondaryMove: widget.secondaryComputerMove,
                           isLeft: false,
                           isWinner: pcWins,
                           elementalMode: widget.elementalMode,
@@ -976,6 +1102,7 @@ class _VersusArenaState extends State<VersusArena>
                           isAnimating: isVfxActive,
                           userMove: widget.userMove,
                           computerMove: widget.computerMove,
+                          secondaryComputerMove: widget.secondaryComputerMove,
                           winner: widget.winner,
                           elementalMode: widget.elementalMode,
                           roundId: widget.roundId,
@@ -1410,6 +1537,8 @@ class _BossArenaSprite extends StatelessWidget {
         return 'assets/images/enemies/metal_wizard_idle.png';
       case 4:
         return 'assets/images/enemies/baby_robot_mage_idle.png';
+      case 5:
+        return 'assets/images/enemies/temple_master_idle.png';
       default:
         switch (actionType) {
           case _BossActionType.attack:
@@ -1430,6 +1559,8 @@ class _BossArenaSprite extends StatelessWidget {
         return const Color(0xFFFFCA28);
       case 4:
         return const Color(0xFFFF8A65);
+      case 5:
+        return const Color(0xFFFFD54F);
       default:
         return const Color(0xFFAB47BC);
     }
@@ -1466,6 +1597,18 @@ class _BossArenaSprite extends StatelessWidget {
           dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
           dy += -arc * 4.5;
           tiltAngle = -arc * 0.12;
+          glowAlpha = 0.30 + 0.45 * (1.0 - t);
+          glowColor = Colors.redAccent;
+        }
+      } else if (enemyStage == 5) {
+        // Temple High Master: radiant golden staff lunge on attack and shake on hit
+        if (actionType == _BossActionType.attack) {
+          dx = -5.5 * arc;
+          scale += 0.08 * arc;
+          glowAlpha = 0.32 + 0.54 * arc;
+          glowColor = const Color(0xFFFFE082);
+        } else {
+          dx = math.sin(t * math.pi * 6) * (1.0 - t) * 5.0;
           glowAlpha = 0.30 + 0.45 * (1.0 - t);
           glowColor = Colors.redAccent;
         }
@@ -1563,6 +1706,7 @@ class BattleVfxPainter extends CustomPainter {
   final bool isAnimating;
   final HandMove? userMove;
   final HandMove? computerMove;
+  final HandMove? secondaryComputerMove;
   final RoundWinner? winner;
   final bool elementalMode;
   final int roundId;
@@ -1576,6 +1720,7 @@ class BattleVfxPainter extends CustomPainter {
     required this.isAnimating,
     required this.userMove,
     required this.computerMove,
+    this.secondaryComputerMove,
     required this.winner,
     required this.elementalMode,
     required this.roundId,
@@ -1632,6 +1777,10 @@ class BattleVfxPainter extends CustomPainter {
   BattleVfxElement? get rightElement => computerMove == null
       ? null
       : elementFor(computerMove!, elementalMode: elementalMode);
+
+  BattleVfxElement? get secondaryRightElement => secondaryComputerMove == null
+      ? null
+      : elementFor(secondaryComputerMove!, elementalMode: elementalMode);
 
   Offset? get leftProjectilePosition {
     final currentPhase = phase;
@@ -1691,6 +1840,8 @@ class BattleVfxPainter extends CustomPainter {
 
     final leftElem = leftElement!;
     final rightElem = rightElement!;
+    final rightElem2 = secondaryRightElement;
+    final hasDualRight = rightElem2 != null;
     final ms = elapsedMs;
     final clashCenter = Offset(centerX, orbCenterY);
     final leftOrigin = Offset(leftCenterX, orbCenterY);
@@ -1707,6 +1858,9 @@ class BattleVfxPainter extends CustomPainter {
         final muzzleT = (ms / 160.0).clamp(0.0, 1.0);
         _paintMuzzlePulse(canvas, leftOrigin, leftElem, muzzleT);
         _paintMuzzlePulse(canvas, rightOrigin, rightElem, muzzleT);
+        if (hasDualRight) {
+          _paintMuzzlePulse(canvas, rightOrigin, rightElem2, muzzleT);
+        }
       }
 
       _paintProjectileWithTrail(
@@ -1719,16 +1873,39 @@ class BattleVfxPainter extends CustomPainter {
         intensityScale: 1.0,
         seed: roundId * 17 + 1,
       );
-      _paintProjectileWithTrail(
-        canvas: canvas,
-        origin: rightOrigin,
-        currentPos: rightPos,
-        direction: -1.0,
-        element: rightElem,
-        phaseProgress: p1,
-        intensityScale: 1.0,
-        seed: roundId * 31 + 2,
-      );
+      if (hasDualRight) {
+        _paintProjectileWithTrail(
+          canvas: canvas,
+          origin: Offset(rightOrigin.dx, rightOrigin.dy - 7.5),
+          currentPos: Offset(rightPos.dx, rightPos.dy - 7.5),
+          direction: -1.0,
+          element: rightElem,
+          phaseProgress: p1,
+          intensityScale: 0.92,
+          seed: roundId * 31 + 2,
+        );
+        _paintProjectileWithTrail(
+          canvas: canvas,
+          origin: Offset(rightOrigin.dx, rightOrigin.dy + 7.5),
+          currentPos: Offset(rightPos.dx, rightPos.dy + 7.5),
+          direction: -1.0,
+          element: rightElem2,
+          phaseProgress: p1,
+          intensityScale: 0.92,
+          seed: roundId * 37 + 9,
+        );
+      } else {
+        _paintProjectileWithTrail(
+          canvas: canvas,
+          origin: rightOrigin,
+          currentPos: rightPos,
+          direction: -1.0,
+          element: rightElem,
+          phaseProgress: p1,
+          intensityScale: 1.0,
+          seed: roundId * 31 + 2,
+        );
+      }
       return;
     }
 
@@ -1785,16 +1962,39 @@ class BattleVfxPainter extends CustomPainter {
         );
       } else if (winner == RoundWinner.computer) {
         final surgePos = rightProjectilePosition!;
-        _paintProjectileWithTrail(
-          canvas: canvas,
-          origin: clashCenter,
-          currentPos: surgePos,
-          direction: -1.0,
-          element: rightElem,
-          phaseProgress: clashT,
-          intensityScale: 1.25,
-          seed: roundId * 79 + 6,
-        );
+        if (hasDualRight) {
+          _paintProjectileWithTrail(
+            canvas: canvas,
+            origin: Offset(clashCenter.dx, clashCenter.dy - 7.5),
+            currentPos: Offset(surgePos.dx, surgePos.dy - 7.5),
+            direction: -1.0,
+            element: rightElem,
+            phaseProgress: clashT,
+            intensityScale: 1.12,
+            seed: roundId * 79 + 6,
+          );
+          _paintProjectileWithTrail(
+            canvas: canvas,
+            origin: Offset(clashCenter.dx, clashCenter.dy + 7.5),
+            currentPos: Offset(surgePos.dx, surgePos.dy + 7.5),
+            direction: -1.0,
+            element: rightElem2,
+            phaseProgress: clashT,
+            intensityScale: 1.12,
+            seed: roundId * 83 + 8,
+          );
+        } else {
+          _paintProjectileWithTrail(
+            canvas: canvas,
+            origin: clashCenter,
+            currentPos: surgePos,
+            direction: -1.0,
+            element: rightElem,
+            phaseProgress: clashT,
+            intensityScale: 1.25,
+            seed: roundId * 79 + 6,
+          );
+        }
       }
       return;
     }
@@ -1816,6 +2016,15 @@ class BattleVfxPainter extends CustomPainter {
         t: impactT,
         seed: roundId * 97 + 11,
       );
+      if (winner == RoundWinner.computer && hasDualRight) {
+        _paintElementalImpactExplosion(
+          canvas: canvas,
+          center: targetCenter,
+          element: rightElem2,
+          t: impactT,
+          seed: roundId * 101 + 13,
+        );
+      }
     }
   }
 
@@ -2474,6 +2683,7 @@ class BattleVfxPainter extends CustomPainter {
         oldDelegate.roundId != roundId ||
         oldDelegate.userMove != userMove ||
         oldDelegate.computerMove != computerMove ||
+        oldDelegate.secondaryComputerMove != secondaryComputerMove ||
         oldDelegate.winner != winner ||
         oldDelegate.elementalMode != elementalMode ||
         oldDelegate.leftCenterX != leftCenterX ||
@@ -2500,6 +2710,7 @@ class _MoveCard extends StatelessWidget {
   final String combatantName;
   final Key? combatantNameKey;
   final HandMove? move;
+  final HandMove? secondaryMove;
   final bool isLeft;
   final bool isWinner;
   final bool elementalMode;
@@ -2521,6 +2732,7 @@ class _MoveCard extends StatelessWidget {
     required this.combatantName,
     this.combatantNameKey,
     required this.move,
+    this.secondaryMove,
     required this.isLeft,
     required this.isWinner,
     required this.elementalMode,
@@ -2539,6 +2751,50 @@ class _MoveCard extends StatelessWidget {
     required this.handBuilder,
   });
 
+  Widget _buildElementalCrestBadge(
+    HandMove badgeMove, {
+    required double orbScale,
+    Key? badgeKey,
+  }) {
+    final bool isEarth = badgeMove == HandMove.lizard;
+    final Color primaryColor = badgeMove.elementalPrimaryColor;
+    final Color secondaryColor = badgeMove.elementalSecondaryColor;
+    const Color earthIconColor = Color(0xFFE29E5A);
+
+    return Container(
+      key: badgeKey,
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF0E121B).withValues(alpha: 0.84),
+        border: Border.all(
+          color: isEarth ? earthIconColor : primaryColor,
+          width: isWinner ? 1.8 : 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withValues(
+              alpha: isWinner ? 0.65 : 0.40,
+            ),
+            blurRadius: isWinner ? 10 : 6,
+          ),
+          if (isWinner)
+            BoxShadow(
+              color: secondaryColor.withValues(alpha: 0.35),
+              blurRadius: 12,
+            ),
+        ],
+      ),
+      child: Center(
+        child: ElementalSymbolIcon(
+          move: badgeMove,
+          size: 18 * orbScale,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -2546,12 +2802,6 @@ class _MoveCard extends StatelessWidget {
     final hasAsset = assetPath != null && assetPath.isNotEmpty;
 
     final bool isElementalOrb = elementalMode && move != null;
-    final bool isEarth = move == HandMove.lizard;
-    final Color primaryElementColor =
-        move?.elementalPrimaryColor ?? Colors.amber;
-    final Color secondaryElementColor =
-        move?.elementalSecondaryColor ?? Colors.deepOrange;
-    const Color earthIconColor = Color(0xFFE29E5A);
 
     final double orbScale =
         (isElementalOrb && isWinner) ? (1.0 + 0.08 * pulseProgress) : 1.0;
@@ -2631,41 +2881,32 @@ class _MoveCard extends StatelessWidget {
                       isLeft ? Alignment.topRight : Alignment.topLeft,
                   child: move == null
                       ? const SizedBox.shrink()
-                      : Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF0E121B)
-                                .withValues(alpha: 0.84),
-                            border: Border.all(
-                              color: isEarth
-                                  ? earthIconColor
-                                  : primaryElementColor,
-                              width: isWinner ? 1.8 : 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: primaryElementColor.withValues(
-                                  alpha: isWinner ? 0.65 : 0.40,
+                      : secondaryMove != null
+                          ? Row(
+                              key: const ValueKey('pc_dual_elemental_badges'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildElementalCrestBadge(
+                                  move!,
+                                  orbScale: orbScale,
+                                  badgeKey: const ValueKey(
+                                    'pc_primary_elemental_badge',
+                                  ),
                                 ),
-                                blurRadius: isWinner ? 10 : 6,
-                              ),
-                              if (isWinner)
-                                BoxShadow(
-                                  color: secondaryElementColor
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 12,
+                                const SizedBox(width: 4),
+                                _buildElementalCrestBadge(
+                                  secondaryMove!,
+                                  orbScale: orbScale,
+                                  badgeKey: const ValueKey(
+                                    'pc_secondary_elemental_badge',
+                                  ),
                                 ),
-                            ],
-                          ),
-                          child: Center(
-                            child: ElementalSymbolIcon(
-                              move: move!,
-                              size: 18 * orbScale,
+                              ],
+                            )
+                          : _buildElementalCrestBadge(
+                              move!,
+                              orbScale: orbScale,
                             ),
-                          ),
-                        ),
                 )
               : Center(
                   child: move == null
@@ -2678,17 +2919,29 @@ class _MoveCard extends StatelessWidget {
                                 : palette.mutedText,
                           ),
                         )
-                      : hasAsset
-                      ? Image.asset(
-                          assetPath,
-                          width: 58,
-                          height: 58,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            move!.emoji,
-                            style: const TextStyle(fontSize: 38),
-                          ),
-                        )
-                      : Text(move!.emoji, style: const TextStyle(fontSize: 38)),
+                      : secondaryMove != null
+                          ? FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${move!.emoji}+${secondaryMove!.emoji}',
+                                style: const TextStyle(fontSize: 26),
+                              ),
+                            )
+                          : hasAsset
+                              ? Image.asset(
+                                  assetPath,
+                                  width: 58,
+                                  height: 58,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Text(
+                                    move!.emoji,
+                                    style: const TextStyle(fontSize: 38),
+                                  ),
+                                )
+                              : Text(
+                                  move!.emoji,
+                                  style: const TextStyle(fontSize: 38),
+                                ),
                 ),
         ),
 

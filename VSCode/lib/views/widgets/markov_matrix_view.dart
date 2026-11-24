@@ -13,7 +13,9 @@ class MarkovMatrixView extends StatelessWidget {
   final LocalizationService? localization;
   final bool isArchmageShortTermView;
   final bool isBabyMageRandomView;
+  final bool isTempleMasterRandomView;
   final bool isMetalWizardView;
+  final int? currentPiDigit;
   final bool initiallyExpanded;
 
   const MarkovMatrixView({
@@ -24,9 +26,14 @@ class MarkovMatrixView extends StatelessWidget {
     this.localization,
     this.isArchmageShortTermView = false,
     this.isBabyMageRandomView = false,
+    this.isTempleMasterRandomView = false,
     this.isMetalWizardView = false,
+    this.currentPiDigit,
     this.initiallyExpanded = true,
   });
+
+  bool get _dimsTransitionMatrix =>
+      isBabyMageRandomView || isTempleMasterRandomView;
 
   Widget _buildMoveHeader(
     AppPalette palette,
@@ -69,6 +76,285 @@ class MarkovMatrixView extends StatelessWidget {
           fontSize: 20,
           fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
         ),
+      ),
+    );
+  }
+
+  Widget _buildInlineElementBadge(AppPalette palette, HandMove move) {
+    final label = move.displayLabel(
+      elemental: elementalMode,
+      localization: localization,
+    );
+    if (elementalMode) {
+      final color = palette.elementalText(move);
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ElementalSymbolIcon(move: move, size: 14),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      );
+    }
+    return Text(
+      '${move.emoji} $label',
+      style: TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+        color: palette.primaryText,
+      ),
+    );
+  }
+
+  Widget _buildBabyMagePiDecoder(AppPalette palette) {
+    final loc = localization;
+    final accent = palette.orangeAccent;
+    final title = loc?.t(
+          'markov_pi_decoder_title',
+          fallback: 'Irrational π Core Decoder (C / d = 3.14159...)',
+        ) ??
+        'Irrational π Core Decoder (C / d = 3.14159...)';
+    final subtitle = loc?.t(
+          'markov_baby_mage_banner',
+          fallback:
+              'Baby Mage Robot channels dual harmonic spells driven by the deterministic digits of π (3.1415926535...).',
+        ) ??
+        'Baby Mage Robot channels dual harmonic spells driven by the deterministic digits of π (3.1415926535...).';
+    final digitsHeader = loc?.t(
+          'markov_pi_decoder_col_digits',
+          fallback: 'π Digit',
+        ) ??
+        'π Digit';
+    final spellsHeader = loc?.t(
+          'markov_pi_decoder_col_spells',
+          fallback: 'Dual Harmonic Spells',
+        ) ??
+        'Dual Harmonic Spells';
+    final counterHeader = loc?.t(
+          'markov_pi_decoder_col_counter',
+          fallback: 'Weakness',
+        ) ??
+        'Weakness';
+
+    const rows = <({
+      String range,
+      int d0,
+      int d1,
+      HandMove spellA,
+      HandMove spellB,
+      HandMove weakness,
+    })>[
+      (
+        range: '0 – 1',
+        d0: 0,
+        d1: 1,
+        spellA: HandMove.fire,
+        spellB: HandMove.water,
+        weakness: HandMove.earth,
+      ),
+      (
+        range: '2 – 3',
+        d0: 2,
+        d1: 3,
+        spellA: HandMove.water,
+        spellB: HandMove.earth,
+        weakness: HandMove.wood,
+      ),
+      (
+        range: '4 – 5',
+        d0: 4,
+        d1: 5,
+        spellA: HandMove.earth,
+        spellB: HandMove.wood,
+        weakness: HandMove.metal,
+      ),
+      (
+        range: '6 – 7',
+        d0: 6,
+        d1: 7,
+        spellA: HandMove.wood,
+        spellB: HandMove.metal,
+        weakness: HandMove.fire,
+      ),
+      (
+        range: '8 – 9',
+        d0: 8,
+        d1: 9,
+        spellA: HandMove.metal,
+        spellB: HandMove.fire,
+        weakness: HandMove.water,
+      ),
+    ];
+
+    return Container(
+      key: const ValueKey('markov_baby_mage_random_banner'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: palette.isDark ? 0.14 : 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Column(
+        key: const ValueKey('markov_baby_mage_pi_decoder'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.functions_rounded, size: 17, color: accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: palette.primaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.3,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: palette.isDark
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : Colors.white.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 48,
+                      child: Text(
+                        digitsHeader,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        spellsHeader,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: palette.secondaryText,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      counterHeader,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 8, thickness: 0.6),
+                for (final row in rows) ...[
+                  Builder(
+                    builder: (context) {
+                      final isActiveDigit = currentPiDigit == row.d0 ||
+                          currentPiDigit == row.d1;
+                      return Container(
+                        key: ValueKey('pi_decoder_row_${row.d0}_${row.d1}'),
+                        margin: const EdgeInsets.symmetric(vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 3,
+                        ),
+                        decoration: isActiveDigit
+                            ? BoxDecoration(
+                                color: accent.withValues(
+                                  alpha: palette.isDark ? 0.22 : 0.16,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.75),
+                                ),
+                              )
+                            : null,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 48,
+                              child: Text(
+                                row.range,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isActiveDigit
+                                      ? accent
+                                      : palette.primaryText,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 4,
+                                children: [
+                                  _buildInlineElementBadge(palette, row.spellA),
+                                  Text(
+                                    '+',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: palette.secondaryText,
+                                    ),
+                                  ),
+                                  _buildInlineElementBadge(palette, row.spellB),
+                                ],
+                              ),
+                            ),
+                            _buildInlineElementBadge(palette, row.weakness),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -172,16 +458,16 @@ class MarkovMatrixView extends StatelessWidget {
         ),
       );
     }
-    if (isBabyMageRandomView) {
+    if (isTempleMasterRandomView) {
       final accent = palette.orangeAccent;
       final body = loc?.t(
-            'markov_baby_mage_banner',
+            'markov_temple_master_banner',
             fallback:
-                'Baby Mage Robot ignores all transition history and picks uniformly at random (1/5 per element).',
+                'Temple High Master ignores all transition history and channels all 5 elements with pure uniform randomness (1/5 per element).',
           ) ??
-          'Baby Mage Robot ignores all transition history and picks uniformly at random (1/5 per element).';
+          'Temple High Master ignores all transition history and channels all 5 elements with pure uniform randomness (1/5 per element).';
       return Container(
-        key: const ValueKey('markov_baby_mage_random_banner'),
+        key: const ValueKey('markov_temple_master_random_banner'),
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -211,6 +497,9 @@ class MarkovMatrixView extends StatelessWidget {
         ),
       );
     }
+    if (isBabyMageRandomView) {
+      return _buildBabyMagePiDecoder(palette);
+    }
     return const SizedBox.shrink();
   }
 
@@ -226,11 +515,17 @@ class MarkovMatrixView extends StatelessWidget {
               fallback: 'Markov Short-Term Memory (Recalibrated)',
             ) ??
             'Markov Short-Term Memory (Recalibrated)')
-        : (localization?.t(
-              'markov_matrix_title',
-              fallback: 'Markov Transition Matrix',
-            ) ??
-            'Markov Transition Matrix');
+        : isBabyMageRandomView
+            ? (localization?.t(
+                  'markov_pi_decoder_title',
+                  fallback: 'Irrational π Core Decoder (C / d = 3.14159...)',
+                ) ??
+                'Irrational π Core Decoder (C / d = 3.14159...)')
+            : (localization?.t(
+                  'markov_matrix_title',
+                  fallback: 'Markov Transition Matrix',
+                ) ??
+                'Markov Transition Matrix');
 
     return _MarkovCollapsibleCard(
       initiallyExpanded: initiallyExpanded,
@@ -243,6 +538,7 @@ class MarkovMatrixView extends StatelessWidget {
           const SizedBox(height: 10),
           if (isArchmageShortTermView ||
               isBabyMageRandomView ||
+              isTempleMasterRandomView ||
               isMetalWizardView)
             _buildModeBanner(palette),
           Table(
@@ -346,7 +642,7 @@ class MarkovMatrixView extends StatelessWidget {
                         }
 
                         final val = row[colIdx];
-                        final isMax = !isBabyMageRandomView &&
+                        final isMax = !_dimsTransitionMatrix &&
                             val > 0 &&
                             val == maxVal;
 
@@ -381,7 +677,7 @@ class MarkovMatrixView extends StatelessWidget {
                                 fontWeight: isMax
                                     ? FontWeight.bold
                                     : FontWeight.normal,
-                                color: isBabyMageRandomView
+                                color: _dimsTransitionMatrix
                                     ? palette.mutedText.withValues(alpha: 0.65)
                                     : (isMax
                                           ? palette.amberText

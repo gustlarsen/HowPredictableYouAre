@@ -298,10 +298,13 @@ class CloudSaveData {
   final int forfeitRunCount;
   final int standardVictoryCount;
   final int secretVictoryCount;
+  final int sacredSacrificeCount;
+  final int deserterCount;
   final int? fastestVictoryWeek;
   final int guardianRobotDefeatedCount;
   final int robotArchmageDefeatedCount;
   final int metalWizardDefeatedCount;
+  final int templeMasterDefeatedCount;
   final int babyMageRobotDefeatedCount;
 
   // Sacred Temple Consagration & Blessings State
@@ -423,10 +426,13 @@ class CloudSaveData {
     this.forfeitRunCount = 0,
     this.standardVictoryCount = 0,
     this.secretVictoryCount = 0,
+    this.sacredSacrificeCount = 0,
+    this.deserterCount = 0,
     this.fastestVictoryWeek,
     this.guardianRobotDefeatedCount = 0,
     this.robotArchmageDefeatedCount = 0,
     this.metalWizardDefeatedCount = 0,
+    this.templeMasterDefeatedCount = 0,
     this.babyMageRobotDefeatedCount = 0,
     this.adConsagrationsThisWeek = 0,
     this.pendingBattleBlessing,
@@ -571,9 +577,12 @@ class CloudSaveData {
             forfeitRunCount > local.forfeitRunCount ||
             standardVictoryCount > local.standardVictoryCount ||
             secretVictoryCount > local.secretVictoryCount ||
+            sacredSacrificeCount > local.sacredSacrificeCount ||
+            deserterCount > local.deserterCount ||
             guardianRobotDefeatedCount > local.guardianRobotDefeatedCount ||
             robotArchmageDefeatedCount > local.robotArchmageDefeatedCount ||
             metalWizardDefeatedCount > local.metalWizardDefeatedCount ||
+            templeMasterDefeatedCount > local.templeMasterDefeatedCount ||
             babyMageRobotDefeatedCount > local.babyMageRobotDefeatedCount ||
             (fastestVictoryWeek != null &&
                 fastestVictoryWeek! >= 0 &&
@@ -751,6 +760,9 @@ class CloudSaveData {
       standardVictoryCount:
           _maxInt(standardVictoryCount, local.standardVictoryCount),
       secretVictoryCount: _maxInt(secretVictoryCount, local.secretVictoryCount),
+      sacredSacrificeCount:
+          _maxInt(sacredSacrificeCount, local.sacredSacrificeCount),
+      deserterCount: _maxInt(deserterCount, local.deserterCount),
       fastestVictoryWeek:
           _minNonZeroWeek(fastestVictoryWeek, local.fastestVictoryWeek),
       guardianRobotDefeatedCount:
@@ -759,6 +771,8 @@ class CloudSaveData {
           _maxInt(robotArchmageDefeatedCount, local.robotArchmageDefeatedCount),
       metalWizardDefeatedCount:
           _maxInt(metalWizardDefeatedCount, local.metalWizardDefeatedCount),
+      templeMasterDefeatedCount:
+          _maxInt(templeMasterDefeatedCount, local.templeMasterDefeatedCount),
       babyMageRobotDefeatedCount:
           _maxInt(babyMageRobotDefeatedCount, local.babyMageRobotDefeatedCount),
       adConsagrationsThisWeek: adConsagrationsThisWeek,
@@ -888,10 +902,13 @@ class CloudSaveData {
       forfeitRunCount: storage.forfeitRunCount,
       standardVictoryCount: storage.standardVictoryCount,
       secretVictoryCount: storage.secretVictoryCount,
+      sacredSacrificeCount: storage.sacredSacrificeCount,
+      deserterCount: storage.deserterCount,
       fastestVictoryWeek: storage.fastestVictoryWeek,
       guardianRobotDefeatedCount: storage.guardianRobotDefeatedCount,
       robotArchmageDefeatedCount: storage.robotArchmageDefeatedCount,
       metalWizardDefeatedCount: storage.metalWizardDefeatedCount,
+      templeMasterDefeatedCount: storage.templeMasterDefeatedCount,
       babyMageRobotDefeatedCount: storage.babyMageRobotDefeatedCount,
       adConsagrationsThisWeek: storage.adConsagrationsThisWeek,
       pendingBattleBlessing: storage.pendingBattleBlessing,
@@ -985,10 +1002,13 @@ class CloudSaveData {
     await storage.setForfeitRunCount(forfeitRunCount);
     await storage.setStandardVictoryCount(standardVictoryCount);
     await storage.setSecretVictoryCount(secretVictoryCount);
+    await storage.setSacredSacrificeCount(sacredSacrificeCount);
+    await storage.setDeserterCount(deserterCount);
     await storage.setFastestVictoryWeek(fastestVictoryWeek);
     await storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
     await storage.setRobotArchmageDefeatedCount(robotArchmageDefeatedCount);
     await storage.setMetalWizardDefeatedCount(metalWizardDefeatedCount);
+    await storage.setTempleMasterDefeatedCount(templeMasterDefeatedCount);
     await storage.setBabyMageRobotDefeatedCount(babyMageRobotDefeatedCount);
 
     await storage.setLanguage(language);
@@ -1143,11 +1163,14 @@ class CloudSaveData {
       'forfeitRunCount': forfeitRunCount,
       'standardVictoryCount': standardVictoryCount,
       'secretVictoryCount': secretVictoryCount,
+      'sacredSacrificeCount': sacredSacrificeCount,
+      'deserterCount': deserterCount,
       if (fastestVictoryWeek != null && fastestVictoryWeek! >= 0)
         'fastestVictoryWeek': fastestVictoryWeek,
       'guardianRobotDefeatedCount': guardianRobotDefeatedCount,
       'robotArchmageDefeatedCount': robotArchmageDefeatedCount,
       'metalWizardDefeatedCount': metalWizardDefeatedCount,
+      'templeMasterDefeatedCount': templeMasterDefeatedCount,
       'babyMageRobotDefeatedCount': babyMageRobotDefeatedCount,
       'adConsagrationsThisWeek': adConsagrationsThisWeek,
       if (pendingBattleBlessing != null)
@@ -1279,6 +1302,12 @@ class CloudSaveData {
     await storage.setSecretVictoryCount(
       _maxInt(storage.secretVictoryCount, secretVictoryCount),
     );
+    await storage.setSacredSacrificeCount(
+      _maxInt(storage.sacredSacrificeCount, sacredSacrificeCount),
+    );
+    await storage.setDeserterCount(
+      _maxInt(storage.deserterCount, deserterCount),
+    );
     await storage.setFastestVictoryWeek(
       _minNonZeroWeek(storage.fastestVictoryWeek, fastestVictoryWeek),
     );
@@ -1290,6 +1319,9 @@ class CloudSaveData {
     );
     await storage.setMetalWizardDefeatedCount(
       _maxInt(storage.metalWizardDefeatedCount, metalWizardDefeatedCount),
+    );
+    await storage.setTempleMasterDefeatedCount(
+      _maxInt(storage.templeMasterDefeatedCount, templeMasterDefeatedCount),
     );
     await storage.setBabyMageRobotDefeatedCount(
       _maxInt(storage.babyMageRobotDefeatedCount, babyMageRobotDefeatedCount),
@@ -1452,6 +1484,8 @@ class CloudSaveData {
       forfeitRunCount: _parseNonNegativeInt(map['forfeitRunCount']),
       standardVictoryCount: _parseNonNegativeInt(map['standardVictoryCount']),
       secretVictoryCount: _parseNonNegativeInt(map['secretVictoryCount']),
+      sacredSacrificeCount: _parseNonNegativeInt(map['sacredSacrificeCount']),
+      deserterCount: _parseNonNegativeInt(map['deserterCount']),
       fastestVictoryWeek: (() {
         final raw = (map['fastestVictoryWeek'] as num?)?.toInt();
         return (raw != null && raw >= 0) ? raw : null;
@@ -1462,6 +1496,8 @@ class CloudSaveData {
           _parseNonNegativeInt(map['robotArchmageDefeatedCount']),
       metalWizardDefeatedCount:
           _parseNonNegativeInt(map['metalWizardDefeatedCount']),
+      templeMasterDefeatedCount:
+          _parseNonNegativeInt(map['templeMasterDefeatedCount']),
       babyMageRobotDefeatedCount:
           _parseNonNegativeInt(map['babyMageRobotDefeatedCount']),
       adConsagrationsThisWeek:
@@ -1484,18 +1520,19 @@ class CloudSaveData {
       pcHp: (map['pcHp'] as num?)?.toInt() ?? 100,
       enemyStage: ((map['enemyStage'] ?? map['enemyPhase']) as num?)
               ?.toInt()
-              .clamp(1, 4) ??
+              .clamp(1, 5) ??
           1,
       enemyMaxHp: ((map['enemyMaxHp'] as num?)?.toInt() ??
               (() {
                 final stage =
                     ((map['enemyStage'] ?? map['enemyPhase']) as num?)
                             ?.toInt()
-                            .clamp(1, 4) ??
+                            .clamp(1, 5) ??
                         1;
                 if (stage == 2) return 200;
                 if (stage == 3) return 300;
                 if (stage == 4) return 400;
+                if (stage == 5) return 350;
                 return 100;
               })())
           .clamp(100, 9999),

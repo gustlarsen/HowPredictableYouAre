@@ -120,6 +120,7 @@ void main() {
         'assets/images/enemies/guardian_robot_hit.png',
         'assets/images/enemies/robot_archmage_idle.png',
         'assets/images/enemies/metal_wizard_idle.png',
+        'assets/images/enemies/temple_master_idle.png',
         'assets/images/enemies/baby_robot_mage_idle.png',
       ];
 

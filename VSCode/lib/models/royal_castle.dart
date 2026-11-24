@@ -283,19 +283,35 @@ enum BestiaryCreature {
     accentColor: Color(0xFF90A4AE),
     portraitAsset: 'assets/images/enemies/metal_wizard_idle.png',
   ),
+  templeMaster(
+    id: 'temple_master',
+    nameKey: 'castle_bestiary_temple_master_name',
+    fallbackName: 'Temple High Master',
+    mathModelKey: 'castle_bestiary_temple_master_model',
+    fallbackMathModel: 'Pure Divine Chaos (1/5)',
+    loreKey: 'castle_bestiary_temple_master_lore',
+    fallbackLore:
+        '350 HP • Pure Divine Chaos: Bound by sacred vows inside the Temple, he channels all 5 elements with 100% pure uniform randomness (1/5 per element).',
+    hintKey: 'castle_bestiary_temple_master_hint',
+    fallbackHint:
+        'Defeat the Metal Wizard in Week 1 or later and refuse the High Master\'s sacrifice decree.',
+    icon: Icons.account_balance_rounded,
+    accentColor: Color(0xFFFFD54F),
+    portraitAsset: 'assets/images/enemies/temple_master_idle.png',
+  ),
   babyRobot(
     id: 'baby_robot',
     nameKey: 'castle_bestiary_baby_name',
     fallbackName: 'Baby Mage Robot',
     mathModelKey: 'castle_bestiary_baby_model',
-    fallbackMathModel: 'Pure Uniform Random (1/5)',
+    fallbackMathModel: 'Dual Harmonic Spells & π Core',
     loreKey: 'castle_bestiary_baby_lore',
     fallbackLore:
-        '400 HP • Pure Random Chaos: Ignores all Markov logic and strikes with pure uniform randomness across all 5 elements.',
+        '400 HP • Dual Harmonic Spells & π Core: Awakens from the Princess in the Sacred Temple, casting two combined elements at once driven by the digits of π (3.14159...).',
     hintKey: 'castle_bestiary_baby_hint',
     fallbackHint:
-        'Defeat the Metal Wizard in Week 1 or later to unleash his final automated contingency.',
-    icon: Icons.casino_outlined,
+        'Defeat the Temple High Master in the Sacred Temple to confront the awakened anomaly.',
+    icon: Icons.functions_rounded,
     accentColor: Color(0xFFBA68C8),
     portraitAsset: 'assets/images/enemies/baby_robot_mage_idle.png',
   );
@@ -329,82 +345,96 @@ enum BestiaryCreature {
   });
 }
 
-/// The narrative endings tracked in the Royal Library.
+/// The 6 canonical narrative endings tracked in the Royal Library (X / 6).
 enum NarrativeEnding {
   secretWeek1(
     id: 'ending_secret_week1',
     titleKey: 'castle_ending_secret_w1_title',
-    fallbackTitle: 'Swift Savior (Secret Week-0)',
+    fallbackTitle: 'Flawless Rescue (Secret)',
     descKey: 'castle_ending_secret_w1_desc',
     fallbackDesc:
-        'Defeated both the Guardian Robot and the Metal Wizard in Week 0 before backup constructs could be built, rescuing the princess untouched!',
+        'Defeated both the Guardian Robot and the Metal Wizard on Week 0 before any dark anomaly could be sealed inside the Princess!',
     hintKey: 'castle_ending_secret_w1_hint',
-    fallbackHint: 'Defeat the Guardian Robot and Metal Wizard in Week 0.',
+    fallbackHint: 'Defeat the Guardian Robot and Metal Wizard on Week 0.',
     icon: Icons.auto_awesome_rounded,
     accentColor: Color(0xFF00E5FF),
   ),
   standardVictory(
     id: 'ending_standard_victory',
+    legacyIds: ['ending_perfect_100'],
     titleKey: 'castle_ending_standard_victory_title',
-    fallbackTitle: 'Metal Lair Liberated',
+    fallbackTitle: 'Sanctuary Victory (Standard)',
     descKey: 'castle_ending_standard_victory_desc',
     fallbackDesc:
-        'Destroyed the Stage 4 Baby Mage Robot (400 HP) and vanquished the Metal Wizard\'s lair!',
+        'Refused the sacrifice, overcame the Temple High Master (350 HP), and destroyed the Baby Mage Robot (400 HP) inside the Sacred Temple!',
     hintKey: 'castle_ending_standard_victory_hint',
-    fallbackHint: 'Defeat the Stage 4 Baby Mage Robot (400 HP).',
+    fallbackHint:
+        'Refuse the sacrifice, defeat the Temple High Master (350 HP), and defeat the Baby Mage Robot (400 HP).',
     icon: Icons.emoji_events_rounded,
     accentColor: Color(0xFFFFD54F),
   ),
-  perfectPredictor(
-    id: 'ending_perfect',
-    titleKey: 'castle_ending_perfect_title',
-    fallbackTitle: 'Master of Chaos (100%)',
-    descKey: 'castle_ending_perfect_desc',
+  sacredSacrifice(
+    id: 'ending_sacred_sacrifice',
+    legacyIds: ['ending_victor'],
+    titleKey: 'castle_ending_sacred_sacrifice_title',
+    fallbackTitle: 'The Sacred Sacrifice',
+    descKey: 'castle_ending_sacred_sacrifice_desc',
     fallbackDesc:
-        'Finished a 100-round battle with 100% score—completely outsmarting Master Hand.',
-    hintKey: 'castle_ending_perfect_hint',
-    fallbackHint: 'Win 100% of decisive rounds in a 100-round battle.',
-    icon: Icons.workspace_premium_rounded,
-    accentColor: Color(0xFFFFCA28),
+        'Yielded to the Temple High Master\'s decree—by choice, defeat, or retreat—allowing the Princess to be sacrificed at the altar to contain the anomaly.',
+    hintKey: 'castle_ending_sacred_sacrifice_hint',
+    fallbackHint:
+        'Accept the Temple High Master\'s sacrifice decree, or fall / teleport during his duel.',
+    icon: Icons.volunteer_activism_rounded,
+    accentColor: Color(0xFFFFB74D),
   ),
-  triumphantStrategist(
-    id: 'ending_victor',
-    titleKey: 'castle_ending_victor_title',
-    fallbackTitle: 'Kingdom Defender (>50%)',
-    descKey: 'castle_ending_victor_desc',
+  theDeserter(
+    id: 'ending_the_deserter',
+    legacyIds: ['ending_outsmarted'],
+    titleKey: 'castle_ending_deserter_title',
+    fallbackTitle: 'The Deserter',
+    descKey: 'castle_ending_deserter_desc',
     fallbackDesc:
-        'Completed 100 rounds victorious above 50%, holding back the Metal Wizard.',
-    hintKey: 'castle_ending_victor_hint',
-    fallbackHint: 'Finish 100 rounds with >50% and <100% predictability score.',
-    icon: Icons.verified_rounded,
-    accentColor: Color(0xFF66BB6A),
-  ),
-  outpredicted(
-    id: 'ending_outsmarted',
-    titleKey: 'castle_ending_outsmarted_title',
-    fallbackTitle: 'Read Like a Scroll (≤50%)',
-    descKey: 'castle_ending_outsmarted_desc',
-    fallbackDesc:
-        'Survived 100 rounds, yet Master Hand anticipated over half your moves.',
-    hintKey: 'castle_ending_outsmarted_hint',
-    fallbackHint: 'Finish 100 rounds with 50% or lower predictability score.',
-    icon: Icons.menu_book_rounded,
-    accentColor: Color(0xFF42A5F5),
+        'Fled the Sacred Temple via Teleport during the final battle against the Baby Mage Robot, abandoning the capital as it fell to ruin.',
+    hintKey: 'castle_ending_deserter_hint',
+    fallbackHint:
+        'Flee via Teleport during the final battle against the Baby Mage Robot.',
+    icon: Icons.directions_run_rounded,
+    accentColor: Color(0xFFBA68C8),
   ),
   kingdomFall(
     id: 'ending_kingdom_fall',
-    titleKey: 'castle_ending_fall_title',
-    fallbackTitle: 'The Kingdom Has Fallen',
-    descKey: 'castle_ending_fall_desc',
+    titleKey: 'castle_ending_ruin_title',
+    fallbackTitle: 'Ruin',
+    descKey: 'castle_ending_ruin_desc',
     fallbackDesc:
-        'Fell to 0 HP or passed the Week 40 deadline—forcing the Kingdom to rise anew.',
-    hintKey: 'castle_ending_fall_hint',
-    fallbackHint: 'Suffer defeat at 0 HP or exceed the Week 40 deadline.',
+        'Fell to 0 HP against the Lair constructs or the Baby Mage Robot—forcing the Kingdom to rise anew.',
+    hintKey: 'castle_ending_ruin_hint',
+    fallbackHint:
+        'Fall to 0 HP against the Lair constructs or the Baby Mage Robot.',
     icon: Icons.whatshot_rounded,
     accentColor: Color(0xFFEF5350),
+  ),
+  invasionTimeout(
+    id: 'ending_invasion_timeout',
+    titleKey: 'castle_ending_invasion_title',
+    fallbackTitle: 'Invasion (Time Out)',
+    descKey: 'castle_ending_invasion_desc',
+    fallbackDesc:
+        'Exceeded the Week 40 deadline before saving the realm, allowing the Metal Wizard\'s legions to besiege the Sacred Capital.',
+    hintKey: 'castle_ending_invasion_hint',
+    fallbackHint: 'Exceed the Week 40 campaign deadline.',
+    icon: Icons.hourglass_disabled_rounded,
+    accentColor: Color(0xFFFF7043),
   );
 
+  // Legacy aliases preserved for backward compatibility in 100-round evaluation
+  static const NarrativeEnding perfectPredictor = standardVictory;
+  static const NarrativeEnding triumphantStrategist = sacredSacrifice;
+  static const NarrativeEnding outpredicted = theDeserter;
+  static const NarrativeEnding ruin = kingdomFall;
+
   final String id;
+  final List<String> legacyIds;
   final String titleKey;
   final String fallbackTitle;
   final String descKey;
@@ -416,6 +446,7 @@ enum NarrativeEnding {
 
   const NarrativeEnding({
     required this.id,
+    this.legacyIds = const [],
     required this.titleKey,
     required this.fallbackTitle,
     required this.descKey,
@@ -426,3 +457,4 @@ enum NarrativeEnding {
     required this.accentColor,
   });
 }
+

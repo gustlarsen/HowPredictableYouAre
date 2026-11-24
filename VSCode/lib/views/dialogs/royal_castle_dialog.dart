@@ -2232,7 +2232,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ),
         const SizedBox(height: 12),
 
-        // 4 Endings Breakdown (2x2 Compact Grid)
+        // 6 Endings Breakdown (3x2 Compact Grid)
         Text(
           loc.t('castle_endings_title', fallback: 'Narrative Endings'),
           style: TextStyle(
@@ -2301,11 +2301,11 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       accentColor: palette.amberText,
                       title: loc.t(
                         'castle_heroes_ending_3_title',
-                        fallback: 'Ending III: Victory',
+                        fallback: 'Ending III: Sanctuary Victory',
                       ),
                       subtitle: loc.t(
                         'castle_heroes_ending_3_sub',
-                        fallback: 'Stage 4',
+                        fallback: 'Sacred Temple',
                       ),
                       count: controller.standardVictoryCount,
                       palette: palette,
@@ -2320,13 +2320,58 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                       accentColor: secretAccent,
                       title: loc.t(
                         'castle_heroes_ending_4_title',
-                        fallback: 'Ending IV: Secret Rescue',
+                        fallback: 'Ending IV: Flawless Rescue',
                       ),
                       subtitle: loc.t(
                         'castle_heroes_ending_4_sub',
                         fallback: 'Week 0',
                       ),
                       count: controller.secretVictoryCount,
+                      palette: palette,
+                      borderColor: cardBorder,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _ChronicleStatCard(
+                      key: const ValueKey('heroes_ending_sacred_sacrifice_card'),
+                      icon: Icons.local_fire_department_rounded,
+                      accentColor: const Color(0xFFFF8F00),
+                      title: loc.t(
+                        'castle_heroes_ending_5_title',
+                        fallback: 'Ending V: The Sacred Sacrifice',
+                      ),
+                      subtitle: loc.t(
+                        'castle_heroes_ending_5_sub',
+                        fallback: 'Altar Sacrifice',
+                      ),
+                      count: controller.sacredSacrificeCount,
+                      palette: palette,
+                      borderColor: cardBorder,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ChronicleStatCard(
+                      key: const ValueKey('heroes_ending_deserter_card'),
+                      icon: Icons.directions_run_rounded,
+                      accentColor: const Color(0xFF8D6E63),
+                      title: loc.t(
+                        'castle_heroes_ending_6_title',
+                        fallback: 'Ending VI: The Deserter',
+                      ),
+                      subtitle: loc.t(
+                        'castle_heroes_ending_6_sub',
+                        fallback: 'Fled Temple',
+                      ),
+                      count: controller.deserterCount,
                       palette: palette,
                       borderColor: cardBorder,
                     ),
@@ -2385,7 +2430,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ),
         const SizedBox(height: 12),
 
-        // Bosses Defeated (2x2 Compact Mini-Cards)
+        // Bosses Defeated (Compact Mini-Cards)
         Text(
           loc.t(
             'castle_heroes_bosses_defeated',
@@ -2457,6 +2502,28 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  Expanded(
+                    child: _ChronicleStatCard(
+                      key: const ValueKey('heroes_boss_temple_master_card'),
+                      icon: BestiaryCreature.templeMaster.icon,
+                      accentColor: const Color(0xFFFFCA28),
+                      title: loc.t(
+                        'castle_bestiary_temple_master_name',
+                        fallback: 'Temple High Master',
+                      ),
+                      count: controller.templeMasterDefeatedCount,
+                      palette: palette,
+                      borderColor: cardBorder,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Expanded(
                     child: _ChronicleStatCard(
                       key: const ValueKey('heroes_boss_baby_mage_card'),

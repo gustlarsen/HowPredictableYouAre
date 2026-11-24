@@ -208,7 +208,7 @@ class StorageService {
   int? get pcHpRaw => _prefs.getInt('pcHp');
   Future<void> setPcHp(int val) => _prefs.setInt('pcHp', val);
 
-  // Boss Stage Progression (1 = Guardian Robot, 2 = Robot Archmage, 3 = Metal Wizard, 4 = Baby Mage Robot)
+  // Boss Stage Progression (1 = Guardian Robot, 2 = Robot Archmage, 3 = Metal Wizard, 4 = Baby Mage Robot, 5 = Temple High Master)
   static const String enemyStageKey = 'enemy_stage';
   static const String enemyPhaseKey = 'enemy_phase';
   static const String enemyMaxHpKey = 'enemy_max_hp';
@@ -217,12 +217,12 @@ class StorageService {
     final raw =
         _prefs.getInt(enemyStageKey) ?? _prefs.getInt(enemyPhaseKey) ?? 1;
     if (raw < 1) return 1;
-    if (raw > 4) return 4;
+    if (raw > 5) return 5;
     return raw;
   }
 
   Future<void> setEnemyStage(int val) {
-    final clamped = val.clamp(1, 4);
+    final clamped = val.clamp(1, 5);
     return Future.wait([
       _prefs.setInt(enemyStageKey, clamped),
       _prefs.setInt(enemyPhaseKey, clamped),
@@ -242,6 +242,8 @@ class StorageService {
         return 300;
       case 4:
         return 400;
+      case 5:
+        return 350;
       default:
         return 100;
     }
@@ -1099,8 +1101,12 @@ class StorageService {
       'robot_archmage_defeated_count';
   static const String _metalWizardDefeatedCountKey =
       'metal_wizard_defeated_count';
+  static const String _templeMasterDefeatedCountKey =
+      'temple_master_defeated_count';
   static const String _babyMageRobotDefeatedCountKey =
       'baby_mage_robot_defeated_count';
+  static const String _sacredSacrificeCountKey = 'sacred_sacrifice_count';
+  static const String _deserterCountKey = 'deserter_count';
 
   int _nonNegativeInt(String key) {
     final val = _prefs.getInt(key) ?? 0;
@@ -1131,6 +1137,14 @@ class StorageService {
   Future<void> setSecretVictoryCount(int val) =>
       _prefs.setInt(_secretVictoryCountKey, val < 0 ? 0 : val);
 
+  int get sacredSacrificeCount => _nonNegativeInt(_sacredSacrificeCountKey);
+  Future<void> setSacredSacrificeCount(int val) =>
+      _prefs.setInt(_sacredSacrificeCountKey, val < 0 ? 0 : val);
+
+  int get deserterCount => _nonNegativeInt(_deserterCountKey);
+  Future<void> setDeserterCount(int val) =>
+      _prefs.setInt(_deserterCountKey, val < 0 ? 0 : val);
+
   int? get fastestVictoryWeek {
     final val = _prefs.getInt(_fastestVictoryWeekKey);
     if (val == null || val < 0) return null;
@@ -1158,6 +1172,11 @@ class StorageService {
       _nonNegativeInt(_metalWizardDefeatedCountKey);
   Future<void> setMetalWizardDefeatedCount(int val) =>
       _prefs.setInt(_metalWizardDefeatedCountKey, val < 0 ? 0 : val);
+
+  int get templeMasterDefeatedCount =>
+      _nonNegativeInt(_templeMasterDefeatedCountKey);
+  Future<void> setTempleMasterDefeatedCount(int val) =>
+      _prefs.setInt(_templeMasterDefeatedCountKey, val < 0 ? 0 : val);
 
   int get babyMageRobotDefeatedCount =>
       _nonNegativeInt(_babyMageRobotDefeatedCountKey);
@@ -1187,10 +1206,13 @@ class StorageService {
       setForfeitRunCount(0),
       setStandardVictoryCount(0),
       setSecretVictoryCount(0),
+      setSacredSacrificeCount(0),
+      setDeserterCount(0),
       setFastestVictoryWeek(null),
       setGuardianRobotDefeatedCount(0),
       setRobotArchmageDefeatedCount(0),
       setMetalWizardDefeatedCount(0),
+      setTempleMasterDefeatedCount(0),
       setBabyMageRobotDefeatedCount(0),
       clearBattleDecreeProgress(),
     ]);

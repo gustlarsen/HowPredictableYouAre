@@ -187,7 +187,7 @@ void main() {
         expect(controller.forfeitRunCount, 1);
         expect(controller.totalCyclesCount, 3);
 
-        // 4. Standard Victory in Week 14 (Stage 1 -> Stage 2 -> Stage 3 -> Stage 4)
+        // 4. Standard Victory in Week 14 (Stage 1 -> Stage 2 -> Stage 3 -> Stage 5 Temple Master -> Stage 4 Baby Mage)
         controller.currentWeek = 14;
         controller.enemyStage = 1;
         controller.computerHp = 1;
@@ -208,11 +208,18 @@ void main() {
         controller.playTurn(HandMove.rock); // defeats Metal Wizard
         expect(controller.metalWizardDefeatedCount, 1);
         expect(controller.advanceAfterBossVictory(), isFalse);
-        expect(controller.enemyStage, 4);
+        expect(controller.enemyStage, 5);
 
         controller.computerHp = 1;
         controller.crystalBallMove = HandMove.scissors;
-        controller.playTurn(HandMove.rock); // defeats Baby Mage Robot
+        controller.playTurn(HandMove.rock); // defeats Temple High Master
+        expect(controller.templeMasterDefeatedCount, 1);
+        expect(controller.advanceAfterBossVictory(), isFalse);
+        expect(controller.enemyStage, 4);
+
+        controller.computerHp = 1;
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.rock); // Fire beats Wood + Metal -> defeats Baby Mage Robot
         expect(controller.babyMageRobotDefeatedCount, 1);
         expect(controller.standardVictoryCount, 1);
         expect(controller.totalCyclesCount, 4);
@@ -241,7 +248,7 @@ void main() {
         controller.currentWeek = 25;
         controller.enemyStage = 4;
         controller.computerHp = 1;
-        controller.crystalBallMove = HandMove.scissors;
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
         controller.playTurn(HandMove.rock);
         expect(controller.babyMageRobotDefeatedCount, 2);
         expect(controller.standardVictoryCount, 2);
@@ -450,14 +457,17 @@ void main() {
           expect(find.text('--'), findsOneWidget);
           expect(find.text('Ending I: Ruin'), findsOneWidget);
           expect(find.text('Ending II: Invasion'), findsOneWidget);
-          expect(find.text('Ending III: Victory'), findsOneWidget);
-          expect(find.text('Ending IV: Secret Rescue'), findsOneWidget);
+          expect(find.text('Ending III: Sanctuary Victory'), findsOneWidget);
+          expect(find.text('Ending IV: Flawless Rescue'), findsOneWidget);
+          expect(find.text('Ending V: The Sacred Sacrifice'), findsOneWidget);
+          expect(find.text('Ending VI: The Deserter'), findsOneWidget);
           expect(find.text('Forfeited Runs'), findsOneWidget);
           expect(find.byType(ForfeitFlagIcon), findsOneWidget);
           expect(find.text('Bosses Defeated'), findsOneWidget);
           expect(find.text('Guardian Robot'), findsOneWidget);
           expect(find.text('Robot Archmage'), findsOneWidget);
           expect(find.text('Metal Wizard'), findsOneWidget);
+          expect(find.text('Temple High Master'), findsOneWidget);
           expect(find.text('Baby Mage Robot'), findsOneWidget);
         }
 

@@ -20,6 +20,8 @@ import '../services/update_service.dart';
 enum PermadeathCause {
   battleDefeat,
   deadlineExceeded,
+  sacredSacrifice,
+  deserter,
 }
 
 class GameController extends ChangeNotifier {
@@ -56,6 +58,114 @@ class GameController extends ChangeNotifier {
   static const int allElementPackMediumBonus = 2500;
   static const int allElementPackLargeBonus = 10000;
   static const int singleElementBulkPackBonus = 1500;
+
+  /// First 520 digits of Pi (3.1415926535...) driving the Baby Mage Robot's
+  /// deterministic dual-element harmonic sequence.
+  static const String piDigitsSequence =
+      '31415926535897932384626433832795028841971693993751'
+      '05820974944592307816406286208998628034825342117067'
+      '98214808651328230664709384460955058223172535940812'
+      '84811174502841027019385211055596446229489549303819'
+      '64428810975665933446128475648233786783165271201909'
+      '14564856692346034861045432664821339360726024914127'
+      '37245870066063155881748815209209628292540917153643'
+      '67892590360011330530548820466521384146951941511609'
+      '43305727036575959195309218611738193261179310511854'
+      '80744623799627495673518857527248912279381830119491'
+      '29833673362440656643';
+
+  /// Returns the index-th digit of [piDigitsSequence] (0-indexed, wrapping modulo length).
+  static int piDigitAt(int turnIndex) {
+    final safeIdx =
+        turnIndex < 0 ? 0 : (turnIndex % piDigitsSequence.length);
+    return piDigitsSequence.codeUnitAt(safeIdx) - 48;
+  }
+
+  /// Maps a single digit of Pi (`0..9`) to its corresponding harmonic dual-element pair:
+  /// - `0` or `1` -> `[Fire, Water]` (unique common weakness: Earth)
+  /// - `2` or `3` -> `[Water, Earth]` (unique common weakness: Wood)
+  /// - `4` or `5` -> `[Earth, Wood]` (unique common weakness: Metal)
+  /// - `6` or `7` -> `[Wood, Metal]` (unique common weakness: Fire)
+  /// - `8` or `9` -> `[Metal, Fire]` (unique common weakness: Water)
+  static List<HandMove> dualElementsForPiDigit(int digit) {
+    switch (digit) {
+      case 0:
+      case 1:
+        return const [HandMove.fire, HandMove.water];
+      case 2:
+      case 3:
+        return const [HandMove.water, HandMove.earth];
+      case 4:
+      case 5:
+        return const [HandMove.earth, HandMove.wood];
+      case 6:
+      case 7:
+        return const [HandMove.wood, HandMove.metal];
+      case 8:
+      case 9:
+      default:
+        return const [HandMove.metal, HandMove.fire];
+    }
+  }
+
+  /// Computes the optimal counter move(s) from [activePlayerDeck] against a
+  /// dual-element pair (`[spellA, spellB]`), prioritizing the unique common
+  /// weakness that beats BOTH spells (score +4), then the safe win+tie counter
+  /// that deals 1 HP without taking damage (score +2).
+  static List<HandMove> optimalCountersForDualSpells(
+    List<HandMove> dualSpells,
+    List<HandMove> activePlayerDeck, {
+    bool elemental = true,
+  }) {
+    if (dualSpells.isEmpty || activePlayerDeck.isEmpty) return const [];
+    if (dualSpells.length == 1) {
+      final single = dualSpells.first;
+      return activePlayerDeck
+          .where((m) => m.beats(single, elemental: elemental))
+          .toList(growable: false);
+    }
+    final spellA = dualSpells[0];
+    final spellB = dualSpells[1];
+    int bestTierScore = -999;
+    final bestMoves = <HandMove>[];
+
+    for (final candidate in activePlayerDeck) {
+      final res = DualSpellMatchupResult.evaluate(
+        playerMove: candidate,
+        spellA: spellA,
+        spellB: spellB,
+        elemental: elemental,
+      );
+      // Tier scoring:
+      // 4 = Beats both spells (2 orbs, -1 boss HP, 0 player damage)
+      // 3 = Beats 1 & Ties 1 (1 orb, -1 boss HP, 0 player damage)
+      // 1 = Beats 1 & Loses 1 (1 orb, -1 boss HP, -1 player damage)
+      // -1 = Ties 1 & Loses 1 (0 boss damage, -1 player damage)
+      // -2 = Loses to both (0 boss damage, -2 player damage)
+      final int tierScore;
+      if (res.defeatedEnemySpells.length == 2 && res.playerDamage == 0) {
+        tierScore = 4;
+      } else if (res.bossDamage > 0 && res.playerDamage == 0) {
+        tierScore = 3;
+      } else if (res.bossDamage > 0 && res.playerDamage == 1) {
+        tierScore = 1;
+      } else if (res.playerDamage == 1) {
+        tierScore = -1;
+      } else {
+        tierScore = -2;
+      }
+
+      if (tierScore > bestTierScore) {
+        bestTierScore = tierScore;
+        bestMoves
+          ..clear()
+          ..add(candidate);
+      } else if (tierScore == bestTierScore) {
+        bestMoves.add(candidate);
+      }
+    }
+    return List.unmodifiable(bestMoves);
+  }
 
   static ElementalCost maxHpUpgradeCostForLevel(int level) {
     final perOrb = 2 + (level ~/ 2);
@@ -287,6 +397,8 @@ class GameController extends ChangeNotifier {
         return 300;
       case 4:
         return 400;
+      case 5:
+        return 350;
       default:
         return pcMaxHp;
     }
@@ -306,22 +418,52 @@ class GameController extends ChangeNotifier {
 
   HandMove? currentUserMove;
   HandMove? currentComputerMove;
+  HandMove? currentSecondaryComputerMove;
   HandMove? lastUserMove;
 
   HandMove? predictedUserMove;
   HandMove? pcNextMove;
   HandMove? suggestedMove;
-  HandMove? crystalBallMove;
+  HandMove? _crystalBallMove;
+  HandMove? crystalBallSecondaryMove;
 
-  /// Predicted upcoming PC move(s) revealed by Crystal Ball.
-  List<HandMove> get crystalBallMoves =>
-      crystalBallMove != null ? [crystalBallMove!] : const [];
+  HandMove? get crystalBallMove => _crystalBallMove;
+  set crystalBallMove(HandMove? value) {
+    _crystalBallMove = value;
+    crystalBallSecondaryMove = null;
+  }
 
-  /// All active player elements that defeat the Crystal Ball's predicted PC
-  /// element(s), derived directly from [crystalBallMoves].
+  /// Sets both primary and secondary Crystal Ball predicted moves simultaneously
+  /// (used for Baby Mage Robot's dual-element spells).
+  void setCrystalBallDualMoves(HandMove primary, HandMove secondary) {
+    _crystalBallMove = primary;
+    crystalBallSecondaryMove = secondary;
+  }
+
+  /// Active computer move(s) cast in the most recent turn (2 spells for Baby Mage Robot).
+  List<HandMove> get currentComputerMoves => [
+    ?currentComputerMove,
+    ?currentSecondaryComputerMove,
+  ];
+
+  /// Predicted upcoming PC move(s) revealed by Crystal Ball (2 spells for Baby Mage Robot).
+  List<HandMove> get crystalBallMoves => [
+    ?_crystalBallMove,
+    ?crystalBallSecondaryMove,
+  ];
+
+  /// All active player elements that optimally counter the Crystal Ball's
+  /// predicted PC element(s), derived directly from [crystalBallMoves].
   List<HandMove> get crystalBallPlusMoves {
     final predictedPcMoves = crystalBallMoves;
     if (predictedPcMoves.isEmpty) return const [];
+    if (predictedPcMoves.length >= 2) {
+      return optimalCountersForDualSpells(
+        predictedPcMoves,
+        _engine.activeMoves,
+        elemental: isElementalMode,
+      );
+    }
     final counters = <HandMove>[];
     for (final pcMove in predictedPcMoves) {
       for (final playerMove in _engine.activeMoves) {
@@ -339,6 +481,10 @@ class GameController extends ChangeNotifier {
   List<HandMove> suggestedMoves = [];
 
   RoundWinner? lastWinner;
+  DualSpellMatchupResult? lastDualSpellResult;
+  int lastRoundUserDamage = 0;
+  int lastRoundComputerDamage = 0;
+  List<HandMove> lastCollectedOrbMoves = const [];
 
   // 5 Elemental Energy Orbs Inventory
   int fireOrbs = 0;
@@ -640,10 +786,13 @@ class GameController extends ChangeNotifier {
   int forfeitRunCount = 0;
   int standardVictoryCount = 0;
   int secretVictoryCount = 0;
+  int sacredSacrificeCount = 0;
+  int deserterCount = 0;
   int? fastestVictoryWeek;
   int guardianRobotDefeatedCount = 0;
   int robotArchmageDefeatedCount = 0;
   int metalWizardDefeatedCount = 0;
+  int templeMasterDefeatedCount = 0;
   int babyMageRobotDefeatedCount = 0;
 
   List<String> activeDecreeIds =
@@ -928,10 +1077,11 @@ class GameController extends ChangeNotifier {
   bool get isPhase2 => isWeekPhase2 || enemyStage >= 2;
 
   /// True only for bosses whose element pool spans all 5 elements
-  /// (Stage 2 Robot Archmage & Stage 4 Baby Mage Robot).
+  /// (Stage 2 Robot Archmage, Stage 5 Temple High Master, & Stage 4 Baby Mage Robot).
   /// Stage 1 Guardian Robot strictly uses [Fire, Water, Wood] and
   /// Stage 3 Metal Wizard strictly uses [Metal].
-  bool get enemyUses5Elements => enemyStage == 2 || enemyStage == 4;
+  bool get enemyUses5Elements =>
+      enemyStage == 2 || enemyStage == 4 || enemyStage == 5;
 
   /// Player's currently active element pool (3 basic elements by default,
   /// or all 5 elements when Earth & Metal is unlocked and enabled).
@@ -943,11 +1093,13 @@ class GameController extends ChangeNotifier {
   /// - Stage 1 (Guardian Robot, 100 HP): [Fire, Water, Wood] ONLY.
   /// - Stage 2 (Robot Archmage, 200 HP): All 5 elements.
   /// - Stage 3 (Metal Wizard, 300 HP): [Metal] ONLY.
-  /// - Stage 4 (Baby Mage Robot, 400 HP): All 5 elements.
+  /// - Stage 5 (Temple High Master, 350 HP): All 5 elements (1/5 Pure Random).
+  /// - Stage 4 (Baby Mage Robot, 400 HP): All 5 elements (Dual Harmonic Pi Sequence).
   List<HandMove> get bossAllowedMoves {
     switch (enemyStage) {
       case 2:
       case 4:
+      case 5:
         return allElementPool;
       case 3:
         return const [HandMove.metal];
@@ -969,6 +1121,12 @@ class GameController extends ChangeNotifier {
 
   bool get isBabyMageBoss => enemyStage == 4;
 
+  bool get isTempleMasterBoss => enemyStage == 5;
+
+  /// True when fighting inside the Sacred Temple arena (`temple_arena_bg`),
+  /// which applies to both the Temple High Master (`350 HP`) and the Baby Mage Robot (`400 HP`).
+  bool get isSacredTempleArena => isTempleMasterBoss || isBabyMageBoss;
+
   String enemyNameForStage(int stage) {
     switch (stage) {
       case 2:
@@ -985,6 +1143,11 @@ class GameController extends ChangeNotifier {
         return localization.t(
           'boss_name_baby_mage',
           fallback: 'Baby Mage Robot',
+        );
+      case 5:
+        return localization.t(
+          'boss_name_temple_master',
+          fallback: 'Temple High Master',
         );
       default:
         return localization.t(
@@ -1124,7 +1287,7 @@ class GameController extends ChangeNotifier {
     giftBoxUnlocked = storage.giftBoxUnlocked;
     overchargedStaffLevel = storage.overchargedStaffLevel.clamp(0, overchargedStaffMaxLevel);
 
-    enemyPhase = storage.enemyPhase.clamp(1, 4);
+    enemyPhase = storage.enemyPhase.clamp(1, 5);
     enemyMaxHp = storage.enemyMaxHpRaw ?? maxHpForEnemyPhase(enemyPhase);
 
     showReset = storage.showReset;
@@ -1293,10 +1456,13 @@ class GameController extends ChangeNotifier {
     forfeitRunCount = storage.forfeitRunCount;
     standardVictoryCount = storage.standardVictoryCount;
     secretVictoryCount = storage.secretVictoryCount;
+    sacredSacrificeCount = storage.sacredSacrificeCount;
+    deserterCount = storage.deserterCount;
     fastestVictoryWeek = storage.fastestVictoryWeek;
     guardianRobotDefeatedCount = storage.guardianRobotDefeatedCount;
     robotArchmageDefeatedCount = storage.robotArchmageDefeatedCount;
     metalWizardDefeatedCount = storage.metalWizardDefeatedCount;
+    templeMasterDefeatedCount = storage.templeMasterDefeatedCount;
     babyMageRobotDefeatedCount = storage.babyMageRobotDefeatedCount;
 
     final storedDecrees = storage.activeDecreeIds;
@@ -1564,11 +1730,11 @@ class GameController extends ChangeNotifier {
       hasHallOfHeroesBlessings;
 
   bool isEndingUnlocked(NarrativeEnding ending) =>
-      unlockedEndings.contains(ending.id);
+      unlockedEndings.contains(ending.id) ||
+      ending.legacyIds.any(unlockedEndings.contains);
 
-  int get unlockedEndingsCount => NarrativeEnding.values
-      .where((e) => unlockedEndings.contains(e.id))
-      .length;
+  int get unlockedEndingsCount =>
+      NarrativeEnding.values.where(isEndingUnlocked).length;
 
   bool isBestiaryEncountered(BestiaryCreature creature) =>
       encounteredBestiary.contains(creature.id);
@@ -2251,6 +2417,15 @@ class GameController extends ChangeNotifier {
     return shown && earned;
   }
 
+  /// Returns the current 0-indexed turn digit of Pi (`0..9`) used by the
+  /// Stage 4 Baby Mage Robot for its upcoming turn (`totalRounds`).
+  int get currentPiDigit => piDigitAt(totalRounds);
+
+  /// Returns the dual-element pair (`[spellA, spellB]`) for the Baby Mage Robot's
+  /// upcoming turn based on [currentPiDigit].
+  List<HandMove> get currentBabyMageDualSpells =>
+      dualElementsForPiDigit(currentPiDigit);
+
   void playTurn(HandMove userChoice, {bool isRapidFire = false}) {
     if (userHp <= 0) {
       isDeathAlertPending = true;
@@ -2285,68 +2460,153 @@ class GameController extends ChangeNotifier {
       _markBestiaryEncountered(BestiaryCreature.archmageRobot);
     } else if (enemyStage == 3) {
       _markBestiaryEncountered(BestiaryCreature.metalWizard);
+    } else if (enemyStage == 5) {
+      _markBestiaryEncountered(BestiaryCreature.templeMaster);
     } else if (enemyStage == 4) {
       _markBestiaryEncountered(BestiaryCreature.babyRobot);
     }
 
-    // AI uses the move already pre-computed before the user chose their hand
-    currentComputerMove =
-        crystalBallMove ?? _chooseComputerMoveForCurrentPhase(previousMove);
+    if (enemyStage == 4 && crystalBallSecondaryMove != null) {
+      // Stage 4 Baby Mage Robot: Dual Combined Elemental Spells driven by Pi
+      currentComputerMove =
+          crystalBallMove ?? currentBabyMageDualSpells.first;
+      currentSecondaryComputerMove =
+          crystalBallSecondaryMove ?? currentBabyMageDualSpells.last;
 
-    // Determine round outcome via HandMove.resolvesAgainst (supports 3-vs-5 Wu Xing)
-    final roundOutcome = currentUserMove!.resolvesAgainst(
-      currentComputerMove!,
-      elemental: isElementalMode,
-    );
-    if (roundOutcome == RoundWinner.draw) {
-      lastWinner = RoundWinner.draw;
-      decreeWinStreak = 0;
-      if (previousMove != null && userChoice == previousMove) {
-        decreeNoRepeatWinCount = 0;
-      }
-      storage.setDecreeWinStreak(decreeWinStreak);
-      storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDraw(vibrate: !isRapidFire, throttleSfx: isRapidFire);
-    } else if (roundOutcome == RoundWinner.user) {
-      lastWinner = RoundWinner.user;
-      userScore += 1;
-      // Grant +1 (or 2x with Harvest blessing) Elemental Orb of the defeated AI/PC element
+      final dualRes = DualSpellMatchupResult.evaluate(
+        playerMove: currentUserMove!,
+        spellA: currentComputerMove!,
+        spellB: currentSecondaryComputerMove!,
+        elemental: isElementalMode,
+      );
+      lastDualSpellResult = dualRes;
+      lastRoundComputerDamage = dualRes.bossDamage * playerWinDamageToBoss;
+      lastRoundUserDamage = dualRes.playerDamage * bossWinDamageToPlayer;
+
       final orbGain = isHarvestBlessingActive ? 2 : 1;
-      _incrementOrbForMove(currentComputerMove!, orbGain);
-      // Mirror +1 Elemental Orb into Royal Treasury Vault (up to shared treasuryMaxCapacity)
-      _depositTreasuryOrbForMove(currentComputerMove!, 1);
-      lastCollectedOrbMove = currentComputerMove;
-      orbCollectionEventId += 1;
-      computerHp = (computerHp - playerWinDamageToBoss).clamp(0, enemyMaxHp);
-      storage.setUserScore(userScore);
-      storage.setPcHp(computerHp);
-
-      // Update Royal Decree trackers
-      if (previousMove != null && userChoice == previousMove) {
-        decreeNoRepeatWinCount = 0;
-      } else {
-        decreeNoRepeatWinCount += 1;
+      for (final defeatedMove in dualRes.defeatedEnemySpells) {
+        _incrementOrbForMove(defeatedMove, orbGain);
+        _depositTreasuryOrbForMove(defeatedMove, 1);
+        decreeDefeatedElements.add(defeatedMove.orbKey);
       }
-      decreeWinStreak += 1;
-      decreeDefeatedElements.add(currentComputerMove!.orbKey);
+      if (dualRes.defeatedEnemySpells.isNotEmpty) {
+        lastCollectedOrbMoves = List.unmodifiable(dualRes.defeatedEnemySpells);
+        lastCollectedOrbMove = dualRes.defeatedEnemySpells.first;
+        orbCollectionEventId += 1;
+      } else {
+        lastCollectedOrbMoves = const [];
+      }
+
+      if (dualRes.bossDamage > 0) {
+        userScore += 1;
+        computerHp =
+            (computerHp - lastRoundComputerDamage).clamp(0, enemyMaxHp);
+        storage.setUserScore(userScore);
+        storage.setPcHp(computerHp);
+      }
+      if (dualRes.playerDamage > 0) {
+        pcScore += 1;
+        userHp =
+            (userHp - lastRoundUserDamage).clamp(0, effectivePlayerMaxHp);
+        storage.setPcScore(pcScore);
+        storage.setUserHp(userHp);
+      }
+
+      if (dualRes.bossDamage > 0 && dualRes.playerDamage == 0) {
+        lastWinner = RoundWinner.user;
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        } else {
+          decreeNoRepeatWinCount += 1;
+        }
+        decreeWinStreak += 1;
+        audio.playWin(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      } else if (dualRes.playerDamage > 0 && dualRes.bossDamage == 0) {
+        lastWinner = RoundWinner.computer;
+        decreeWinStreak = 0;
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        }
+        audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      } else {
+        // Simultaneous clash (-1 HP both)
+        lastWinner = RoundWinner.draw;
+        decreeWinStreak = 0;
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        }
+        audio.playDraw(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      }
       storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
       storage.setDecreeWinStreak(decreeWinStreak);
       storage.setDecreeDefeatedElements(decreeDefeatedElements.toList());
-
-      audio.playWin(vibrate: !isRapidFire, throttleSfx: isRapidFire);
     } else {
-      lastWinner = RoundWinner.computer;
-      pcScore += 1;
-      userHp = (userHp - bossWinDamageToPlayer).clamp(0, effectivePlayerMaxHp);
-      storage.setPcScore(pcScore);
-      storage.setUserHp(userHp);
-      decreeWinStreak = 0;
-      if (previousMove != null && userChoice == previousMove) {
-        decreeNoRepeatWinCount = 0;
+      // Single-element combat (Stages 1, 2, 3, 5, or explicit single crystalBallMove override in tests)
+      lastDualSpellResult = null;
+      currentSecondaryComputerMove = null;
+      currentComputerMove =
+          crystalBallMove ?? _chooseComputerMoveForCurrentPhase(previousMove);
+
+      final roundOutcome = currentUserMove!.resolvesAgainst(
+        currentComputerMove!,
+        elemental: isElementalMode,
+      );
+      if (roundOutcome == RoundWinner.draw) {
+        lastWinner = RoundWinner.draw;
+        lastRoundUserDamage = 0;
+        lastRoundComputerDamage = 0;
+        lastCollectedOrbMoves = const [];
+        decreeWinStreak = 0;
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        }
+        storage.setDecreeWinStreak(decreeWinStreak);
+        storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
+        audio.playDraw(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      } else if (roundOutcome == RoundWinner.user) {
+        lastWinner = RoundWinner.user;
+        lastRoundUserDamage = 0;
+        lastRoundComputerDamage = playerWinDamageToBoss;
+        userScore += 1;
+        final orbGain = isHarvestBlessingActive ? 2 : 1;
+        _incrementOrbForMove(currentComputerMove!, orbGain);
+        _depositTreasuryOrbForMove(currentComputerMove!, 1);
+        lastCollectedOrbMove = currentComputerMove;
+        lastCollectedOrbMoves = [currentComputerMove!];
+        orbCollectionEventId += 1;
+        computerHp = (computerHp - playerWinDamageToBoss).clamp(0, enemyMaxHp);
+        storage.setUserScore(userScore);
+        storage.setPcHp(computerHp);
+
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        } else {
+          decreeNoRepeatWinCount += 1;
+        }
+        decreeWinStreak += 1;
+        decreeDefeatedElements.add(currentComputerMove!.orbKey);
+        storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
+        storage.setDecreeWinStreak(decreeWinStreak);
+        storage.setDecreeDefeatedElements(decreeDefeatedElements.toList());
+
+        audio.playWin(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      } else {
+        lastWinner = RoundWinner.computer;
+        lastRoundUserDamage = bossWinDamageToPlayer;
+        lastRoundComputerDamage = 0;
+        lastCollectedOrbMoves = const [];
+        pcScore += 1;
+        userHp = (userHp - bossWinDamageToPlayer).clamp(0, effectivePlayerMaxHp);
+        storage.setPcScore(pcScore);
+        storage.setUserHp(userHp);
+        decreeWinStreak = 0;
+        if (previousMove != null && userChoice == previousMove) {
+          decreeNoRepeatWinCount = 0;
+        }
+        storage.setDecreeWinStreak(decreeWinStreak);
+        storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
+        audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
       }
-      storage.setDecreeWinStreak(decreeWinStreak);
-      storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
-      audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
     }
 
     if (isRapidFire) {
@@ -2380,16 +2640,10 @@ class GameController extends ChangeNotifier {
       audio.playStoryChime();
     } else if (totalRounds >= playerMaxMana) {
       is100RoundsAlertPending = true;
-      if (percentPredict == 100) {
-        _markEndingUnlocked(NarrativeEnding.perfectPredictor);
-      } else if (percentPredict > 50) {
-        _markEndingUnlocked(NarrativeEnding.triumphantStrategist);
-      } else {
-        _markEndingUnlocked(NarrativeEnding.outpredicted);
-      }
     }
 
     if (lastWinner == RoundWinner.user ||
+        lastRoundComputerDamage > 0 ||
         computerHp <= 0 ||
         totalRounds >= playerMaxMana) {
       _triggerCloudSave();
@@ -2401,9 +2655,13 @@ class GameController extends ChangeNotifier {
 
   HandMove _chooseComputerMoveForCurrentPhase(HandMove? previousMove) {
     _syncEngineEnemyPool();
-    if (enemyStage == 4) {
-      // Stage 4 Baby Mage Robot: pure uniform random (1/5 per element).
+    if (enemyStage == 5) {
+      // Stage 5 Temple High Master: pure uniform random (1/5 per element).
       return _engine.getRandomEnemyMove();
+    }
+    if (enemyStage == 4) {
+      // Stage 4 Baby Mage Robot: deterministic Pi sequence dual spell (first spell).
+      return currentBabyMageDualSpells.first;
     }
     if (enemyStage == 3) {
       // Stage 3 Metal Wizard: 100% pure Metal magic (bypasses Markov matrix).
@@ -2456,8 +2714,12 @@ class GameController extends ChangeNotifier {
         storage.setTotalCyclesCount(totalCyclesCount);
         _recordFastestVictoryWeek(0);
       } else {
-        _markBestiaryEncountered(BestiaryCreature.babyRobot);
+        _markBestiaryEncountered(BestiaryCreature.templeMaster);
       }
+    } else if (defeatedStage == 5) {
+      templeMasterDefeatedCount += 1;
+      storage.setTempleMasterDefeatedCount(templeMasterDefeatedCount);
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
     } else if (defeatedStage == 4) {
       babyMageRobotDefeatedCount += 1;
       storage.setBabyMageRobotDefeatedCount(babyMageRobotDefeatedCount);
@@ -2468,6 +2730,25 @@ class GameController extends ChangeNotifier {
       storage.setTotalCyclesCount(totalCyclesCount);
       _recordFastestVictoryWeek(week);
     }
+  }
+
+  /// Accepts the Temple High Master's decree after defeating the Metal Wizard
+  /// at `currentWeek >= 1`, unlocking **Ending: The Sacred Sacrifice** and
+  /// resetting the campaign cycle via [applyPermadeathReset].
+  Future<void> acceptSacredSacrifice() async {
+    isBossVictoryPending = false;
+    pendingBossVictoryStage = null;
+    pendingBossVictoryWeek = null;
+    await applyPermadeathReset(cause: PermadeathCause.sacredSacrifice);
+  }
+
+  /// Flees the Sacred Temple via Teleport during the Baby Mage Robot final battle,
+  /// unlocking **Ending: The Deserter** and resetting the campaign cycle.
+  Future<void> triggerDeserterEnding() async {
+    isBossVictoryPending = false;
+    pendingBossVictoryStage = null;
+    pendingBossVictoryWeek = null;
+    await applyPermadeathReset(cause: PermadeathCause.deserter);
   }
 
   /// Advances the campaign state after the user confirms the Boss Defeated modal
@@ -2521,6 +2802,15 @@ class GameController extends ChangeNotifier {
     } else if (defeatedStage == 2) {
       enemyStage = 3;
       _markBestiaryEncountered(BestiaryCreature.metalWizard);
+    } else if (defeatedStage == 3) {
+      // Post-Week-0 Metal Wizard victory -> Refuse Sacrifice -> Stage 5 Temple High Master (350 HP)
+      enemyStage = 5;
+      _markBestiaryEncountered(BestiaryCreature.templeMaster);
+    } else if (defeatedStage == 5) {
+      // Defeating Temple High Master -> Sanctuary Altar restores HP & Mana to 100%,
+      // and transitions to Stage 4 Baby Mage Robot (400 HP).
+      enemyStage = 4;
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
     } else {
       enemyStage = 4;
       _markBestiaryEncountered(BestiaryCreature.babyRobot);
@@ -2543,10 +2833,11 @@ class GameController extends ChangeNotifier {
 
   void _computeNextHints() {
     _syncEngineEnemyPool();
-    crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
 
-    if (enemyStage == 4) {
-      // Pure uniform random 1/5 AI: Markov prediction hints are meaningless.
+    if (enemyStage == 5) {
+      // Stage 5 Temple High Master: pure uniform random (1/5 per element).
+      crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
+      crystalBallSecondaryMove = null;
       predictedUserMoves = const [];
       pcNextMoves = const [];
       suggestedMoves = const [];
@@ -2555,6 +2846,28 @@ class GameController extends ChangeNotifier {
       suggestedMove = null;
       return;
     }
+
+    if (enemyStage == 4) {
+      // Stage 4 Baby Mage Robot: deterministic Pi sequence dual elemental spells.
+      final dualSpells = currentBabyMageDualSpells;
+      _crystalBallMove = dualSpells.first;
+      crystalBallSecondaryMove = dualSpells.last;
+      predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
+      pcNextMoves = List.unmodifiable(dualSpells);
+      suggestedMoves = optimalCountersForDualSpells(
+        dualSpells,
+        _engine.activeMoves,
+        elemental: isElementalMode,
+      );
+      predictedUserMove =
+          predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+      pcNextMove = dualSpells.first;
+      suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
+      return;
+    }
+
+    _crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
+    crystalBallSecondaryMove = null;
 
     if (enemyStage == 3) {
       // Stage 3 Metal Wizard: conjures ONLY Metal (100%) every turn.
@@ -2601,9 +2914,14 @@ class GameController extends ChangeNotifier {
     turnCount = 0;
     currentUserMove = null;
     currentComputerMove = null;
+    currentSecondaryComputerMove = null;
     lastUserMove = null;
     lastWinner = null;
+    lastDualSpellResult = null;
+    lastRoundUserDamage = 0;
+    lastRoundComputerDamage = 0;
     lastCollectedOrbMove = null;
+    lastCollectedOrbMoves = const [];
     userHp = effectivePlayerMaxHp;
     enemyMaxHp = maxHpForEnemyStage(enemyStage);
     computerHp = enemyMaxHp;
@@ -2800,7 +3118,9 @@ class GameController extends ChangeNotifier {
     final resolvedCause = cause ??
         (currentWeek >= maxCampaignWeeks && userHp > 0
             ? PermadeathCause.deadlineExceeded
-            : PermadeathCause.battleDefeat);
+            : (enemyStage == 5
+                ? PermadeathCause.sacredSacrifice
+                : PermadeathCause.battleDefeat));
 
     final nextTotalCycles = totalCyclesCount + 1;
     final nextDeathDefeats = resolvedCause == PermadeathCause.battleDefeat
@@ -2810,6 +3130,12 @@ class GameController extends ChangeNotifier {
         resolvedCause == PermadeathCause.deadlineExceeded
             ? timeoutDefeatCount + 1
             : timeoutDefeatCount;
+    final nextSacrifices = resolvedCause == PermadeathCause.sacredSacrifice
+        ? sacredSacrificeCount + 1
+        : sacredSacrificeCount;
+    final nextDeserters = resolvedCause == PermadeathCause.deserter
+        ? deserterCount + 1
+        : deserterCount;
 
     final verifiedPaidIds = <String>{
       ...storage.purchasedIapProductIds,
@@ -2855,10 +3181,25 @@ class GameController extends ChangeNotifier {
     final nextPeakMana = math.max(peakManaUpgradeLevel, manaUpgradeLevel);
     final nextClaimAvailable = nextPeakHp > 0 || nextPeakMana > 0;
 
-    // 3. Record Kingdom Fall ending
+    // 3. Record corresponding narrative ending
+    final NarrativeEnding unlockedEnding;
+    switch (resolvedCause) {
+      case PermadeathCause.sacredSacrifice:
+        unlockedEnding = NarrativeEnding.sacredSacrifice;
+        break;
+      case PermadeathCause.deserter:
+        unlockedEnding = NarrativeEnding.theDeserter;
+        break;
+      case PermadeathCause.deadlineExceeded:
+        unlockedEnding = NarrativeEnding.invasionTimeout;
+        break;
+      case PermadeathCause.battleDefeat:
+        unlockedEnding = NarrativeEnding.kingdomFall;
+        break;
+    }
     final nextEndings = <String>{
       ...unlockedEndings,
-      NarrativeEnding.kingdomFall.id,
+      unlockedEnding.id,
     }.toList();
 
     final preservedRemoveAdsOwned = unlockedAds || storage.unlockedAds;
@@ -2893,6 +3234,8 @@ class GameController extends ChangeNotifier {
     await storage.setTotalCyclesCount(nextTotalCycles);
     await storage.setDeathDefeatCount(nextDeathDefeats);
     await storage.setTimeoutDefeatCount(nextTimeoutDefeats);
+    await storage.setSacredSacrificeCount(nextSacrifices);
+    await storage.setDeserterCount(nextDeserters);
     await storage.setTurn0Orbs(
       fire: 0,
       water: 0,

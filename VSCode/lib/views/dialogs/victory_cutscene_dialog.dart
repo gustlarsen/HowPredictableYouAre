@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/metal_wizard_lair_icon.dart';
+import '../widgets/sacred_temple_icon.dart';
 
 enum VictoryCutsceneType {
   secretWeek1,
   standardVictory,
+  sacredSacrifice,
+  theDeserter,
 }
 
 class _VictoryPanelData {
@@ -122,7 +125,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'Secret Ending Unlocked',
             bodyKey: 'secret_cutscene_p3_body',
             fallbackBody:
-                'Peace returns in record time! The Secret Week-0 Ending has been inscribed in the Royal Library as you prepare for the next cycle.',
+                'Peace returns in record time! The Flawless Rescue (Secret Ending) has been inscribed in the Royal Library as you prepare for the next cycle.',
           ),
         ];
       case VictoryCutsceneType.standardVictory:
@@ -136,7 +139,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'The Final Construct Falls!',
             bodyKey: 'standard_cutscene_p1_body',
             fallbackBody:
-                'Despite its chaotic 400 HP shield and unpredictable pure random attacks, the Baby Mage Robot overloads and collapses in a shower of elemental sparks!',
+                'Inside the Sacred Temple, you decode the Baby Mage Robot\'s irrational π core and shatter its dual harmonic elemental spells across 400 HP!',
           ),
           _VictoryPanelData(
             icon: Icons.fort_rounded,
@@ -148,7 +151,7 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: "Metal Wizard's Lair Defeated",
             bodyKey: 'standard_cutscene_p2_body',
             fallbackBody:
-                'The dark citadel\'s Markov engines power down forever. Free from the tower, the Princess thanks you for outlasting and conquering every construct in your path.',
+                'Purged of the mechanical anomaly and protected from sacrifice, Princess Aria awakens unharmed beside the Sacred Altar as the Temple High Master bows in awe.',
           ),
           _VictoryPanelData(
             icon: Icons.military_tech_rounded,
@@ -159,7 +162,80 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
             fallbackTitle: 'Champion of the Realm',
             bodyKey: 'standard_cutscene_p3_body',
             fallbackBody:
-                'The kingdom celebrates your triumph! The Standard Victory Ending is recorded in the Royal Library as a new cycle dawns.',
+                'The kingdom celebrates your triumph! Sanctuary Victory (Standard Ending) is recorded in the Royal Library as a new cycle dawns.',
+          ),
+        ];
+      case VictoryCutsceneType.sacredSacrifice:
+        return const [
+          _VictoryPanelData(
+            icon: Icons.volunteer_activism_rounded,
+            iconWidget: SacredTempleIcon(size: 42),
+            accentColor: Color(0xFFFFB74D),
+            speakerKey: 'temple_master_speaker',
+            fallbackSpeaker: 'Temple High Master',
+            titleKey: 'sacrifice_cutscene_p1_title',
+            fallbackTitle: 'The Altar of Containment',
+            bodyKey: 'sacrifice_cutscene_p1_body',
+            fallbackBody:
+                'Beneath the rose window of the Sacred Temple, the Temple High Master completes the ancient rite, sealing the dark mechanical anomaly—and the Princess\'s life—into the sanctum stone.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.shield_rounded,
+            accentColor: Color(0xFFFFCA28),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'sacrifice_cutscene_p2_title',
+            fallbackTitle: 'A Kingdom Saved in Sorrow',
+            bodyKey: 'sacrifice_cutscene_p2_body',
+            fallbackBody:
+                'The Baby Mage Robot never awakens. Though the realm is spared from mechanical devastation, the bells of the capital toll in mourning for Princess Aria.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.menu_book_rounded,
+            accentColor: Color(0xFFFF8A65),
+            speakerKey: 'victory_cutscene_king',
+            fallbackSpeaker: 'King Aldric',
+            titleKey: 'sacrifice_cutscene_p3_title',
+            fallbackTitle: 'Ending: The Sacred Sacrifice',
+            bodyKey: 'sacrifice_cutscene_p3_body',
+            fallbackBody:
+                'The Sacred Sacrifice has been inscribed in the Royal Library. Time rewinds to Week 0 so you may seek a brighter fate.',
+          ),
+        ];
+      case VictoryCutsceneType.theDeserter:
+        return const [
+          _VictoryPanelData(
+            icon: Icons.directions_run_rounded,
+            accentColor: Color(0xFFBA68C8),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'deserter_cutscene_p1_title',
+            fallbackTitle: 'Flight from the Sanctuary',
+            bodyKey: 'deserter_cutscene_p1_body',
+            fallbackBody:
+                'Overwhelmed by the Baby Mage Robot\'s dual harmonic spells, you step through the arcane portal and abandon the Sacred Temple.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.whatshot_rounded,
+            accentColor: Color(0xFFEF5350),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'deserter_cutscene_p2_title',
+            fallbackTitle: 'The Capital Falls',
+            bodyKey: 'deserter_cutscene_p2_body',
+            fallbackBody:
+                'With no Cleric left to stand in its way, the awakened Baby Mage Robot bursts from the Temple gates and reduces the Royal Capital to ashes while you flee into exile.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.history_edu_rounded,
+            accentColor: Color(0xFFAB47BC),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'deserter_cutscene_p3_title',
+            fallbackTitle: 'Ending: The Deserter',
+            bodyKey: 'deserter_cutscene_p3_body',
+            fallbackBody:
+                'The Deserter ending has been recorded in the Royal Library. The chronicle resets to Week 0 for another chance at redemption.',
           ),
         ];
     }
@@ -174,9 +250,33 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
     final isFirst = _index == 0;
     final isLast = _index == panels.length - 1;
 
-    final cutsceneBanner = widget.type == VictoryCutsceneType.secretWeek1
-        ? loc.t('secret_cutscene_header', fallback: 'SECRET WEEK-0 VICTORY')
-        : loc.t('standard_cutscene_header', fallback: 'CAMPAIGN VICTORY');
+    final String cutsceneBanner;
+    switch (widget.type) {
+      case VictoryCutsceneType.secretWeek1:
+        cutsceneBanner = loc.t(
+          'secret_cutscene_header',
+          fallback: 'SECRET WEEK-0 VICTORY',
+        );
+        break;
+      case VictoryCutsceneType.standardVictory:
+        cutsceneBanner = loc.t(
+          'standard_cutscene_header',
+          fallback: 'CAMPAIGN VICTORY',
+        );
+        break;
+      case VictoryCutsceneType.sacredSacrifice:
+        cutsceneBanner = loc.t(
+          'sacrifice_cutscene_header',
+          fallback: 'THE SACRED SACRIFICE',
+        );
+        break;
+      case VictoryCutsceneType.theDeserter:
+        cutsceneBanner = loc.t(
+          'deserter_cutscene_header',
+          fallback: 'THE DESERTER',
+        );
+        break;
+    }
 
     return SafeArea(
       child: Center(

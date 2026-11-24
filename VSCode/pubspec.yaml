@@ -70,6 +70,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/enemies/
+    - assets/images/enemies/temple_master_idle.png
     - assets/images/player/
     - assets/images/forge_arena_bg.webp
     - assets/images/temple_arena_bg.webp

@@ -474,15 +474,11 @@ void main() {
         );
 
         // Complete 100 rounds at 100% score (15 wins + 85 draws so Phase 1 Guardian stays > 0 HP)
-        // -> unlocks ending_perfect & predictAbove70 decree
+        // -> completes predictAbove70 decree
         for (int i = 15; i < 100; i++) {
           controller.crystalBallMove = HandMove.rock;
           controller.playTurn(HandMove.rock);
         }
-        expect(
-          controller.isEndingUnlocked(NarrativeEnding.perfectPredictor),
-          isTrue,
-        );
         expect(
           controller.isDecreeCompletedInCycle(RoyalDecreeType.predictAbove70),
           isTrue,
@@ -491,7 +487,6 @@ void main() {
         // CloudSaveData round-trip check
         final cloud = CloudSaveData.tryParse(playGamesClient.savedPayload)!;
         expect(cloud.totalDecreesCompleted, 3);
-        expect(cloud.unlockedEndings, contains('ending_perfect'));
         expect(
           cloud.encounteredBestiary,
           contains('guardian_robot'),
@@ -522,7 +517,7 @@ void main() {
             'treasury_orbs_wood': 10,
             'spoils_orbs_earth': 6,
             'relic_chamber_upgrades': ['reset'],
-            'unlocked_endings': ['ending_perfect'],
+            'unlocked_endings': ['ending_standard_victory'],
             'encountered_bestiary': ['guardian_robot'],
           },
         );

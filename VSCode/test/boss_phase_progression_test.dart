@@ -254,7 +254,7 @@ void main() {
     );
 
     testWidgets(
-      'Weeks 2-9 Route (and Week-1 Stage-1 beat followed by Week 2+): Stage 1 -> Stage 3 Metal Wizard (300 HP) -> Stage 4 Baby Mage Robot (400 HP, pure random AI) -> Standard Victory',
+      'Weeks 2-9 Route (and Week-1 Stage-1 beat followed by Week 2+): Stage 1 -> Stage 3 Metal Wizard (300 HP) -> Moral Choice (Refuse) -> Stage 5 Temple High Master (350 HP, pure random AI) -> Stage 4 Baby Mage Robot (400 HP, Pi dual-spell AI) -> Standard Victory',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
@@ -262,6 +262,8 @@ void main() {
             'enemy_stage': 1,
             'enemy_max_hp': 100,
             'pcHp': 1,
+            'unlockedNewHands': true,
+            'showNewHands': true,
           },
         );
         addTearDown(controller.dispose);
@@ -292,7 +294,7 @@ void main() {
           isTrue,
         );
 
-        // Defeat Stage 3 Metal Wizard in Week 5 -> transitions to Stage 4 Baby Mage Robot (400 HP)
+        // Defeat Stage 3 Metal Wizard in Week 5 -> opens Sacred Temple Moral Choice Cutscene
         controller.computerHp = 1;
         controller.playTurn(HandMove.rock);
         expect(controller.computerHp, 0);
@@ -303,30 +305,31 @@ void main() {
         );
 
         await tester.pumpAndSettle();
-        expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
         expect(
-          find.text('Automated Contingency: Baby Mage Robot!'),
+          find.byKey(const ValueKey('temple_moral_choice_dialog')),
           findsOneWidget,
         );
-
         await tester.tap(
-          find.byKey(const ValueKey('boss_victory_confirm_button')),
+          find.byKey(const ValueKey('temple_moral_choice_next_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('temple_choice_refuse_protect_button')),
         );
         await tester.pumpAndSettle();
 
-        expect(controller.enemyStage, 4);
-        expect(controller.enemyMaxHp, 400);
-        expect(controller.computerHp, 400);
+        expect(controller.enemyStage, 5);
+        expect(controller.enemyMaxHp, 350);
+        expect(controller.computerHp, 350);
         expect(controller.engine.enemySize, 5);
         expect(
-          controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
+          controller.isBestiaryEncountered(BestiaryCreature.templeMaster),
           isTrue,
         );
-        expect(find.byKey(const ValueKey('boss_phase_pill_4')), findsNothing);
-        expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
-        expect(find.text('400 / 400'), findsOneWidget);
+        expect(find.text('TEMPLE HIGH MASTER'), findsOneWidget);
+        expect(find.text('350 / 350'), findsOneWidget);
 
-        // Verify Baby Mage Robot ignores heavy cumulative history and chooses all 5 elements roughly uniformly.
+        // Verify Temple High Master ignores heavy cumulative history and chooses all 5 elements roughly uniformly.
         for (int i = 0; i < 40; i++) {
           controller.engine.recordTransition(HandMove.rock, HandMove.rock);
         }
@@ -344,14 +347,49 @@ void main() {
           expect(
             seenMoves[m]!,
             greaterThan(5),
-            reason: 'Baby Mage Robot should pick $m randomly regardless of bias',
+            reason:
+                'Temple High Master should pick $m randomly regardless of bias',
           );
         }
 
-        // Defeat Stage 4 Baby Mage Robot -> unlocks Standard Victory Ending
+        // Defeat Stage 5 Temple High Master -> Sanctuary Altar restores HP & Mana to 100%, transitions to Stage 4 Baby Mage Robot (400 HP)
+        controller.userHp = 12;
+        controller.totalRounds = 45;
         controller.computerHp = 1;
         controller.crystalBallMove = HandMove.scissors;
         controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+
+        await tester.pumpAndSettle();
+        expect(find.text('Temple High Master Defeated!'), findsOneWidget);
+        await tester.tap(
+          find.byKey(const ValueKey('boss_victory_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.enemyStage, 4);
+        expect(controller.enemyMaxHp, 400);
+        expect(controller.computerHp, 400);
+        expect(controller.userHp, controller.effectivePlayerMaxHp);
+        expect(controller.remainingMana, controller.playerMaxMana);
+        expect(
+          controller.isBestiaryEncountered(BestiaryCreature.babyRobot),
+          isTrue,
+        );
+        expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
+        expect(find.text('400 / 400'), findsOneWidget);
+
+        // Turn 0 of Baby Mage Robot: Pi digit 3 -> Water + Earth (beaten by Wood/scissors)
+        expect(controller.currentPiDigit, 3);
+        expect(
+          controller.crystalBallMoves,
+          [HandMove.water, HandMove.earth],
+        );
+
+        // Defeat Stage 4 Baby Mage Robot -> unlocks Sanctuary Victory (Standard Victory) Ending
+        controller.computerHp = 1;
+        controller.playTurn(HandMove.scissors); // Wood beats Water + Earth
         expect(controller.computerHp, 0);
         expect(
           controller.isEndingUnlocked(NarrativeEnding.standardVictory),
@@ -374,7 +412,7 @@ void main() {
     );
 
     testWidgets(
-      'Week 10+ Route: Stage 1 -> Stage 2 Robot Archmage (200 HP) -> Stage 3 Metal Wizard (300 HP) -> Stage 4 Baby Mage Robot (400 HP) -> Standard Victory',
+      'Week 10+ Route: Stage 1 -> Stage 2 Robot Archmage (200 HP) -> Stage 3 Metal Wizard (300 HP) -> Moral Choice (Refuse) -> Stage 5 Temple High Master (350 HP) -> Stage 4 Baby Mage Robot (400 HP) -> Standard Victory',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
@@ -447,14 +485,45 @@ void main() {
         expect(find.text('METAL WIZARD'), findsOneWidget);
         expect(find.text('300 / 300'), findsOneWidget);
 
-        // Defeat Stage 3 Metal Wizard -> transitions to Stage 4 Baby Mage Robot (400 HP)
+        // Defeat Stage 3 Metal Wizard -> opens Sacred Temple Moral Choice Cutscene
         controller.computerHp = 1;
         controller.playTurn(HandMove.rock);
         expect(controller.computerHp, 0);
         expect(controller.isBossVictoryPending, isTrue);
 
         await tester.pumpAndSettle();
-        expect(find.text('Metal Wizard Defeated!'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('temple_moral_choice_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('temple_moral_choice_next_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('temple_choice_refuse_protect_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.enemyStage, 5);
+        expect(controller.enemyMaxHp, 350);
+        expect(controller.computerHp, 350);
+        expect(
+          controller.isBestiaryEncountered(BestiaryCreature.templeMaster),
+          isTrue,
+        );
+        expect(find.text('TEMPLE HIGH MASTER'), findsOneWidget);
+        expect(find.text('350 / 350'), findsOneWidget);
+
+        // Defeat Stage 5 Temple High Master -> transitions to Stage 4 Baby Mage Robot (400 HP)
+        controller.computerHp = 1;
+        controller.crystalBallMove = HandMove.scissors;
+        controller.playTurn(HandMove.rock);
+        expect(controller.computerHp, 0);
+        expect(controller.isBossVictoryPending, isTrue);
+
+        await tester.pumpAndSettle();
+        expect(find.text('Temple High Master Defeated!'), findsOneWidget);
         await tester.tap(
           find.byKey(const ValueKey('boss_victory_confirm_button')),
         );
@@ -505,7 +574,7 @@ void main() {
     );
 
     test(
-      'Stage 1 beaten in Week 0 followed by advancing to Week 1+ transitions Stage 3 Metal Wizard defeat into Stage 4 Baby Mage Robot (not Secret Ending)',
+      'Stage 1 beaten in Week 0 followed by advancing to Week 1+ transitions Stage 3 Metal Wizard defeat into Stage 5 Temple High Master (not Secret Ending)',
       () async {
         final controller = await _createController(
           prefs: {
@@ -530,8 +599,8 @@ void main() {
 
         final concluded = controller.advanceAfterBossVictory();
         expect(concluded, isFalse);
-        expect(controller.enemyStage, 4);
-        expect(controller.enemyMaxHp, 400);
+        expect(controller.enemyStage, 5);
+        expect(controller.enemyMaxHp, 350);
       },
     );
 

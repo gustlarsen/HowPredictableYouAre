@@ -24,6 +24,7 @@ import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/elemental_symbol_icon.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
+import '../dialogs/temple_moral_choice_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
 import '../dialogs/victory_cutscene_dialog.dart';
@@ -137,7 +138,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _syncAtmosphereAnimations(GameController controller) {
     final enabled = controller.animationsEnabled;
-    final isTemple = controller.isBabyMageBoss;
+    final isTemple = controller.isSacredTempleArena;
 
     if (enabled && !isTemple) {
       if (!_embersController.isAnimating) {
@@ -411,13 +412,46 @@ class _GameScreenState extends State<GameScreen>
     _stopOverchargedHold();
     controller.audio.playTapVibrate();
     if (controller.userHp <= 0 || _isDeathSequenceActive) return;
-    if (controller.confirmBattleTeleport) {
+
+    final isTempleMaster = controller.isTempleMasterBoss;
+    final isBabyMage = controller.isBabyMageBoss;
+
+    if (isTempleMaster || isBabyMage || controller.confirmBattleTeleport) {
       final confirmed = await TeleportConfirmDialog.show(
         context,
         controller: controller,
       );
       if (!confirmed || !context.mounted) return;
     }
+
+    if (isTempleMaster) {
+      await controller.acceptSacredSacrifice();
+      if (!context.mounted) return;
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.sacredSacrifice,
+        controller: controller,
+      );
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
+    if (isBabyMage) {
+      await controller.triggerDeserterEnding();
+      if (!context.mounted) return;
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.theDeserter,
+        controller: controller,
+      );
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
     _handleExitViaWeekProgression(context, controller);
   }
 
@@ -876,13 +910,25 @@ class _GameScreenState extends State<GameScreen>
                                   ? null
                                   : () async {
                                       setDialogState(() => isProcessing = true);
+                                      final wasTempleMaster =
+                                          controller.isTempleMasterBoss;
                                       await controller.applyPermadeathReset(
-                                        cause: PermadeathCause.battleDefeat,
+                                        cause: wasTempleMaster
+                                            ? PermadeathCause.sacredSacrifice
+                                            : PermadeathCause.battleDefeat,
                                       );
                                       _isDeathDialogOpen = false;
                                       _isDeathSequenceActive = false;
                                       if (dialogCtx.mounted) {
                                         Navigator.of(dialogCtx).pop();
+                                      }
+                                      if (wasTempleMaster && context.mounted) {
+                                        await VictoryCutsceneDialog.show(
+                                          context,
+                                          type: VictoryCutsceneType
+                                              .sacredSacrifice,
+                                          controller: controller,
+                                        );
                                       }
                                       if (context.mounted &&
                                           Navigator.of(context).canPop()) {
@@ -1101,10 +1147,14 @@ class _GameScreenState extends State<GameScreen>
           .replaceAll('{hp}', '${controller.battleBonusTempHp}');
     } else if (controller.isClairvoyanceActive) {
       blessing = SacredBlessing.clairvoyance;
-      final predictedMove = controller.crystalBallMove!.displayLabel(
-        elemental: controller.isElementalMode,
-        localization: loc,
-      );
+      final predictedMove = controller.crystalBallMoves
+          .map(
+            (m) => m.displayLabel(
+              elemental: controller.isElementalMode,
+              localization: loc,
+            ),
+          )
+          .join(' + ');
       label = loc
           .t(
             'temple_blessing_battle_clairvoyance',
@@ -1189,8 +1239,42 @@ class _GameScreenState extends State<GameScreen>
         defeatedStage == 1 && week >= GameController.phase2StartWeek;
     final bool isStage2Defeat = defeatedStage == 2;
     final bool isSecretWeek1 = defeatedStage == 3 && week == 0;
-    final bool isStage3ToBabyMage = defeatedStage == 3 && week >= 1;
+    final bool isStage3ToTemple = defeatedStage == 3 && week >= 1;
+    final bool isStage5ToBabyMage = defeatedStage == 5;
     final bool isStage4Defeat = defeatedStage == 4;
+
+    // Post-Week-0 Metal Wizard defeat -> Sacred Temple Sanctuary Moral Choice Cutscene
+    if (isStage3ToTemple) {
+      final choice = await TempleMoralChoiceDialog.show(
+        context,
+        controller: controller,
+      );
+      if (!mounted) {
+        _isBossVictoryDialogOpen = false;
+        return;
+      }
+      if (choice == TempleMoralChoice.sacrificePrincess) {
+        await controller.acceptSacredSacrifice();
+        if (!mounted) {
+          _isBossVictoryDialogOpen = false;
+          return;
+        }
+        await VictoryCutsceneDialog.show(
+          context,
+          type: VictoryCutsceneType.sacredSacrifice,
+          controller: controller,
+        );
+        _isBossVictoryDialogOpen = false;
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+        return;
+      }
+      // Refuse & Protect Her -> Advance to Stage 5 Temple High Master (350 HP)
+      controller.advanceAfterBossVictory();
+      _isBossVictoryDialogOpen = false;
+      return;
+    }
 
     late final String emoji;
     late final Color accent;
@@ -1279,21 +1363,21 @@ class _GameScreenState extends State<GameScreen>
         'boss_victory_watch_cutscene_btn',
         fallback: 'Watch Ending Cutscene',
       );
-    } else if (isStage3ToBabyMage) {
+    } else if (isStage5ToBabyMage) {
       emoji = '⚡🤖';
       accent = const Color(0xFFFF7043);
       title = loc.t(
-        'boss_victory_s3_defeated_title',
-        fallback: 'Metal Wizard Defeated!',
+        'boss_victory_s5_defeated_title',
+        fallback: 'Temple High Master Defeated!',
       );
       subtitle = loc.t(
-        'boss_victory_s3_to_s4_subtitle',
-        fallback: 'Automated Contingency: Baby Mage Robot!',
+        'boss_victory_s5_to_s4_subtitle',
+        fallback: 'Sanctuary Altar Restores HP & Mana — Baby Mage Robot Awakens!',
       );
       body = loc.t(
-        'boss_victory_s3_to_s4_body',
+        'boss_victory_s5_to_s4_body',
         fallback:
-            'The Metal Wizard falls, unleashing his final automated contingency: Baby Mage Robot (400 HP, 5 elements, pure uniform random AI)!',
+            'As the Temple High Master falls to his knees, the Sacred Temple altar restores your HP and Mana Pool to 100%! Suddenly, the dark seal inside the Princess shatters and the Baby Mage Robot (400 HP, Dual Harmonic Spells & π Core) bursts forth!',
       );
       buttonLabel = loc.t(
         'boss_victory_face_baby_mage_btn',
@@ -1308,12 +1392,12 @@ class _GameScreenState extends State<GameScreen>
       );
       subtitle = loc.t(
         'boss_victory_p3_defeated_subtitle',
-        fallback: "Metal Wizard's Lair Defeated!",
+        fallback: "Sanctuary Victory — The Princess is Saved!",
       );
       body = loc.t(
         'boss_victory_p3_defeated_body',
         fallback:
-            "The Baby Mage Robot has been destroyed and the Metal Wizard's lair is defeated! Standard Victory Ending unlocked.",
+            "The Baby Mage Robot has been destroyed inside the Sacred Temple and the Princess is freed from the curse! Sanctuary Victory Ending unlocked.",
       );
       buttonLabel = loc.t(
         'boss_victory_watch_cutscene_btn',
@@ -1529,7 +1613,7 @@ class _GameScreenState extends State<GameScreen>
       'assets/images/temple_arena_bg.webp';
 
   String _resolveBackgroundImage(GameController controller) {
-    return controller.isBabyMageBoss
+    return controller.isSacredTempleArena
         ? templeArenaBackgroundAsset
         : forgeArenaBackgroundAsset;
   }
@@ -1854,7 +1938,7 @@ class _GameScreenState extends State<GameScreen>
     _checkUpdateSnackBar(context, controller);
     _checkFlyingOrbVfx(controller);
 
-    final isBabyMageBoss = controller.isBabyMageBoss;
+    final isSacredTempleArena = controller.isSacredTempleArena;
     final switcherDuration = controller.animationsEnabled
         ? const Duration(milliseconds: 400)
         : Duration.zero;
@@ -1865,7 +1949,7 @@ class _GameScreenState extends State<GameScreen>
         body: Stack(
           key: _rootStackKey,
           children: [
-            // Full-Screen Battle Background (Sacred Temple for Baby Mage Robot; Dark Stone Forge for all others)
+            // Full-Screen Battle Background (Sacred Temple for Temple High Master & Baby Mage Robot; Dark Stone Forge for Lair bosses)
             Positioned.fill(
               child: AnimatedSwitcher(
                 duration: switcherDuration,
@@ -1906,7 +1990,7 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
 
-            // Animated Ambient Atmosphere Layer (Sacred Temple rays/torches/incense/dust for Baby Mage Robot; Forge embers for others)
+            // Animated Ambient Atmosphere Layer (Sacred Temple rays/torches/incense/dust for Temple bosses; Forge embers for Lair bosses)
             Positioned.fill(
               child: IgnorePointer(
                 child: AnimatedSwitcher(
@@ -1922,7 +2006,7 @@ class _GameScreenState extends State<GameScreen>
                       ],
                     );
                   },
-                  child: isBabyMageBoss
+                  child: isSacredTempleArena
                       ? AnimatedBuilder(
                           key: const ValueKey('temple_arena_atmosphere_layer'),
                           animation: _templeAtmosphereController,
@@ -2062,8 +2146,14 @@ class _GameScreenState extends State<GameScreen>
                                                       .isMarkovRecalibratorActive,
                                               isBabyMageRandomView:
                                                   controller.isBabyMageBoss,
+                                              isTempleMasterRandomView:
+                                                  controller.isTempleMasterBoss,
                                               isMetalWizardView:
                                                   controller.isMetalWizardBoss,
+                                              currentPiDigit:
+                                                  controller.isBabyMageBoss
+                                                      ? controller.currentPiDigit
+                                                      : null,
                                             ),
                                           ],
                                         ],
@@ -2089,6 +2179,10 @@ class _GameScreenState extends State<GameScreen>
                                     userMove: controller.currentUserMove,
                                     computerMove:
                                         controller.currentComputerMove,
+                                    secondaryComputerMove:
+                                        controller.currentSecondaryComputerMove,
+                                    dualSpellResult:
+                                        controller.lastDualSpellResult,
                                     winner: controller.lastWinner,
                                     localization: loc,
                                     animationsEnabled:
@@ -2103,9 +2197,13 @@ class _GameScreenState extends State<GameScreen>
                                     maxMana: controller.playerMaxMana,
                                     elementalMode: controller.isElementalMode,
                                     userDamageAmount:
-                                        controller.bossWinDamageToPlayer,
+                                        controller.lastRoundUserDamage > 0
+                                            ? controller.lastRoundUserDamage
+                                            : controller.bossWinDamageToPlayer,
                                     computerDamageAmount:
-                                        controller.playerWinDamageToBoss,
+                                        controller.lastRoundComputerDamage > 0
+                                            ? controller.lastRoundComputerDamage
+                                            : controller.playerWinDamageToBoss,
                                     isPhase2: controller.enemyUses5Elements,
                                     enemyStage: controller.enemyStage,
                                     pcSlotKey: _pcSlotKey,

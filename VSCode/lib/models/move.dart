@@ -409,3 +409,78 @@ enum RoundWinner {
   bool get isComputer => this == RoundWinner.computer;
   bool get isDraw => this == RoundWinner.draw;
 }
+
+/// Resolution result for a single turn against a dual-element boss spell
+/// (e.g., Baby Mage Robot casting Spell A + Spell B simultaneously).
+class DualSpellMatchupResult {
+  final HandMove playerMove;
+  final HandMove spellA;
+  final HandMove spellB;
+  final RoundWinner outcomeA;
+  final RoundWinner outcomeB;
+  final int bossDamage;
+  final int playerDamage;
+  final List<HandMove> defeatedEnemySpells;
+
+  const DualSpellMatchupResult({
+    required this.playerMove,
+    required this.spellA,
+    required this.spellB,
+    required this.outcomeA,
+    required this.outcomeB,
+    required this.bossDamage,
+    required this.playerDamage,
+    required this.defeatedEnemySpells,
+  });
+
+  bool get isSimultaneousClash => bossDamage > 0 && playerDamage > 0;
+  bool get isDoubleBossWin => playerDamage >= 2;
+  bool get isDoubleLoss => playerDamage >= 2;
+  bool get isCommonWeaknessHit => defeatedEnemySpells.length == 2;
+
+  RoundWinner get primaryWinner {
+    if (bossDamage > 0 && playerDamage == 0) return RoundWinner.user;
+    if (playerDamage > 0 && bossDamage == 0) return RoundWinner.computer;
+    return RoundWinner.draw;
+  }
+
+  /// Evaluates [playerMove] independently against [spellA] and [spellB]
+  /// according to the 5-element Wu Xing / RPSLS rules:
+  /// - Beats BOTH spells: 1 HP damage to boss, 0 HP to player, +1 Orb of EACH defeated element.
+  /// - Beats 1 & Ties 1: 1 HP damage to boss, 0 HP to player, +1 Orb of defeated element.
+  /// - Beats 1 & Loses to 1: 1 HP damage to boss AND 1 HP damage to player, +1 Orb of defeated element.
+  /// - Ties 1 & Loses to 1: 0 HP to boss, 1 HP damage to player.
+  /// - Loses to BOTH spells: 0 HP to boss, 2 HP damage to player.
+  factory DualSpellMatchupResult.evaluate({
+    required HandMove playerMove,
+    required HandMove spellA,
+    required HandMove spellB,
+    bool elemental = true,
+  }) {
+    final outcomeA = playerMove.resolvesAgainst(spellA, elemental: elemental);
+    final outcomeB = playerMove.resolvesAgainst(spellB, elemental: elemental);
+
+    final defeated = <HandMove>[
+      if (outcomeA == RoundWinner.user) spellA,
+      if (outcomeB == RoundWinner.user) spellB,
+    ];
+    final losses =
+        (outcomeA == RoundWinner.computer ? 1 : 0) +
+        (outcomeB == RoundWinner.computer ? 1 : 0);
+
+    final bossDamage = defeated.isNotEmpty ? 1 : 0;
+    final playerDamage = losses;
+
+    return DualSpellMatchupResult(
+      playerMove: playerMove,
+      spellA: spellA,
+      spellB: spellB,
+      outcomeA: outcomeA,
+      outcomeB: outcomeB,
+      bossDamage: bossDamage,
+      playerDamage: playerDamage,
+      defeatedEnemySpells: List.unmodifiable(defeated),
+    );
+  }
+}
+
