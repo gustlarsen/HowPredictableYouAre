@@ -272,10 +272,10 @@ enum BestiaryCreature {
     nameKey: 'castle_bestiary_metal_wizard_name',
     fallbackName: 'Metal Wizard',
     mathModelKey: 'castle_bestiary_metal_wizard_model',
-    fallbackMathModel: 'Pure Metal Obsession (100%)',
+    fallbackMathModel: 'Adaptive Metal & Earth • Anti-Metal Shield',
     loreKey: 'castle_bestiary_metal_wizard_lore',
     fallbackLore:
-        '300 HP • Pure Metal Obsession: Conjures exclusively Metal spells, testing the Cleric\'s endurance and Mana reserves.',
+        '300 HP • Wields both Metal and Earth, protected by an Anti-Metal Shield that blocks all Metal attacks. Adapts his casting patterns when defeated repeatedly.',
     hintKey: 'castle_bestiary_metal_wizard_hint',
     fallbackHint:
         'Defeat Guardian Robot in Weeks 0–9 or defeat Robot Archmage to confront the Metal Wizard.',

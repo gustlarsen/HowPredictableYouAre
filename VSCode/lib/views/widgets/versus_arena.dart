@@ -59,6 +59,7 @@ class VersusArena extends StatefulWidget {
   final int computerDamageAmount;
   final bool isPhase2;
   final int enemyStage;
+  final bool isAntiMetalShieldBlocked;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
   final Key? clashCenterKey;
@@ -85,6 +86,7 @@ class VersusArena extends StatefulWidget {
     this.computerDamageAmount = 1,
     this.isPhase2 = false,
     this.enemyStage = 1,
+    this.isAntiMetalShieldBlocked = false,
     this.onImpactHaptic,
     this.pcSlotKey,
     this.clashCenterKey,
@@ -696,17 +698,30 @@ class _VersusArenaState extends State<VersusArena>
             ? palette.elementalText(widget.computerMove!)
             : palette.dangerText;
       } else if (isDraw) {
-        final drawKey = widget.elementalMode
-            ? 'battle_draw_elemental'
-            : 'battle_draw_classic';
-        final drawFallback = widget.elementalMode
-            ? "It's a Draw! Elements neutralized."
-            : "It's a Draw! Moves neutralized.";
-        battleDescription = widget.localization.t(
-          drawKey,
-          fallback: drawFallback,
-        );
-        battleDescColor = palette.isDark ? Colors.white : palette.amberText;
+        final bool isAntiMetalBlocked =
+            widget.isAntiMetalShieldBlocked ||
+            (widget.enemyStage == 3 && widget.userMove == HandMove.metal);
+        if (isAntiMetalBlocked) {
+          battleDescription = widget.localization.t(
+            'battle_anti_metal_shield_block',
+            fallback: 'Anti-Metal Shield blocks Metal!',
+          );
+          battleDescColor = palette.isDark
+              ? const Color(0xFF80D8FF)
+              : const Color(0xFF01579B);
+        } else {
+          final drawKey = widget.elementalMode
+              ? 'battle_draw_elemental'
+              : 'battle_draw_classic';
+          final drawFallback = widget.elementalMode
+              ? "It's a Draw! Elements neutralized."
+              : "It's a Draw! Moves neutralized.";
+          battleDescription = widget.localization.t(
+            drawKey,
+            fallback: drawFallback,
+          );
+          battleDescColor = palette.isDark ? Colors.white : palette.amberText;
+        }
       } else {
         final idleKey = widget.elementalMode
             ? 'battle_idle_elemental'

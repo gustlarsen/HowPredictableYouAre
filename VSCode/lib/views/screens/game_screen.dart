@@ -1294,7 +1294,7 @@ class _GameScreenState extends State<GameScreen>
       body = loc.t(
         'boss_victory_s1_to_s3_body',
         fallback:
-            'The Guardian Robot is shattered! Before any backup construct is ready, the Metal Wizard (300 HP) himself steps onto the battlefield wielding pure Metal magic.',
+            'The Guardian Robot is shattered! Before any backup construct is ready, the Metal Wizard (300 HP) himself steps onto the battlefield wielding Metal and Earth magic behind his Anti-Metal Shield.',
       );
       buttonLabel = loc.t(
         'boss_victory_face_metal_wizard_btn',
@@ -1334,7 +1334,7 @@ class _GameScreenState extends State<GameScreen>
       body = loc.t(
         'boss_victory_s2_to_s3_body',
         fallback:
-            'The Robot Archmage is destroyed! Now the Metal Wizard (300 HP) steps onto the battlefield himself, conjuring exclusively Metal spells.',
+            'The Robot Archmage is destroyed! Now the Metal Wizard (300 HP) steps onto the battlefield himself, wielding Metal and Earth behind his Anti-Metal Shield.',
       );
       buttonLabel = loc.t(
         'boss_victory_face_metal_wizard_btn',
@@ -2147,6 +2147,11 @@ class _GameScreenState extends State<GameScreen>
                                                   controller.isTempleMasterBoss,
                                               isMetalWizardView:
                                                   controller.isMetalWizardBoss,
+                                              metalWizardAiState:
+                                                  controller.isMetalWizardBoss
+                                                      ? controller
+                                                          .metalWizardAiState
+                                                      : null,
                                               currentPiDigit:
                                                   controller.isBabyMageBoss
                                                       ? controller.currentPiDigit
@@ -2203,6 +2208,8 @@ class _GameScreenState extends State<GameScreen>
                                             : controller.playerWinDamageToBoss,
                                     isPhase2: controller.enemyUses5Elements,
                                     enemyStage: controller.enemyStage,
+                                    isAntiMetalShieldBlocked: controller
+                                        .lastRoundBlockedByAntiMetalShield,
                                     pcSlotKey: _pcSlotKey,
                                     clashCenterKey: _clashCenterKey,
                                     onImpactHaptic: controller.isElementalMode

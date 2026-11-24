@@ -150,7 +150,7 @@ void main() {
       expect(archmageController.engine.enemySize, 5);
       archmageController.dispose();
 
-      // Stage 3: Metal Wizard -> strictly [Metal]
+      // Stage 3: Metal Wizard -> [Metal, Earth]
       final wizardController = await _createController(
         prefs: {
           'current_week': 3,
@@ -161,9 +161,9 @@ void main() {
           'showNewHands': true,
         },
       );
-      expect(wizardController.bossAllowedMoves, [HandMove.metal]);
-      expect(wizardController.engine.enemyMoves, [HandMove.metal]);
-      expect(wizardController.engine.enemySize, 1);
+      expect(wizardController.bossAllowedMoves, [HandMove.metal, HandMove.earth]);
+      expect(wizardController.engine.enemyMoves, [HandMove.metal, HandMove.earth]);
+      expect(wizardController.engine.enemySize, 2);
       wizardController.dispose();
 
       // Stage 4: Baby Mage Robot even when player does NOT have Earth & Metal -> all 5 elements

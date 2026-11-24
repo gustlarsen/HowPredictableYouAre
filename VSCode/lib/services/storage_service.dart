@@ -932,6 +932,34 @@ class StorageService {
     return _prefs.remove(shortTermTransitionsKey);
   }
 
+  static const String metalWizardAiStateKey = 'metal_wizard_ai_state';
+
+  Map<String, dynamic>? get metalWizardAiState {
+    final str = _prefs.getString(metalWizardAiStateKey);
+    if (str == null || str.isEmpty) return null;
+    try {
+      final decoded = json.decode(str);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((k, v) => MapEntry(k.toString(), v));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setMetalWizardAiState(Map<String, dynamic>? stateJson) {
+    if (stateJson == null || stateJson.isEmpty) {
+      return _prefs.remove(metalWizardAiStateKey);
+    }
+    return _prefs.setString(metalWizardAiStateKey, json.encode(stateJson));
+  }
+
+  Future<void> removeMetalWizardAiState() {
+    return _prefs.remove(metalWizardAiStateKey);
+  }
+
   // Royal Treasury Piggy Bank Orbs (shared vault capacity)
   static const int defaultTreasuryMaxCapacity = 200;
   static const int defaultTreasuryVaultLevel = 1;
@@ -1376,6 +1404,7 @@ class StorageService {
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
       removeShortTermTransitions(),
+      removeMetalWizardAiState(),
     ]);
   }
 
@@ -1482,6 +1511,7 @@ class StorageService {
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
       removeShortTermTransitions(),
+      removeMetalWizardAiState(),
     ]);
   }
 }

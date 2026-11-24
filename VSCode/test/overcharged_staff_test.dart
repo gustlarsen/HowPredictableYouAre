@@ -946,7 +946,10 @@ void main() {
             'overcharged_staff_level': 6,
             'overcharged_staff_enabled': true,
             'overcharged_staff_selected_speed': 30, // 25ms
-            'enemy_stage': 3, // 100% Metal -> Fire (rock) beats Metal!
+            'enemy_stage': 3,
+            // Inverse mode (Lose-Stay on Metal) keeps Wizard casting Metal for 3 losses
+            'metal_wizard_ai_state':
+                '{"currentMoveId":5,"strategyMode":"inverse","consecutiveLosses":0,"scriptedQueueIds":[],"tenLossStage":0}',
             'pcHp': 3,
             'userScore': 297,
             'total': 297,

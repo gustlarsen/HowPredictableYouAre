@@ -189,14 +189,20 @@ void main() {
           containsAll([HandMove.rock, HandMove.paper]),
         );
 
-        // Verify Metal Wizard chooses 100% Metal on every turn
-        for (int i = 0; i < 10; i++) {
-          controller.playTurn(HandMove.rock); // Fire melts Metal -> -1 HP, +1 Metal orb
-          expect(controller.currentComputerMove, HandMove.metal);
-          expect(controller.lastWinner, RoundWinner.user);
-        }
-        expect(controller.computerHp, 290);
-        expect(controller.metalOrbs, 10);
+        // Verify Metal Wizard starts with Metal and shifts to Earth on loss (Initial Strategy)
+        controller.playTurn(HandMove.rock); // Fire melts Metal -> -1 HP, +1 Metal orb
+        expect(controller.currentComputerMove, HandMove.metal);
+        expect(controller.lastWinner, RoundWinner.user);
+        expect(controller.pcNextMoves, [HandMove.earth]);
+        expect(controller.crystalBallMoves, [HandMove.earth]);
+        expect(controller.crystalBallPlusMoves, [HandMove.wood]);
+
+        controller.playTurn(HandMove.wood); // Wood roots in Earth -> -1 HP, +1 Earth orb
+        expect(controller.currentComputerMove, HandMove.earth);
+        expect(controller.lastWinner, RoundWinner.user);
+        expect(controller.computerHp, 298);
+        expect(controller.metalOrbs, 1);
+        expect(controller.earthOrbs, 1);
 
         // Reduce Metal Wizard to 1 HP and finish him while still in Week 0
         controller.computerHp = 1;
@@ -1002,6 +1008,14 @@ void main() {
           'markov_recalibrator_desc',
           'markov_recalibrator_archmage_banner',
           'markov_metal_wizard_banner',
+          'battle_anti_metal_shield_block',
+          'markov_metal_wizard_stance_normal',
+          'markov_metal_wizard_stance_inverse',
+          'markov_metal_wizard_stance_alternating',
+          'markov_metal_wizard_stance_barrage',
+          'markov_metal_wizard_loss_streak',
+          'markov_metal_wizard_scripted_remaining',
+          'markov_metal_wizard_shield_note',
           'boss_victory_p1_title',
           'boss_victory_s1_to_s3_subtitle',
           'boss_victory_s1_to_s3_body',

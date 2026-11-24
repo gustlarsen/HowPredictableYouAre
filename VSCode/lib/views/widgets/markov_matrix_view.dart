@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/markov_engine.dart';
 import '../../services/localization_service.dart';
+import '../../models/metal_wizard_ai_state.dart';
 import '../../models/move.dart';
 import '../../theme/app_theme.dart';
 import 'elemental_symbol_icon.dart';
@@ -15,6 +16,7 @@ class MarkovMatrixView extends StatelessWidget {
   final bool isBabyMageRandomView;
   final bool isTempleMasterRandomView;
   final bool isMetalWizardView;
+  final MetalWizardAiState? metalWizardAiState;
   final int? currentPiDigit;
   final bool initiallyExpanded;
 
@@ -28,12 +30,13 @@ class MarkovMatrixView extends StatelessWidget {
     this.isBabyMageRandomView = false,
     this.isTempleMasterRandomView = false,
     this.isMetalWizardView = false,
+    this.metalWizardAiState,
     this.currentPiDigit,
     this.initiallyExpanded = true,
   });
 
   bool get _dimsTransitionMatrix =>
-      isBabyMageRandomView || isTempleMasterRandomView;
+      isBabyMageRandomView || isTempleMasterRandomView || isMetalWizardView;
 
   Widget _buildMoveHeader(
     AppPalette palette,
@@ -421,12 +424,61 @@ class MarkovMatrixView extends StatelessWidget {
     }
     if (isMetalWizardView) {
       const accent = Color(0xFF90A4AE);
-      final body = loc?.t(
-            'markov_metal_wizard_banner',
-            fallback:
-                'Metal Wizard bypasses the Markov matrix and conjures exclusively Metal (100%) on every turn.',
+      final ai = metalWizardAiState;
+      final String stanceText;
+      if (ai != null && ai.isExecutingScriptedSequence) {
+        if (ai.activeScriptType == MetalWizardScriptType.fiveMetalFiveEarth) {
+          stanceText = loc?.t(
+                'markov_metal_wizard_stance_barrage',
+                fallback: '5-Metal / 5-Earth Barrage',
+              ) ??
+              '5-Metal / 5-Earth Barrage';
+        } else {
+          stanceText = loc?.t(
+                'markov_metal_wizard_stance_alternating',
+                fallback: '10-Turn Alternating Protocol',
+              ) ??
+              '10-Turn Alternating Protocol';
+        }
+      } else if (ai != null &&
+          ai.strategyMode == MetalWizardStrategyMode.inverse) {
+        stanceText = loc?.t(
+              'markov_metal_wizard_stance_inverse',
+              fallback: 'Inverse Strategy: Win-Shift / Lose-Stay',
+            ) ??
+            'Inverse Strategy: Win-Shift / Lose-Stay';
+      } else {
+        stanceText = loc?.t(
+              'markov_metal_wizard_stance_normal',
+              fallback: 'Initial Strategy: Win-Stay / Lose-Shift',
+            ) ??
+            'Initial Strategy: Win-Stay / Lose-Shift';
+      }
+
+      final lossCount = ai?.consecutiveLosses ?? 0;
+      final lossStreakText = (loc?.t(
+                'markov_metal_wizard_loss_streak',
+                fallback: 'Consecutive Losses: {count}',
+              ) ??
+              'Consecutive Losses: {count}')
+          .replaceAll('{count}', '$lossCount');
+
+      final scriptedRemaining = ai?.scriptedQueue.length ?? 0;
+      final scriptedRemainingText = scriptedRemaining > 0
+          ? (loc?.t(
+                    'markov_metal_wizard_scripted_remaining',
+                    fallback: 'Protocol Turns Left: {count}',
+                  ) ??
+                  'Protocol Turns Left: {count}')
+              .replaceAll('{count}', '$scriptedRemaining')
+          : null;
+
+      final shieldNote = loc?.t(
+            'markov_metal_wizard_shield_note',
+            fallback: 'Anti-Metal Shield: Blocks all Metal attacks (0 damage).',
           ) ??
-          'Metal Wizard bypasses the Markov matrix and conjures exclusively Metal (100%) on every turn.';
+          'Anti-Metal Shield: Blocks all Metal attacks (0 damage).';
+
       return Container(
         key: const ValueKey('markov_metal_wizard_banner'),
         width: double.infinity,
@@ -445,13 +497,108 @@ class MarkovMatrixView extends StatelessWidget {
             const MetalWizardLairIcon(size: 18),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                body,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.3,
-                  color: palette.secondaryText,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stanceText,
+                    key: const ValueKey('markov_metal_wizard_stance'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        key: const ValueKey('markov_metal_wizard_loss_streak'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.amberBorder.withValues(
+                            alpha: palette.isDark ? 0.22 : 0.16,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: palette.amberBorder.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Text(
+                          lossStreakText,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: palette.amberText,
+                          ),
+                        ),
+                      ),
+                      if (scriptedRemainingText != null)
+                        Container(
+                          key: const ValueKey(
+                            'markov_metal_wizard_scripted_remaining',
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.purpleAccent.withValues(
+                              alpha: palette.isDark ? 0.22 : 0.14,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color:
+                                  palette.purpleAccent.withValues(alpha: 0.55),
+                            ),
+                          ),
+                          child: Text(
+                            scriptedRemainingText,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: palette.isDark
+                                  ? const Color(0xFFE1BEE7)
+                                  : palette.purpleAccent,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.shield_rounded,
+                        size: 13,
+                        color: palette.isDark
+                            ? const Color(0xFF80D8FF)
+                            : const Color(0xFF01579B),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          shieldNote,
+                          key: const ValueKey(
+                            'markov_metal_wizard_shield_note',
+                          ),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                            color: palette.secondaryText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],

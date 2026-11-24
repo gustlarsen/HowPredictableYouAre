@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import '../models/move.dart';
 import '../models/evaluation_tier.dart';
+import '../models/metal_wizard_ai_state.dart';
 import '../models/royal_castle.dart';
 import '../models/sacred_blessing.dart';
 import '../models/story_chapter.dart';
@@ -480,6 +481,8 @@ class GameController extends ChangeNotifier {
   late final UpdateService updateService;
 
   late MarkovEngine _engine;
+  MetalWizardAiState _metalWizardAiState = MetalWizardAiState();
+  MetalWizardAiState get metalWizardAiState => _metalWizardAiState;
 
   HandMove? currentUserMove;
   HandMove? currentComputerMove;
@@ -532,6 +535,7 @@ class GameController extends ChangeNotifier {
     final counters = <HandMove>[];
     for (final pcMove in predictedPcMoves) {
       for (final playerMove in _engine.activeMoves) {
+        if (isMetalWizardBoss && playerMove == HandMove.metal) continue;
         if (playerMove.beats(pcMove, elemental: isElementalMode) &&
             !counters.contains(playerMove)) {
           counters.add(playerMove);
@@ -547,6 +551,7 @@ class GameController extends ChangeNotifier {
 
   RoundWinner? lastWinner;
   DualSpellMatchupResult? lastDualSpellResult;
+  bool lastRoundBlockedByAntiMetalShield = false;
   int lastRoundUserDamage = 0;
   int lastRoundComputerDamage = 0;
   List<HandMove> lastCollectedOrbMoves = const [];
@@ -1156,7 +1161,7 @@ class GameController extends ChangeNotifier {
   /// True only for bosses whose element pool spans all 5 elements
   /// (Stage 2 Robot Archmage, Stage 5 Temple High Master, & Stage 4 Baby Mage Robot).
   /// Stage 1 Guardian Robot strictly uses [Fire, Water, Wood] and
-  /// Stage 3 Metal Wizard strictly uses [Metal].
+  /// Stage 3 Metal Wizard uses [Metal, Earth].
   bool get enemyUses5Elements =>
       enemyStage == 2 || enemyStage == 4 || enemyStage == 5;
 
@@ -1169,7 +1174,7 @@ class GameController extends ChangeNotifier {
   /// unlocked elements:
   /// - Stage 1 (Guardian Robot, 100 HP): [Fire, Water, Wood] ONLY.
   /// - Stage 2 (Robot Archmage, 200 HP): All 5 elements.
-  /// - Stage 3 (Metal Wizard, 300 HP): [Metal] ONLY.
+  /// - Stage 3 (Metal Wizard, 300 HP): [Metal, Earth].
   /// - Stage 5 (Temple High Master, 350 HP): All 5 elements (1/5 Pure Random).
   /// - Stage 4 (Baby Mage Robot, 400 HP): All 5 elements (Dual Harmonic Pi Sequence).
   List<HandMove> get bossAllowedMoves {
@@ -1179,7 +1184,7 @@ class GameController extends ChangeNotifier {
       case 5:
         return allElementPool;
       case 3:
-        return const [HandMove.metal];
+        return const [HandMove.metal, HandMove.earth];
       default:
         return basicElementPool;
     }
@@ -1479,6 +1484,11 @@ class GameController extends ChangeNotifier {
     }
     _engine.setLastTransitions(storage.shortTermTransitions);
 
+    final savedWizardState = storage.metalWizardAiState;
+    _metalWizardAiState = savedWizardState != null
+        ? MetalWizardAiState.fromJson(savedWizardState)
+        : MetalWizardAiState();
+
     currentUserMove = storage.lastUserMove;
     currentComputerMove = storage.lastComputerMove;
     if (!showNewHands) {
@@ -1495,11 +1505,17 @@ class GameController extends ChangeNotifier {
       currentUserMove = null;
       currentComputerMove = null;
       lastWinner = null;
+      lastRoundBlockedByAntiMetalShield = false;
     } else {
-      lastWinner = currentUserMove!.resolvesAgainst(
-        currentComputerMove!,
-        elemental: isElementalMode,
-      );
+      final antiMetalBlocked =
+          enemyStage == 3 && currentUserMove == HandMove.metal;
+      lastRoundBlockedByAntiMetalShield = antiMetalBlocked;
+      lastWinner = antiMetalBlocked
+          ? RoundWinner.draw
+          : currentUserMove!.resolvesAgainst(
+              currentComputerMove!,
+              elemental: isElementalMode,
+            );
     }
     lastUserMove = currentUserMove;
 
@@ -2567,6 +2583,7 @@ class GameController extends ChangeNotifier {
 
     if (enemyStage == 4 && crystalBallSecondaryMove != null) {
       // Stage 4 Baby Mage Robot: Dual Combined Elemental Spells driven by Pi
+      lastRoundBlockedByAntiMetalShield = false;
       currentComputerMove =
           crystalBallMove ?? currentBabyMageDualSpells.first;
       currentSecondaryComputerMove =
@@ -2646,10 +2663,15 @@ class GameController extends ChangeNotifier {
       currentComputerMove =
           crystalBallMove ?? _chooseComputerMoveForCurrentPhase(previousMove);
 
-      final roundOutcome = currentUserMove!.resolvesAgainst(
-        currentComputerMove!,
-        elemental: isElementalMode,
-      );
+      final bool isAntiMetalBlocked =
+          enemyStage == 3 && currentUserMove == HandMove.metal;
+      lastRoundBlockedByAntiMetalShield = isAntiMetalBlocked;
+      final roundOutcome = isAntiMetalBlocked
+          ? RoundWinner.draw
+          : currentUserMove!.resolvesAgainst(
+              currentComputerMove!,
+              elemental: isElementalMode,
+            );
       if (roundOutcome == RoundWinner.draw) {
         lastWinner = RoundWinner.draw;
         lastRoundUserDamage = 0;
@@ -2705,6 +2727,11 @@ class GameController extends ChangeNotifier {
         storage.setDecreeWinStreak(decreeWinStreak);
         storage.setDecreeNoRepeatWinCount(decreeNoRepeatWinCount);
         audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
+      }
+
+      if (enemyStage == 3) {
+        _metalWizardAiState.resolveTurn(roundOutcome);
+        storage.setMetalWizardAiState(_metalWizardAiState.toJson());
       }
     }
 
@@ -2763,8 +2790,8 @@ class GameController extends ChangeNotifier {
       return currentBabyMageDualSpells.first;
     }
     if (enemyStage == 3) {
-      // Stage 3 Metal Wizard: 100% pure Metal magic (bypasses Markov matrix).
-      return HandMove.metal;
+      // Stage 3 Metal Wizard: deterministic adaptive state machine using Metal & Earth.
+      return _metalWizardAiState.currentMove;
     }
     if (enemyStage == 2) {
       // Stage 2 Robot Archmage: 1-step short-term memory counter if available.
@@ -2930,6 +2957,18 @@ class GameController extends ChangeNotifier {
     playTurn(randMove, isRapidFire: isRapidFire);
   }
 
+  List<HandMove> _computeMetalWizardCounters(HandMove upcomingMove) {
+    final counters = <HandMove>[];
+    for (final m in _engine.activeMoves) {
+      if (m == HandMove.metal) continue;
+      if (m.beats(upcomingMove, elemental: isElementalMode) &&
+          !counters.contains(m)) {
+        counters.add(m);
+      }
+    }
+    return List.unmodifiable(counters);
+  }
+
   void _computeNextHints() {
     _syncEngineEnemyPool();
 
@@ -2969,13 +3008,15 @@ class GameController extends ChangeNotifier {
     crystalBallSecondaryMove = null;
 
     if (enemyStage == 3) {
-      // Stage 3 Metal Wizard: conjures ONLY Metal (100%) every turn.
+      // Stage 3 Metal Wizard: exact upcoming move from MetalWizardAiState.
+      final upcomingMove = _metalWizardAiState.currentMove;
+      _crystalBallMove = upcomingMove;
       predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
-      pcNextMoves = const [HandMove.metal];
-      suggestedMoves = _engine.computeSuggestions(pcNextMoves);
+      pcNextMoves = [upcomingMove];
+      suggestedMoves = _computeMetalWizardCounters(upcomingMove);
       predictedUserMove =
           predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-      pcNextMove = HandMove.metal;
+      pcNextMove = upcomingMove;
       suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
       return;
     }
@@ -3017,6 +3058,7 @@ class GameController extends ChangeNotifier {
     lastUserMove = null;
     lastWinner = null;
     lastDualSpellResult = null;
+    lastRoundBlockedByAntiMetalShield = false;
     lastRoundUserDamage = 0;
     lastRoundComputerDamage = 0;
     lastCollectedOrbMove = null;
@@ -3029,6 +3071,7 @@ class GameController extends ChangeNotifier {
     isBossVictoryPending = false;
     pendingBossVictoryStage = null;
     pendingBossVictoryWeek = null;
+    _metalWizardAiState.reset();
     _syncEngineEnemyPool();
     _engine.reset();
 
@@ -5290,10 +5333,15 @@ class GameController extends ChangeNotifier {
     _engine.enableElementalMode = isElementalMode;
 
     if (currentUserMove != null && currentComputerMove != null) {
-      lastWinner = currentUserMove!.resolvesAgainst(
-        currentComputerMove!,
-        elemental: isElementalMode,
-      );
+      final antiMetalBlocked =
+          enemyStage == 3 && currentUserMove == HandMove.metal;
+      lastRoundBlockedByAntiMetalShield = antiMetalBlocked;
+      lastWinner = antiMetalBlocked
+          ? RoundWinner.draw
+          : currentUserMove!.resolvesAgainst(
+              currentComputerMove!,
+              elemental: isElementalMode,
+            );
     }
 
     _computeNextHints();

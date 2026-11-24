@@ -251,6 +251,7 @@ class CloudSaveData {
   final List<List<int>>? markovMatrix3;
   final List<List<int>>? markovMatrix5;
   final Map<int, int>? shortTermTransitions;
+  final Map<String, dynamic>? metalWizardAiState;
 
   // Per-Account Settings
   final String language;
@@ -395,6 +396,7 @@ class CloudSaveData {
     this.markovMatrix3,
     this.markovMatrix5,
     this.shortTermTransitions,
+    this.metalWizardAiState,
     this.language = 'en',
     this.darkMode = true,
     this.soundEnabled = true,
@@ -755,6 +757,7 @@ class CloudSaveData {
       markovMatrix3: markovMatrix3 ?? local.markovMatrix3,
       markovMatrix5: markovMatrix5 ?? local.markovMatrix5,
       shortTermTransitions: shortTermTransitions ?? local.shortTermTransitions,
+      metalWizardAiState: metalWizardAiState ?? local.metalWizardAiState,
       language: language,
       darkMode: darkMode,
       soundEnabled: soundEnabled,
@@ -916,6 +919,7 @@ class CloudSaveData {
       markovMatrix3: storage.getMarkovMatrix(3),
       markovMatrix5: storage.getMarkovMatrix(5),
       shortTermTransitions: storage.shortTermTransitions,
+      metalWizardAiState: storage.metalWizardAiState,
       language: storage.language,
       darkMode: storage.darkMode,
       soundEnabled: storage.soundEnabled,
@@ -1165,6 +1169,11 @@ class CloudSaveData {
     } else {
       await storage.removeShortTermTransitions();
     }
+    if (metalWizardAiState != null && metalWizardAiState!.isNotEmpty) {
+      await storage.setMetalWizardAiState(metalWizardAiState);
+    } else {
+      await storage.removeMetalWizardAiState();
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -1322,6 +1331,7 @@ class CloudSaveData {
       'shortTermTransitions': shortTermTransitions?.map(
         (key, value) => MapEntry(key.toString(), value),
       ),
+      if (metalWizardAiState != null) 'metalWizardAiState': metalWizardAiState,
       'language': language,
       'darkMode': darkMode,
       'soundEnabled': soundEnabled,
@@ -1741,6 +1751,10 @@ class CloudSaveData {
       markovMatrix3: _parseMatrix(map['markovMatrix3'], 3),
       markovMatrix5: _parseMatrix(map['markovMatrix5'], 5),
       shortTermTransitions: _parseIntMap(map['shortTermTransitions']),
+      metalWizardAiState: map['metalWizardAiState'] is Map
+          ? (map['metalWizardAiState'] as Map)
+              .map((k, v) => MapEntry(k.toString(), v))
+          : null,
       language: (map['language'] as String?) ?? 'en',
       darkMode: map['darkMode'] as bool? ?? true,
       soundEnabled: map['soundEnabled'] as bool? ?? true,
