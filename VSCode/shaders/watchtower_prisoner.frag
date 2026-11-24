@@ -108,15 +108,127 @@ vec3 evalTearDrop(
   return vec3(body, glint, caustic);
 }
 
-float evalSplashRipple(vec2 p, vec2 center, float cycle, float startF, float endF, float aspect) {
-  if (cycle < startF || cycle > endF) return 0.0;
-  float imp = clamp((cycle - startF) / max(endF - startF, 1e-4), 0.0, 1.0);
-  float d = length((p - center) * vec2(aspect, 1.0));
-  float ringR = mix(0.0018, 0.0145, sqrt(imp));
-  float ringW = mix(0.0026, 0.0010, imp);
-  float ring = exp(-pow((d - ringR) / ringW, 2.0)) * (1.0 - imp);
-  float core = exp(-dot(d, d) / 0.000028) * pow(1.0 - imp, 1.9);
-  return ring * 0.85 + core * 0.95;
+// Sweetheart scalloped lace neckline curve of the purple corset in crying-sprite UV space.
+// Used to naturally wick/absorb chest moisture right at the lace edge so tears never cross fabric.
+float laceNecklineY(float x) {
+  float dx = x - 0.4765;
+  float sideSpan = (dx < 0.0) ? 0.072 : 0.074;
+  float t = clamp(abs(dx) / sideSpan, 0.0, 1.0);
+  return 0.4865 - 0.0315 * pow(max(t, 1e-5), 0.88);
+}
+
+// Physically believable clear water micro-bead sitting on bare skin:
+// returns vec3(body, meniscusShadow, specGlint) and outputs refraction normal.
+vec3 evalSkinMicroBead(
+    vec2 p,
+    vec2 center,
+    float radius,
+    float stretch,
+    float squashX,
+    float aspect,
+    out vec2 refractDir) {
+  vec2 d = vec2((p.x - center.x) * aspect / max(squashX, 0.5), p.y - center.y);
+  float tail = clamp(-d.y / max(radius * stretch, 1e-5), 0.0, 1.0);
+  d.x /= mix(1.0, 0.42, tail * tail);
+  vec2 dNorm = d;
+  if (dNorm.y < 0.0) {
+    dNorm.y /= max(stretch, 1.0);
+  }
+  float dist = length(dNorm);
+  float body = 1.0 - smoothstep(radius * 0.38, radius, dist);
+
+  // Soft lower-right contact shadow / meniscus rim so transparent water reads cleanly on bright skin
+  vec2 sd = vec2(
+    (p.x - (center.x + 0.15 * radius / aspect)) * aspect / max(squashX, 0.5),
+    p.y - (center.y + 0.26 * radius)
+  );
+  float sDist = length(sd);
+  float dropShadow = (1.0 - smoothstep(radius * 0.42, radius * 1.18, sDist)) * (1.0 - body * 0.52);
+
+  vec2 nDir = (dist > 1e-5) ? (dNorm / dist) : vec2(0.0);
+  refractDir = nDir * body;
+
+  float rimEdge = smoothstep(radius * 0.44, radius * 0.92, dist) * body;
+  float meniscus = clamp(
+    rimEdge * 0.68 * max(0.0, nDir.y * 0.72 + nDir.x * 0.38 + 0.28) + dropShadow * 0.55,
+    0.0,
+    1.0
+  );
+
+  // Pinpoint upper-left skylight catchlight + delicate lower caustic focus
+  vec2 gPos = center + vec2(-0.23 * radius / aspect, -0.17 * radius);
+  float gDist = length((p - gPos) * vec2(aspect, 1.0));
+  float glint = (1.0 - smoothstep(radius * 0.08, radius * 0.40, gDist)) * body;
+
+  vec2 kPos = center + vec2(0.06 * radius / aspect, 0.28 * radius);
+  float kDist = length((p - kPos) * vec2(aspect, 1.0));
+  float caustic = (1.0 - smoothstep(radius * 0.12, radius * 0.48, kDist)) * body * 0.45;
+
+  return vec3(body, meniscus, clamp(glint + caustic, 0.0, 1.0));
+}
+
+// Evaluates one synchronized post-impact chest micro-droplet and its delicate evaporating
+// moisture trail curving organically along bare upper-bust skin toward the cleavage/lace edge.
+void evalChestStream(
+    vec2 p,
+    float cycle,
+    float touchStart,
+    float trickEnd,
+    float beadRadius,
+    float phaseOff,
+    vec2 p0,
+    vec2 p1,
+    vec2 p2,
+    vec2 p3,
+    float aspect,
+    float time,
+    inout float chestWet,
+    inout float chestMeniscus,
+    inout float chestSpec,
+    inout vec2 chestRefract) {
+  if (cycle < touchStart || cycle > trickEnd) return;
+
+  float prog = clamp((cycle - touchStart) / max(trickEnd - touchStart, 1e-4), 0.0, 1.0);
+  // Single continuous droplet: settles briefly on skin, then glides along the curved contour
+  float slideP = clamp((prog - 0.08) / 0.92, 0.0, 1.0);
+  float beadT = pow(max(slideP, 1e-5), 1.25);
+  float beadFade = smoothstep(0.0, 0.07, prog) * smoothstep(1.0, 0.78, prog);
+
+  float settleBell = smoothstep(0.0, 0.06, prog) * (1.0 - smoothstep(0.08, 0.22, prog));
+  float squashX = mix(0.92, 1.18, settleBell);
+  float stretch = mix(1.48, 1.04, settleBell);
+  float curR = beadRadius * mix(1.05, 0.74, beadT);
+
+  vec2 bPos = samplePoly3(p0, p1, p2, p3, beadT);
+  bPos.x += sin(beadT * 9.0 + phaseOff) * 0.0007 * sin(beadT * 3.14159);
+
+  vec2 bRef;
+  vec3 bead = evalSkinMicroBead(p, bPos, curR, stretch, squashX, aspect, bRef);
+  chestWet = max(chestWet, bead.x * beadFade * 0.82);
+  chestMeniscus = max(chestMeniscus, bead.y * beadFade * 0.88);
+  chestSpec = max(chestSpec, bead.z * beadFade * 0.76);
+  chestRefract += bRef * beadFade * 0.85;
+
+  // Delicate, whisper-thin translucent wet trail lingering only behind the gliding micro-bead
+  if (slideP > 0.01) {
+    float dPath, tPath;
+    vec2 tDir;
+    evalPoly3(p, p0, p1, p2, p3, aspect, dPath, tPath, tDir);
+    if (tPath <= beadT + 0.02) {
+      float lag = max(0.0, beadT - tPath);
+      float trailEnv = exp(-lag * 3.2) * smoothstep(beadT + 0.012, beadT - 0.012, tPath);
+      float trailFade = smoothstep(0.0, 0.06, tPath)
+                      * smoothstep(1.0, 0.76, tPath)
+                      * smoothstep(1.0, 0.78, prog);
+      float width = mix(0.0018, 0.0009, clamp(lag * 1.4, 0.0, 1.0));
+      float trailMask = (1.0 - smoothstep(0.00035, width, dPath)) * trailEnv * trailFade;
+      float shimmer = 0.48 + 0.52 * (0.5 + 0.5 * sin(tPath * 22.0 - time * 2.1 + phaseOff));
+      chestWet = max(chestWet, trailMask * 0.46);
+      chestMeniscus = max(chestMeniscus, trailMask * 0.34);
+      chestSpec = max(chestSpec, trailMask * shimmer * 0.34);
+      chestRefract += tDir * trailMask * 0.32;
+    }
+  }
 }
 
 void main() {
@@ -462,12 +574,13 @@ void main() {
         fgRgb += vec3(0.82, 0.88, 1.0) * satinSheen * sheenTravel * 0.11;
 
         // --- PROCEDURAL GLSL CRYING TEAR ANIMATION (uIsCrying > 0.5) ---
-        // Stage 1: Shimmering Cheek Tear Streams
-        // Stage 2: Gravity-Accelerated Free-Falling Droplets (Face/Chin -> Upper Chest) + Splash Ripples
-        // Stage 3: Glistening Chest & Corset Trickling Rivulets (Upper Bust -> Cleavage & Corset)
+        // Stage 1: Shimmering Cheek Tear Streams (eyes -> cheeks -> chin/jawline)
+        // Stage 2: Gravity-Accelerated Free-Falling Droplets (face/chin -> bare upper chest)
+        // Stage 3: Delicate Bare-Skin Chest Micro-Beads & Curved Cleavage Moisture Trails
+        //          (curving organically into the cleavage and absorbing cleanly at the lace neckline)
         if (isCry > 0.5 &&
             sampleUv.x > 0.42 && sampleUv.x < 0.59 &&
-            sampleUv.y > 0.30 && sampleUv.y < 0.64) {
+            sampleUv.y > 0.30 && sampleUv.y < 0.505) {
           float tearWet = 0.0;
           float tearHighlight = 0.0;
           float tearCaustic = 0.0;
@@ -535,147 +648,123 @@ void main() {
           tearCaustic += bL.z + bR.z;
           tearRefract += refDummy * 0.6;
 
-          // Stage 2: Free-Falling Tear Droplets (Face/Chin -> Upper Chest) + Splash Ripples
+          // Stage 2: Free-Falling Tear Droplets (Face/Chin -> Bare Upper Chest)
           // Drop A: Left Chin/Jaw -> Left Upper Bust Skin
           float cycA = fract(uTime / 2.45 + 0.10);
           vec2 dropStartA = vec2(0.474, 0.365);
-          vec2 dropEndA = vec2(0.468, 0.448);
-          if (cycA < 0.36) {
-            float u = cycA / 0.36;
+          vec2 dropEndA = vec2(0.466, 0.447);
+          if (cycA < 0.35) {
+            float u = cycA / 0.35;
             vec2 posA = vec2(mix(dropStartA.x, dropEndA.x, u), mix(dropStartA.y, dropEndA.y, u * u));
+            vec2 coordA = mix(fgUv, sampleUv, smoothstep(0.55, 1.0, u));
+            float fadeA = smoothstep(1.0, 0.86, u);
             float rA = 0.0052 * smoothstep(0.0, 0.14, u);
             vec2 refA;
-            vec3 tdA = evalTearDrop(fgUv, posA, rA, mix(1.45, 2.25, u), texAspect, refA);
-            tearWet += tdA.x;
-            tearHighlight += tdA.y * 1.15;
-            tearCaustic += tdA.z * 0.95;
-            tearRefract += refA;
+            vec3 tdA = evalTearDrop(coordA, posA, rA, mix(1.45, 2.25, u), texAspect, refA);
+            tearWet += tdA.x * fadeA;
+            tearHighlight += tdA.y * 1.15 * fadeA;
+            tearCaustic += tdA.z * 0.95 * fadeA;
+            tearRefract += refA * fadeA;
           }
-          float ripA = evalSplashRipple(sampleUv, dropEndA, cycA, 0.35, 0.62, texAspect);
 
           // Drop B: Chin Tip -> Upper Center Chest / Cleavage Top
           float cycB = fract(uTime / 2.85 + 0.44);
           vec2 dropStartB = vec2(0.502, 0.371);
-          vec2 dropEndB = vec2(0.494, 0.446);
+          vec2 dropEndB = vec2(0.496, 0.445);
           if (cycB < 0.35) {
             float u = cycB / 0.35;
             vec2 posB = vec2(mix(dropStartB.x, dropEndB.x, u), mix(dropStartB.y, dropEndB.y, u * u));
+            vec2 coordB = mix(fgUv, sampleUv, smoothstep(0.55, 1.0, u));
+            float fadeB = smoothstep(1.0, 0.86, u);
             float rB = 0.0055 * smoothstep(0.0, 0.14, u);
             vec2 refB;
-            vec3 tdB = evalTearDrop(fgUv, posB, rB, mix(1.50, 2.35, u), texAspect, refB);
-            tearWet += tdB.x;
-            tearHighlight += tdB.y * 1.20;
-            tearCaustic += tdB.z * 0.95;
-            tearRefract += refB;
+            vec3 tdB = evalTearDrop(coordB, posB, rB, mix(1.50, 2.35, u), texAspect, refB);
+            tearWet += tdB.x * fadeB;
+            tearHighlight += tdB.y * 1.20 * fadeB;
+            tearCaustic += tdB.z * 0.95 * fadeB;
+            tearRefract += refB * fadeB;
           }
-          float ripB = evalSplashRipple(sampleUv, dropEndB, cycB, 0.34, 0.60, texAspect);
 
           // Drop C: Right Cheek/Jaw -> Right Upper Bust Skin
           float cycC = fract(uTime / 3.15 + 0.76);
           vec2 dropStartC = vec2(0.530, 0.360);
-          vec2 dropEndC = vec2(0.530, 0.444);
-          if (cycC < 0.36) {
-            float u = cycC / 0.36;
+          vec2 dropEndC = vec2(0.526, 0.443);
+          if (cycC < 0.35) {
+            float u = cycC / 0.35;
             vec2 posC = vec2(mix(dropStartC.x, dropEndC.x, u), mix(dropStartC.y, dropEndC.y, u * u));
+            vec2 coordC = mix(fgUv, sampleUv, smoothstep(0.55, 1.0, u));
+            float fadeC = smoothstep(1.0, 0.86, u);
             float rC = 0.0050 * smoothstep(0.0, 0.14, u);
             vec2 refC;
-            vec3 tdC = evalTearDrop(fgUv, posC, rC, mix(1.45, 2.25, u), texAspect, refC);
-            tearWet += tdC.x;
-            tearHighlight += tdC.y * 1.15;
-            tearCaustic += tdC.z * 0.95;
-            tearRefract += refC;
-          }
-          float ripC = evalSplashRipple(sampleUv, dropEndC, cycC, 0.35, 0.62, texAspect);
-
-          tearHighlight += (ripA + ripB + ripC) * 0.95;
-          tearWet += (ripA + ripB + ripC) * 0.55;
-
-          // Stage 3: Chest & Corset Trickling Rivulets (Upper Bust -> Cleavage -> Purple Corset)
-          // Rivulet 1: Left Upper Bust -> Cleavage -> Heart Trim -> Corset Center Seam
-          float dRiv1, tRiv1;
-          vec2 dirRiv1;
-          vec2 r1p0 = vec2(0.468, 0.448);
-          vec2 r1p1 = vec2(0.479, 0.474);
-          vec2 r1p2 = vec2(0.478, 0.518);
-          vec2 r1p3 = vec2(0.474, 0.618);
-          evalPoly3(sampleUv, r1p0, r1p1, r1p2, r1p3, texAspect, dRiv1, tRiv1, dirRiv1);
-          float rivMask1 = (1.0 - smoothstep(0.0006, 0.0022, dRiv1)) * smoothstep(0.0, 0.05, tRiv1) * smoothstep(1.0, 0.85, tRiv1);
-          float rivShimmer1 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv1 * 24.0 - uTime * 2.6), 2.0);
-          tearWet += rivMask1 * 0.62;
-          tearHighlight += rivMask1 * rivShimmer1 * 0.52;
-          tearRefract += dirRiv1 * rivMask1 * 0.32;
-
-          // Trickle beads on Rivulet 1
-          for (int i = 0; i < 2; i++) {
-            float fi = float(i);
-            float tBead = fract(uTime * 0.20 + fi * 0.50 + 0.12);
-            vec2 bPos = samplePoly3(r1p0, r1p1, r1p2, r1p3, tBead);
-            bPos.x += sin(tBead * 14.0 + fi) * 0.0014;
-            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
-            vec2 bRef;
-            vec3 td = evalTearDrop(sampleUv, bPos, 0.0044, 1.55, texAspect, bRef);
-            tearWet += td.x * fade;
-            tearHighlight += td.y * fade * 1.05;
-            tearCaustic += td.z * fade * 0.85;
-            tearRefract += bRef * fade * 0.7;
+            vec3 tdC = evalTearDrop(coordC, posC, rC, mix(1.45, 2.25, u), texAspect, refC);
+            tearWet += tdC.x * fadeC;
+            tearHighlight += tdC.y * 1.15 * fadeC;
+            tearCaustic += tdC.z * 0.95 * fadeC;
+            tearRefract += refC * fadeC;
           }
 
-          // Rivulet 2: Center Upper Chest -> Cleavage Crease -> Center Corset
-          float dRiv2, tRiv2;
-          vec2 dirRiv2;
-          vec2 r2p0 = vec2(0.494, 0.446);
-          vec2 r2p1 = vec2(0.483, 0.468);
-          vec2 r2p2 = vec2(0.479, 0.510);
-          vec2 r2p3 = vec2(0.477, 0.624);
-          evalPoly3(sampleUv, r2p0, r2p1, r2p2, r2p3, texAspect, dRiv2, tRiv2, dirRiv2);
-          float rivMask2 = (1.0 - smoothstep(0.0006, 0.0022, dRiv2)) * smoothstep(0.0, 0.05, tRiv2) * smoothstep(1.0, 0.85, tRiv2);
-          float rivShimmer2 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv2 * 22.0 - uTime * 2.3 + 1.1), 2.0);
-          tearWet += rivMask2 * 0.65;
-          tearHighlight += rivMask2 * rivShimmer2 * 0.55;
-          tearRefract += dirRiv2 * rivMask2 * 0.32;
+          // Stage 3: Delicate Bare-Skin Chest Landing Micro-Beads & Organic Curved Cleavage Trails
+          // Strictly confined to bare skin above the sweetheart lace neckline (never crosses fabric)
+          float chestWet = 0.0;
+          float chestMeniscus = 0.0;
+          float chestSpec = 0.0;
+          vec2 chestRefract = vec2(0.0);
 
-          for (int i = 0; i < 2; i++) {
-            float fi = float(i);
-            float tBead = fract(uTime * 0.17 + fi * 0.50 + 0.35);
-            vec2 bPos = samplePoly3(r2p0, r2p1, r2p2, r2p3, tBead);
-            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
-            vec2 bRef;
-            vec3 td = evalTearDrop(sampleUv, bPos, 0.0046, 1.60, texAspect, bRef);
-            tearWet += td.x * fade;
-            tearHighlight += td.y * fade * 1.10;
-            tearCaustic += td.z * fade * 0.85;
-            tearRefract += bRef * fade * 0.7;
+          float laceY = laceNecklineY(sampleUv.x);
+          float bareChestMask = smoothstep(laceY, laceY - 0.0085, sampleUv.y)
+                              * smoothstep(0.425, 0.440, sampleUv.y)
+                              * smoothstep(0.42, 0.44, sampleUv.x)
+                              * smoothstep(0.56, 0.54, sampleUv.x);
+          float skinGuard = smoothstep(0.05, 0.17, fgRgb.r - fgRgb.b);
+          float chestGate = bareChestMask * skinGuard;
+
+          if (chestGate > 0.001) {
+            // Stream A: Left upper bust -> curves gently inward into cleavage V-dip -> absorbs at lace
+            evalChestStream(
+              sampleUv, cycA, 0.33, 0.93, 0.0036, 0.0,
+              dropEndA, vec2(0.471, 0.458), vec2(0.475, 0.471), vec2(0.476, 0.484),
+              texAspect, uTime,
+              chestWet, chestMeniscus, chestSpec, chestRefract
+            );
+
+            // Stream B: Top of cleavage -> follows natural cleavage crease -> absorbs at V-dip lace
+            evalChestStream(
+              sampleUv, cycB, 0.33, 0.95, 0.0038, 1.3,
+              dropEndB, vec2(0.487, 0.456), vec2(0.480, 0.470), vec2(0.4775, 0.485),
+              texAspect, uTime,
+              chestWet, chestMeniscus, chestSpec, chestRefract
+            );
+
+            // Stream C: Right upper bust -> curves gently inward along inner slope -> absorbs at right lace
+            evalChestStream(
+              sampleUv, cycC, 0.33, 0.89, 0.0034, 2.5,
+              dropEndC, vec2(0.522, 0.451), vec2(0.516, 0.458), vec2(0.508, 0.4645),
+              texAspect, uTime,
+              chestWet, chestMeniscus, chestSpec, chestRefract
+            );
+
+            // Whisper-subtle persistent damp sheen catching light inside the cleavage valley
+            float dClev, tClev;
+            vec2 dirClev;
+            evalPoly3(
+              sampleUv,
+              dropEndB, vec2(0.487, 0.456), vec2(0.480, 0.470), vec2(0.4775, 0.485),
+              texAspect, dClev, tClev, dirClev
+            );
+            float clevSheen = (1.0 - smoothstep(0.0004, 0.0022, dClev))
+                            * smoothstep(0.08, 0.32, tClev)
+                            * smoothstep(1.0, 0.76, tClev);
+            float clevPulse = 0.55 + 0.45 * sin(tClev * 16.0 - uTime * 1.5);
+            chestWet = max(chestWet, clevSheen * 0.24);
+            chestSpec = max(chestSpec, clevSheen * clevPulse * 0.16);
+
+            chestWet *= chestGate;
+            chestMeniscus *= chestGate;
+            chestSpec *= chestGate;
+            chestRefract *= chestGate;
           }
 
-          // Rivulet 3: Right Upper Bust -> Right Corset Cup -> Right Corset Panel
-          float dRiv3, tRiv3;
-          vec2 dirRiv3;
-          vec2 r3p0 = vec2(0.530, 0.444);
-          vec2 r3p1 = vec2(0.525, 0.472);
-          vec2 r3p2 = vec2(0.518, 0.520);
-          vec2 r3p3 = vec2(0.509, 0.614);
-          evalPoly3(sampleUv, r3p0, r3p1, r3p2, r3p3, texAspect, dRiv3, tRiv3, dirRiv3);
-          float rivMask3 = (1.0 - smoothstep(0.0006, 0.0021, dRiv3)) * smoothstep(0.0, 0.05, tRiv3) * smoothstep(1.0, 0.85, tRiv3);
-          float rivShimmer3 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(tRiv3 * 22.0 - uTime * 2.4 + 2.3), 2.0);
-          tearWet += rivMask3 * 0.60;
-          tearHighlight += rivMask3 * rivShimmer3 * 0.50;
-          tearRefract += dirRiv3 * rivMask3 * 0.30;
-
-          for (int i = 0; i < 2; i++) {
-            float fi = float(i);
-            float tBead = fract(uTime * 0.185 + fi * 0.50 + 0.62);
-            vec2 bPos = samplePoly3(r3p0, r3p1, r3p2, r3p3, tBead);
-            bPos.x += sin(tBead * 12.0 + 0.7) * 0.0014;
-            float fade = smoothstep(0.0, 0.08, tBead) * smoothstep(1.0, 0.86, tBead);
-            vec2 bRef;
-            vec3 td = evalTearDrop(sampleUv, bPos, 0.0043, 1.55, texAspect, bRef);
-            tearWet += td.x * fade;
-            tearHighlight += td.y * fade * 1.05;
-            tearCaustic += td.z * fade * 0.85;
-            tearRefract += bRef * fade * 0.7;
-          }
-
-          // Composite subtle water refraction + crisp #E8F8FF sunbeam glints & warm torch sparkles
+          // Composite Stage 1 & 2 (face & falling drops): water refraction + crisp dungeon catchlights
           float wetAmt = clamp(tearWet, 0.0, 1.0);
           if (wetAmt > 0.01) {
             vec2 refUv = clamp(sampleUv - tearRefract * vec2(0.0024 / texAspect, 0.0024), 0.003, 0.997);
@@ -690,6 +779,25 @@ void main() {
           vec3 warmTorchGlint = vec3(1.0, 0.82, 0.58) * (0.28 * flicker * smoothstep(0.45, 0.56, sampleUv.x));
           fgRgb += coolTearSpec * clamp(tearHighlight, 0.0, 1.35) * 0.78;
           fgRgb += (coolTearSpec * 0.72 + warmTorchGlint) * clamp(tearCaustic, 0.0, 1.0) * 0.65;
+
+          // Composite Stage 3 (bare-skin chest water): refraction + warm meniscus rim depth + soft glisten
+          if (chestWet > 0.005 || chestMeniscus > 0.005 || chestSpec > 0.005) {
+            if (chestWet > 0.01) {
+              vec2 cRefUv = clamp(sampleUv - chestRefract * vec2(0.0022 / texAspect, 0.0022), 0.003, 0.997);
+              vec4 cRefFg = texture(uPrincess, cRefUv);
+              if (cRefFg.a > 0.05) {
+                vec3 cRefCol = clamp(cRefFg.rgb / cRefFg.a, 0.0, 1.0);
+                fgRgb = mix(fgRgb, cRefCol * vec3(0.97, 0.99, 1.02), chestWet * 0.48);
+              }
+            }
+            // Delicate warm meniscus shading gives clear-water volume on bright peach skin
+            fgRgb = mix(fgRgb, fgRgb * vec3(0.82, 0.76, 0.74), chestMeniscus * 0.48);
+            // Restrained skin-harmonized pinpoint specular glisten (never blows out to neon white)
+            float skinLum = dot(fgRgb, vec3(0.299, 0.587, 0.114));
+            float specScale = mix(0.60, 0.36, smoothstep(0.75, 0.96, skinLum));
+            vec3 chestSpecTint = mix(vec3(1.0, 0.94, 0.90), coolTearSpec, 0.55) + warmTorchGlint * 0.62;
+            fgRgb += chestSpecTint * chestSpec * specScale;
+          }
         }
 
         compCol = mix(bgCol, clamp(fgRgb, 0.0, 1.0), fg.a);
