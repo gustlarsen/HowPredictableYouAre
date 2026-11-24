@@ -2607,3 +2607,450 @@ class _VowOfSilencePainter extends CustomPainter {
       oldDelegate.isOnGoldBackground != isOnGoldBackground;
 }
 
+/// Tab 6 — Offertory (Gazofilácio): Sacred Temple Offertory Chest / Tithe Urn
+/// rendered in rich gold, warm ivory/marble, and dark graphite outlines
+/// (`#263238`), featuring an arched sanctuary front motif and a glowing
+/// cyan-gold orb hovering into the top offering slot.
+class OffertoryVaultIcon extends StatelessWidget {
+  final double size;
+  final bool isOnGoldBackground;
+
+  const OffertoryVaultIcon({
+    super.key,
+    this.size = 28.0,
+    this.isOnGoldBackground = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: _OffertoryVaultPainter(
+        isOnGoldBackground: isOnGoldBackground,
+      ),
+    );
+  }
+}
+
+class _OffertoryVaultPainter extends CustomPainter {
+  final bool isOnGoldBackground;
+
+  const _OffertoryVaultPainter({required this.isOnGoldBackground});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+
+    const graphiteOutline = Color(0xFF263238);
+    final outline = Paint()
+      ..color = isOnGoldBackground ? const Color(0xFF12181B) : graphiteOutline
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.9, 1.28 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    final detail = Paint()
+      ..color = (isOnGoldBackground ? const Color(0xFF12181B) : graphiteOutline)
+          .withValues(alpha: 0.78)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.55, 0.85 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final goldHighlight =
+        isOnGoldBackground ? const Color(0xFF546E7A) : const Color(0xFFFFF3B0);
+    final goldLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFD54F);
+    final goldMid =
+        isOnGoldBackground ? const Color(0xFF2E3B42) : const Color(0xFFFFB300);
+    final goldDark =
+        isOnGoldBackground ? const Color(0xFF1B2429) : const Color(0xFFB27800);
+
+    final marbleLight =
+        isOnGoldBackground ? const Color(0xFF607D8B) : const Color(0xFFFFFDF7);
+    final marbleMid =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFF3ECE0);
+    final marbleDark =
+        isOnGoldBackground ? const Color(0xFF263238) : const Color(0xFFC9BBA4);
+
+    final archInterior =
+        isOnGoldBackground ? const Color(0xFF141B1F) : const Color(0xFF5D4010);
+    final slotDark =
+        isOnGoldBackground ? const Color(0xFF0E1417) : const Color(0xFF1F2A30);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Soft radiant halo behind hovering cyan-gold orb (top)
+    final orbCenter = Offset(s * 0.50, s * 0.205);
+    final orbRadius = s * 0.12;
+    canvas.drawCircle(
+      orbCenter,
+      orbRadius * 1.65,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF4DD0E1).withValues(alpha: 0.45),
+            const Color(0xFFFFD54F).withValues(alpha: 0.25),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(Rect.fromCircle(center: orbCenter, radius: orbRadius * 1.65)),
+    );
+
+    // 2. Stepped warm ivory/marble temple pedestal base (y: 0.81..0.915)
+    final lowerPlinth = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.12, s * 0.845, s * 0.88, s * 0.915),
+      Radius.circular(s * 0.025),
+    );
+    canvas.drawRRect(
+      lowerPlinth,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [marbleLight, marbleMid, marbleDark],
+        ).createShader(lowerPlinth.outerRect),
+    );
+    canvas.drawRRect(lowerPlinth, outline);
+
+    final upperBaseTrim = Rect.fromLTRB(s * 0.16, s * 0.795, s * 0.84, s * 0.848);
+    canvas.drawRect(
+      upperBaseTrim,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [goldLight, goldMid, goldDark],
+        ).createShader(upperBaseTrim),
+    );
+    canvas.drawRect(upperBaseTrim, outline);
+
+    // 3. Sculpted Offertory Vault Chest Body (marble body + gold corner pilasters)
+    final chestRect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.175, s * 0.44, s * 0.825, s * 0.80),
+      Radius.circular(s * 0.03),
+    );
+    canvas.drawRRect(
+      chestRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [marbleLight, marbleMid, marbleDark],
+          stops: const [0.0, 0.52, 1.0],
+        ).createShader(chestRect.outerRect),
+    );
+    canvas.drawRRect(chestRect, outline);
+
+    // Left & right burnished gold corner pilasters
+    for (final px in [s * 0.175, s * 0.735]) {
+      final pilaster = Rect.fromLTRB(px, s * 0.445, px + s * 0.09, s * 0.795);
+      canvas.drawRect(
+        pilaster,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [goldHighlight, goldMid, goldDark],
+          ).createShader(pilaster),
+      );
+      canvas.drawRect(pilaster, outline);
+    }
+
+    // 4. Arched Sanctuary Front Motif centered on chest facade
+    final archOuter = Path()
+      ..moveTo(s * 0.34, s * 0.795)
+      ..lineTo(s * 0.34, s * 0.62)
+      ..arcToPoint(
+        Offset(s * 0.66, s * 0.62),
+        radius: Radius.circular(s * 0.16),
+        clockwise: true,
+      )
+      ..lineTo(s * 0.66, s * 0.795)
+      ..close();
+    canvas.drawPath(
+      archOuter,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [goldHighlight, goldLight, goldDark],
+        ).createShader(Rect.fromLTRB(s * 0.34, s * 0.46, s * 0.66, s * 0.795)),
+    );
+    canvas.drawPath(archOuter, outline);
+
+    final archInner = Path()
+      ..moveTo(s * 0.39, s * 0.79)
+      ..lineTo(s * 0.39, s * 0.635)
+      ..arcToPoint(
+        Offset(s * 0.61, s * 0.635),
+        radius: Radius.circular(s * 0.11),
+        clockwise: true,
+      )
+      ..lineTo(s * 0.61, s * 0.79)
+      ..close();
+    canvas.drawPath(archInner, Paint()..color = archInterior);
+    canvas.drawPath(archInner, detail);
+
+    // Subtle golden sacred star/emblem inside the recessed sanctuary arch
+    final emblemPaint = Paint()
+      ..color = const Color(0xFFFFD54F)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.8, 1.05 * scale)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(s * 0.50, s * 0.58),
+      Offset(s * 0.50, s * 0.73),
+      emblemPaint,
+    );
+    canvas.drawLine(
+      Offset(s * 0.445, s * 0.635),
+      Offset(s * 0.555, s * 0.635),
+      emblemPaint,
+    );
+
+    // 5. Domed / Beveled Golden Offertory Lid with Top Offering Slot (y: 0.32..0.46)
+    final lidPath = Path()
+      ..moveTo(s * 0.13, s * 0.455)
+      ..lineTo(s * 0.19, s * 0.335)
+      ..quadraticBezierTo(s * 0.50, s * 0.295, s * 0.81, s * 0.335)
+      ..lineTo(s * 0.87, s * 0.455)
+      ..close();
+    canvas.drawPath(
+      lidPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.30, 0.70, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.30, s * 0.87, s * 0.455)),
+    );
+    canvas.drawPath(lidPath, outline);
+
+    // Recessed dark offering slot on top of the lid
+    final slotRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(s * 0.50, s * 0.375),
+        width: s * 0.28,
+        height: s * 0.055,
+      ),
+      Radius.circular(s * 0.028),
+    );
+    canvas.drawRRect(slotRect, Paint()..color = slotDark);
+    canvas.drawRRect(slotRect, detail);
+
+    // 6. Glowing Cyan-Gold Elemental Orb hovering into the top offering slot
+    final orbRect = Rect.fromCircle(center: orbCenter, radius: orbRadius);
+    canvas.drawCircle(
+      orbCenter,
+      orbRadius,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.32, -0.35),
+          radius: 0.92,
+          colors: [
+            Color(0xFFFFFFFF),
+            Color(0xFF80DEEA),
+            Color(0xFF26C6DA),
+            Color(0xFFFFCA28),
+          ],
+          stops: [0.0, 0.34, 0.68, 1.0],
+        ).createShader(orbRect),
+    );
+    canvas.drawCircle(orbCenter, orbRadius, outline);
+
+    // Crisp specular highlight crescent on orb
+    canvas.drawCircle(
+      Offset(orbCenter.dx - orbRadius * 0.32, orbCenter.dy - orbRadius * 0.32),
+      orbRadius * 0.26,
+      Paint()..color = Colors.white.withValues(alpha: 0.88),
+    );
+
+    // Twin golden sparkle accents flanking the hovering orb
+    void drawMiniStar(Offset c, double r) {
+      final star = Path()
+        ..moveTo(c.dx, c.dy - r)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy - r * 0.18, c.dx + r, c.dy)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy + r * 0.18, c.dx, c.dy + r)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy + r * 0.18, c.dx - r, c.dy)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy - r * 0.18, c.dx, c.dy - r)
+        ..close();
+      canvas.drawPath(star, Paint()..color = const Color(0xFFFFE082));
+      canvas.drawPath(star, detail);
+    }
+
+    drawMiniStar(Offset(s * 0.25, s * 0.20), s * 0.065);
+    drawMiniStar(Offset(s * 0.76, s * 0.18), s * 0.055);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_OffertoryVaultPainter oldDelegate) =>
+      oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+
+/// Compact Sacred Temple vector icon for the 10% Tithe Blessing (`2x` Speed)
+/// card header: golden sanctuary offering bowl radiating ascending golden
+/// acceleration chevrons and a radiant blessing star.
+class TitheBlessingIcon extends StatelessWidget {
+  final double size;
+  final bool isOnGoldBackground;
+
+  const TitheBlessingIcon({
+    super.key,
+    this.size = 28.0,
+    this.isOnGoldBackground = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: _TitheBlessingPainter(
+        isOnGoldBackground: isOnGoldBackground,
+      ),
+    );
+  }
+}
+
+class _TitheBlessingPainter extends CustomPainter {
+  final bool isOnGoldBackground;
+
+  const _TitheBlessingPainter({required this.isOnGoldBackground});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+
+    const graphiteOutline = Color(0xFF263238);
+    final outline = Paint()
+      ..color = isOnGoldBackground ? const Color(0xFF12181B) : graphiteOutline
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.85, 1.22 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final goldHighlight =
+        isOnGoldBackground ? const Color(0xFF546E7A) : const Color(0xFFFFF8D6);
+    final goldLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFD54F);
+    final goldMid =
+        isOnGoldBackground ? const Color(0xFF2E3B42) : const Color(0xFFFFA000);
+    final goldDark =
+        isOnGoldBackground ? const Color(0xFF1B2429) : const Color(0xFFB26A00);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Radiant warm aura behind upper blessing chevrons
+    final auraCenter = Offset(s * 0.50, s * 0.38);
+    canvas.drawCircle(
+      auraCenter,
+      s * 0.34,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFD54F).withValues(alpha: 0.42),
+            const Color(0xFFFF8F00).withValues(alpha: 0.14),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ).createShader(Rect.fromCircle(center: auraCenter, radius: s * 0.34)),
+    );
+
+    // 2. Twin upward blessing acceleration chevrons (symbolizing 2x production speed)
+    void drawChevron(double topY, double halfW, double thick) {
+      final path = Path()
+        ..moveTo(s * 0.50, topY)
+        ..lineTo(s * 0.50 + halfW, topY + halfW * 0.68)
+        ..lineTo(s * 0.50 + halfW, topY + halfW * 0.68 + thick)
+        ..lineTo(s * 0.50, topY + thick)
+        ..lineTo(s * 0.50 - halfW, topY + halfW * 0.68 + thick)
+        ..lineTo(s * 0.50 - halfW, topY + halfW * 0.68)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [goldHighlight, goldLight, goldMid],
+          ).createShader(Rect.fromLTRB(
+            s * 0.50 - halfW,
+            topY,
+            s * 0.50 + halfW,
+            topY + halfW + thick,
+          )),
+      );
+      canvas.drawPath(path, outline);
+    }
+
+    drawChevron(s * 0.11, s * 0.24, s * 0.095);
+    drawChevron(s * 0.29, s * 0.29, s * 0.105);
+
+    // 3. Sacred Golden Offering Bowl / Tithe Vessel at bottom (y: 0.58..0.88)
+    final bowlPath = Path()
+      ..moveTo(s * 0.18, s * 0.60)
+      ..lineTo(s * 0.82, s * 0.60)
+      ..cubicTo(s * 0.80, s * 0.77, s * 0.66, s * 0.83, s * 0.50, s * 0.83)
+      ..cubicTo(s * 0.34, s * 0.83, s * 0.20, s * 0.77, s * 0.18, s * 0.60)
+      ..close();
+    canvas.drawPath(
+      bowlPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.28, 0.68, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.18, s * 0.60, s * 0.82, s * 0.83)),
+    );
+    canvas.drawPath(bowlPath, outline);
+
+    // Marble & gold foot plinth
+    final footRect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.30, s * 0.825, s * 0.70, s * 0.90),
+      Radius.circular(s * 0.03),
+    );
+    canvas.drawRRect(
+      footRect,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [const Color(0xFFFFFDF7), const Color(0xFFD7CBB7)],
+        ).createShader(footRect.outerRect),
+    );
+    canvas.drawRRect(footRect, outline);
+
+    // Radiant cyan-white blessing sparkle gem centered on bowl rim
+    final gemCenter = Offset(s * 0.50, s * 0.695);
+    final gemR = s * 0.068;
+    final gem = Path()
+      ..moveTo(gemCenter.dx, gemCenter.dy - gemR)
+      ..lineTo(gemCenter.dx + gemR * 0.82, gemCenter.dy)
+      ..lineTo(gemCenter.dx, gemCenter.dy + gemR)
+      ..lineTo(gemCenter.dx - gemR * 0.82, gemCenter.dy)
+      ..close();
+    canvas.drawPath(
+      gem,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFF4DD0E1)],
+        ).createShader(Rect.fromCircle(center: gemCenter, radius: gemR)),
+    );
+    canvas.drawPath(gem, outline);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_TitheBlessingPainter oldDelegate) =>
+      oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+
+

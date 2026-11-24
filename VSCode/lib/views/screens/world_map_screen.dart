@@ -396,6 +396,9 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             animationsEnabled: controller.animationsEnabled,
                             showNotificationBadge:
                                 controller.hasRoyalCastleNotification,
+                            notificationBadgeKey: const ValueKey(
+                              'royal_castle_notification_badge',
+                            ),
                             onTap: () => _openThroneRoom(context, controller),
                           ),
 
@@ -413,6 +416,11 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             accentColor: const Color(0xFFFFD54F),
                             phaseOffset: 0.75,
                             animationsEnabled: controller.animationsEnabled,
+                            showNotificationBadge:
+                                controller.hasSacredTempleNotification,
+                            notificationBadgeKey: const ValueKey(
+                              'sacred_temple_notification_badge',
+                            ),
                             onTap: () => _openSacredTemple(context, controller),
                           ),
                         ],
@@ -475,6 +483,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     required double phaseOffset,
     required bool animationsEnabled,
     bool showNotificationBadge = false,
+    Key? notificationBadgeKey,
     required VoidCallback onTap,
   }) {
     assert(icon != null || iconWidget != null);
@@ -498,6 +507,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         phaseOffset: phaseOffset,
         animationsEnabled: animationsEnabled,
         showNotificationBadge: showNotificationBadge,
+        notificationBadgeKey: notificationBadgeKey,
         onTap: onTap,
       ),
     );
@@ -663,6 +673,7 @@ class _LandmarkPinBadge extends StatelessWidget {
   final double phaseOffset;
   final bool animationsEnabled;
   final bool showNotificationBadge;
+  final Key? notificationBadgeKey;
   final VoidCallback onTap;
 
   const _LandmarkPinBadge({
@@ -675,6 +686,7 @@ class _LandmarkPinBadge extends StatelessWidget {
     required this.phaseOffset,
     required this.animationsEnabled,
     this.showNotificationBadge = false,
+    this.notificationBadgeKey,
     required this.onTap,
   }) : assert(icon != null || iconWidget != null);
 
@@ -740,7 +752,10 @@ class _LandmarkPinBadge extends StatelessWidget {
                           top: -4,
                           right: -4,
                           child: Container(
-                            key: const ValueKey('royal_castle_notification_badge'),
+                            key: notificationBadgeKey ??
+                                const ValueKey(
+                                  'royal_castle_notification_badge',
+                                ),
                             width: 16,
                             height: 16,
                             decoration: BoxDecoration(

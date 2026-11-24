@@ -451,6 +451,110 @@ class StorageService {
     return _prefs.setString(_lastFreeDailyPrayerDateKey, clean);
   }
 
+  // Sacred Temple Offertory Permanent Idle Orb Generator (survives run resets; cleared only on account switch)
+  static const String offertoryLevelKey = 'offertory_level';
+  static const String offertoryLastCollectedAtKey =
+      'offertory_last_collected_at';
+  static const String offertoryPendingFractionKey =
+      'offertory_pending_fraction';
+  static const String offertoryBankedOrbsKey = 'offertory_banked_orbs';
+  static const String offertoryBankedSecondsKey = 'offertory_banked_seconds';
+  static const String offertoryBoostExpiresAtKey = 'offertory_boost_expires_at';
+  static const String offertoryFreeDoubleReadyAtKey =
+      'offertory_free_double_ready_at';
+
+  int get offertoryLevel {
+    final val = _prefs.getInt(offertoryLevelKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setOffertoryLevel(int val) =>
+      _prefs.setInt(offertoryLevelKey, val < 0 ? 0 : val);
+
+  int? get offertoryLastCollectedAt {
+    final val = _prefs.getInt(offertoryLastCollectedAtKey);
+    return (val != null && val > 0) ? val : null;
+  }
+
+  Future<void> setOffertoryLastCollectedAt(int? epochMillisUtc) {
+    if (epochMillisUtc == null || epochMillisUtc <= 0) {
+      return _prefs.remove(offertoryLastCollectedAtKey);
+    }
+    return _prefs.setInt(offertoryLastCollectedAtKey, epochMillisUtc);
+  }
+
+  double get offertoryPendingFraction {
+    final val = _prefs.getDouble(offertoryPendingFractionKey) ?? 0.0;
+    if (val.isNaN || val.isInfinite || val < 0.0) return 0.0;
+    if (val >= 1.0) return 0.999999;
+    return val;
+  }
+
+  Future<void> setOffertoryPendingFraction(double val) {
+    final safe = (val.isNaN || val.isInfinite || val < 0.0)
+        ? 0.0
+        : (val >= 1.0 ? 0.999999 : val);
+    return _prefs.setDouble(offertoryPendingFractionKey, safe);
+  }
+
+  int get offertoryBankedOrbs {
+    final val = _prefs.getInt(offertoryBankedOrbsKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setOffertoryBankedOrbs(int val) =>
+      _prefs.setInt(offertoryBankedOrbsKey, val < 0 ? 0 : val);
+
+  double get offertoryBankedSeconds {
+    final val = _prefs.getDouble(offertoryBankedSecondsKey) ?? 0.0;
+    if (val.isNaN || val.isInfinite || val < 0.0) return 0.0;
+    if (val > 28800.0) return 28800.0;
+    return val;
+  }
+
+  Future<void> setOffertoryBankedSeconds(double val) {
+    final safe = (val.isNaN || val.isInfinite || val < 0.0)
+        ? 0.0
+        : (val > 28800.0 ? 28800.0 : val);
+    return _prefs.setDouble(offertoryBankedSecondsKey, safe);
+  }
+
+  int? get offertoryBoostExpiresAt {
+    final val = _prefs.getInt(offertoryBoostExpiresAtKey);
+    return (val != null && val > 0) ? val : null;
+  }
+
+  Future<void> setOffertoryBoostExpiresAt(int? epochMillisUtc) {
+    if (epochMillisUtc == null || epochMillisUtc <= 0) {
+      return _prefs.remove(offertoryBoostExpiresAtKey);
+    }
+    return _prefs.setInt(offertoryBoostExpiresAtKey, epochMillisUtc);
+  }
+
+  int? get offertoryFreeDoubleReadyAt {
+    final val = _prefs.getInt(offertoryFreeDoubleReadyAtKey);
+    return (val != null && val > 0) ? val : null;
+  }
+
+  Future<void> setOffertoryFreeDoubleReadyAt(int? epochMillisUtc) {
+    if (epochMillisUtc == null || epochMillisUtc <= 0) {
+      return _prefs.remove(offertoryFreeDoubleReadyAtKey);
+    }
+    return _prefs.setInt(offertoryFreeDoubleReadyAtKey, epochMillisUtc);
+  }
+
+  Future<void> clearOffertoryData() {
+    return Future.wait([
+      setOffertoryLevel(0),
+      setOffertoryLastCollectedAt(null),
+      setOffertoryPendingFraction(0.0),
+      setOffertoryBankedOrbs(0),
+      setOffertoryBankedSeconds(0.0),
+      setOffertoryBoostExpiresAt(null),
+      setOffertoryFreeDoubleReadyAt(null),
+    ]);
+  }
+
   // Persisted Real-Money Google Play IAP Product IDs (survives Permadeath Reset)
   static const String purchasedIapProductIdsKey = 'iap_purchased_product_ids';
 
@@ -1256,6 +1360,7 @@ class StorageService {
       setTempleMasterDefeatedCount(0),
       setBabyMageRobotDefeatedCount(0),
       clearBattleDecreeProgress(),
+      clearOffertoryData(),
     ]);
   }
 

@@ -314,6 +314,15 @@ class CloudSaveData {
   final int battleBonusTempHp;
   final String? lastFreeDailyPrayerDate;
 
+  // Sacred Temple Offertory Permanent Idle Orb Generator
+  final int offertoryLevel;
+  final int? offertoryLastCollectedAt;
+  final double offertoryPendingFraction;
+  final int offertoryBankedOrbs;
+  final double offertoryBankedSeconds;
+  final int? offertoryBoostExpiresAt;
+  final int? offertoryFreeDoubleReadyAt;
+
   final int updatedAtMillis;
 
   const CloudSaveData({
@@ -439,6 +448,13 @@ class CloudSaveData {
     this.activeBattleBlessing,
     this.battleBonusTempHp = 0,
     this.lastFreeDailyPrayerDate,
+    this.offertoryLevel = 0,
+    this.offertoryLastCollectedAt,
+    this.offertoryPendingFraction = 0.0,
+    this.offertoryBankedOrbs = 0,
+    this.offertoryBankedSeconds = 0.0,
+    this.offertoryBoostExpiresAt,
+    this.offertoryFreeDoubleReadyAt,
     this.updatedAtMillis = 0,
   }) : enemyStage = enemyStage ?? enemyPhase,
        removeAdsEnabled = removeAdsEnabled ?? unlockedAds,
@@ -548,6 +564,7 @@ class CloudSaveData {
     if (totalOrbs > local.totalOrbs) return true;
     if (unlockedCount > local.unlockedCount) return true;
     if (unlockedShopValue > local.unlockedShopValue) return true;
+    if (offertoryLevel > local.offertoryLevel) return true;
     if (unlockedCount == local.unlockedCount &&
         totalOrbs == local.totalOrbs &&
         (currentWeek > local.currentWeek ||
@@ -596,6 +613,14 @@ class CloudSaveData {
 
   static int _maxInt(int a, int b) => a > b ? a : b;
 
+  static int? _maxNullablePositiveInt(int? a, int? b) {
+    final validA = (a != null && a > 0) ? a : null;
+    final validB = (b != null && b > 0) ? b : null;
+    if (validA == null) return validB;
+    if (validB == null) return validA;
+    return validA > validB ? validA : validB;
+  }
+
   static int? _minNonZeroWeek(int? a, int? b) {
     final validA = (a != null && a >= 0) ? a : null;
     final validB = (b != null && b >= 0) ? b : null;
@@ -620,6 +645,29 @@ class CloudSaveData {
       mergedRemoveAdsEnabled = false;
       mergedHasExplicitRemoveAdsEnabled = false;
     }
+
+    final bool useLocalOffertory = local.offertoryLevel > offertoryLevel;
+    final mergedOffertoryLevel = _maxInt(offertoryLevel, local.offertoryLevel);
+    final mergedOffertoryLastCollectedAt = useLocalOffertory
+        ? local.offertoryLastCollectedAt
+        : (offertoryLastCollectedAt ?? local.offertoryLastCollectedAt);
+    final mergedOffertoryPendingFraction = useLocalOffertory
+        ? local.offertoryPendingFraction
+        : offertoryPendingFraction;
+    final mergedOffertoryBankedOrbs = useLocalOffertory
+        ? local.offertoryBankedOrbs
+        : offertoryBankedOrbs;
+    final mergedOffertoryBankedSeconds = useLocalOffertory
+        ? local.offertoryBankedSeconds
+        : offertoryBankedSeconds;
+    final mergedOffertoryBoostExpiresAt = _maxNullablePositiveInt(
+      offertoryBoostExpiresAt,
+      local.offertoryBoostExpiresAt,
+    );
+    final mergedOffertoryFreeDoubleReadyAt = _maxNullablePositiveInt(
+      offertoryFreeDoubleReadyAt,
+      local.offertoryFreeDoubleReadyAt,
+    );
 
     return CloudSaveData(
       fireOrbs: fireOrbs,
@@ -781,6 +829,13 @@ class CloudSaveData {
       battleBonusTempHp: battleBonusTempHp,
       lastFreeDailyPrayerDate:
           lastFreeDailyPrayerDate ?? local.lastFreeDailyPrayerDate,
+      offertoryLevel: mergedOffertoryLevel,
+      offertoryLastCollectedAt: mergedOffertoryLastCollectedAt,
+      offertoryPendingFraction: mergedOffertoryPendingFraction,
+      offertoryBankedOrbs: mergedOffertoryBankedOrbs,
+      offertoryBankedSeconds: mergedOffertoryBankedSeconds,
+      offertoryBoostExpiresAt: mergedOffertoryBoostExpiresAt,
+      offertoryFreeDoubleReadyAt: mergedOffertoryFreeDoubleReadyAt,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -915,6 +970,13 @@ class CloudSaveData {
       activeBattleBlessing: storage.activeBattleBlessing,
       battleBonusTempHp: storage.battleBonusTempHp,
       lastFreeDailyPrayerDate: storage.lastFreeDailyPrayerDate,
+      offertoryLevel: storage.offertoryLevel,
+      offertoryLastCollectedAt: storage.offertoryLastCollectedAt,
+      offertoryPendingFraction: storage.offertoryPendingFraction,
+      offertoryBankedOrbs: storage.offertoryBankedOrbs,
+      offertoryBankedSeconds: storage.offertoryBankedSeconds,
+      offertoryBoostExpiresAt: storage.offertoryBoostExpiresAt,
+      offertoryFreeDoubleReadyAt: storage.offertoryFreeDoubleReadyAt,
       updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -953,6 +1015,13 @@ class CloudSaveData {
     await storage.setActiveBattleBlessing(activeBattleBlessing);
     await storage.setBattleBonusTempHp(battleBonusTempHp);
     await storage.setLastFreeDailyPrayerDate(lastFreeDailyPrayerDate);
+    await storage.setOffertoryLevel(offertoryLevel);
+    await storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
+    await storage.setOffertoryPendingFraction(offertoryPendingFraction);
+    await storage.setOffertoryBankedOrbs(offertoryBankedOrbs);
+    await storage.setOffertoryBankedSeconds(offertoryBankedSeconds);
+    await storage.setOffertoryBoostExpiresAt(offertoryBoostExpiresAt);
+    await storage.setOffertoryFreeDoubleReadyAt(offertoryFreeDoubleReadyAt);
     if (purchasedIapProductIds.isNotEmpty) {
       await storage.setPurchasedIapProductIds({
         ...storage.purchasedIapProductIds,
@@ -1180,6 +1249,16 @@ class CloudSaveData {
       'battleBonusTempHp': battleBonusTempHp,
       if (lastFreeDailyPrayerDate != null)
         'lastFreeDailyPrayerDate': lastFreeDailyPrayerDate,
+      'offertoryLevel': offertoryLevel,
+      if (offertoryLastCollectedAt != null)
+        'offertoryLastCollectedAt': offertoryLastCollectedAt,
+      'offertoryPendingFraction': offertoryPendingFraction,
+      'offertoryBankedOrbs': offertoryBankedOrbs,
+      'offertoryBankedSeconds': offertoryBankedSeconds,
+      if (offertoryBoostExpiresAt != null)
+        'offertoryBoostExpiresAt': offertoryBoostExpiresAt,
+      if (offertoryFreeDoubleReadyAt != null)
+        'offertoryFreeDoubleReadyAt': offertoryFreeDoubleReadyAt,
       'hasClaimedQaBonus': hasClaimedQaBonus,
       'userScore': userScore,
       'pcScore': pcScore,
@@ -1335,6 +1414,29 @@ class CloudSaveData {
     if (treasuryEarthMetalBonusGranted &&
         !storage.treasuryEarthMetalBonusGranted) {
       await storage.setTreasuryEarthMetalBonusGranted(true);
+    }
+    if (offertoryLevel > storage.offertoryLevel) {
+      await storage.setOffertoryLevel(offertoryLevel);
+      if (offertoryLastCollectedAt != null) {
+        await storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
+      }
+      await storage.setOffertoryPendingFraction(offertoryPendingFraction);
+      await storage.setOffertoryBankedOrbs(offertoryBankedOrbs);
+      await storage.setOffertoryBankedSeconds(offertoryBankedSeconds);
+    }
+    final mergedBoostExp = _maxNullablePositiveInt(
+      storage.offertoryBoostExpiresAt,
+      offertoryBoostExpiresAt,
+    );
+    if (mergedBoostExp != storage.offertoryBoostExpiresAt) {
+      await storage.setOffertoryBoostExpiresAt(mergedBoostExp);
+    }
+    final mergedDoubleReady = _maxNullablePositiveInt(
+      storage.offertoryFreeDoubleReadyAt,
+      offertoryFreeDoubleReadyAt,
+    );
+    if (mergedDoubleReady != storage.offertoryFreeDoubleReadyAt) {
+      await storage.setOffertoryFreeDoubleReadyAt(mergedDoubleReady);
     }
   }
 
@@ -1512,6 +1614,32 @@ class CloudSaveData {
               : ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0),
       lastFreeDailyPrayerDate:
           (map['lastFreeDailyPrayerDate'] as String?)?.trim(),
+      offertoryLevel: _parseNonNegativeInt(map['offertoryLevel']),
+      offertoryLastCollectedAt: (() {
+        final raw = (map['offertoryLastCollectedAt'] as num?)?.toInt();
+        return (raw != null && raw > 0) ? raw : null;
+      })(),
+      offertoryPendingFraction: (() {
+        final raw = (map['offertoryPendingFraction'] as num?)?.toDouble() ?? 0.0;
+        if (raw.isNaN || raw.isInfinite || raw < 0.0) return 0.0;
+        if (raw >= 1.0) return 0.999999;
+        return raw;
+      })(),
+      offertoryBankedOrbs: _parseNonNegativeInt(map['offertoryBankedOrbs']),
+      offertoryBankedSeconds: (() {
+        final raw = (map['offertoryBankedSeconds'] as num?)?.toDouble() ?? 0.0;
+        if (raw.isNaN || raw.isInfinite || raw < 0.0) return 0.0;
+        if (raw > 28800.0) return 28800.0;
+        return raw;
+      })(),
+      offertoryBoostExpiresAt: (() {
+        final raw = (map['offertoryBoostExpiresAt'] as num?)?.toInt();
+        return (raw != null && raw > 0) ? raw : null;
+      })(),
+      offertoryFreeDoubleReadyAt: (() {
+        final raw = (map['offertoryFreeDoubleReadyAt'] as num?)?.toInt();
+        return (raw != null && raw > 0) ? raw : null;
+      })(),
       hasClaimedQaBonus: map['hasClaimedQaBonus'] as bool? ?? false,
       userScore: (map['userScore'] as num?)?.toInt() ?? 0,
       pcScore: (map['pcScore'] as num?)?.toInt() ?? 0,

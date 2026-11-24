@@ -13,13 +13,32 @@ import '../widgets/temple_wing_icons.dart';
 import 'royal_castle_dialog.dart';
 import 'story_dialog.dart';
 
-/// Identifies the 5 wings inside the Sacred Temple ([ShopDialog] / [SacredTempleDialog]) hub.
+/// Identifies the 6 wings inside the Sacred Temple ([ShopDialog] / [SacredTempleDialog]) hub.
 enum TempleWing {
   consagration,
   offerings,
   transmute,
   adoration,
   prayer,
+  offertory,
+}
+
+enum _OffertoryBatchOption {
+  x1(1, 'offertory_batch_1x'),
+  x10(10, 'offertory_batch_10x'),
+  max(null, 'offertory_batch_max');
+
+  final int? fixedMultiplier;
+  final String keyName;
+
+  const _OffertoryBatchOption(this.fixedMultiplier, this.keyName);
+
+  String label(LocalizationService loc) {
+    if (fixedMultiplier != null) {
+      return '${fixedMultiplier}x';
+    }
+    return loc.t('castle_alchemy_max', fallback: 'MAX');
+  }
 }
 
 enum _TransmuteBatchOption {
@@ -60,7 +79,7 @@ enum _ConsagrationBatchOption {
   }
 }
 
-/// Alias so callers can refer to the 5-tab Sacred Temple Hub as [SacredTempleDialog]
+/// Alias so callers can refer to the 6-tab Sacred Temple Hub as [SacredTempleDialog]
 /// or [ShopDialog].
 typedef SacredTempleDialog = ShopDialog;
 
@@ -83,6 +102,7 @@ class ShopDialog extends StatefulWidget {
 class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   static const Color _goldFill = Color(0xFFF5C22B);
   static const Color _goldDarkInk = Color(0xFF1E1B16);
+  static const Color _alertRed = Color(0xFFE53935);
 
   GameController get controller => widget.controller;
 
@@ -109,6 +129,18 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   late final AnimationController _manaFeedbackController;
   String? _hpFloatingGainText;
   String? _manaFloatingGainText;
+
+  // Offertory Wing state, 1-second live counter ticker, and parabolic flying 3D orbs VFX
+  _OffertoryBatchOption _selectedOffertoryBatch = _OffertoryBatchOption.x1;
+  Timer? _offertoryLiveTimer;
+  final GlobalKey _dialogStackKey = GlobalKey();
+  final GlobalKey _offertoryVaultAnchorKey = GlobalKey();
+  final Map<HandMove, GlobalKey> _headerOrbKeys = {
+    for (final m in HandMove.values) m: GlobalKey(),
+  };
+  late final AnimationController _offertoryFlyController;
+  List<HandMove> _offertoryFlyingMoves = const [];
+  int _offertoryFloatingCollectAmount = 0;
 
   HandMove _selectedBulkElement = HandMove.rock;
 
@@ -144,15 +176,46 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           setState(() => _manaFloatingGainText = null);
         }
       });
+    _offertoryFlyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 780),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {
+            _offertoryFlyingMoves = const [];
+            _offertoryFloatingCollectAmount = 0;
+          });
+        }
+      });
+    _syncOffertoryLiveTimer();
     controller.billingService.addEventListener(_onBillingEvent);
+  }
+
+  void _syncOffertoryLiveTimer() {
+    if (_selectedWing == TempleWing.offertory) {
+      _offertoryLiveTimer ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) {
+          if (mounted && _selectedWing == TempleWing.offertory) {
+            setState(() {});
+          }
+        },
+      );
+    } else {
+      _offertoryLiveTimer?.cancel();
+      _offertoryLiveTimer = null;
+    }
   }
 
   @override
   void dispose() {
     _stopHoldTransmute();
     _stopHoldConsagration();
+    _offertoryLiveTimer?.cancel();
+    _offertoryLiveTimer = null;
     _hpFeedbackController.dispose();
     _manaFeedbackController.dispose();
+    _offertoryFlyController.dispose();
     _transmuteConfirmationTimer?.cancel();
     _wingScrollController.dispose();
     controller.billingService.removeEventListener(_onBillingEvent);
@@ -173,6 +236,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           _showInsufficientOrbsInlinePrompt = false;
         }
       });
+      _syncOffertoryLiveTimer();
     }
   }
 
@@ -586,12 +650,15 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               key: ValueKey('shop_header_orb_${move.orbKey}'),
               mainAxisSize: MainAxisSize.min,
               children: [
-                ElementalEnergySphere(
-                  key: ValueKey('shop_header_orb_sphere_${move.orbKey}'),
-                  size: 17,
-                  primaryColor: move.elementalPrimaryColor,
-                  secondaryColor: move.elementalSecondaryColor,
-                  isDark: palette.isDark,
+                KeyedSubtree(
+                  key: _headerOrbKeys[move],
+                  child: ElementalEnergySphere(
+                    key: ValueKey('shop_header_orb_sphere_${move.orbKey}'),
+                    size: 17,
+                    primaryColor: move.elementalPrimaryColor,
+                    secondaryColor: move.elementalSecondaryColor,
+                    isDark: palette.isDark,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -640,179 +707,193 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           minHeight: fixedHeight,
           maxHeight: fixedHeight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14.0, 12.0, 14.0, 10.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. Fixed Top Header, Navigation Tabs & Orb Balance Bar (Never Scrolls)
-              Row(
+        child: Stack(
+          key: _dialogStackKey,
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14.0, 12.0, 14.0, 10.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: palette.amberBorder.withValues(
-                        alpha: palette.isDark ? 0.18 : 0.14,
-                      ),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: palette.amberBorder.withValues(alpha: 0.55),
-                      ),
-                    ),
-                    child: const SacredTempleEmblemIcon(size: 32),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.t(
-                            'map_landmark_sacred_temple',
-                            fallback: 'Sacred Temple',
+                  // 1. Fixed Top Header, Navigation Tabs & Orb Balance Bar (Never Scrolls)
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: palette.amberBorder.withValues(
+                            alpha: palette.isDark ? 0.18 : 0.14,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: palette.primaryText,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: palette.amberBorder.withValues(alpha: 0.55),
                           ),
                         ),
-                        Text(
-                          loc.t(
-                            'temple_hub_subtitle',
-                            fallback: 'Sanctuary of Offerings & Blessings',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: const SacredTempleEmblemIcon(size: 32),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.t(
+                                'map_landmark_sacred_temple',
+                                fallback: 'Sacred Temple',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: palette.primaryText,
+                              ),
+                            ),
+                            Text(
+                              loc.t(
+                                'temple_hub_subtitle',
+                                fallback: 'Sanctuary of Offerings & Blessings',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.2,
+                                color: palette.amberSubtitle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.rewardedAdCardSurface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: palette.rewardedAdCardBorder),
+                        ),
+                        child: Text(
+                          '$weekLabel $week / ${GameController.maxCampaignWeeks}',
                           style: TextStyle(
+                            fontWeight: FontWeight.bold,
                             fontSize: 11.5,
-                            height: 1.2,
-                            color: palette.amberSubtitle,
+                            color: palette.amberText,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: palette.rewardedAdCardSurface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: palette.rewardedAdCardBorder),
-                    ),
-                    child: Text(
-                      '$weekLabel $week / ${GameController.maxCampaignWeeks}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11.5,
-                        color: palette.amberText,
+                  const SizedBox(height: 8),
+
+                  // 6 Compact Vertical Navigation Tab Pills in a Single Row
+                  _buildTempleTabBar(context, palette, loc),
+                  const SizedBox(height: 8),
+
+                  // Persistent 5 Elemental Orbs Balance Bar across all 6 Wings
+                  _buildOrbSummaryBar(context),
+
+                  Divider(
+                    height: 12,
+                    thickness: 1,
+                    color: palette.divider,
+                  ),
+
+                  // 2. Scrollable Wing Content Area Only (Expanded)
+                  Expanded(
+                    child: ClipRect(
+                      child: Scrollbar(
+                        key: ValueKey(
+                          'temple_wing_scrollbar_${_selectedWing.name}',
+                        ),
+                        controller: _wingScrollController,
+                        thumbVisibility: true,
+                        thickness: 4,
+                        radius: const Radius.circular(8),
+                        child: _buildSelectedWing(context, palette, loc),
                       ),
                     ),
+                  ),
+
+                  // 3. Pinned Bottom Footer (Restore Purchases & Ok Button — Never Scrolls)
+                  Divider(
+                    height: 12,
+                    thickness: 1,
+                    color: palette.divider,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: TextButton.icon(
+                          key: const ValueKey('shop_restore_purchases_button'),
+                          style: palette.isDark
+                              ? null
+                              : TextButton.styleFrom(
+                                  foregroundColor: palette.amberText,
+                                ),
+                          onPressed: controller.billingService.isRestoring
+                              ? null
+                              : _handleRestorePurchases,
+                          icon: controller.billingService.isRestoring
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.restore_rounded, size: 16),
+                          label: Text(
+                            loc.t(
+                              'temple_restore_purchases',
+                              fallback: 'Restore Purchases',
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        key: const ValueKey('shop_close_button'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: palette.amberText,
+                          backgroundColor: palette.isDark
+                              ? palette.amberBorder.withValues(alpha: 0.16)
+                              : palette.rewardedAdCardSurface,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: palette.amberBorder.withValues(alpha: 0.45),
+                            ),
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(
+                          loc.t('string36', fallback: 'Close'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-
-              // 5 Compact Vertical Navigation Tab Pills in a Single Row
-              _buildTempleTabBar(context, palette, loc),
-              const SizedBox(height: 8),
-
-              // Persistent 5 Elemental Orbs Balance Bar across all 5 Wings
-              _buildOrbSummaryBar(context),
-
-              Divider(
-                height: 12,
-                thickness: 1,
-                color: palette.divider,
-              ),
-
-              // 2. Scrollable Wing Content Area Only (Expanded)
-              Expanded(
-                child: ClipRect(
-                  child: Scrollbar(
-                    key: ValueKey(
-                      'temple_wing_scrollbar_${_selectedWing.name}',
-                    ),
-                    controller: _wingScrollController,
-                    thumbVisibility: true,
-                    thickness: 4,
-                    radius: const Radius.circular(8),
-                    child: _buildSelectedWing(context, palette, loc),
-                  ),
+            ),
+            if (_offertoryFlyingMoves.isNotEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _buildOffertoryFlyingOrbsOverlay(palette),
                 ),
               ),
-
-              // 3. Pinned Bottom Footer (Restore Purchases & Ok Button — Never Scrolls)
-              Divider(
-                height: 12,
-                thickness: 1,
-                color: palette.divider,
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: TextButton.icon(
-                      key: const ValueKey('shop_restore_purchases_button'),
-                      style: palette.isDark
-                          ? null
-                          : TextButton.styleFrom(
-                              foregroundColor: palette.amberText,
-                            ),
-                      onPressed: controller.billingService.isRestoring
-                          ? null
-                          : _handleRestorePurchases,
-                      icon: controller.billingService.isRestoring
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.restore_rounded, size: 16),
-                      label: Text(
-                        loc.t(
-                          'temple_restore_purchases',
-                          fallback: 'Restore Purchases',
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    key: const ValueKey('shop_close_button'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: palette.amberText,
-                      backgroundColor: palette.isDark
-                          ? palette.amberBorder.withValues(alpha: 0.16)
-                          : palette.rewardedAdCardSurface,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: palette.amberBorder.withValues(alpha: 0.45),
-                        ),
-                      ),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      loc.t('string36', fallback: 'Close'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -828,6 +909,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       ValueKey<String> key,
       Widget Function(bool isSelected) iconBuilder,
       String label,
+      bool hasDot,
     })> tabs = [
       (
         wing: TempleWing.consagration,
@@ -837,6 +919,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_consagration', fallback: 'Consagration'),
+        hasDot: false,
       ),
       (
         wing: TempleWing.offerings,
@@ -846,6 +929,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_offerings', fallback: 'Offerings'),
+        hasDot: false,
       ),
       (
         wing: TempleWing.transmute,
@@ -855,6 +939,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_transmute', fallback: 'Transform'),
+        hasDot: false,
       ),
       (
         wing: TempleWing.adoration,
@@ -864,6 +949,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_adoration', fallback: 'Adoration'),
+        hasDot: false,
       ),
       (
         wing: TempleWing.prayer,
@@ -873,6 +959,17 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           isOnGoldBackground: false,
         ),
         label: loc.t('temple_tab_prayer', fallback: 'Prayer'),
+        hasDot: false,
+      ),
+      (
+        wing: TempleWing.offertory,
+        key: const ValueKey('temple_tab_offertory'),
+        iconBuilder: (_) => const OffertoryVaultIcon(
+          size: 28,
+          isOnGoldBackground: false,
+        ),
+        label: loc.t('temple_tab_offertory', fallback: 'Offertory'),
+        hasDot: controller.isOffertoryFull,
       ),
     ];
 
@@ -887,6 +984,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               iconBuilder: tabs[i].iconBuilder,
               label: tabs[i].label,
               selected: _selectedWing == tabs[i].wing,
+              showDot: tabs[i].hasDot,
               palette: palette,
               onTap: () => _selectWing(tabs[i].wing),
             ),
@@ -912,6 +1010,8 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         return _buildAdorationWing(context, palette, loc);
       case TempleWing.prayer:
         return _buildPrayerWing(context, palette, loc);
+      case TempleWing.offertory:
+        return _buildOffertoryWing(context, palette, loc);
     }
   }
 
@@ -4225,12 +4325,1820 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // WING 6: OFFERTORY (GAZOFILÁCIO — PERMANENT IDLE ORB GENERATOR)
+  // ---------------------------------------------------------------------------
+
+  String _formatOffertoryDuration(Duration d) {
+    final totalSeconds = math.max(0, d.inSeconds);
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    return '${h.toString().padLeft(2, '0')}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+  }
+
+  String _formatRateValue(double value, LocalizationService loc) {
+    if (value <= 0) return '0';
+    final rounded = value.roundToDouble();
+    if ((value - rounded).abs() < 0.005) {
+      return _formatGroupedInt(rounded.toInt(), loc);
+    }
+    final formatted = value.toStringAsFixed(1);
+    return loc.currentLanguage == 'en'
+        ? formatted
+        : formatted.replaceAll('.', ',');
+  }
+
+  void _triggerOffertoryFlyingOrbs(int grantedPerElement) {
+    if (!mounted || grantedPerElement <= 0) return;
+    if (!controller.animationsEnabled) return;
+    setState(() {
+      _offertoryFlyingMoves = List<HandMove>.from(
+        controller.offertoryActiveElements,
+      );
+      _offertoryFloatingCollectAmount = grantedPerElement;
+    });
+    _offertoryFlyController.forward(from: 0.0);
+  }
+
+  Offset _resolveRelativeCenter(GlobalKey key, Offset fallback) {
+    final stackBox =
+        _dialogStackKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetBox = key.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null ||
+        targetBox == null ||
+        !stackBox.hasSize ||
+        !targetBox.hasSize) {
+      return fallback;
+    }
+    final globalCenter = targetBox.localToGlobal(
+      targetBox.size.center(Offset.zero),
+    );
+    return stackBox.globalToLocal(globalCenter);
+  }
+
+  Widget _buildOffertoryFlyingOrbsOverlay(AppPalette palette) {
+    return AnimatedBuilder(
+      animation: _offertoryFlyController,
+      builder: (context, _) {
+        final raw = _offertoryFlyController.value;
+        if (raw <= 0.0 || raw >= 1.0 || _offertoryFlyingMoves.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final stackBox =
+            _dialogStackKey.currentContext?.findRenderObject() as RenderBox?;
+        final stackSize = stackBox?.size ?? const Size(340, 560);
+        final origin = _resolveRelativeCenter(
+          _offertoryVaultAnchorKey,
+          Offset(stackSize.width * 0.5, stackSize.height * 0.48),
+        );
+
+        final moves = _offertoryFlyingMoves;
+        final children = <Widget>[];
+
+        for (int idx = 0; idx < moves.length; idx++) {
+          final move = moves[idx];
+          final stagger = idx * 0.06;
+          final localT = ((raw - stagger) / (1.0 - stagger)).clamp(0.0, 1.0);
+          if (localT <= 0.0 || localT >= 1.0) continue;
+          final curved = Curves.easeInOutCubic.transform(localT);
+          final target = _resolveRelativeCenter(
+            _headerOrbKeys[move]!,
+            Offset(
+              stackSize.width * (0.18 + idx * 0.16),
+              stackSize.height * 0.24,
+            ),
+          );
+          final spreadX = (idx - (moves.length - 1) * 0.5) * 26.0;
+          final control = Offset(
+            (origin.dx + target.dx) * 0.5 + spreadX,
+            math.min(origin.dy, target.dy) - 42.0,
+          );
+          Offset bezier(double t) {
+            final mt = 1.0 - t;
+            return Offset(
+              mt * mt * origin.dx + 2 * mt * t * control.dx + t * t * target.dx,
+              mt * mt * origin.dy + 2 * mt * t * control.dy + t * t * target.dy,
+            );
+          }
+
+          final pos = bezier(curved);
+          final scale = 1.15 - 0.25 * curved;
+
+          // Subtle glowing trail particles along the parabolic arc
+          for (int trail = 1; trail <= 3; trail++) {
+            final tt = (curved - trail * 0.055).clamp(0.0, 1.0);
+            if (tt <= 0.0) continue;
+            final tp = bezier(tt);
+            final r = 5.5 - trail * 1.1;
+            children.add(
+              Positioned(
+                left: tp.dx - r,
+                top: tp.dy - r,
+                child: Container(
+                  width: r * 2,
+                  height: r * 2,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: move.elementalPrimaryColor.withValues(
+                      alpha: (0.45 - trail * 0.10).clamp(0.08, 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          children.add(
+            Positioned(
+              left: pos.dx - 11 * scale,
+              top: pos.dy - 11 * scale,
+              child: ElementalEnergySphere(
+                key: ValueKey('offertory_flying_orb_${move.orbKey}'),
+                size: 22 * scale,
+                primaryColor: move.elementalPrimaryColor,
+                secondaryColor: move.elementalSecondaryColor,
+                isDark: palette.isDark,
+              ),
+            ),
+          );
+        }
+
+        if (_offertoryFloatingCollectAmount > 0) {
+          final floatOpacity = (1.0 - raw).clamp(0.0, 1.0);
+          children.add(
+            Positioned(
+              left: (origin.dx - 44).clamp(8.0, stackSize.width - 96),
+              top: origin.dy - 24 - 30 * raw,
+              child: Opacity(
+                opacity: floatOpacity,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _goldFill,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '+${_formatGroupedInt(_offertoryFloatingCollectAmount, controller.localization)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: _goldDarkInk,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Stack(
+          key: const ValueKey('offertory_flying_orbs_overlay'),
+          clipBehavior: Clip.none,
+          children: children,
+        );
+      },
+    );
+  }
+
+  ({int levels, ElementalCost totalCost, bool isAffordable})
+      _resolveOffertoryUpgradePreview() {
+    final fixed = _selectedOffertoryBatch.fixedMultiplier;
+    if (fixed == null) {
+      final maxRes = controller.maxAffordableOffertoryUpgrade();
+      if (maxRes.levels > 0) {
+        return (
+          levels: maxRes.levels,
+          totalCost: maxRes.totalCost,
+          isAffordable: true,
+        );
+      }
+      return (
+        levels: 1,
+        totalCost: controller.nextOffertoryUpgradeCost,
+        isAffordable: false,
+      );
+    }
+    final cost = controller.offertoryCostForLevels(fixed);
+    return (
+      levels: fixed,
+      totalCost: cost,
+      isAffordable: controller.canAfford(cost),
+    );
+  }
+
+  void _stepDownOffertoryBatchIfNeeded() {
+    if (_selectedOffertoryBatch == _OffertoryBatchOption.x10 &&
+        !controller.canAffordOffertoryLevels(10)) {
+      _selectedOffertoryBatch = _OffertoryBatchOption.x1;
+    }
+  }
+
+  Future<bool> _showOffertoryMaxConfirmDialog({
+    required int levels,
+    required ElementalCost totalCost,
+  }) async {
+    final loc = controller.localization;
+    final palette = AppPalette.of(context);
+    final beforeLv = controller.offertoryLevel;
+    final afterLv = beforeLv + levels;
+    final beforeRate = controller.offertoryHourlyRate(level: beforeLv);
+    final afterRate = controller.offertoryHourlyRate(level: afterLv);
+    final activeMoves = controller.offertoryActiveElements;
+
+    final levelsGainedText = loc
+        .t('consagration_confirm_levels_gained', fallback: '+{count} Levels')
+        .replaceAll('{count}', _formatGroupedInt(levels, loc));
+    final summaryText =
+        '$levelsGainedText • Lv. ${_formatGroupedInt(beforeLv, loc)} → Lv. ${_formatGroupedInt(afterLv, loc)} • +${_formatRateValue(beforeRate, loc)}/h → +${_formatRateValue(afterRate, loc)}/h';
+
+    Widget buildOrbRow(Key rowKey, List<(HandMove move, int amount)> items) {
+      return Container(
+        key: rowKey,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: palette.summaryBarSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: palette.amberBorder.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Wrap(
+          alignment: WrapAlignment.spaceEvenly,
+          spacing: 10,
+          runSpacing: 6,
+          children: [
+            for (final item in items)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElementalEnergySphere(
+                    size: 16,
+                    primaryColor: item.$1.elementalPrimaryColor,
+                    secondaryColor: item.$1.elementalSecondaryColor,
+                    isDark: palette.isDark,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatGroupedInt(item.$2, loc),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: palette.elementalText(item.$1),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      );
+    }
+
+    int costForMove(HandMove move) {
+      switch (move) {
+        case HandMove.rock:
+          return totalCost.fire;
+        case HandMove.paper:
+          return totalCost.water;
+        case HandMove.scissors:
+          return totalCost.wood;
+        case HandMove.lizard:
+          return totalCost.earth;
+        case HandMove.spock:
+          return totalCost.metal;
+      }
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('offertory_max_confirm_dialog'),
+        backgroundColor: palette.dialogSurface,
+        surfaceTintColor: palette.isDark ? null : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: palette.amberBorder.withValues(alpha: 0.65),
+            width: 1.4,
+          ),
+        ),
+        title: Row(
+          children: [
+            const OffertoryVaultIcon(size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'offertory_confirm_title',
+                  fallback: 'Confirm Offertory Upgrade',
+                ),
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.bold,
+                  color: palette.primaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: palette.rewardedAdCardSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Text(
+                summaryText,
+                key: const ValueKey('offertory_max_confirm_summary'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: palette.amberText,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              loc.t(
+                'consagration_confirm_total_cost',
+                fallback: 'Total Orb Cost',
+              ),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: palette.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            buildOrbRow(
+              const ValueKey('offertory_max_confirm_cost'),
+              [for (final m in activeMoves) (m, costForMove(m))],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              loc.t(
+                'consagration_confirm_remaining_balance',
+                fallback: 'Remaining After Purchase',
+              ),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: palette.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            buildOrbRow(
+              const ValueKey('offertory_max_confirm_remaining'),
+              [
+                for (final m in activeMoves)
+                  (m, math.max(0, controller.orbsFor(m) - costForMove(m))),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('offertory_max_confirm_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              loc.t('consagration_confirm_cancel', fallback: 'Cancel'),
+              style: TextStyle(color: palette.secondaryText),
+            ),
+          ),
+          ElevatedButton(
+            key: const ValueKey('offertory_max_confirm_submit'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _goldFill,
+              foregroundColor: _goldDarkInk,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              loc.t('consagration_confirm_action', fallback: 'Confirm Upgrade'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _handleOffertoryUpgradeTap() async {
+    final loc = controller.localization;
+    final preview = _resolveOffertoryUpgradePreview();
+    if (!preview.isAffordable || preview.levels <= 0) {
+      controller.audio.playVibrate();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+
+    if (_selectedOffertoryBatch == _OffertoryBatchOption.max &&
+        preview.levels >= 10) {
+      final confirmed = await _showOffertoryMaxConfirmDialog(
+        levels: preview.levels,
+        totalCost: preview.totalCost,
+      );
+      if (!mounted || !confirmed) return;
+    }
+
+    final ok = controller.upgradeOffertoryBatch(preview.levels);
+    if (ok && mounted) {
+      setState(() {
+        _stepDownOffertoryBatchIfNeeded();
+      });
+      final msg = loc
+          .t(
+            'offertory_upgraded_msg',
+            fallback: 'Offertory upgraded to Lv. {level}!',
+          )
+          .replaceAll('{level}', _formatGroupedInt(controller.offertoryLevel, loc));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  void _handleOffertoryCollect1x() {
+    final loc = controller.localization;
+    final granted = controller.collectOffertoryOrbs(multiplier: 1);
+    if (granted > 0 && mounted) {
+      _triggerOffertoryFlyingOrbs(granted);
+      final msg = loc
+          .t(
+            'offertory_collected_msg',
+            fallback: 'Collected +{amount} orbs per active element!',
+          )
+          .replaceAll('{amount}', _formatGroupedInt(granted, loc));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+        );
+    }
+  }
+
+  Future<void> _handleOffertoryCollect2x() async {
+    final loc = controller.localization;
+    if (controller.isRemoveAdsActive) {
+      final granted = controller.claimRemoveAdsDoubleCollectOffertory();
+      if (granted > 0 && mounted) {
+        _triggerOffertoryFlyingOrbs(granted);
+        final msg = loc
+            .t(
+              'offertory_collected_msg',
+              fallback: 'Collected +{amount} orbs per active element!',
+            )
+            .replaceAll('{amount}', _formatGroupedInt(granted, loc));
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+          );
+      }
+      return;
+    }
+
+    await controller.watchAdToDoubleCollectOffertory(
+      onCollected: (granted) {
+        if (!mounted || granted <= 0) return;
+        _triggerOffertoryFlyingOrbs(granted);
+        final msg = loc
+            .t(
+              'offertory_collected_msg',
+              fallback: 'Collected +{amount} orbs per active element!',
+            )
+            .replaceAll('{amount}', _formatGroupedInt(granted, loc));
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+          );
+      },
+    );
+  }
+
+  void _handleOffertoryTitheBoostTap() {
+    final loc = controller.localization;
+    final ok = controller.invokeOffertoryTitheBoost();
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t(
+                'offertory_tithe_activated_msg',
+                fallback: '2x Offertory Production Speed invoked!',
+              ),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  Widget _buildOffertoryBatchSelector({
+    required AppPalette palette,
+    required LocalizationService loc,
+    required bool canAfford10x,
+  }) {
+    final trackBg = palette.isDark
+        ? const Color(0xFF14171F)
+        : const Color(0xFFE9E0CD);
+    final trackBorder = palette.amberBorder.withValues(
+      alpha: palette.isDark ? 0.25 : 0.45,
+    );
+
+    bool isOptionEnabled(_OffertoryBatchOption option) {
+      switch (option) {
+        case _OffertoryBatchOption.x1:
+          return true;
+        case _OffertoryBatchOption.x10:
+          return canAfford10x;
+        case _OffertoryBatchOption.max:
+          return true;
+      }
+    }
+
+    return Container(
+      key: const ValueKey('offertory_batch_selector'),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: trackBg,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: trackBorder, width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < _OffertoryBatchOption.values.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2.5),
+            Builder(
+              builder: (_) {
+                final option = _OffertoryBatchOption.values[i];
+                final enabled = isOptionEnabled(option);
+                final selected = _selectedOffertoryBatch == option;
+                final Color bgColor;
+                final Color borderColor;
+                final Color textColor;
+                if (selected) {
+                  bgColor = enabled
+                      ? _goldFill
+                      : _goldFill.withValues(alpha: 0.45);
+                  borderColor = bgColor;
+                  textColor = enabled
+                      ? _goldDarkInk
+                      : _goldDarkInk.withValues(alpha: 0.72);
+                } else if (enabled) {
+                  bgColor = palette.isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : const Color(0xFFFAF6EE);
+                  borderColor = palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.28 : 0.42,
+                  );
+                  textColor = palette.isDark
+                      ? Colors.white.withValues(alpha: 0.90)
+                      : palette.primaryText;
+                } else {
+                  bgColor = Colors.transparent;
+                  borderColor = palette.isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : palette.sandCardBorder.withValues(alpha: 0.55);
+                  textColor = palette.isDark
+                      ? Colors.white.withValues(alpha: 0.28)
+                      : palette.mutedText.withValues(alpha: 0.42);
+                }
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: ValueKey(option.keyName),
+                    onTap: enabled
+                        ? () {
+                            controller.audio.playTapVibrate();
+                            setState(() => _selectedOffertoryBatch = option);
+                          }
+                        : null,
+                    borderRadius: BorderRadius.circular(6.5),
+                    child: Container(
+                      height: 24,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        borderRadius: BorderRadius.circular(6.5),
+                        border: Border.all(color: borderColor, width: 0.9),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        option.label(loc),
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w700,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOffertoryWing(
+    BuildContext context,
+    AppPalette palette,
+    LocalizationService loc,
+  ) {
+    final lv = controller.offertoryLevel;
+    final activeMoves = controller.offertoryActiveElements;
+    final isPhase2Elements = controller.includesEarthAndMetalInBonuses;
+    final isBoostActive = controller.isOffertoryBoostActive();
+    final boostRemaining = controller.offertoryBoostRemaining();
+    final hourlyRate = controller.offertoryHourlyRate();
+    final perMinRate = controller.offertoryPerMinuteRate();
+    final storedOrbs = controller.offertoryStoredOrbs();
+    final fillProgress = controller.offertoryFillProgress();
+    final isFull = controller.isOffertoryFull;
+    final timeUntilFull = controller.offertoryTimeUntilFull();
+    final milestonePercent = controller.offertoryMilestoneBonusPercent;
+    final isRemoveAds = controller.isRemoveAdsActive;
+    final canCollect = storedOrbs >= 1;
+    final isFreeDoubleReady = controller.isOffertoryFreeDoubleReady();
+    final freeDoubleRemaining = controller.offertoryFreeDoubleRemaining();
+    final canDoubleCollect = isRemoveAds
+        ? controller.canClaimRemoveAdsDoubleCollectOffertory()
+        : controller.canWatchAdDoubleCollectOffertory();
+
+    final canAfford10x = controller.canAffordOffertoryLevels(10);
+    final upgradePreview = _resolveOffertoryUpgradePreview();
+    final previewTargetLv = lv + upgradePreview.levels;
+    final previewHourlyRate = controller.offertoryHourlyRate(
+      level: previewTargetLv,
+    );
+    final crossesMilestone = (previewTargetLv ~/ 10) > (lv ~/ 10);
+    final nextReachedMilestonePercent = (previewTargetLv ~/ 10) * 25;
+    final nextReachedMilestoneLv = (previewTargetLv ~/ 10) * 10;
+
+    final titheCosts = controller.offertoryTitheCosts();
+    final canTithe = controller.canInvokeOffertoryTitheBoost();
+    final isBoostAtMaxCap = controller.isOffertoryBoostAtMaxCap();
+
+    final cardBg = palette.isDark
+        ? const Color(0xFF1E222B)
+        : palette.dialogCardSurface;
+
+    final vaultHeaderTitle = lv == 0
+        ? loc.t('offertory_unbuilt_title', fallback: 'Unbuilt — Lv. 0')
+        : loc
+            .t('offertory_level_title', fallback: 'Offertory Lv. {level}')
+            .replaceAll('{level}', _formatGroupedInt(lv, loc));
+
+    final rateLine = loc
+        .t(
+          'offertory_rate_format',
+          fallback: '+{hourly}/h • {perMin}/min per element',
+        )
+        .replaceAll('{hourly}', _formatRateValue(hourlyRate, loc))
+        .replaceAll('{perMin}', _formatRateValue(perMinRate, loc));
+
+    int costForMove(ElementalCost cost, HandMove move) {
+      switch (move) {
+        case HandMove.rock:
+          return cost.fire;
+        case HandMove.paper:
+          return cost.water;
+        case HandMove.scissors:
+          return cost.wood;
+        case HandMove.lizard:
+          return cost.earth;
+        case HandMove.spock:
+          return cost.metal;
+      }
+    }
+
+    return SingleChildScrollView(
+      key: const ValueKey('temple_wing_offertory'),
+      controller: _wingScrollController,
+      padding: const EdgeInsets.only(top: 2, bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Wing Header
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                const OffertoryVaultIcon(size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.t(
+                      'temple_offertory_title',
+                      fallback: 'Sacred Offertory',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.rewardedAdCardSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Text(
+                        isPhase2Elements
+                            ? loc.t(
+                                'offertory_phase2_elements_note',
+                                fallback: 'Phase 2+: All 5 Elements',
+                              )
+                            : loc.t(
+                                'offertory_phase1_elements_note',
+                                fallback: 'Phase 1: 3 Main Elements',
+                              ),
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: palette.amberText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===================================================================
+          // CARD 1 — SACRED OFFERTORY VAULT (LIVE IDLE COUNTER & COLLECTION)
+          // ===================================================================
+          Container(
+            key: const ValueKey('offertory_vault_card'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isFull
+                    ? (palette.isDark
+                          ? const Color(0xFFFFD54F)
+                          : const Color(0xFFC88A00))
+                    : palette.amberBorder.withValues(
+                        alpha: palette.isDark ? 0.40 : 0.55,
+                      ),
+                width: isFull ? 1.8 : 1.1,
+              ),
+              boxShadow: isFull
+                  ? [
+                      BoxShadow(
+                        color: _goldFill.withValues(alpha: 0.24),
+                        blurRadius: 10,
+                        spreadRadius: 0.5,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              key: _offertoryVaultAnchorKey,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Vault Header Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: palette.amberBorder.withValues(
+                          alpha: palette.isDark ? 0.16 : 0.14,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: const OffertoryVaultIcon(size: 32),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                vaultHeaderTitle,
+                                key: const ValueKey('offertory_level_header'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                  color: palette.primaryText,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: palette.successText.withValues(
+                                    alpha: 0.14,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: palette.successText.withValues(
+                                      alpha: 0.45,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  loc.t(
+                                    'offertory_permanent_badge',
+                                    fallback: 'Permanent',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: palette.successText,
+                                  ),
+                                ),
+                              ),
+                              if (milestonePercent > 0)
+                                Container(
+                                  key: const ValueKey(
+                                    'offertory_milestone_badge',
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _goldFill.withValues(
+                                      alpha: palette.isDark ? 0.22 : 0.30,
+                                    ),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: palette.amberBorder.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    loc
+                                        .t(
+                                          'offertory_milestone_badge',
+                                          fallback: '+{percent}% Milestone',
+                                        )
+                                        .replaceAll(
+                                          '{percent}',
+                                          '$milestonePercent',
+                                        ),
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: palette.amberText,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              if (isBoostActive) ...[
+                                Container(
+                                  margin: const EdgeInsets.only(right: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _goldFill,
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: const Text(
+                                    '2x',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: _goldDarkInk,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  rateLine,
+                                  key: const ValueKey('offertory_rate_text'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isBoostActive
+                                        ? palette.amberText
+                                        : palette.amberSubtitle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 9),
+
+                // Live Ticking Storage Display (3D Elemental Orbs)
+                Container(
+                  key: const ValueKey('offertory_storage_display'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.summaryBarSurface,
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (lv == 0)
+                        Text(
+                          loc.t(
+                            'offertory_unbuilt_hint',
+                            fallback:
+                                'Consecrate Elemental Orbs below to awaken permanent idle orb generation (up to 8h offline).',
+                          ),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1.3,
+                            color: palette.secondaryText,
+                          ),
+                        )
+                      else ...[
+                        Wrap(
+                          alignment: WrapAlignment.spaceEvenly,
+                          spacing: 10,
+                          runSpacing: 6,
+                          children: [
+                            for (final move in activeMoves)
+                              Row(
+                                key: ValueKey(
+                                  'offertory_stored_orb_${move.orbKey}',
+                                ),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ElementalEnergySphere(
+                                    key: ValueKey(
+                                      'offertory_stored_sphere_${move.orbKey}',
+                                    ),
+                                    size: 20,
+                                    primaryColor: move.elementalPrimaryColor,
+                                    secondaryColor:
+                                        move.elementalSecondaryColor,
+                                    isDark: palette.isDark,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatGroupedInt(storedOrbs, loc),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: palette.elementalText(move),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              flex: 6,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: isFull
+                                    ? Container(
+                                        key: const ValueKey(
+                                          'offertory_full_badge',
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _goldFill,
+                                          borderRadius: BorderRadius.circular(
+                                            7,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: _goldFill.withValues(
+                                                alpha: 0.45,
+                                              ),
+                                              blurRadius: 6,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Text(
+                                          loc.t(
+                                            'offertory_full_badge',
+                                            fallback: 'FULL (8h Cap)',
+                                          ),
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            color: _goldDarkInk,
+                                          ),
+                                        ),
+                                      )
+                                    : Text(
+                                        loc
+                                            .t(
+                                              'offertory_full_in',
+                                              fallback: 'Full in {time}',
+                                            )
+                                            .replaceAll(
+                                              '{time}',
+                                              _formatOffertoryDuration(
+                                                timeUntilFull,
+                                              ),
+                                            ),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: palette.secondaryText,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              flex: 4,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  '${(fillProgress * 100).floor()}% • ${loc.t('offertory_cap_label', fallback: '8h Cap')}',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: palette.amberText,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            key: const ValueKey('offertory_cap_progress_bar'),
+                            value: fillProgress,
+                            minHeight: 7,
+                            backgroundColor: palette.isDark
+                                ? Colors.white.withValues(alpha: 0.10)
+                                : const Color(0xFFD6C9B2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isFull
+                                  ? const Color(0xFFFFD54F)
+                                  : palette.amberBorder,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+
+                // Collect (1x) and 2x Collect Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 4,
+                      child: ElevatedButton.icon(
+                        key: const ValueKey('offertory_collect_button'),
+                        onPressed: canCollect ? _handleOffertoryCollect1x : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _goldFill,
+                          foregroundColor: _goldDarkInk,
+                          disabledBackgroundColor: palette.isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : palette.sandCardSurface,
+                          disabledForegroundColor: palette.mutedText,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 9,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.download_done_rounded,
+                          size: 16,
+                        ),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            loc.t('offertory_collect_btn', fallback: 'Collect'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 6,
+                      child: ElevatedButton.icon(
+                        key: const ValueKey('offertory_double_collect_button'),
+                        onPressed:
+                            canDoubleCollect ? _handleOffertoryCollect2x : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: palette.isDark
+                              ? const Color(0xFF2B3447)
+                              : const Color(0xFFE6D5B2),
+                          foregroundColor: palette.amberText,
+                          disabledBackgroundColor: palette.isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : palette.sandCardSurface,
+                          disabledForegroundColor: palette.mutedText,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 9,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(
+                              color: canDoubleCollect
+                                  ? palette.amberBorder.withValues(alpha: 0.75)
+                                  : palette.sandCardBorder,
+                              width: 1.1,
+                            ),
+                          ),
+                        ),
+                        icon: Icon(
+                          isRemoveAds
+                              ? Icons.auto_awesome_rounded
+                              : Icons.play_circle_fill_rounded,
+                          size: 15,
+                        ),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isRemoveAds
+                                ? (isFreeDoubleReady
+                                      ? loc.t(
+                                          'offertory_sanctuary_grace_2x_btn',
+                                          fallback:
+                                              '2x Collect (Sanctuary Grace)',
+                                        )
+                                      : loc
+                                            .t(
+                                              'offertory_sanctuary_grace_cooldown',
+                                              fallback: 'Grace in {time}',
+                                            )
+                                            .replaceAll(
+                                              '{time}',
+                                              _formatOffertoryDuration(
+                                                freeDoubleRemaining,
+                                              ),
+                                            ))
+                                : loc.t(
+                                    'offertory_watch_ad_2x_btn',
+                                    fallback: 'Watch Ad (2x Collect)',
+                                  ),
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isRemoveAds) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    key: const ValueKey('offertory_ad_disclosure_box'),
+                    children: [
+                      Icon(
+                        Icons.ondemand_video_rounded,
+                        size: 13,
+                        color: palette.amberIcon,
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          loc.t(
+                            'offertory_ad_disclosure',
+                            fallback:
+                                'Rewarded Video Ad: watch an ad to double (2x) your accumulated Offertory orbs upon collection.',
+                          ),
+                          style: TextStyle(
+                            fontSize: 10,
+                            height: 1.25,
+                            color: palette.secondaryText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ===================================================================
+          // CARD 2 — CONSECRATE & UPGRADE OFFERTORY (1x | 10x | MAX)
+          // ===================================================================
+          Container(
+            key: const ValueKey('offertory_upgrade_card'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.36 : 0.50,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        loc.t(
+                          'offertory_upgrade_card_title',
+                          fallback: 'Consecrate & Upgrade',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: palette.primaryText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _buildOffertoryBatchSelector(
+                      palette: palette,
+                      loc: loc,
+                      canAfford10x: canAfford10x,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Lv. ${_formatGroupedInt(lv, loc)} → Lv. ${_formatGroupedInt(previewTargetLv, loc)}',
+                          key: const ValueKey('offertory_level_jump_preview'),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: palette.amberText,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '+${_formatRateValue(hourlyRate, loc)}/h → +${_formatRateValue(previewHourlyRate, loc)}/h',
+                          key: const ValueKey('offertory_rate_jump_preview'),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: palette.successText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (crossesMilestone) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    key: const ValueKey('offertory_next_milestone_badge'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _goldFill.withValues(
+                        alpha: palette.isDark ? 0.18 : 0.28,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: palette.amberBorder.withValues(alpha: 0.70),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: palette.amberIcon,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            loc
+                                .t(
+                                  'offertory_next_milestone_reached',
+                                  fallback:
+                                      'Reaches +{percent}% Milestone (Lv. {level})!',
+                                )
+                                .replaceAll(
+                                  '{percent}',
+                                  '$nextReachedMilestonePercent',
+                                )
+                                .replaceAll(
+                                  '{level}',
+                                  '$nextReachedMilestoneLv',
+                                ),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: palette.amberText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 7),
+
+                // Real-Time 3D Elemental Orb Cost Breakdown
+                Container(
+                  key: const ValueKey('offertory_upgrade_cost_box'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.summaryBarSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 10,
+                    runSpacing: 5,
+                    children: [
+                      for (final move in activeMoves)
+                        Builder(
+                          builder: (_) {
+                            final req = costForMove(
+                              upgradePreview.totalCost,
+                              move,
+                            );
+                            final hasEnough = controller.orbsFor(move) >= req;
+                            return Row(
+                              key: ValueKey(
+                                'offertory_upgrade_cost_${move.orbKey}',
+                              ),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ElementalEnergySphere(
+                                  size: 17,
+                                  primaryColor: move.elementalPrimaryColor,
+                                  secondaryColor: move.elementalSecondaryColor,
+                                  isDark: palette.isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatGroupedInt(req, loc),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: hasEnough
+                                        ? palette.elementalText(move)
+                                        : palette.dangerText,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                ElevatedButton.icon(
+                  key: const ValueKey('offertory_upgrade_button'),
+                  onPressed: upgradePreview.isAffordable
+                      ? _handleOffertoryUpgradeTap
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _goldFill,
+                    foregroundColor: _goldDarkInk,
+                    disabledBackgroundColor: palette.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : palette.sandCardSurface,
+                    disabledForegroundColor: palette.mutedText,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.upgrade_rounded, size: 17),
+                  label: Text(
+                    (lv == 0
+                            ? loc.t(
+                                'offertory_build_btn',
+                                fallback: 'Build Offertory (+{count} Lv)',
+                              )
+                            : loc.t(
+                                'offertory_upgrade_btn',
+                                fallback: 'Upgrade (+{count} Lv)',
+                              ))
+                        .replaceAll(
+                          '{count}',
+                          _formatGroupedInt(upgradePreview.levels, loc),
+                        ),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===================================================================
+          // CARD 3 — VOW OF TITHE: 10% OFFERING (2x PRODUCTION SPEED FOR 4H)
+          // ===================================================================
+          Container(
+            key: const ValueKey('offertory_tithe_card'),
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: isBoostActive
+                  ? Color.alphaBlend(
+                      _goldFill.withValues(alpha: palette.isDark ? 0.11 : 0.14),
+                      cardBg,
+                    )
+                  : cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isBoostActive
+                    ? (palette.isDark
+                          ? const Color(0xFFFFD54F)
+                          : const Color(0xFFC88A00))
+                    : palette.amberBorder.withValues(
+                        alpha: palette.isDark ? 0.36 : 0.50,
+                      ),
+                width: isBoostActive ? 2.0 : 1.0,
+              ),
+              boxShadow: isBoostActive
+                  ? [
+                      BoxShadow(
+                        color: _goldFill.withValues(alpha: 0.25),
+                        blurRadius: 9,
+                        spreadRadius: 0.5,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _goldFill.withValues(
+                          alpha: palette.isDark ? 0.16 : 0.22,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: const TitheBlessingIcon(size: 30),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            loc.t(
+                              'offertory_tithe_card_title',
+                              fallback: 'Vow of Tithe — 10% Offering',
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: palette.primaryText,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            loc.t(
+                              'offertory_tithe_card_desc',
+                              fallback:
+                                  'Sacrifice 10% of each active element to invoke 2x idle production speed for 4 hours (up to 8h cap).',
+                            ),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              height: 1.25,
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (isBoostActive) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    key: const ValueKey('offertory_boost_timer'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _goldFill.withValues(
+                        alpha: palette.isDark ? 0.22 : 0.30,
+                      ),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: palette.amberBorder.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.bolt_rounded,
+                          size: 16,
+                          color: palette.amberIcon,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              loc
+                                  .t(
+                                    'offertory_tithe_active_timer',
+                                    fallback: '2x Speed Active: {time}',
+                                  )
+                                  .replaceAll(
+                                    '{time}',
+                                    _formatOffertoryDuration(boostRemaining),
+                                  ),
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: palette.amberText,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+
+                // Exact 10% Orb Cost per Active Element (3D Orbs)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.summaryBarSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 10,
+                    runSpacing: 5,
+                    children: [
+                      for (final move in activeMoves)
+                        Builder(
+                          builder: (_) {
+                            final bal = controller.orbsFor(move);
+                            final meetsMin =
+                                bal >= GameController.offertoryTitheMinBalance;
+                            final displayCost = meetsMin
+                                ? (titheCosts[move] ?? 5)
+                                : 5;
+                            return Row(
+                              key: ValueKey(
+                                'offertory_tithe_cost_${move.orbKey}',
+                              ),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ElementalEnergySphere(
+                                  size: 17,
+                                  primaryColor: move.elementalPrimaryColor,
+                                  secondaryColor: move.elementalSecondaryColor,
+                                  isDark: palette.isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '-${_formatGroupedInt(displayCost, loc)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: meetsMin
+                                        ? palette.elementalText(move)
+                                        : palette.dangerText,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  loc.t(
+                    'offertory_tithe_min_req',
+                    fallback:
+                        'Requires at least 50 of each active element (min. 5/element)',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: palette.mutedText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                ElevatedButton.icon(
+                  key: const ValueKey('offertory_tithe_button'),
+                  onPressed: canTithe ? _handleOffertoryTitheBoostTap : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _goldFill,
+                    foregroundColor: _goldDarkInk,
+                    disabledBackgroundColor: palette.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : palette.sandCardSurface,
+                    disabledForegroundColor: palette.mutedText,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                  label: Text(
+                    isBoostAtMaxCap
+                        ? loc.t(
+                            'offertory_tithe_max_cap_btn',
+                            fallback: 'Max 8h Boost Cap Reached',
+                          )
+                        : (isBoostActive
+                              ? loc.t(
+                                  'offertory_tithe_extend_btn',
+                                  fallback: 'Extend 2x Blessing (+4h)',
+                                )
+                              : loc.t(
+                                  'offertory_tithe_btn',
+                                  fallback: 'Consecrate 10% Tithe (2x • 4h)',
+                                )),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TempleCompactVerticalTabPill extends StatelessWidget {
   final Widget Function(bool isSelected) iconBuilder;
   final String label;
   final bool selected;
+  final bool showDot;
   final AppPalette palette;
   final VoidCallback onTap;
 
@@ -4239,6 +6147,7 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
     required this.iconBuilder,
     required this.label,
     required this.selected,
+    this.showDot = false,
     required this.palette,
     required this.onTap,
   });
@@ -4270,58 +6179,90 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
               ? Colors.white70
               : const Color(0xFF5C4934));
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: selected ? 1.8 : 3.0,
-            vertical: selected ? 4.8 : 6.0,
-          ),
-          decoration: BoxDecoration(
-            color: bgColor,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: borderColor,
-              width: selected ? 2.2 : 1.0,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFF5C22B).withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      spreadRadius: 0.5,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              iconBuilder(selected),
-              const SizedBox(height: 3),
-              SizedBox(
-                height: 13,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      color: textColor,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: selected ? 1.8 : 3.0,
+                vertical: selected ? 4.8 : 6.0,
+              ),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: borderColor,
+                  width: selected ? 2.2 : 1.0,
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFF5C22B).withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          spreadRadius: 0.5,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  iconBuilder(selected),
+                  const SizedBox(height: 3),
+                  SizedBox(
+                    height: 13,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+        if (showDot)
+          Positioned(
+            top: -3,
+            right: -2,
+            child: Container(
+              key: key is ValueKey<String>
+                  ? Key('${(key as ValueKey<String>).value}_dot')
+                  : null,
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _ShopDialogState._alertRed,
+                border: Border.all(
+                  color: palette.dialogSurface,
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _ShopDialogState._goldFill.withValues(alpha: 0.55),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
