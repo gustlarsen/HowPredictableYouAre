@@ -222,14 +222,20 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                   // 2. Scrollable Wing Content Area Only (Expanded)
                   Expanded(
                     child: ClipRect(
-                      child: _selectedWing == CastleWing.relicChamber
-                          ? _buildRelicChamberWing(context, palette, loc)
-                          : _buildScrollableWing(
-                              key: ValueKey(
-                                'castle_wing_scroll_${_selectedWing.name}',
-                              ),
-                              child: _buildSelectedWing(context, palette, loc),
+                      child: switch (_selectedWing) {
+                        CastleWing.relicChamber =>
+                          _buildRelicChamberWing(context, palette, loc),
+                        CastleWing.spoilsOfWar =>
+                          _buildSpoilsOfWarWing(context, palette, loc),
+                        CastleWing.hallOfHeroes =>
+                          _buildHallOfHeroesWing(context, palette, loc),
+                        _ => _buildScrollableWing(
+                            key: ValueKey(
+                              'castle_wing_scroll_${_selectedWing.name}',
                             ),
+                            child: _buildSelectedWing(context, palette, loc),
+                          ),
+                      },
                     ),
                   ),
 
@@ -1136,6 +1142,78 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     );
   }
 
+  Widget _buildPinnedRecoveryButton({
+    required bool isRemoveAds,
+    required Key directKey,
+    required Key adKey,
+    required IconData directIcon,
+    required String label,
+    required VoidCallback? onDirectPressed,
+    required VoidCallback? onAdPressed,
+  }) {
+    if (isRemoveAds) {
+      return SizedBox(
+        height: 44,
+        child: ElevatedButton.icon(
+          key: directKey,
+          onPressed: onDirectPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _goldFill,
+            foregroundColor: _goldDarkInk,
+            disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: Icon(directIcon, size: 18),
+          label: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 44,
+      child: ElevatedButton(
+        key: adKey,
+        onPressed: onAdPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _goldFill,
+          foregroundColor: _goldDarkInk,
+          disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.ondemand_video_rounded, size: 19),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // WING 4: RELIC CHAMBER (RESTORE PREVIOUS RUN'S SHOP UPGRADES)
   // ---------------------------------------------------------------------------
@@ -1268,78 +1346,27 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1. Pinned Full-Width Golden Restore Relics Button at the Top
-        if (isRemoveAds)
-          SizedBox(
-            height: 44,
-            child: ElevatedButton.icon(
-              key: const ValueKey('relic_chamber_restore_direct_button'),
-              onPressed: () {
-                final ok = controller.restoreRelicsDirect();
-                if (ok) showRestoredToast();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_relics_restore_direct',
-                  fallback: 'Restore Relics',
-                ),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-          )
-        else
-          SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              key: const ValueKey('relic_chamber_restore_ad_button'),
-              onPressed: canRestoreAd
-                  ? () {
-                      controller.watchAdToRestoreRelics(
-                        onRestored: showRestoredToast,
-                      );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                disabledBackgroundColor: _goldFill.withValues(alpha: 0.35),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      loc.t(
-                        'castle_relics_restore_direct',
-                        fallback: 'Restore Relics',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.ondemand_video_rounded, size: 19),
-                ],
-              ),
-            ),
+        _buildPinnedRecoveryButton(
+          isRemoveAds: isRemoveAds,
+          directKey: const ValueKey('relic_chamber_restore_direct_button'),
+          adKey: const ValueKey('relic_chamber_restore_ad_button'),
+          directIcon: Icons.auto_awesome_rounded,
+          label: loc.t(
+            'castle_relics_restore_direct',
+            fallback: 'Restore Relics',
           ),
+          onDirectPressed: () {
+            final ok = controller.restoreRelicsDirect();
+            if (ok) showRestoredToast();
+          },
+          onAdPressed: canRestoreAd
+              ? () {
+                  controller.watchAdToRestoreRelics(
+                    onRestored: showRestoredToast,
+                  );
+                }
+              : null,
+        ),
         const SizedBox(height: 8),
 
         // 2. Pinned Compact Header Summary Beneath the Button
@@ -1504,24 +1531,42 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
     final canReclaimAd =
         totalSpoils > 0 && controller.adService.isRewardedAdReady;
 
-    return Column(
-      key: const ValueKey('castle_wing_spoils_of_war'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: palette.rewardedAdCardSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: palette.rewardedAdCardBorder),
+    void showReclaimedToast() {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t(
+                'castle_spoils_reclaimed_msg',
+                fallback: 'Lost orbs reclaimed into your backpack!',
+              ),
+            ),
+            duration: const Duration(seconds: 2),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const WarBannerIcon(size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
+        );
+    }
+
+    final infoCard = Container(
+      key: const ValueKey('spoils_info_card'),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: palette.rewardedAdCardSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.rewardedAdCardBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const WarBannerIcon(size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   loc.t(
                     'castle_spoils_desc',
                     fallback:
@@ -1533,187 +1578,167 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
                     color: palette.primaryText,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        if (totalSpoils == 0)
-          Container(
-            key: const ValueKey('spoils_empty_state'),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: palette.dialogCardSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: palette.sandCardBorder),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 32,
-                  color: palette.mutedText,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  loc.t(
-                    'castle_spoils_empty',
-                    fallback: 'No lost orbs waiting to be reclaimed.',
+                if (totalSpoils > 0 && !isRemoveAds) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    loc.t(
+                      'castle_spoils_ad_disclosure',
+                      fallback:
+                          'Rewarded Video Ad: watch an ad to recover lost orbs into your backpack.',
+                    ),
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.25,
+                      color: palette.secondaryText,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: palette.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: palette.dialogCardSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: palette.amberBorder.withValues(alpha: 0.45),
-              ),
-            ),
-            child: Column(
-              children: [
-                for (final move in HandMove.values) ...[
-                  Row(
-                    key: ValueKey('spoils_orb_row_${move.orbKey}'),
-                    children: [
-                      ElementalEnergySphere(
-                        size: 24,
-                        primaryColor: move.elementalPrimaryColor,
-                        secondaryColor: move.elementalSecondaryColor,
-                        isDark: palette.isDark,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          move.elementalOrbName(loc),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: palette.primaryText,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '+${controller.spoilsOrbsFor(move)}',
-                        key: ValueKey('spoils_orb_count_${move.orbKey}'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: palette.elementalText(move),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (move != HandMove.spock) const SizedBox(height: 8),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          if (isRemoveAds)
-            ElevatedButton.icon(
-              key: const ValueKey('spoils_reclaim_direct_button'),
-              onPressed: () {
-                final ok = controller.reclaimSpoilsDirect();
-                if (ok && context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          loc.t(
-                            'castle_spoils_reclaimed_msg',
-                            fallback: 'Lost orbs reclaimed into your backpack!',
-                          ),
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+        ],
+      ),
+    );
+
+    if (totalSpoils == 0) {
+      return _buildScrollableWing(
+        key: const ValueKey('castle_wing_scroll_spoilsOfWar'),
+        child: Column(
+          key: const ValueKey('castle_wing_spoils_of_war'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            infoCard,
+            const SizedBox(height: 12),
+            Container(
+              key: const ValueKey('spoils_empty_state'),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: palette.dialogCardSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: palette.sandCardBorder),
               ),
-              icon: const Icon(Icons.military_tech_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_spoils_reclaim_direct',
-                  fallback: 'Reclaim Spoils',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 32,
+                    color: palette.mutedText,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    loc.t(
+                      'castle_spoils_empty',
+                      fallback: 'No lost orbs waiting to be reclaimed.',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: palette.secondaryText,
+                    ),
+                  ),
+                ],
               ),
-            )
-          else ...[
-            ElevatedButton.icon(
-              key: const ValueKey('spoils_reclaim_ad_button'),
-              onPressed: canReclaimAd
-                  ? () {
-                      controller.watchAdToReclaimSpoils(
-                        onReclaimed: () {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  loc.t(
-                                    'castle_spoils_reclaimed_msg',
-                                    fallback:
-                                        'Lost orbs reclaimed into your backpack!',
-                                  ),
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                        },
-                      );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_spoils_reclaim_ad',
-                  fallback: 'Watch Ad to Reclaim Spoils',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              loc.t(
-                'castle_spoils_ad_disclosure',
-                fallback:
-                    'Rewarded Video Ad: watch an ad to recover lost orbs into your backpack.',
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10.5, color: palette.mutedText),
             ),
           ],
-        ],
+        ),
+      );
+    }
+
+    return Column(
+      key: const ValueKey('castle_wing_spoils_of_war'),
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Pinned Full-Width Golden Reclaim Spoils Button at the Top
+        _buildPinnedRecoveryButton(
+          isRemoveAds: isRemoveAds,
+          directKey: const ValueKey('spoils_reclaim_direct_button'),
+          adKey: const ValueKey('spoils_reclaim_ad_button'),
+          directIcon: Icons.military_tech_rounded,
+          label: loc.t(
+            'castle_spoils_reclaim_direct',
+            fallback: 'Reclaim Spoils',
+          ),
+          onDirectPressed: () {
+            final ok = controller.reclaimSpoilsDirect();
+            if (ok) showReclaimedToast();
+          },
+          onAdPressed: canReclaimAd
+              ? () {
+                  controller.watchAdToReclaimSpoils(
+                    onReclaimed: showReclaimedToast,
+                  );
+                }
+              : null,
+        ),
+        const SizedBox(height: 8),
+
+        // 2. Scrollable Description Box & Elemental Orbs List Card
+        Expanded(
+          child: ClipRect(
+            child: _buildScrollableWing(
+              key: const ValueKey('castle_wing_scroll_spoilsOfWar'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  infoCard,
+                  const SizedBox(height: 12),
+                  Container(
+                    key: const ValueKey('spoils_orbs_list_card'),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: palette.dialogCardSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: palette.amberBorder.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final move in HandMove.values) ...[
+                          Row(
+                            key: ValueKey('spoils_orb_row_${move.orbKey}'),
+                            children: [
+                              ElementalEnergySphere(
+                                size: 24,
+                                primaryColor: move.elementalPrimaryColor,
+                                secondaryColor: move.elementalSecondaryColor,
+                                isDark: palette.isDark,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  move.elementalOrbName(loc),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '+${controller.spoilsOrbsFor(move)}',
+                                key: ValueKey('spoils_orb_count_${move.orbKey}'),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                  color: palette.elementalText(move),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (move != HandMove.spock) const SizedBox(height: 8),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1752,796 +1777,789 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
         ? palette.amberBorder.withValues(alpha: 0.35)
         : palette.sandCardBorder;
 
-    return Column(
-      key: const ValueKey('castle_wing_hall_of_heroes'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 1. Top Section — Fallen Hero Blessings
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: palette.rewardedAdCardSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: palette.rewardedAdCardBorder),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const HeroesHelmIcon(size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  loc.t(
-                    'castle_heroes_desc',
-                    fallback:
-                        'Restores your Cleric\'s Max HP and Max Mana back up to the highest levels achieved in past journeys (once per campaign cycle).',
-                  ),
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.35,
-                    color: palette.primaryText,
-                  ),
-                ),
+    void showRestoredToast() {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t(
+                'castle_heroes_restored_msg',
+                fallback: 'Fallen hero blessings restored to your Cleric!',
               ),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+
+    final List<Widget> scrollableChildren = [
+      // 1. Informational Description Box & Peak Records / Claimed Status
+      Container(
+        key: const ValueKey('hall_of_heroes_info_card'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: palette.rewardedAdCardSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.rewardedAdCardBorder),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const HeroesHelmIcon(size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    loc.t(
+                      'castle_heroes_desc',
+                      fallback:
+                          'Restores your Cleric\'s Max HP and Max Mana back up to the highest levels achieved in past journeys (once per campaign cycle).',
+                    ),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                  if (hasBlessings && !isRemoveAds) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      loc.t(
+                        'castle_heroes_ad_disclosure',
+                        fallback:
+                            'Rewarded Video Ad: watch an ad to restore your fallen hero\'s Max HP and Max Mana blessings once.',
+                      ),
+                      style: TextStyle(
+                        fontSize: 10,
+                        height: 1.25,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+
+      if (!hasBlessings)
+        Container(
+          key: const ValueKey('hall_of_heroes_empty_state'),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: palette.dialogCardSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.sandCardBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    hasAnyPeakRecord
+                        ? Icons.verified_rounded
+                        : Icons.shield_outlined,
+                    size: 18,
+                    color: hasAnyPeakRecord
+                        ? palette.successText
+                        : palette.mutedText,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasAnyPeakRecord
+                          ? loc.t(
+                              'castle_heroes_already_claimed',
+                              fallback: 'Blessing already claimed this cycle',
+                            )
+                          : loc.t(
+                              'castle_heroes_empty',
+                              fallback:
+                                  'No fallen hero blessings awaiting restoration.',
+                            ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (hasAnyPeakRecord) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (peakHp > 0)
+                      Container(
+                        key: const ValueKey('hall_of_heroes_peak_hp_chip'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.dangerText.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: palette.dangerText.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          '${loc.t('castle_heroes_hp_blessing', fallback: 'Peak Max HP Record')}: Lv. $peakHp ($targetHp)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: palette.dangerText,
+                          ),
+                        ),
+                      ),
+                    if (peakMana > 0)
+                      Container(
+                        key: const ValueKey('hall_of_heroes_peak_mana_chip'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00B0FF).withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF00B0FF).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          '${loc.t('castle_heroes_mana_blessing', fallback: 'Peak Max Mana Record')}: Lv. $peakMana ($targetMana)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: palette.isDark
+                                ? const Color(0xFF40C4FF)
+                                : const Color(0xFF01579B),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-
-        if (!hasBlessings)
-          Container(
-            key: const ValueKey('hall_of_heroes_empty_state'),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: palette.dialogCardSurface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: palette.sandCardBorder),
+        )
+      else
+        Container(
+          key: const ValueKey('hall_of_heroes_peak_records_card'),
+          padding: const EdgeInsets.all(13),
+          decoration: BoxDecoration(
+            color: palette.dialogCardSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: palette.amberBorder.withValues(alpha: 0.45),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          ),
+          child: Column(
+            children: [
+              if (peakHp > 0)
                 Row(
+                  key: const ValueKey('hall_of_heroes_hp_bonus_row'),
                   children: [
-                    Icon(
-                      hasAnyPeakRecord
-                          ? Icons.verified_rounded
-                          : Icons.shield_outlined,
-                      size: 18,
-                      color: hasAnyPeakRecord
-                          ? palette.successText
-                          : palette.mutedText,
-                    ),
+                    const RubyHeartIcon(size: 22),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        hasAnyPeakRecord
-                            ? loc.t(
-                                'castle_heroes_already_claimed',
-                                fallback: 'Blessing already claimed this cycle',
-                              )
-                            : loc.t(
-                                'castle_heroes_empty',
-                                fallback:
-                                    'No fallen hero blessings awaiting restoration.',
-                              ),
+                        loc.t(
+                          'castle_heroes_hp_blessing',
+                          fallback: 'Peak Max HP Record',
+                        ),
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: palette.secondaryText,
+                          fontSize: 12.5,
+                          color: palette.primaryText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'Lv. $peakHp • $targetHp Max HP',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: palette.dangerText,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                if (hasAnyPeakRecord) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      if (peakHp > 0)
-                        Container(
-                          key: const ValueKey('hall_of_heroes_peak_hp_chip'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: palette.dangerText.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: palette.dangerText.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            '${loc.t('castle_heroes_hp_blessing', fallback: 'Peak Max HP Record')}: Lv. $peakHp ($targetHp)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: palette.dangerText,
-                            ),
-                          ),
+              if (peakHp > 0 && peakMana > 0) const SizedBox(height: 10),
+              if (peakMana > 0)
+                Row(
+                  key: const ValueKey('hall_of_heroes_mana_bonus_row'),
+                  children: [
+                    const ManaCrystalIcon(size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        loc.t(
+                          'castle_heroes_mana_blessing',
+                          fallback: 'Peak Max Mana Record',
                         ),
-                      if (peakMana > 0)
-                        Container(
-                          key: const ValueKey('hall_of_heroes_peak_mana_chip'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF00B0FF,
-                            ).withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(
-                                0xFF00B0FF,
-                              ).withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            '${loc.t('castle_heroes_mana_blessing', fallback: 'Peak Max Mana Record')}: Lv. $peakMana ($targetMana)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: palette.isDark
-                                  ? const Color(0xFF40C4FF)
-                                  : const Color(0xFF01579B),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          )
-        else ...[
-          Container(
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: palette.dialogCardSurface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: palette.amberBorder.withValues(alpha: 0.45),
-              ),
-            ),
-            child: Column(
-              children: [
-                if (peakHp > 0)
-                  Row(
-                    key: const ValueKey('hall_of_heroes_hp_bonus_row'),
-                    children: [
-                      const RubyHeartIcon(size: 22),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          loc.t(
-                            'castle_heroes_hp_blessing',
-                            fallback: 'Peak Max HP Record',
-                          ),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12.5,
-                            color: palette.primaryText,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            'Lv. $peakHp • $targetHp Max HP',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: palette.dangerText,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                if (peakHp > 0 && peakMana > 0) const SizedBox(height: 10),
-                if (peakMana > 0)
-                  Row(
-                    key: const ValueKey('hall_of_heroes_mana_bonus_row'),
-                    children: [
-                      const ManaCrystalIcon(size: 22),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          loc.t(
-                            'castle_heroes_mana_blessing',
-                            fallback: 'Peak Max Mana Record',
-                          ),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12.5,
-                            color: palette.primaryText,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            'Lv. $peakMana • $targetMana Max ${loc.t('mana_title_word', fallback: 'Mana')}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: palette.isDark
-                                  ? const Color(0xFF00B0FF)
-                                  : const Color(0xFF01579B),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (isRemoveAds)
-            ElevatedButton.icon(
-              key: const ValueKey('hall_of_heroes_restore_direct_button'),
-              onPressed: () {
-                final ok = controller.restoreHallOfHeroesDirect();
-                if (ok && context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          loc.t(
-                            'castle_heroes_restored_msg',
-                            fallback:
-                                'Fallen hero blessings restored to your Cleric!',
-                          ),
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.workspace_premium_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_heroes_restore_direct',
-                  fallback: 'Restore Blessings',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            )
-          else ...[
-            ElevatedButton.icon(
-              key: const ValueKey('hall_of_heroes_restore_ad_button'),
-              onPressed: canRestoreAd
-                  ? () {
-                      controller.watchAdToRestoreHallOfHeroes(
-                        onRestored: () {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  loc.t(
-                                    'castle_heroes_restored_msg',
-                                    fallback:
-                                        'Fallen hero blessings restored to your Cleric!',
-                                  ),
-                                ),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                        },
-                      );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _goldFill,
-                foregroundColor: _goldDarkInk,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-              label: Text(
-                loc.t(
-                  'castle_heroes_restore_ad',
-                  fallback: 'Watch Ad to Restore',
-                ),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              loc.t(
-                'castle_heroes_ad_disclosure',
-                fallback:
-                    'Rewarded Video Ad: watch an ad to restore your fallen hero\'s Max HP and Max Mana blessings once.',
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10.5, color: palette.mutedText),
-            ),
-          ],
-        ],
-
-        const SizedBox(height: 14),
-        Divider(height: 1, color: palette.divider),
-        const SizedBox(height: 12),
-
-        // 2. Main Section — Always-Visible Kingdom Chronicles
-        Row(
-          key: const ValueKey('heroes_kingdom_chronicles_header'),
-          children: [
-            Icon(
-              Icons.history_edu_rounded,
-              size: 18,
-              color: palette.amberIcon,
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                loc.t(
-                  'castle_heroes_chronicles_title',
-                  fallback: 'Kingdom Chronicles',
-                ),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: palette.amberText,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-
-        // Headline Stat Card: Total Cycles / Resets & Fastest Victory
-        Container(
-          key: const ValueKey('heroes_chronicles_headline_card'),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          decoration: BoxDecoration(
-            color: palette.dialogCardSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: palette.amberBorder.withValues(
-                alpha: palette.isDark ? 0.45 : 0.65,
-              ),
-              width: 1.2,
-            ),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.restart_alt_rounded,
-                            size: 15,
-                            color: palette.amberIcon,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              loc.t(
-                                'castle_heroes_total_cycles',
-                                fallback: 'Total Cycles / Resets',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: palette.secondaryText,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${controller.totalCyclesCount}',
-                        key: const ValueKey('heroes_stat_total_cycles'),
                         style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
                           color: palette.primaryText,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                VerticalDivider(
-                  width: 18,
-                  thickness: 1,
-                  color: palette.divider,
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.bolt_rounded,
-                            size: 15,
-                            color: secretAccent,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'Lv. $peakMana • $targetMana Max ${loc.t('mana_title_word', fallback: 'Mana')}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: palette.isDark
+                                ? const Color(0xFF00B0FF)
+                                : const Color(0xFF01579B),
                           ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              loc.t(
-                                'castle_heroes_fastest_victory',
-                                fallback: 'Fastest Victory',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: palette.secondaryText,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        fastestText,
-                        key: const ValueKey('heroes_stat_fastest_victory'),
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: (fastestWeek != null && fastestWeek >= 0)
-                              ? palette.amberText
-                              : palette.mutedText,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
 
-        // 6 Endings Breakdown (3x2 Compact Grid)
-        Text(
-          loc.t('castle_endings_title', fallback: 'Narrative Endings'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12.5,
-            color: palette.amberText,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Column(
-          key: const ValueKey('heroes_chronicles_endings_grid'),
-          children: [
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_ruin_card'),
-                      icon: Icons.heart_broken_rounded,
-                      accentColor: palette.dangerText,
-                      title: loc.t(
-                        'castle_heroes_ending_1_title',
-                        fallback: 'Ending I: Ruin',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_1_sub',
-                        fallback: '0 HP',
-                      ),
-                      count: controller.deathDefeatCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_invasion_card'),
-                      icon: Icons.hourglass_disabled_rounded,
-                      accentColor: palette.orangeAccent,
-                      title: loc.t(
-                        'castle_heroes_ending_2_title',
-                        fallback: 'Ending II: Invasion',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_2_sub',
-                        fallback: 'Week 40',
-                      ),
-                      count: controller.timeoutDefeatCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_victory_card'),
-                      icon: Icons.emoji_events_rounded,
-                      accentColor: palette.amberText,
-                      title: loc.t(
-                        'castle_heroes_ending_3_title',
-                        fallback: 'Ending III: Sanctuary Victory',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_3_sub',
-                        fallback: 'Sacred Temple',
-                      ),
-                      count: controller.standardVictoryCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_secret_card'),
-                      icon: Icons.auto_awesome_rounded,
-                      accentColor: secretAccent,
-                      title: loc.t(
-                        'castle_heroes_ending_4_title',
-                        fallback: 'Ending IV: Flawless Rescue',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_4_sub',
-                        fallback: 'Week 0',
-                      ),
-                      count: controller.secretVictoryCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_sacred_sacrifice_card'),
-                      icon: Icons.local_fire_department_rounded,
-                      accentColor: const Color(0xFFFF8F00),
-                      title: loc.t(
-                        'castle_heroes_ending_5_title',
-                        fallback: 'Ending V: The Sacred Sacrifice',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_5_sub',
-                        fallback: 'Altar Sacrifice',
-                      ),
-                      count: controller.sacredSacrificeCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_ending_deserter_card'),
-                      icon: Icons.directions_run_rounded,
-                      accentColor: const Color(0xFF8D6E63),
-                      title: loc.t(
-                        'castle_heroes_ending_6_title',
-                        fallback: 'Ending VI: The Deserter',
-                      ),
-                      subtitle: loc.t(
-                        'castle_heroes_ending_6_sub',
-                        fallback: 'Fled Temple',
-                      ),
-                      count: controller.deserterCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+      const SizedBox(height: 14),
+      Divider(height: 1, color: palette.divider),
+      const SizedBox(height: 12),
 
-        // Forfeited Journeys Row / Card
-        Container(
-          key: const ValueKey('heroes_forfeit_runs_card'),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: palette.dialogCardSurface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cardBorder),
+      // 2. Main Section — Always-Visible Kingdom Chronicles
+      Row(
+        key: const ValueKey('heroes_kingdom_chronicles_header'),
+        children: [
+          Icon(
+            Icons.history_edu_rounded,
+            size: 18,
+            color: palette.amberIcon,
           ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              loc.t(
+                'castle_heroes_chronicles_title',
+                fallback: 'Kingdom Chronicles',
+              ),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: palette.amberText,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+
+      // Headline Stat Card: Total Cycles / Resets & Fastest Victory
+      Container(
+        key: const ValueKey('heroes_chronicles_headline_card'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: palette.dialogCardSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: palette.amberBorder.withValues(
+              alpha: palette.isDark ? 0.45 : 0.65,
+            ),
+            width: 1.2,
+          ),
+        ),
+        child: IntrinsicHeight(
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: palette.sandCardSurface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const ForfeitFlagIcon(size: 18),
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  loc.t(
-                    'castle_heroes_forfeited_runs',
-                    fallback: 'Forfeited Runs',
-                  ),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: palette.primaryText,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.restart_alt_rounded,
+                          size: 15,
+                          color: palette.amberIcon,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            loc.t(
+                              'castle_heroes_total_cycles',
+                              fallback: 'Total Cycles / Resets',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${controller.totalCyclesCount}',
+                      key: const ValueKey('heroes_stat_total_cycles'),
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        color: palette.primaryText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                '${controller.forfeitRunCount}',
-                key: const ValueKey('heroes_stat_forfeit_runs'),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: palette.primaryText,
+              VerticalDivider(
+                width: 18,
+                thickness: 1,
+                color: palette.divider,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.bolt_rounded,
+                          size: 15,
+                          color: secretAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            loc.t(
+                              'castle_heroes_fastest_victory',
+                              fallback: 'Fastest Victory',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      fastestText,
+                      key: const ValueKey('heroes_stat_fastest_victory'),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: (fastestWeek != null && fastestWeek >= 0)
+                            ? palette.amberText
+                            : palette.mutedText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+      ),
+      const SizedBox(height: 12),
 
-        // Bosses Defeated (Compact Mini-Cards)
-        Text(
-          loc.t(
-            'castle_heroes_bosses_defeated',
-            fallback: 'Bosses Defeated',
-          ),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12.5,
-            color: palette.amberText,
-          ),
+      // 6 Endings Breakdown (3x2 Compact Grid)
+      Text(
+        loc.t('castle_endings_title', fallback: 'Narrative Endings'),
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12.5,
+          color: palette.amberText,
         ),
-        const SizedBox(height: 6),
-        Column(
-          key: const ValueKey('heroes_chronicles_bosses_grid'),
+      ),
+      const SizedBox(height: 6),
+      Column(
+        key: const ValueKey('heroes_chronicles_endings_grid'),
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_ruin_card'),
+                    icon: Icons.heart_broken_rounded,
+                    accentColor: palette.dangerText,
+                    title: loc.t(
+                      'castle_heroes_ending_1_title',
+                      fallback: 'Ending I: Ruin',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_1_sub',
+                      fallback: '0 HP',
+                    ),
+                    count: controller.deathDefeatCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_invasion_card'),
+                    icon: Icons.hourglass_disabled_rounded,
+                    accentColor: palette.orangeAccent,
+                    title: loc.t(
+                      'castle_heroes_ending_2_title',
+                      fallback: 'Ending II: Invasion',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_2_sub',
+                      fallback: 'Week 40',
+                    ),
+                    count: controller.timeoutDefeatCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_victory_card'),
+                    icon: Icons.emoji_events_rounded,
+                    accentColor: palette.amberText,
+                    title: loc.t(
+                      'castle_heroes_ending_3_title',
+                      fallback: 'Ending III: Sanctuary Victory',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_3_sub',
+                      fallback: 'Sacred Temple',
+                    ),
+                    count: controller.standardVictoryCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_secret_card'),
+                    icon: Icons.auto_awesome_rounded,
+                    accentColor: secretAccent,
+                    title: loc.t(
+                      'castle_heroes_ending_4_title',
+                      fallback: 'Ending IV: Flawless Rescue',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_4_sub',
+                      fallback: 'Week 0',
+                    ),
+                    count: controller.secretVictoryCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_sacred_sacrifice_card'),
+                    icon: Icons.local_fire_department_rounded,
+                    accentColor: const Color(0xFFFF8F00),
+                    title: loc.t(
+                      'castle_heroes_ending_5_title',
+                      fallback: 'Ending V: The Sacred Sacrifice',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_5_sub',
+                      fallback: 'Altar Sacrifice',
+                    ),
+                    count: controller.sacredSacrificeCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_ending_deserter_card'),
+                    icon: Icons.directions_run_rounded,
+                    accentColor: const Color(0xFF8D6E63),
+                    title: loc.t(
+                      'castle_heroes_ending_6_title',
+                      fallback: 'Ending VI: The Deserter',
+                    ),
+                    subtitle: loc.t(
+                      'castle_heroes_ending_6_sub',
+                      fallback: 'Fled Temple',
+                    ),
+                    count: controller.deserterCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+
+      // Forfeited Journeys Row / Card
+      Container(
+        key: const ValueKey('heroes_forfeit_runs_card'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: palette.dialogCardSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cardBorder),
+        ),
+        child: Row(
           children: [
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_boss_guardian_card'),
-                      icon: BestiaryCreature.guardianRobot.icon,
-                      accentColor: guardianAccent,
-                      title: loc.t(
-                        'boss_name_guardian',
-                        fallback: 'Guardian Robot',
-                      ),
-                      count: controller.guardianRobotDefeatedCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_boss_archmage_card'),
-                      icon: BestiaryCreature.archmageRobot.icon,
-                      accentColor: palette.orangeAccent,
-                      title: loc.t(
-                        'boss_name_archmage',
-                        fallback: 'Robot Archmage',
-                      ),
-                      count: controller.robotArchmageDefeatedCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: palette.sandCardSurface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const ForfeitFlagIcon(size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                loc.t(
+                  'castle_heroes_forfeited_runs',
+                  fallback: 'Forfeited Runs',
+                ),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: palette.primaryText,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_boss_metal_wizard_card'),
-                      leadingWidget: const MetalWizardLairIcon(size: 18),
-                      accentColor: metalWizardAccent,
-                      title: loc.t(
-                        'boss_name_metal_wizard',
-                        fallback: 'Metal Wizard',
-                      ),
-                      count: controller.metalWizardDefeatedCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_boss_temple_master_card'),
-                      icon: BestiaryCreature.templeMaster.icon,
-                      accentColor: const Color(0xFFFFCA28),
-                      title: loc.t(
-                        'castle_bestiary_temple_master_name',
-                        fallback: 'Temple High Master',
-                      ),
-                      count: controller.templeMasterDefeatedCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _ChronicleStatCard(
-                      key: const ValueKey('heroes_boss_baby_mage_card'),
-                      icon: BestiaryCreature.babyRobot.icon,
-                      accentColor: palette.purpleAccent,
-                      title: loc.t(
-                        'boss_name_baby_mage',
-                        fallback: 'Baby Mage Robot',
-                      ),
-                      count: controller.babyMageRobotDefeatedCount,
-                      palette: palette,
-                      borderColor: cardBorder,
-                    ),
-                  ),
-                ],
+            Text(
+              '${controller.forfeitRunCount}',
+              key: const ValueKey('heroes_stat_forfeit_runs'),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: palette.primaryText,
               ),
             ),
           ],
+        ),
+      ),
+      const SizedBox(height: 12),
+
+      // Bosses Defeated (Compact Mini-Cards)
+      Text(
+        loc.t(
+          'castle_heroes_bosses_defeated',
+          fallback: 'Bosses Defeated',
+        ),
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12.5,
+          color: palette.amberText,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Column(
+        key: const ValueKey('heroes_chronicles_bosses_grid'),
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_boss_guardian_card'),
+                    icon: BestiaryCreature.guardianRobot.icon,
+                    accentColor: guardianAccent,
+                    title: loc.t(
+                      'boss_name_guardian',
+                      fallback: 'Guardian Robot',
+                    ),
+                    count: controller.guardianRobotDefeatedCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_boss_archmage_card'),
+                    icon: BestiaryCreature.archmageRobot.icon,
+                    accentColor: palette.orangeAccent,
+                    title: loc.t(
+                      'boss_name_archmage',
+                      fallback: 'Robot Archmage',
+                    ),
+                    count: controller.robotArchmageDefeatedCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_boss_metal_wizard_card'),
+                    leadingWidget: const MetalWizardLairIcon(size: 18),
+                    accentColor: metalWizardAccent,
+                    title: loc.t(
+                      'boss_name_metal_wizard',
+                      fallback: 'Metal Wizard',
+                    ),
+                    count: controller.metalWizardDefeatedCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_boss_temple_master_card'),
+                    icon: BestiaryCreature.templeMaster.icon,
+                    accentColor: const Color(0xFFFFCA28),
+                    title: loc.t(
+                      'castle_bestiary_temple_master_name',
+                      fallback: 'Temple High Master',
+                    ),
+                    count: controller.templeMasterDefeatedCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _ChronicleStatCard(
+                    key: const ValueKey('heroes_boss_baby_mage_card'),
+                    icon: BestiaryCreature.babyRobot.icon,
+                    accentColor: palette.purpleAccent,
+                    title: loc.t(
+                      'boss_name_baby_mage',
+                      fallback: 'Baby Mage Robot',
+                    ),
+                    count: controller.babyMageRobotDefeatedCount,
+                    palette: palette,
+                    borderColor: cardBorder,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    if (!hasBlessings) {
+      return _buildScrollableWing(
+        key: const ValueKey('castle_wing_scroll_hallOfHeroes'),
+        child: Column(
+          key: const ValueKey('castle_wing_hall_of_heroes'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: scrollableChildren,
+        ),
+      );
+    }
+
+    return Column(
+      key: const ValueKey('castle_wing_hall_of_heroes'),
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Pinned Full-Width Golden Restore Blessings Button at the Top
+        _buildPinnedRecoveryButton(
+          isRemoveAds: isRemoveAds,
+          directKey: const ValueKey('hall_of_heroes_restore_direct_button'),
+          adKey: const ValueKey('hall_of_heroes_restore_ad_button'),
+          directIcon: Icons.workspace_premium_rounded,
+          label: loc.t(
+            'castle_heroes_restore_direct',
+            fallback: 'Restore Blessings',
+          ),
+          onDirectPressed: () {
+            final ok = controller.restoreHallOfHeroesDirect();
+            if (ok) showRestoredToast();
+          },
+          onAdPressed: canRestoreAd
+              ? () {
+                  controller.watchAdToRestoreHallOfHeroes(
+                    onRestored: showRestoredToast,
+                  );
+                }
+              : null,
+        ),
+        const SizedBox(height: 8),
+
+        // Scrollable Info Box, Peak Records, Kingdom Chronicles & Narrative Endings
+        Expanded(
+          child: ClipRect(
+            child: _buildScrollableWing(
+              key: const ValueKey('castle_wing_scroll_hallOfHeroes'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: scrollableChildren,
+              ),
+            ),
+          ),
         ),
       ],
     );

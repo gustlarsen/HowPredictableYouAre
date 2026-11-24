@@ -2025,6 +2025,258 @@ void main() {
       },
     );
   });
+
+  group('Pinned Recovery Buttons Parity Across Relics, Spoils & Heroes', () {
+    testWidgets(
+      'Spoils Reclaim Spoils and Heroes Restore Blessings match Relics Restore Relics exact pixel coordinates, stay pinned above scrollable content, and reclaim/restore cleanly',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        for (final isRemoveAds in [false, true]) {
+          for (final isDark in [true, false]) {
+            final controller = await _createController(
+              loadJsonStrings: true,
+              prefs: {
+                'darkMode': isDark,
+                if (isRemoveAds) ...{
+                  'unlockedAds': true,
+                  'removeAdsEnabled': true,
+                },
+                'unlockedPredictability': true,
+                'showPredictability': true,
+                'orbs_fire': 12,
+                'orbs_water': 5,
+                'hp_upgrade_level': 4,
+                'mana_upgrade_level': 3,
+              },
+            );
+            addTearDown(controller.dispose);
+
+            await controller.applyPermadeathReset(
+              cause: PermadeathCause.battleDefeat,
+            );
+
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: ThemeData.light(useMaterial3: true),
+                darkTheme: ThemeData.dark(useMaterial3: true),
+                themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+                home: Scaffold(
+                  body: RoyalCastleDialog(
+                    key: ValueKey('parity_${isRemoveAds}_$isDark'),
+                    controller: controller,
+                    initialWing: CastleWing.relicChamber,
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+
+            // 1. Capture Relics button Rect
+            final relicsBtnFinder = find.byKey(
+              isRemoveAds
+                  ? const ValueKey('relic_chamber_restore_direct_button')
+                  : const ValueKey('relic_chamber_restore_ad_button'),
+            );
+            expect(relicsBtnFinder, findsOneWidget);
+            expect(find.text('Restore Relics'), findsOneWidget);
+            final relicsRect = tester.getRect(relicsBtnFinder);
+            expect(relicsRect.height, closeTo(44.0, 0.01));
+
+            // 2. Switch to Spoils -> Reclaim Spoils button matches exact Rect of Restore Relics
+            await tester.tap(find.byKey(const ValueKey('castle_tab_spoils')));
+            await tester.pumpAndSettle();
+
+            final spoilsBtnFinder = find.byKey(
+              isRemoveAds
+                  ? const ValueKey('spoils_reclaim_direct_button')
+                  : const ValueKey('spoils_reclaim_ad_button'),
+            );
+            final spoilsScrollFinder = find.byKey(
+              const ValueKey('castle_wing_scroll_spoilsOfWar'),
+            );
+            final spoilsInfoFinder = find.byKey(
+              const ValueKey('spoils_info_card'),
+            );
+            final spoilsOrbsCardFinder = find.byKey(
+              const ValueKey('spoils_orbs_list_card'),
+            );
+
+            expect(spoilsBtnFinder, findsOneWidget);
+            expect(find.text('Reclaim Spoils'), findsOneWidget);
+            expect(spoilsScrollFinder, findsOneWidget);
+            expect(spoilsInfoFinder, findsOneWidget);
+            expect(spoilsOrbsCardFinder, findsOneWidget);
+
+            final spoilsRect = tester.getRect(spoilsBtnFinder);
+            expect(spoilsRect.top, closeTo(relicsRect.top, 0.01));
+            expect(spoilsRect.bottom, closeTo(relicsRect.bottom, 0.01));
+            expect(spoilsRect.left, closeTo(relicsRect.left, 0.01));
+            expect(spoilsRect.right, closeTo(relicsRect.right, 0.01));
+            expect(spoilsRect.height, closeTo(44.0, 0.01));
+
+            expect(
+              find.descendant(
+                of: spoilsScrollFinder,
+                matching: spoilsBtnFinder,
+              ),
+              findsNothing,
+            );
+            expect(
+              find.descendant(
+                of: spoilsScrollFinder,
+                matching: spoilsInfoFinder,
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: spoilsScrollFinder,
+                matching: spoilsOrbsCardFinder,
+              ),
+              findsOneWidget,
+            );
+            expect(
+              tester.getTopLeft(spoilsInfoFinder).dy,
+              greaterThanOrEqualTo(spoilsRect.bottom),
+            );
+            expect(
+              tester.getTopLeft(spoilsOrbsCardFinder).dy,
+              greaterThan(tester.getTopLeft(spoilsInfoFinder).dy),
+            );
+
+            // 3. Switch to Heroes -> Restore Blessings button matches exact Rect of Restore Relics & Reclaim Spoils
+            await tester.tap(
+              find.byKey(const ValueKey('castle_tab_hall_of_heroes')),
+            );
+            await tester.pumpAndSettle();
+
+            final heroesBtnFinder = find.byKey(
+              isRemoveAds
+                  ? const ValueKey('hall_of_heroes_restore_direct_button')
+                  : const ValueKey('hall_of_heroes_restore_ad_button'),
+            );
+            final heroesScrollFinder = find.byKey(
+              const ValueKey('castle_wing_scroll_hallOfHeroes'),
+            );
+            final heroesInfoFinder = find.byKey(
+              const ValueKey('hall_of_heroes_info_card'),
+            );
+            final heroesPeakCardFinder = find.byKey(
+              const ValueKey('hall_of_heroes_peak_records_card'),
+            );
+            final chroniclesHeaderFinder = find.byKey(
+              const ValueKey('heroes_kingdom_chronicles_header'),
+            );
+
+            expect(heroesBtnFinder, findsOneWidget);
+            expect(find.text('Restore Blessings'), findsOneWidget);
+            expect(heroesScrollFinder, findsOneWidget);
+            expect(heroesInfoFinder, findsOneWidget);
+            expect(heroesPeakCardFinder, findsOneWidget);
+            expect(chroniclesHeaderFinder, findsOneWidget);
+
+            final heroesRect = tester.getRect(heroesBtnFinder);
+            expect(heroesRect.top, closeTo(relicsRect.top, 0.01));
+            expect(heroesRect.bottom, closeTo(relicsRect.bottom, 0.01));
+            expect(heroesRect.left, closeTo(relicsRect.left, 0.01));
+            expect(heroesRect.right, closeTo(relicsRect.right, 0.01));
+            expect(heroesRect.height, closeTo(44.0, 0.01));
+
+            expect(
+              find.descendant(
+                of: heroesScrollFinder,
+                matching: heroesBtnFinder,
+              ),
+              findsNothing,
+            );
+            expect(
+              find.descendant(
+                of: heroesScrollFinder,
+                matching: heroesInfoFinder,
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: heroesScrollFinder,
+                matching: heroesPeakCardFinder,
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: heroesScrollFinder,
+                matching: chroniclesHeaderFinder,
+              ),
+              findsOneWidget,
+            );
+            expect(
+              tester.getTopLeft(heroesInfoFinder).dy,
+              greaterThanOrEqualTo(heroesRect.bottom),
+            );
+            expect(
+              tester.getTopLeft(heroesPeakCardFinder).dy,
+              greaterThan(tester.getTopLeft(heroesInfoFinder).dy),
+            );
+
+            // Scrolling Heroes keeps Restore Blessings pinned at exact same Y
+            await tester.drag(heroesScrollFinder, const Offset(0, -240));
+            await tester.pumpAndSettle();
+            expect(
+              tester.getRect(heroesBtnFinder).top,
+              closeTo(heroesRect.top, 0.01),
+            );
+
+            // Scroll back up and tap Restore Blessings -> clears button, shows empty/claimed state & Chronicles near top
+            await tester.drag(heroesScrollFinder, const Offset(0, 240));
+            await tester.pumpAndSettle();
+            await tester.tap(heroesBtnFinder);
+            await tester.pumpAndSettle();
+
+            expect(controller.hpUpgradeLevel, 4);
+            expect(controller.manaUpgradeLevel, 3);
+            expect(controller.hasHallOfHeroesBlessings, isFalse);
+            expect(heroesBtnFinder, findsNothing);
+            expect(
+              find.byKey(const ValueKey('hall_of_heroes_empty_state')),
+              findsOneWidget,
+            );
+            expect(
+              tester.getTopLeft(heroesInfoFinder).dy,
+              closeTo(relicsRect.top, 4.0),
+            );
+            expect(chroniclesHeaderFinder, findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('heroes_chronicles_endings_grid')),
+              findsOneWidget,
+            );
+
+            // Tap Spoils tab and tap Reclaim Spoils -> reclaims orbs and shows empty state
+            await tester.tap(find.byKey(const ValueKey('castle_tab_spoils')));
+            await tester.pumpAndSettle();
+            await tester.tap(spoilsBtnFinder);
+            await tester.pumpAndSettle();
+
+            expect(controller.fireOrbs, 12);
+            expect(controller.waterOrbs, 5);
+            expect(controller.totalSpoilsOfWarOrbs, 0);
+            expect(spoilsBtnFinder, findsNothing);
+            expect(
+              find.byKey(const ValueKey('spoils_empty_state')),
+              findsOneWidget,
+            );
+          }
+        }
+      },
+    );
+  });
 }
 
 
