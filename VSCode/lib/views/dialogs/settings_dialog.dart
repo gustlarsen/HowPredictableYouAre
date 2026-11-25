@@ -581,6 +581,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           value: controller.confirmBattleTeleport,
                           onChanged: controller.setConfirmBattleTeleport,
                         ),
+                        const SizedBox(height: 10),
+
+                        // Offertory Full Notification toggle
+                        SwitchListTile(
+                          key: const ValueKey(
+                            'settings_offertory_notifications_tile',
+                          ),
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            loc.t(
+                              'settings_offertory_notifications',
+                              fallback: 'Offertory Full Notification',
+                            ),
+                          ),
+                          value: controller.offertoryNotificationsEnabled,
+                          onChanged: controller.setOffertoryNotificationsEnabled,
+                        ),
 
                         Divider(
                           height: 16,

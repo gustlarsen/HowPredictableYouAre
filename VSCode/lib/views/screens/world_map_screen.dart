@@ -9,6 +9,7 @@ import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/observatory_dialog.dart';
+import '../dialogs/offline_offertory_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
@@ -52,6 +53,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _isInventoryDialogOpen = false;
   bool _isWeek0ScreamDialogOpen = false;
   bool _isWeek10ArchmageDialogOpen = false;
+  bool _isOfflineOffertoryDialogOpen = false;
   bool _metricsRebuildScheduled = false;
 
   @override
@@ -63,9 +65,13 @@ class _WorldMapScreenState extends State<WorldMapScreen>
       duration: const Duration(milliseconds: 1800),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _hasCheckedForUpdate) return;
-      _hasCheckedForUpdate = true;
-      unawaited(context.read<GameController>().checkForUpdate());
+      if (!mounted) return;
+      final controller = context.read<GameController>();
+      if (!_hasCheckedForUpdate) {
+        _hasCheckedForUpdate = true;
+        unawaited(controller.checkForUpdate());
+      }
+      _checkOfflineOffertoryDialog(context, controller);
     });
   }
 
@@ -98,6 +104,17 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!mounted) return;
+    final controller = _controller ?? context.read<GameController>();
+    controller.onWorldMapLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _checkOfflineOffertoryDialog(context, controller);
+    }
   }
 
   @override
@@ -276,6 +293,52 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
+  void _checkOfflineOffertoryDialog(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldShowOfflineOffertoryDialog ||
+        _isOfflineOffertoryDialogOpen ||
+        _isWeek0ScreamDialogOpen ||
+        _isWeek10ArchmageDialogOpen ||
+        _isInventoryDialogOpen ||
+        controller.shouldShowWeek0ScreamWarning ||
+        controller.shouldShowWeek10ArchmageWarning ||
+        controller.pendingStoryChapter != null) {
+      return;
+    }
+    _isOfflineOffertoryDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !context.mounted) {
+        _isOfflineOffertoryDialogOpen = false;
+        return;
+      }
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) {
+        _isOfflineOffertoryDialogOpen = false;
+        return;
+      }
+      final offlineDuration = controller.pendingOfflineOffertoryDuration;
+      if (!controller.shouldShowOfflineOffertoryDialog ||
+          offlineDuration == null) {
+        _isOfflineOffertoryDialogOpen = false;
+        return;
+      }
+      try {
+        await OfflineOffertoryDialog.show(
+          context,
+          controller: controller,
+          offlineDuration: offlineDuration,
+        );
+      } finally {
+        if (controller.shouldShowOfflineOffertoryDialog) {
+          controller.dismissOfflineOffertoryPrompt();
+        }
+        _isOfflineOffertoryDialogOpen = false;
+      }
+    });
+  }
+
   Future<void> _enterMetalWizardLair(
     BuildContext context,
     GameController controller,
@@ -327,6 +390,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     _checkUpdateSnackBar(context, controller);
     _checkWeek0ScreamWarning(context, controller);
     _checkWeek10ArchmageWarning(context, controller);
+    _checkOfflineOffertoryDialog(context, controller);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0D14),

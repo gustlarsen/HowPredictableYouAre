@@ -265,6 +265,7 @@ class CloudSaveData {
   final bool vibrationEnabled;
   final bool animationsEnabled;
   final bool confirmBattleTeleport;
+  final bool offertoryNotificationsEnabled;
 
   final List<String> purchasedIapProductIds;
 
@@ -412,6 +413,7 @@ class CloudSaveData {
     this.vibrationEnabled = true,
     this.animationsEnabled = true,
     this.confirmBattleTeleport = true,
+    this.offertoryNotificationsEnabled = true,
     this.purchasedIapProductIds = const [],
     this.treasuryFireOrbs = 0,
     this.treasuryWaterOrbs = 0,
@@ -791,6 +793,7 @@ class CloudSaveData {
       vibrationEnabled: vibrationEnabled,
       animationsEnabled: animationsEnabled,
       confirmBattleTeleport: confirmBattleTeleport,
+      offertoryNotificationsEnabled: offertoryNotificationsEnabled,
       purchasedIapProductIds: (
         {...purchasedIapProductIds, ...local.purchasedIapProductIds}.toList()
           ..sort()
@@ -957,6 +960,7 @@ class CloudSaveData {
       vibrationEnabled: storage.vibrationEnabled,
       animationsEnabled: storage.animationsEnabled,
       confirmBattleTeleport: storage.confirmBattleTeleport,
+      offertoryNotificationsEnabled: storage.offertoryNotificationsEnabled,
       purchasedIapProductIds: storage.purchasedIapProductIds.toList()..sort(),
       treasuryFireOrbs: storage.treasuryFireOrbs,
       treasuryWaterOrbs: storage.treasuryWaterOrbs,
@@ -1129,6 +1133,9 @@ class CloudSaveData {
     await storage.setVibrationEnabled(vibrationEnabled);
     await storage.setAnimationsEnabled(animationsEnabled);
     await storage.setConfirmBattleTeleport(confirmBattleTeleport);
+    await storage.setOffertoryNotificationsEnabled(
+      offertoryNotificationsEnabled,
+    );
 
     await storage.setUnlockedReset(unlockedReset);
     await storage.setUnlockedPredictability(unlockedPredictability);
@@ -1381,6 +1388,7 @@ class CloudSaveData {
       'vibrationEnabled': vibrationEnabled,
       'animationsEnabled': animationsEnabled,
       'confirmBattleTeleport': confirmBattleTeleport,
+      'offertoryNotificationsEnabled': offertoryNotificationsEnabled,
       'purchasedIapProductIds': purchasedIapProductIds,
       'updatedAtMillis': updatedAtMillis,
     };
@@ -1814,6 +1822,8 @@ class CloudSaveData {
       vibrationEnabled: map['vibrationEnabled'] as bool? ?? true,
       animationsEnabled: map['animationsEnabled'] as bool? ?? true,
       confirmBattleTeleport: map['confirmBattleTeleport'] as bool? ?? true,
+      offertoryNotificationsEnabled:
+          map['offertoryNotificationsEnabled'] as bool? ?? true,
       purchasedIapProductIds: (map['purchasedIapProductIds'] is List)
           ? (map['purchasedIapProductIds'] as List)
               .map((e) => e.toString().trim())

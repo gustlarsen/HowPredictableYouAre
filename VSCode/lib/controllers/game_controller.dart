@@ -15,6 +15,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/play_games_service.dart';
 import '../services/ad_service.dart';
 import '../services/billing_service.dart';
+import '../services/notification_service.dart';
 import '../services/update_service.dart';
 
 /// Identifies why a campaign cycle ended via permadeath reset.
@@ -68,6 +69,7 @@ class GameController extends ChangeNotifier {
   static const int offertoryTitheMinBalance = 50;
   static const double offertoryTithePercentage = 0.10;
   static const Duration offertoryFreeDoubleCooldown = Duration(hours: 4);
+  static const Duration offlineOffertoryMinDuration = Duration(minutes: 2);
 
   /// First 520 digits of Pi (3.1415926535...) driving the Baby Mage Robot's
   /// deterministic dual-element harmonic sequence.
@@ -479,6 +481,7 @@ class GameController extends ChangeNotifier {
   late final AdService adService;
   late final BillingService billingService;
   late final UpdateService updateService;
+  late final NotificationService notificationService;
 
   late MarkovEngine _engine;
   MetalWizardAiState _metalWizardAiState = MetalWizardAiState();
@@ -741,6 +744,7 @@ class GameController extends ChangeNotifier {
   bool vibrationEnabled = true;
   bool animationsEnabled = true;
   bool confirmBattleTeleport = true;
+  bool offertoryNotificationsEnabled = true;
 
   bool get skipTeleportConfirm => !confirmBattleTeleport;
 
@@ -906,6 +910,11 @@ class GameController extends ChangeNotifier {
   double offertoryBankedSeconds = 0.0;
   int? offertoryBoostExpiresAt;
   int? offertoryFreeDoubleReadyAt;
+  int? lastAppPausedAt;
+  Duration? pendingOfflineOffertoryDuration;
+  bool _offlineOffertoryDismissedThisSession = false;
+  bool _hasEvaluatedInitialOfflineReturn = false;
+  bool _isAppBackgrounded = false;
 
   GameController({
     required this.storage,
@@ -915,12 +924,14 @@ class GameController extends ChangeNotifier {
     AdService? adService,
     BillingService? billingService,
     UpdateService? updateService,
+    NotificationService? notificationService,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now {
     this.playGames = playGames ?? PlayGamesService(storage: storage);
     this.adService = adService ?? AdService();
     this.billingService = billingService ?? BillingService();
     this.updateService = updateService ?? UpdateService();
+    this.notificationService = notificationService ?? NotificationService();
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
     this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
@@ -1125,13 +1136,133 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Initializes local notifications on startup without blocking offline gameplay
+  /// and synchronizes any pending Offertory 100%-full alert.
+  Future<void> initializeNotifications() async {
+    await notificationService.initialize();
+    await syncOffertoryFullNotification();
+  }
+
+  /// Schedules or cancels the local Offertory 100%-full notification (`ID 1001`)
+  /// based on [offertoryLevel], [offertoryNotificationsEnabled], and remaining
+  /// time until the 8-hour storage cap.
+  Future<void> syncOffertoryFullNotification({DateTime? now}) async {
+    if (!offertoryNotificationsEnabled || offertoryLevel <= 0) {
+      await notificationService.cancelOffertoryFullNotification();
+      return;
+    }
+    final nowUtc = _nowUtc(now);
+    final remaining = offertoryTimeUntilFull(nowUtc);
+    if (remaining.inSeconds <= NotificationService.minScheduleLeadSeconds) {
+      await notificationService.cancelOffertoryFullNotification();
+      return;
+    }
+    final title = localization.t(
+      'offertory_notif_full_title',
+      fallback: 'Offertory Vault Full!',
+    );
+    final body = localization.t(
+      'offertory_notif_full_body',
+      fallback:
+          'Your Sacred Temple Offertory reached 100% capacity and stopped collecting. Tap to harvest your Elemental Orbs!',
+    );
+    await notificationService.scheduleOffertoryFullNotification(
+      remainingUntilFull: remaining,
+      title: title,
+      body: body,
+      now: nowUtc,
+    );
+  }
+
+  Future<void> _requestPermissionAndSyncOffertoryNotification({
+    DateTime? now,
+  }) async {
+    await notificationService.requestPermission();
+    await syncOffertoryFullNotification(now: now);
+  }
+
+  /// True when the Welcome Back / Offline Offertory Harvest modal should be
+  /// shown on [WorldMapScreen].
+  bool get shouldShowOfflineOffertoryDialog {
+    final duration = pendingOfflineOffertoryDuration;
+    if (_offlineOffertoryDismissedThisSession || duration == null) {
+      return false;
+    }
+    return offertoryLevel >= 1 &&
+        duration >= offlineOffertoryMinDuration &&
+        offertoryStoredOrbs() >= 1;
+  }
+
+  /// Evaluates elapsed offline time since [lastAppPausedAt] (falling back to
+  /// [offertoryLastCollectedAt] on first launch after upgrade) and queues the
+  /// Welcome Back harvest dialog if all anti-spam conditions are met.
+  bool evaluateOfflineOffertoryReturn({DateTime? now}) {
+    if (offertoryLevel < 1) return false;
+    final nowUtc = _nowUtc(now);
+    final awaySinceMs = lastAppPausedAt ?? offertoryLastCollectedAt;
+    if (awaySinceMs == null || awaySinceMs <= 0) return false;
+    final elapsedMs = math.max(0, nowUtc.millisecondsSinceEpoch - awaySinceMs);
+    final elapsed = Duration(milliseconds: elapsedMs);
+    if (elapsed < offlineOffertoryMinDuration) return false;
+    if (offertoryStoredOrbs(nowUtc) < 1) return false;
+
+    pendingOfflineOffertoryDuration = elapsed;
+    _offlineOffertoryDismissedThisSession = false;
+    lastAppPausedAt = nowUtc.millisecondsSinceEpoch;
+    storage.setLastAppPausedAt(lastAppPausedAt);
+    return true;
+  }
+
+  /// Dismisses the Welcome Back harvest prompt for the rest of the current
+  /// foreground session so it will not re-open repeatedly.
+  void dismissOfflineOffertoryPrompt({DateTime? now}) {
+    _offlineOffertoryDismissedThisSession = true;
+    pendingOfflineOffertoryDuration = null;
+    lastAppPausedAt = _nowUtc(now).millisecondsSinceEpoch;
+    storage.setLastAppPausedAt(lastAppPausedAt);
+    notifyListeners();
+  }
+
+  void _recordAppPaused({DateTime? now}) {
+    _isAppBackgrounded = true;
+    lastAppPausedAt = _nowUtc(now).millisecondsSinceEpoch;
+    storage.setLastAppPausedAt(lastAppPausedAt);
+    unawaited(syncOffertoryFullNotification(now: now));
+  }
+
+  void _handleAppResumedOfflineCheck({DateTime? now}) {
+    _isAppBackgrounded = false;
+    if (evaluateOfflineOffertoryReturn(now: now)) {
+      notifyListeners();
+    }
+  }
+
+  /// Called by [WorldMapScreen]'s lifecycle observer so standalone widget trees
+  /// without [HowPredictableApp] still track pause/resume without duplicating
+  /// work when [HowPredictableApp] already forwarded the event.
+  void onWorldMapLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      if (!_isAppBackgrounded) {
+        _recordAppPaused();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      if (_isAppBackgrounded) {
+        _handleAppResumedOfflineCheck();
+      }
+    }
+  }
+
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       updateService.setAppForeground(false);
+      _recordAppPaused();
     } else if (state == AppLifecycleState.resumed) {
       updateService.setAppForeground(true);
+      _handleAppResumedOfflineCheck();
     }
 
     unawaited(audio.handleAppLifecycleState(state));
@@ -1357,6 +1488,7 @@ class GameController extends ChangeNotifier {
     offertoryBankedSeconds = storage.offertoryBankedSeconds;
     offertoryBoostExpiresAt = storage.offertoryBoostExpiresAt;
     offertoryFreeDoubleReadyAt = storage.offertoryFreeDoubleReadyAt;
+    lastAppPausedAt = storage.lastAppPausedAt;
     if (offertoryLevel > 0 && offertoryLastCollectedAt == null) {
       offertoryLastCollectedAt = _nowUtc().millisecondsSinceEpoch;
       storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
@@ -1385,7 +1517,18 @@ class GameController extends ChangeNotifier {
     vibrationEnabled = storage.vibrationEnabled;
     animationsEnabled = storage.animationsEnabled;
     confirmBattleTeleport = storage.confirmBattleTeleport;
+    offertoryNotificationsEnabled = storage.offertoryNotificationsEnabled;
     localization.setLanguage(storage.language);
+
+    if (!_hasEvaluatedInitialOfflineReturn) {
+      _hasEvaluatedInitialOfflineReturn = true;
+      evaluateOfflineOffertoryReturn();
+    } else {
+      if (offertoryLevel <= 0) {
+        pendingOfflineOffertoryDuration = null;
+      }
+      unawaited(syncOffertoryFullNotification());
+    }
 
     unlockedReset = storage.unlockedReset;
     unlockedPredictability = storage.unlockedPredictability;
@@ -4543,6 +4686,7 @@ class GameController extends ChangeNotifier {
     }
 
     final nowUtc = _nowUtc(now);
+    final wasUnbuilt = offertoryLevel == 0;
     // Settle earned orbs up to this exact moment before raising the rate
     _settleOffertoryUpTo(nowUtc);
 
@@ -4560,6 +4704,11 @@ class GameController extends ChangeNotifier {
     offertoryLevel += levels;
     _persistAllOrbsAndTurn0();
     _persistOffertoryState();
+    if (wasUnbuilt && offertoryNotificationsEnabled) {
+      unawaited(_requestPermissionAndSyncOffertoryNotification(now: nowUtc));
+    } else {
+      unawaited(syncOffertoryFullNotification(now: nowUtc));
+    }
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -4610,9 +4759,14 @@ class GameController extends ChangeNotifier {
     offertoryBankedSeconds = 0.0;
     offertoryPendingFraction = (totalFloat - whole).clamp(0.0, 0.999999);
     offertoryLastCollectedAt = nowUtc.millisecondsSinceEpoch;
+    pendingOfflineOffertoryDuration = null;
+    _offlineOffertoryDismissedThisSession = false;
+    lastAppPausedAt = nowUtc.millisecondsSinceEpoch;
 
     _persistAllOrbsAndTurn0();
     _persistOffertoryState();
+    storage.setLastAppPausedAt(lastAppPausedAt);
+    unawaited(syncOffertoryFullNotification(now: nowUtc));
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -4709,6 +4863,7 @@ class GameController extends ChangeNotifier {
 
     _persistAllOrbsAndTurn0();
     _persistOffertoryState();
+    unawaited(syncOffertoryFullNotification(now: nowUtc));
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -5520,9 +5675,24 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setOffertoryNotificationsEnabled(bool val) {
+    offertoryNotificationsEnabled = val;
+    storage.setOffertoryNotificationsEnabled(val);
+    if (val) {
+      unawaited(_requestPermissionAndSyncOffertoryNotification());
+    } else {
+      unawaited(notificationService.cancelOffertoryFullNotification());
+    }
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
   void setLanguage(String lang) {
     localization.setLanguage(lang);
     storage.setLanguage(lang);
+    if (offertoryLevel >= 1 && offertoryNotificationsEnabled) {
+      unawaited(syncOffertoryFullNotification());
+    }
     _triggerCloudSave();
     notifyListeners();
   }

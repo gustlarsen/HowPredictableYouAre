@@ -10,6 +10,7 @@ import 'services/audio_service.dart';
 import 'services/play_games_service.dart';
 import 'services/ad_service.dart';
 import 'services/billing_service.dart';
+import 'services/notification_service.dart';
 import 'services/update_service.dart';
 import 'controllers/game_controller.dart';
 import 'views/screens/intro_story_screen.dart';
@@ -32,6 +33,7 @@ void main() async {
   final adService = AdService();
   final billingService = BillingService();
   final updateService = UpdateService();
+  final notificationService = NotificationService();
   final controller = GameController(
     storage: storage,
     localization: localization,
@@ -40,6 +42,7 @@ void main() async {
     adService: adService,
     billingService: billingService,
     updateService: updateService,
+    notificationService: notificationService,
   );
   unawaited(() async {
     await billingService.initialize();
@@ -60,6 +63,7 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(adService.initialize(adsRemoved: controller.isRemoveAdsActive));
     unawaited(playGames.initialize());
+    unawaited(controller.initializeNotifications());
   });
 }
 

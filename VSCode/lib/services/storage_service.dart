@@ -499,6 +499,7 @@ class StorageService {
   static const String offertoryBoostExpiresAtKey = 'offertory_boost_expires_at';
   static const String offertoryFreeDoubleReadyAtKey =
       'offertory_free_double_ready_at';
+  static const String lastAppPausedAtKey = 'last_app_paused_at';
 
   int get offertoryLevel {
     final val = _prefs.getInt(offertoryLevelKey) ?? 0;
@@ -580,6 +581,18 @@ class StorageService {
     return _prefs.setInt(offertoryFreeDoubleReadyAtKey, epochMillisUtc);
   }
 
+  int? get lastAppPausedAt {
+    final val = _prefs.getInt(lastAppPausedAtKey);
+    return (val != null && val > 0) ? val : null;
+  }
+
+  Future<void> setLastAppPausedAt(int? epochMillisUtc) {
+    if (epochMillisUtc == null || epochMillisUtc <= 0) {
+      return _prefs.remove(lastAppPausedAtKey);
+    }
+    return _prefs.setInt(lastAppPausedAtKey, epochMillisUtc);
+  }
+
   Future<void> clearOffertoryData() {
     return Future.wait([
       setOffertoryLevel(0),
@@ -589,6 +602,7 @@ class StorageService {
       setOffertoryBankedSeconds(0.0),
       setOffertoryBoostExpiresAt(null),
       setOffertoryFreeDoubleReadyAt(null),
+      setLastAppPausedAt(null),
     ]);
   }
 
@@ -646,6 +660,14 @@ class StorageService {
       _prefs.getBool(confirmBattleTeleportKey) ?? true;
   Future<void> setConfirmBattleTeleport(bool val) =>
       _prefs.setBool(confirmBattleTeleportKey, val);
+
+  // Sacred Temple Offertory 100%-full local notification preference (default true)
+  static const String offertoryNotificationsEnabledKey =
+      'offertory_notifications_enabled';
+  bool get offertoryNotificationsEnabled =>
+      _prefs.getBool(offertoryNotificationsEnabledKey) ?? true;
+  Future<void> setOffertoryNotificationsEnabled(bool val) =>
+      _prefs.setBool(offertoryNotificationsEnabledKey, val);
 
   // Unlocks (Purchased in shop)
   bool get unlockedReset => _prefs.getBool('unlockedReset') ?? false;
@@ -1456,6 +1478,7 @@ class StorageService {
       setVibrationEnabled(true),
       setAnimationsEnabled(true),
       setConfirmBattleTeleport(true),
+      setOffertoryNotificationsEnabled(true),
     ]);
   }
 
