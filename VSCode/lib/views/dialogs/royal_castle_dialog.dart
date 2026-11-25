@@ -787,7 +787,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
           ),
           icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
           label: Text(
-            loc.t('story_replay_intro', fallback: 'Replay Intro'),
+            loc.t('story_replay_intro', fallback: 'Replay Intro / Tutorial'),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           ),
         ),

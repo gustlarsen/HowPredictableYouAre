@@ -6,6 +6,7 @@ import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
+import '../screens/intro_story_screen.dart';
 import '../widgets/forfeit_flag_icon.dart';
 import 'help_dialog.dart';
 import 'story_gallery_dialog.dart';
@@ -645,6 +646,48 @@ class _SettingsDialogState extends State<SettingsDialog> {
                             loc.t(
                               'story_gallery_title',
                               fallback: 'Story Memories',
+                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Replay Intro / Tutorial button (isolated sandbox mode)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('settings_replay_intro_button'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: palette.amberText,
+                            backgroundColor: palette.isDark
+                                ? null
+                                : palette.dialogCardSurface,
+                            side: BorderSide(
+                              color: palette.amberBorder.withValues(
+                                alpha: palette.isDark ? 0.55 : 0.72,
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 9,
+                              horizontal: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () {
+                            controller.audio.playTapVibrate();
+                            IntroStoryScreen.showReplay(context);
+                          },
+                          icon: const Icon(
+                            Icons.play_circle_outline_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            loc.t(
+                              'story_replay_intro',
+                              fallback: 'Replay Intro / Tutorial',
                             ),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),

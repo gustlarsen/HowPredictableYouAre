@@ -218,29 +218,70 @@ void main() {
         expect(tester.widget<Text>(caption0Finder).data, fullCard1Text);
         expect(find.text('1 / 4'), findsOneWidget);
 
-        // Second tap on dialogue box advances to Card 2
+        // Second tap on dialogue box enters the playable Royal Garden Tutorial Battle
         await tester.tap(find.byKey(const ValueKey('intro_dialogue_box_0')));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        expect(find.byKey(const ValueKey('royal_garden_tutorial_battle')), findsOneWidget);
+
+        // Act 1: Guided Turns 1-3 (Fire -> Water -> Wood)
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
+        await tester.pump();
+
+        // Act 2: Play until all 3 mages fall (repeating a pattern so Markov Matrix counters reliably)
+        for (int i = 0; i < 60; i++) {
+          if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+            break;
+          }
+          for (final key in const [
+            'tutorial_move_btn_fire',
+            'tutorial_move_btn_water',
+            'tutorial_move_btn_wood',
+          ]) {
+            final finder = find.byKey(ValueKey(key));
+            if (finder.evaluate().isEmpty) continue;
+            final inkWell = tester.widget<InkWell>(finder);
+            if (inkWell.onTap != null) {
+              await tester.tap(finder);
+              await tester.pump();
+              break;
+            }
+          }
+        }
+
+        // Continue from completed tutorial battle into closing Card 2
+        if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+          await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
+          await tester.pump();
+        } else {
+          await tester.pump(const Duration(milliseconds: 1600));
+        }
+
         expect(find.text('2 / 4'), findsOneWidget);
         expect(find.text('Chapter II'), findsOneWidget);
         expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
 
         // Tap Next button -> advances to Card 3
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('3 / 4'), findsOneWidget);
         expect(find.text('Chapter III'), findsOneWidget);
         expect(find.text("The King's Summons"), findsOneWidget);
 
         // Tap Next button -> advances to Card 4 where action button becomes Begin Quest
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('4 / 4'), findsOneWidget);
         expect(find.text('Chapter IV'), findsOneWidget);
         expect(find.text('The Quest Begins'), findsOneWidget);
         expect(find.text('Begin Quest'), findsOneWidget);
 
-        // Tap Begin Quest -> persists hasSeenIntro = true, syncs Cloud Save, transitions to WorldMapScreen
+        // Tap Begin Quest -> persists hasSeenIntro = true, grants 3 starting orbs, syncs Cloud Save, enters WorldMapScreen at Week 0
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
@@ -248,11 +289,21 @@ void main() {
         expect(controller.hasSeenIntro, isTrue);
         expect(storage.hasSeenIntro, isTrue);
         expect(storage.hasSeenStoryIntro, isTrue);
+        expect(controller.currentWeek, 0);
+        expect(controller.fireOrbs, 1);
+        expect(controller.waterOrbs, 1);
+        expect(controller.woodOrbs, 1);
+        expect(storage.fireOrbs, 1);
+        expect(storage.waterOrbs, 1);
+        expect(storage.woodOrbs, 1);
         expect(find.byType(IntroStoryScreen), findsNothing);
         expect(find.byType(WorldMapScreen), findsOneWidget);
 
         final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
         expect(cloud.hasSeenStoryIntro, isTrue);
+        expect(cloud.fireOrbs, 1);
+        expect(cloud.waterOrbs, 1);
+        expect(cloud.woodOrbs, 1);
       },
     );
 
@@ -435,7 +486,7 @@ void main() {
         await tester.ensureVisible(replayIntroBtn);
         await tester.pumpAndSettle();
         expect(replayIntroBtn, findsOneWidget);
-        expect(find.text('Replay Intro'), findsOneWidget);
+        expect(find.text('Replay Intro / Tutorial'), findsOneWidget);
 
         // Unified #1 card is present; old 4 duplicate intro_1..intro_4 list entries are absent
         final introSlot = find.byKey(const ValueKey('story_gallery_item_intro'));
@@ -472,7 +523,7 @@ void main() {
         }
         expect(find.text('#10'), findsNothing);
 
-        // Tapping Replay Intro opens IntroStoryScreen at Card 1, and Skip returns to Library
+        // Tapping Replay Intro / Tutorial opens IntroStoryScreen at Card 1, and Skip returns to Library
         await tester.ensureVisible(replayIntroBtn);
         await tester.pumpAndSettle();
         await tester.tap(replayIntroBtn);
@@ -487,7 +538,7 @@ void main() {
         expect(find.byType(RoyalCastleDialog), findsOneWidget);
         expect(controller.currentWeek, 3);
 
-        // Tapping the unified #1 Intro card opens the full 4-slide IntroStoryScreen carousel
+        // Tapping the unified #1 Intro card opens Card 1 -> Playable Royal Garden Tutorial Battle -> Cards 2-4
         final readBtn = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
         await tester.ensureVisible(readBtn);
         await tester.pumpAndSettle();
@@ -500,6 +551,49 @@ void main() {
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('royal_garden_tutorial_battle')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('tutorial_sandbox_badge')),
+          findsOneWidget,
+        );
+
+        // Play through Act 1 + Act 2 in sandbox replay mode
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
+        await tester.pump();
+
+        for (int i = 0; i < 60; i++) {
+          if (find.byKey(const ValueKey('royal_garden_tutorial_battle')).evaluate().isEmpty) {
+            break;
+          }
+          if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+            await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
+            await tester.pumpAndSettle();
+            break;
+          }
+          for (final key in const [
+            'tutorial_move_btn_fire',
+            'tutorial_move_btn_water',
+            'tutorial_move_btn_wood',
+          ]) {
+            final finder = find.byKey(ValueKey(key));
+            if (finder.evaluate().isEmpty) continue;
+            final inkWell = tester.widget<InkWell>(finder);
+            if (inkWell.onTap != null) {
+              await tester.tap(finder);
+              await tester.pump();
+              break;
+            }
+          }
+        }
+        await tester.pumpAndSettle();
+
         expect(find.text('2 / 4'), findsOneWidget);
         expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
 
@@ -513,12 +607,15 @@ void main() {
         expect(find.text('4 / 4'), findsOneWidget);
         expect(find.text('The Quest Begins'), findsOneWidget);
 
-        // Begin Quest on slide 4 returns cleanly to Royal Castle Library
+        // Begin Quest on slide 4 returns cleanly to Royal Castle Library with ZERO campaign changes
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
         expect(find.byType(IntroStoryScreen), findsNothing);
         expect(find.byType(RoyalCastleDialog), findsOneWidget);
         expect(controller.currentWeek, 3);
+        expect(controller.fireOrbs, 0);
+        expect(controller.waterOrbs, 0);
+        expect(controller.woodOrbs, 0);
 
         // Unlocking all 8 artifact chapters brings Story Memories counter to 9 / 9
         for (final chapter in controller.artifactStoryChapters) {

@@ -1,7 +1,13 @@
 # How Predictable You Are — Canonical Story, Boss Progression & Endings
 
-## 1. Premise & The Metal Wizard's Siege
-A Wizard obsessed with the element of **Metal** studied human behavior and forged a predictive Markov automaton—the **Guardian Robot**—capable of learning human patterns and conjuring **Fire**, **Water**, and **Wood**. Ambushing the royal garden, the automaton defeated the three guardian mages and kidnapped **Princess Aria** into the Metal Wizard's volcanic iron fortress.
+## 1. Premise, Royal Garden Prologue & The Metal Wizard's Siege
+A Wizard obsessed with the element of **Metal** studied human behavior and forged a predictive Markov automaton—the **Guardian Robot**—capable of learning human patterns and conjuring **Fire**, **Water**, and **Wood**.
+
+### Playable Royal Garden Prologue Tutorial Battle
+In the opening prologue (`IntroStoryScreen`), players experience the **Ambush in the Royal Garden** (`royal_garden_arena_bg.png`) controlling the **three Royal Guardian Mages** (**Fire Mage**, **Water Mage**, and **Wood Mage** — each starting with **`5 HP`** and **`100 Mana`**) against the invading **Guardian Robot (`100 HP`)**:
+- **Act 1 (Turns 1–3):** Guided elemental triangle combat (`Fire burns Wood`, `Water extinguishes Fire`, `Wood absorbs Water`), collecting **`1 Fire Orb`**, **`1 Water Orb`**, and **`1 Wood Orb`** (`3 Orbs total`).
+- **Act 2 (Turn 4+):** The Guardian Robot brings its **Cumulative 3-Element Markov Matrix** online, adapting to the player's transitions until all three Royal Guardian Mages fall in defense of the garden and **Princess Aria** is kidnapped into the Metal Wizard's volcanic iron fortress.
+- **Starting Orb Inheritance:** Completing the prologue on first launch carries the **`3` collected Elemental Orbs (`1 Fire`, `1 Water`, `1 Wood`)** directly into the young **Cleric's** backpack at **Week 0**. Replaying the prologue from **Royal Castle -> Library (`#1` Prologue)** or **Settings** runs in isolated sandbox mode.
 
 With the neighboring realms under threat and a **40-Week** conquest horizon ticking down, **King Aldric** turns to the **Sacred Temple** and summons a young **Cleric** capable of wielding all elements to rescue the Princess and shatter Master Hand's predictive algorithms.
 
@@ -37,7 +43,7 @@ The Cleric faces two choices:
 
 | Stage | Boss Name | HP | Arena | Elemental Pool | Mathematical AI / Combat Mechanic |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1** | **Guardian Robot** | `100 HP` | Dark Forge (`forge_arena_bg`) | 3 Base Elements (`Fire`, `Water`, `Wood`) | **Cumulative Markov Matrix:** Tracks all historical 1-step player transitions and counters the player's most frequent follow-up. |
+| **Stage 1** | **Guardian Robot** | `100 HP` | Royal Garden (Prologue) / Dark Forge (`forge_arena_bg`) | 3 Base Elements (`Fire`, `Water`, `Wood`) | **Cumulative Markov Matrix:** Defeated the three Royal Guardian Mages in the Royal Garden prior to the Cleric's quest. Tracks all historical 1-step player transitions and counters the player's most frequent follow-up. |
 | **Stage 2** | **Robot Archmage** *(Week 10+)* | `200 HP` | Dark Forge (`forge_arena_bg`) | All 5 Elements (`Fire`, `Water`, `Wood`, `Earth`, `Metal`) | **1-Step Short-Term Memory:** Ignores cumulative history and counters only the player's single most recent transition out of each element (exposed via the **Markov Recalibrator**). |
 | **Stage 3** | **Metal Wizard** | `300 HP` | Dark Forge (`forge_arena_bg`) | Pure `Metal` (`100%`) | **Pure Metal Obsession:** Bypasses the Markov matrix and conjures exclusively `Metal` on every turn. |
 | **Stage 5** | **Temple High Master** *(Week 1+ Sanctuary)* | `350 HP` | Sacred Temple (`temple_arena_bg`) | All 5 Elements (`Fire`, `Water`, `Wood`, `Earth`, `Metal`) | **Pure Divine Chaos (`1/5` Uniform Random):** Ignores all transition history and channels all 5 elements with 100% pure uniform randomness (`1/5` probability per element). |

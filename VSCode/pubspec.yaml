@@ -73,9 +73,13 @@ flutter:
     - assets/images/
     - assets/images/enemies/
     - assets/images/enemies/temple_master_idle.png
+    - assets/images/enemies/mage_fire_idle.png
+    - assets/images/enemies/mage_water_idle.png
+    - assets/images/enemies/mage_wood_idle.png
     - assets/images/player/
     - assets/images/forge_arena_bg.webp
     - assets/images/temple_arena_bg.webp
+    - assets/images/royal_garden_arena_bg.png
     - assets/images/kingdom_map.jpeg
     - assets/images/world_map_peace.jpeg
     - assets/images/world_map_conquered.jpeg

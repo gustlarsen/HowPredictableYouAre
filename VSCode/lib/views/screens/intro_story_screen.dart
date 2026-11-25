@@ -2,29 +2,36 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
+import '../../controllers/royal_garden_tutorial_controller.dart';
 import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/royal_garden_tutorial_battle.dart';
 import 'world_map_screen.dart';
 
-/// Interactive 4-Card Storybook Intro Carousel shown on first launch
-/// (`hasSeenIntro == false`) and replayable anytime from the Royal Library.
+/// Interactive Prologue Intro & Playable Royal Garden Tutorial Battle shown on
+/// first launch (`hasSeenIntro == false`) and replayable anytime in isolated
+/// sandbox mode from Royal Castle Library `#1` or Settings.
 class IntroStoryScreen extends StatefulWidget {
   final bool isReplay;
   final int initialPage;
   final VoidCallback? onFinished;
+  final RoyalGardenTutorialController? tutorialController;
 
   const IntroStoryScreen({
     super.key,
     this.isReplay = false,
     this.initialPage = 0,
     this.onFinished,
+    this.tutorialController,
   });
 
   /// Opens [IntroStoryScreen] as a full-screen replay modal (e.g., from Royal
-  /// Castle -> Library) without altering campaign progress.
+  /// Castle -> Library or Settings) in isolated sandbox mode without altering
+  /// campaign progress.
   static Future<void> showReplay(
     BuildContext context, {
     int initialPage = 0,
+    RoyalGardenTutorialController? tutorialController,
   }) {
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -32,6 +39,7 @@ class IntroStoryScreen extends StatefulWidget {
         builder: (_) => IntroStoryScreen(
           isReplay: true,
           initialPage: initialPage.clamp(0, IntroStoryCardData.cards.length - 1),
+          tutorialController: tutorialController,
         ),
       ),
     );
@@ -44,21 +52,30 @@ class IntroStoryScreen extends StatefulWidget {
 class _IntroStoryScreenState extends State<IntroStoryScreen> {
   static const Duration _typewriterCharInterval = Duration(milliseconds: 25);
 
-  late final PageController _pageController;
+  late PageController _pageController;
   late int _currentPage;
   int _revealedCharCount = 0;
   Timer? _typewriterTimer;
   GameController? _controller;
   bool _hasCompleted = false;
 
+  bool _isInTutorialBattle = false;
+  bool _hasCompletedTutorialBattle = false;
+  int _earnedFireOrbs = 0;
+  int _earnedWaterOrbs = 0;
+  int _earnedWoodOrbs = 0;
+
   List<IntroStoryCardData> get _cards => IntroStoryCardData.cards;
   IntroStoryCardData get _activeCard => _cards[_currentPage];
   bool get _isLastCard => _currentPage >= _cards.length - 1;
+  bool get _shouldLaunchTutorialAfterCurrentCard =>
+      _currentPage == 0 && !_hasCompletedTutorialBattle;
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage.clamp(0, _cards.length - 1);
+    _hasCompletedTutorialBattle = _currentPage > 0;
     _pageController = PageController(initialPage: _currentPage);
   }
 
@@ -69,7 +86,7 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     if (_controller != nextController) {
       final isInitialAttach = _controller == null;
       _controller = nextController;
-      if (isInitialAttach) {
+      if (isInitialAttach && !_isInTutorialBattle) {
         _startTypewriterForPage(_currentPage);
       }
     }
@@ -133,6 +150,34 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     });
   }
 
+  void _enterTutorialBattle() {
+    _typewriterTimer?.cancel();
+    setState(() {
+      _isInTutorialBattle = true;
+    });
+  }
+
+  void _handleTutorialBattleCompleted({
+    required int fireOrbs,
+    required int waterOrbs,
+    required int woodOrbs,
+  }) {
+    if (!mounted) return;
+    _earnedFireOrbs = fireOrbs;
+    _earnedWaterOrbs = waterOrbs;
+    _earnedWoodOrbs = woodOrbs;
+    _hasCompletedTutorialBattle = true;
+
+    const closingStartIndex = 1;
+    _pageController.dispose();
+    _pageController = PageController(initialPage: closingStartIndex);
+    setState(() {
+      _isInTutorialBattle = false;
+      _currentPage = closingStartIndex;
+      _startTypewriterForPage(closingStartIndex);
+    });
+  }
+
   void _goToPage(int nextPage) {
     final controller = _controller;
     if (controller == null) return;
@@ -170,7 +215,12 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
       return;
     }
 
-    controller.completeIntroStory();
+    controller.completeIntroStory(
+      grantTutorialOrbs: _hasCompletedTutorialBattle,
+      fireOrbsBonus: _earnedFireOrbs,
+      waterOrbsBonus: _earnedWaterOrbs,
+      woodOrbsBonus: _earnedWoodOrbs,
+    );
     if (widget.onFinished != null) {
       widget.onFinished!();
       return;
@@ -191,7 +241,9 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
       _revealFullTextNow(controller);
       return;
     }
-    if (_isLastCard) {
+    if (_shouldLaunchTutorialAfterCurrentCard) {
+      _enterTutorialBattle();
+    } else if (_isLastCard) {
       _finishIntro();
     } else {
       _goToPage(_currentPage + 1);
@@ -200,7 +252,9 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
 
   void _handleActionButtonTap(GameController controller) {
     controller.audio.playTapVibrate();
-    if (_isLastCard) {
+    if (_shouldLaunchTutorialAfterCurrentCard) {
+      _enterTutorialBattle();
+    } else if (_isLastCard) {
       _finishIntro();
     } else {
       _goToPage(_currentPage + 1);
@@ -218,6 +272,17 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     final loc = controller.localization;
     final palette = AppPalette.of(context);
     final isDark = palette.isDark;
+
+    if (_isInTutorialBattle) {
+      return RoyalGardenTutorialBattle(
+        key: const ValueKey('intro_royal_garden_tutorial_battle'),
+        gameController: controller,
+        tutorialController: widget.tutorialController,
+        isReplay: widget.isReplay,
+        onSkip: _finishIntro,
+        onBattleCompleted: _handleTutorialBattleCompleted,
+      );
+    }
 
     final skipLabel = loc.t('story_skip', fallback: 'Skip');
     final nextLabel = loc.t('story_next', fallback: 'Next');
@@ -332,6 +397,9 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
                       child: PageView.builder(
                         key: const ValueKey('intro_story_page_view'),
                         controller: _pageController,
+                        physics: _shouldLaunchTutorialAfterCurrentCard
+                            ? const NeverScrollableScrollPhysics()
+                            : null,
                         itemCount: _cards.length,
                         onPageChanged: (index) {
                           setState(() {

@@ -266,7 +266,7 @@ enum StoryChapter {
   String get fallbackItemName {
     switch (this) {
       case StoryChapter.intro:
-        return "The Metal Wizard's automaton kidnaps the Princess, and the King summons a young Cleric to strike back.";
+        return "Stand with the three Royal Guardian Mages in the Royal Garden as the automaton ambushes the Princess, before the King summons a young Cleric.";
       case StoryChapter.resetButton:
         return 'Reset Button';
       case StoryChapter.predictabilityScore:

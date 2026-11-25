@@ -855,21 +855,60 @@ void main() {
     final nextBtnFinder = find.byKey(const ValueKey('intro_action_button'));
     expect(nextBtnFinder, findsOneWidget);
 
-    // Swipe left on PageView -> moves forward to Card 2
-    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(-300, 0));
-    await tester.pumpAndSettle();
-    expect(find.text('2 / 4'), findsOneWidget);
-
-    // Swipe right on PageView -> rewinds to Card 1
-    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(300, 0));
-    await tester.pumpAndSettle();
-    expect(find.text('1 / 4'), findsOneWidget);
-
-    // Tap Next through cards 2, 3, 4
+    // Tap Next on Card 1 -> enters the playable Royal Garden Tutorial Battle
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('royal_garden_tutorial_battle')),
+      findsOneWidget,
+    );
+
+    // Complete Act 1 (Fire -> Water -> Wood) and Act 2 until all 3 mages fall
+    await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
+    await tester.pump();
+
+    for (int i = 0; i < 60; i++) {
+      if (find.byKey(const ValueKey('royal_garden_tutorial_battle')).evaluate().isEmpty) {
+        break;
+      }
+      if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+        await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
+        await tester.pumpAndSettle();
+        break;
+      }
+      for (final key in const [
+        'tutorial_move_btn_fire',
+        'tutorial_move_btn_water',
+        'tutorial_move_btn_wood',
+      ]) {
+        final finder = find.byKey(ValueKey(key));
+        if (finder.evaluate().isEmpty) continue;
+        final inkWell = tester.widget<InkWell>(finder);
+        if (inkWell.onTap != null) {
+          await tester.tap(finder);
+          await tester.pump();
+          break;
+        }
+      }
+    }
+    await tester.pumpAndSettle();
     expect(find.text('2 / 4'), findsOneWidget);
 
+    // Swipe left on closing PageView -> moves forward to Card 3
+    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('3 / 4'), findsOneWidget);
+
+    // Swipe right on closing PageView -> rewinds to Card 2
+    await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 4'), findsOneWidget);
+
+    // Tap Next through cards 3, 4
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(find.text('3 / 4'), findsOneWidget);
@@ -879,10 +918,13 @@ void main() {
     expect(find.text('4 / 4'), findsOneWidget);
     expect(find.text('Begin Quest'), findsOneWidget);
 
-    // Final tap on Begin Quest persists hasSeenIntro and enters WorldMapScreen
+    // Final tap on Begin Quest persists hasSeenIntro, grants 3 starting orbs, and enters WorldMapScreen
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(storage.hasSeenStoryIntro, isTrue);
+    expect(controller.fireOrbs, 1);
+    expect(controller.waterOrbs, 1);
+    expect(controller.woodOrbs, 1);
     expect(find.byKey(const ValueKey('intro_story_screen')), findsNothing);
     expect(find.byKey(const ValueKey('world_map_screen')), findsOneWidget);
   });

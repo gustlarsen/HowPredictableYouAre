@@ -4062,9 +4062,32 @@ class GameController extends ChangeNotifier {
   int get unlockedStoryMemoriesCount =>
       StoryChapter.values.where(isStoryChapterUnlocked).length;
 
-  void completeIntroStory() {
+  void completeIntroStory({
+    bool grantTutorialOrbs = false,
+    int fireOrbsBonus = 1,
+    int waterOrbsBonus = 1,
+    int woodOrbsBonus = 1,
+  }) {
+    final isFirstIntroCompletion = !hasSeenStoryIntro;
     final shouldSave =
-        !hasSeenStoryIntro || pendingStoryChapter == StoryChapter.intro;
+        isFirstIntroCompletion || pendingStoryChapter == StoryChapter.intro;
+
+    if (isFirstIntroCompletion && grantTutorialOrbs) {
+      final fireAdd = math.max(0, fireOrbsBonus);
+      final waterAdd = math.max(0, waterOrbsBonus);
+      final woodAdd = math.max(0, woodOrbsBonus);
+      if (fireAdd > 0 || waterAdd > 0 || woodAdd > 0) {
+        fireOrbs += fireAdd;
+        waterOrbs += waterAdd;
+        woodOrbs += woodAdd;
+        turn0FireOrbs += fireAdd;
+        turn0WaterOrbs += waterAdd;
+        turn0WoodOrbs += woodAdd;
+        _persistOrbsToStorage();
+        _persistTurn0OrbsToStorage();
+      }
+    }
+
     hasSeenStoryIntro = true;
     storage.setHasSeenStoryIntro(true);
     if (pendingStoryChapter == StoryChapter.intro) {

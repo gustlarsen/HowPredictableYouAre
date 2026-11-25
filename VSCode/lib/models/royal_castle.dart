@@ -244,7 +244,7 @@ enum BestiaryCreature {
     fallbackMathModel: 'Cumulative Markov Matrix',
     loreKey: 'castle_bestiary_guardian_lore',
     fallbackLore:
-        'Records every transition from your previous move to your next inside a cumulative Markov matrix, countering your most habitual follow-up.',
+        "Defeated the three Royal Guardian Mages in the Royal Garden prior to the Cleric's quest. Records every transition from your previous move to your next inside a cumulative Markov matrix, countering your most habitual follow-up.",
     hintKey: 'castle_bestiary_guardian_hint',
     fallbackHint: 'Play rounds in battle so the construct learns a transition.',
     icon: Icons.memory_rounded,
