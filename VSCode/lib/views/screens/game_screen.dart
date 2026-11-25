@@ -19,6 +19,8 @@ import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
 import '../widgets/rpg_backpack_icon.dart';
+import '../widgets/rpg_reset_icon.dart';
+import '../widgets/rpg_settings_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
 import '../widgets/elemental_energy_sphere.dart';
@@ -2142,31 +2144,26 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(width: 4),
           ],
 
-          // 4. Conditional Reset Action Button (Fixed 44x44 Beveled Frame)
+          // 4. Conditional Unboxed Arcane Rewind / Reset Button (Fixed 44x44)
           if (controller.showReset) ...[
             SizedBox(
               width: 44,
               height: 44,
-              child: DecoratedBox(
-                decoration: actionBoxDecoration,
-                child: IconButton(
-                  key: const ValueKey('battle_reset_button'),
-                  padding: EdgeInsets.zero,
-                  iconSize: 30,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 44,
-                    height: 44,
-                  ),
-                  icon: Icon(
-                    Icons.restart_alt,
-                    size: 30,
-                    color: palette.isDark
-                        ? const Color(0xFFFF6B57)
-                        : const Color(0xFFD32F2F),
-                  ),
-                  tooltip: loc.t('string53', fallback: 'RESET'),
-                  onPressed: () => _confirmReset(context, controller, loc),
+              child: IconButton(
+                key: const ValueKey('battle_reset_button'),
+                padding: EdgeInsets.zero,
+                iconSize: 38,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
                 ),
+                icon: const SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: RpgResetIcon(size: 38),
+                ),
+                tooltip: loc.t('string53', fallback: 'RESET'),
+                onPressed: () => _confirmReset(context, controller, loc),
               ),
             ),
             const SizedBox(width: 4),
@@ -2202,36 +2199,31 @@ class _GameScreenState extends State<GameScreen>
           ),
           const SizedBox(width: 4),
 
-          // 7. Beveled Dark Square Settings Button (Fixed 44x44 Beveled Frame)
+          // 7. Unboxed Forged Arcane Gear Settings Button (Fixed 44x44)
           SizedBox(
             width: 44,
             height: 44,
-            child: DecoratedBox(
-              decoration: actionBoxDecoration,
-              child: IconButton(
-                key: const ValueKey('battle_settings_button'),
-                padding: EdgeInsets.zero,
-                iconSize: 30,
-                constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
-                ),
-                icon: Icon(
-                  Icons.settings_outlined,
-                  size: 30,
-                  color: palette.isDark
-                      ? const Color(0xFFD9C398)
-                      : palette.primaryText,
-                ),
-                tooltip: 'Settings',
-                onPressed: () {
-                  _stopOverchargedHold();
-                  showDialog(
-                    context: context,
-                    builder: (_) => SettingsDialog(controller: controller),
-                  );
-                },
+            child: IconButton(
+              key: const ValueKey('battle_settings_button'),
+              padding: EdgeInsets.zero,
+              iconSize: 38,
+              constraints: const BoxConstraints.tightFor(
+                width: 44,
+                height: 44,
               ),
+              icon: const SizedBox(
+                width: 38,
+                height: 38,
+                child: RpgSettingsIcon(size: 38),
+              ),
+              tooltip: 'Settings',
+              onPressed: () {
+                _stopOverchargedHold();
+                showDialog(
+                  context: context,
+                  builder: (_) => SettingsDialog(controller: controller),
+                );
+              },
             ),
           ),
         ],

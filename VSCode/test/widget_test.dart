@@ -25,6 +25,8 @@ import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
+import 'package:how_predictable/views/widgets/rpg_reset_icon.dart';
+import 'package:how_predictable/views/widgets/rpg_settings_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_teleport_portal_icon.dart';
 import 'package:how_predictable/views/widgets/adaptive_rewarded_ad_button.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
@@ -492,7 +494,8 @@ void main() {
     expect(find.text('VS'), findsNothing);
     expect(find.text('The winner of this round:'), findsNothing);
     expect(find.text('The winner of this round::'), findsNothing);
-    expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+    expect(find.byKey(const ValueKey('battle_reset_button')), findsOneWidget);
+    expect(find.byType(RpgResetIcon), findsOneWidget);
     expect(find.byKey(const ValueKey('appbar_story_gallery_button')), findsNothing);
 
     // Verify that "Your Choice:" and "PC's Choice:" are rendered side-by-side on a single row
@@ -1038,7 +1041,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Open SettingsDialog and open Story Memories gallery
-    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.tap(find.byKey(const ValueKey('battle_settings_button')));
     await tester.pumpAndSettle();
 
     final storyMemoriesBtn = find.byKey(
@@ -2915,11 +2918,12 @@ void main() {
       findsNothing,
     );
     final settingsFinder = find.byKey(const ValueKey('battle_settings_button'));
-    final settingsIconFinder = find.byIcon(Icons.settings_outlined);
+    final settingsIconFinder = find.byType(RpgSettingsIcon);
     expect(settingsFinder, findsOneWidget);
     expect(settingsIconFinder, findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsNothing);
     expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.widget<Icon>(settingsIconFinder).size, equals(30.0));
+    expect(tester.getSize(settingsIconFinder), equals(const Size(38.0, 38.0)));
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('battle_top_hud_bar')),
@@ -2928,7 +2932,7 @@ void main() {
           matching: find.byType(DecoratedBox),
         ),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
 
@@ -2949,11 +2953,12 @@ void main() {
     expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
     final giftFinder = find.byKey(const ValueKey('gift_box_button'));
     final resetFinder = find.byKey(const ValueKey('battle_reset_button'));
-    final resetIconFinder = find.byIcon(Icons.restart_alt);
+    final resetIconFinder = find.byType(RpgResetIcon);
     expect(giftFinder, findsOneWidget);
     expect(find.text('🎁'), findsOneWidget);
     expect(resetFinder, findsOneWidget);
     expect(resetIconFinder, findsOneWidget);
+    expect(find.byIcon(Icons.restart_alt), findsNothing);
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
     expect(teleportFinder, findsOneWidget);
     expect(teleportIconFinder, findsOneWidget);
@@ -2974,22 +2979,72 @@ void main() {
 
     expect(tester.getSize(giftFinder), equals(const Size(44.0, 44.0)));
     expect(tester.getSize(resetFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.widget<Icon>(resetIconFinder).size, equals(30.0));
+    expect(tester.getSize(resetIconFinder), equals(const Size(38.0, 38.0)));
     expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.widget<Icon>(settingsIconFinder).size, equals(30.0));
+    expect(tester.getSize(settingsIconFinder), equals(const Size(38.0, 38.0)));
 
-    for (final boxedBtn in [giftFinder, resetFinder, settingsFinder]) {
+    // Reset, Teleport, and Settings render unboxed (no surrounding DecoratedBox)
+    for (final unboxedBtn in [resetFinder, teleportFinder, settingsFinder]) {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('battle_top_hud_bar')),
           matching: find.ancestor(
-            of: boxedBtn,
+            of: unboxedBtn,
             matching: find.byType(DecoratedBox),
           ),
         ),
-        findsOneWidget,
+        findsNothing,
       );
     }
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('battle_top_hud_bar')),
+        matching: find.ancestor(
+          of: giftFinder,
+          matching: find.byType(DecoratedBox),
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('RpgResetIcon and RpgSettingsIcon render bespoke CustomPainter RPG illustrations cleanly with and without glow', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              RpgResetIcon(size: 38),
+              RpgResetIcon(size: 44, showGlow: false),
+              RpgSettingsIcon(size: 38),
+              RpgSettingsIcon(size: 44, showGlow: false),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RpgResetIcon), findsNWidgets(2));
+    expect(find.byType(RpgSettingsIcon), findsNWidgets(2));
+    expect(tester.getSize(find.byType(RpgResetIcon).first), equals(const Size(38.0, 38.0)));
+    expect(tester.getSize(find.byType(RpgResetIcon).last), equals(const Size(44.0, 44.0)));
+    expect(tester.getSize(find.byType(RpgSettingsIcon).first), equals(const Size(38.0, 38.0)));
+    expect(tester.getSize(find.byType(RpgSettingsIcon).last), equals(const Size(44.0, 44.0)));
+    expect(
+      find.descendant(
+        of: find.byType(RpgResetIcon).first,
+        matching: find.byType(CustomPaint),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(RpgSettingsIcon).first,
+        matching: find.byType(CustomPaint),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {
@@ -3058,7 +3113,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('🎁'), findsNothing);
-    expect(find.byIcon(Icons.restart_alt), findsNothing);
+    expect(find.byKey(const ValueKey('battle_reset_button')), findsNothing);
 
     // Space opens up -> automatically switches back to full "Watch Ad +50 Orbs" text pill
     expect(find.byIcon(Icons.ondemand_video_rounded), findsNothing);
@@ -3622,7 +3677,7 @@ void main() {
 
       // Trigger AppBar Reset -> shows -1 Wood loss, Mana Pool resets back to 100 and woodOrbs reverts to 0
       expect(controller.woodOrbs, 1);
-      await tester.tap(find.byIcon(Icons.restart_alt));
+      await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('reset_confirm_dialog')), findsOneWidget);
       expect(find.text('-1 Wood'), findsOneWidget);

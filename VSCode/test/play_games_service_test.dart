@@ -916,7 +916,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 350));
 
         expect(controller.fireOrbs, 420);
-        expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+        expect(find.byKey(const ValueKey('battle_reset_button')), findsOneWidget);
 
         // Simulate user switching to AccountBeta in Google Play Games app while game is in background
         fakeClient.mockPlayerName = 'AccountBeta';
@@ -938,12 +938,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 350));
 
         // UI immediately updates: orbs reset to 0, Reset button disappears
-        expect(find.byIcon(Icons.restart_alt), findsNothing);
+        expect(find.byKey(const ValueKey('battle_reset_button')), findsNothing);
         expect(controller.totalOrbs, 0);
         expect(controller.unlockedReset, isFalse);
 
         // Open SettingsDialog -> shows AccountBeta's profile
-        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.tap(find.byKey(const ValueKey('battle_settings_button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
         expect(find.text('AccountBeta'), findsOneWidget);

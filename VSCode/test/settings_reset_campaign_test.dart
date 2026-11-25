@@ -620,7 +620,7 @@ void main() {
         expect(controller.totalRounds, 1);
 
         // Open SettingsDialog from GameScreen AppBar
-        await tester.tap(find.byIcon(Icons.settings_outlined));
+        await tester.tap(find.byKey(const ValueKey('battle_settings_button')));
         await tester.pumpAndSettle();
         expect(find.byType(SettingsDialog), findsOneWidget);
 

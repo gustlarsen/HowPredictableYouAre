@@ -375,7 +375,7 @@ void main() {
         expect(controller.metalOrbs, 65);
 
         // Tap top-bar Reset button
-        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
         await tester.pumpAndSettle();
 
         expect(find.byKey(const ValueKey('reset_confirm_dialog')), findsOneWidget);
@@ -406,7 +406,7 @@ void main() {
         expect(controller.remainingMana, 97);
 
         // Open Reset dialog again and confirm RESET
-        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('reset_confirm_button')));
         await tester.pumpAndSettle();
@@ -480,7 +480,7 @@ void main() {
         expect(controller.fireOrbs, 50);
 
         // Open Reset dialog in Light Mode
-        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
         await tester.pumpAndSettle();
 
         const lightPalette = AppPalette(isDark: false);
@@ -513,7 +513,7 @@ void main() {
         controller.playTurn(HandMove.paper);
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
         await tester.pumpAndSettle();
 
         const darkPalette = AppPalette(isDark: true);
@@ -548,7 +548,7 @@ void main() {
         controller.toggleDarkMode(false);
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.restart_alt));
+        await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
         await tester.pumpAndSettle();
         final lightOrbsCard = tester.widget<Container>(
           find.byKey(const ValueKey('reset_orbs_lost_card')),
