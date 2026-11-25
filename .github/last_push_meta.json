@@ -1,5 +1,5 @@
 {
-  "summary": "- Split locked orb status in InventoryDialog into two lines: lock icon + Locked, with (Unlock Earth & Metal) on its own line below\n- Added inventory_locked_status and inventory_locked_requirement localizations for en, pt, es, and de\n- Wrapped locked status and requirement text with FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) without ellipsis truncation and balanced locked card vertical padding\n- Updated InventoryDialog widget tests and verified with flutter analyze and full flutter test (397 passed)",
+  "summary": "- Repositioned ManaPoolOrb in VersusArena from the horizontal center to a compact 50px position on the far-left side of the Cleric (Player) with safe >= 8px left edge padding across narrow 360px screens\n- Kept the Cleric sprite centered directly above his HP bar and PLAYER label while leaving the opponent side without a mana pool\n- Preserved the unobstructed horizontal center of VersusArena for Mid-Arena Clash VFX (~300ms) and parabolic Elemental Orb flight arcs into the top-left Backpack\n- Updated ManaPoolOrb and VersusArena widget tests and verified flutter analyze and all 399 tests pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-25T17:51:53Z"
+  "updated_at_utc": "2026-11-25T19:37:46Z"
 }

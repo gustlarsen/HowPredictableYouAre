@@ -799,13 +799,19 @@ class _VersusArenaState extends State<VersusArena>
               const totalItemsWidth = cardWidth * 2 + vsWidth;
               const spriteWidth = 112.0;
               const spriteHeight = 112.0;
+              const manaOrbSize = 50.0;
               final arenaStackHeight = widget.compactHeight ? 132.0 : 140.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
               final freeSpace = math.max(0.0, rowWidth - totalItemsWidth);
               final spaceUnit = freeSpace / 3.0;
 
-              final leftX = (0.5 * spaceUnit).clamp(0.0, maxCardLeft);
+              final desiredPlayerLeftX = 0.5 * spaceUnit;
+              final minPlayerLeftX = math.min(
+                maxCardLeft,
+                math.max(desiredPlayerLeftX, manaOrbSize + 2.0),
+              );
+              final leftX = minPlayerLeftX.clamp(0.0, maxCardLeft);
               final rightX = rowWidth >= totalItemsWidth
                   ? (2.5 * spaceUnit + cardWidth + vsWidth)
                       .clamp(0.0, maxCardLeft)
@@ -825,6 +831,12 @@ class _VersusArenaState extends State<VersusArena>
                   .toDouble();
               final bossLeft = (rightCenterX - spriteWidth / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
+                  .toDouble();
+              final manaOrbLeft = (leftX - manaOrbSize - 4.0)
+                  .clamp(0.0, math.max(0.0, rowWidth - manaOrbSize))
+                  .toDouble();
+              final manaOrbTop = (orbCenterY - manaOrbSize / 2.0)
+                  .clamp(0.0, math.max(0.0, arenaStackHeight - manaOrbSize))
                   .toDouble();
 
               final sanctuaryRunesLayer = Positioned.fill(
@@ -921,19 +933,18 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              final centerColumn = Positioned(
-                top: 6,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: ManaPoolOrb(
-                    key: const ValueKey('mana_pool_orb'),
-                    size: 72.0,
-                    remainingMana: widget.remainingMana,
-                    maxMana: widget.maxMana,
-                    localization: widget.localization,
-                    animationsEnabled: widget.animationsEnabled,
-                  ),
+              final playerManaOrb = Positioned(
+                top: manaOrbTop,
+                left: manaOrbLeft,
+                width: manaOrbSize,
+                height: manaOrbSize,
+                child: ManaPoolOrb(
+                  key: const ValueKey('mana_pool_orb'),
+                  size: manaOrbSize,
+                  remainingMana: widget.remainingMana,
+                  maxMana: widget.maxMana,
+                  localization: widget.localization,
+                  animationsEnabled: widget.animationsEnabled,
                 ),
               );
 
@@ -1141,7 +1152,7 @@ class _VersusArenaState extends State<VersusArena>
                       sanctuaryRunesLayer,
                       playerSprite,
                       bossSprite,
-                      centerColumn,
+                      playerManaOrb,
                       clashCenterAnchor,
                       pcCard,
                       userCard,
@@ -1151,7 +1162,7 @@ class _VersusArenaState extends State<VersusArena>
                       sanctuaryRunesLayer,
                       playerSprite,
                       bossSprite,
-                      centerColumn,
+                      playerManaOrb,
                       clashCenterAnchor,
                       userCard,
                       pcCard,

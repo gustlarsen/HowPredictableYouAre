@@ -2347,10 +2347,11 @@ void main() {
     final flyingOrbFinder = find.byKey(const ValueKey('flying_orb_fire'));
     expect(flyingOrbFinder, findsOneWidget);
 
+    final arenaRect = tester.getRect(find.byType(VersusArena));
     final userOrbCenter = tester.getCenter(find.byKey(const ValueKey('user_orb_container')));
     final pcOrbCenter = tester.getCenter(find.byKey(const ValueKey('pc_orb_container')));
     final clashCenter = Offset(
-      (userOrbCenter.dx + pcOrbCenter.dx) * 0.5,
+      arenaRect.center.dx,
       (userOrbCenter.dy + pcOrbCenter.dy) * 0.5,
     );
     final backpackCenter = tester.getCenter(find.byType(RpgBackpackIcon));
@@ -3734,8 +3735,10 @@ void main() {
       final initialMoveCardRect = tester.getRect(moveCardFinder);
       final initialRockRect = tester.getRect(rockBtnFinder);
 
-      // Mana Pool Orb sits centered inside VersusArena without a VS badge, starting at 100
+      // Mana Pool Orb sits cleanly on the left side of the Cleric inside VersusArena without a VS badge, starting at 100
       final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
+      final playerSpriteFinder = find.byKey(const ValueKey('versus_player_sprite'));
+      final userHpFinder = find.byKey(const ValueKey('user_hp_bar'));
       expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
       expect(find.text('VS'), findsNothing);
       expect(
@@ -3743,8 +3746,16 @@ void main() {
         findsOneWidget,
       );
       expect(
-        tester.getRect(manaOrbFinder).center.dx,
-        closeTo(tester.getRect(arenaFinder).center.dx, 0.5),
+        tester.getRect(manaOrbFinder).left - tester.getRect(arenaFinder).left,
+        greaterThanOrEqualTo(8.0),
+      );
+      expect(
+        tester.getRect(manaOrbFinder).right,
+        lessThanOrEqualTo(tester.getRect(userHpFinder).left),
+      );
+      expect(
+        tester.getRect(playerSpriteFinder).center.dx,
+        closeTo(tester.getRect(userHpFinder).center.dx, 0.5),
       );
       expect(
         find.descendant(of: manaOrbFinder, matching: find.text('100')),

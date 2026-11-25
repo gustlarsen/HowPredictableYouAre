@@ -49,8 +49,8 @@ void main() {
         expect(find.text('MANA'), findsOneWidget);
 
         final orbRect = tester.getRect(find.byType(ManaPoolOrb));
-        expect(orbRect.width, inInclusiveRange(44.0, 48.0));
-        expect(orbRect.height, inInclusiveRange(44.0, 48.0));
+        expect(orbRect.width, inInclusiveRange(48.0, 52.0));
+        expect(orbRect.height, inInclusiveRange(48.0, 52.0));
         expect(orbRect.width, equals(orbRect.height));
 
         // Ornate frame painter and 3D glass highlight painter are mounted
@@ -265,13 +265,15 @@ void main() {
     );
 
     testWidgets(
-      'ManaPoolOrb sits centrally near the top of VersusArena without a VS badge and preserves exact fixed arena height',
+      'ManaPoolOrb sits cleanly on the left side of the Cleric while Cleric sprite is centered above his HP bar and mid-arena center stays unobstructed',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
+        final clashKey = GlobalKey();
 
         Future<double> pumpArena({
           required int mana,
+          double width = 400,
           HandMove? userMove,
           HandMove? computerMove,
           RoundWinner? winner,
@@ -280,17 +282,21 @@ void main() {
           await tester.pumpWidget(
             MaterialApp(
               home: Scaffold(
-                body: SizedBox(
-                  width: 400,
-                  child: VersusArena(
-                    userMove: userMove,
-                    computerMove: computerMove,
-                    winner: winner,
-                    localization: localization,
-                    animationsEnabled: false,
-                    roundId: roundId,
-                    remainingMana: mana,
-                    elementalMode: true,
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: width,
+                    child: VersusArena(
+                      userMove: userMove,
+                      computerMove: computerMove,
+                      winner: winner,
+                      localization: localization,
+                      animationsEnabled: false,
+                      roundId: roundId,
+                      remainingMana: mana,
+                      elementalMode: true,
+                      clashCenterKey: clashKey,
+                    ),
                   ),
                 ),
               ),
@@ -303,15 +309,56 @@ void main() {
         final heightAt100 = await pumpArena(mana: 100);
         final arenaRect = tester.getRect(find.byType(VersusArena));
         final manaOrbRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
+        final playerSpriteRect = tester.getRect(
+          find.byKey(const ValueKey('versus_player_sprite')),
+        );
+        final bossSpriteRect = tester.getRect(
+          find.byKey(const ValueKey('versus_boss_sprite_stage_1')),
+        );
+        final userHpRect = tester.getRect(find.byKey(const ValueKey('user_hp_bar')));
+        final pcHpRect = tester.getRect(find.byKey(const ValueKey('pc_hp_bar')));
         final userOrbRect = tester.getRect(find.byKey(const ValueKey('user_orb_container')));
         final pcOrbRect = tester.getRect(find.byKey(const ValueKey('pc_orb_container')));
+        final clashRect = tester.getRect(find.byKey(clashKey));
 
-        // Central VS badge, "You Chose:", and "PC Chose:" are completely removed; ManaPoolOrb is centered horizontally
+        // Central VS badge, "You Chose:", and "PC Chose:" are completely removed; only 1 ManaPoolOrb exists (none on enemy side)
         expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
         expect(find.text('VS'), findsNothing);
         expect(find.text('You Chose:'), findsNothing);
         expect(find.text('PC Chose:'), findsNothing);
-        expect(manaOrbRect.center.dx, closeTo(arenaRect.center.dx, 0.5));
+        expect(find.byType(ManaPoolOrb), findsOneWidget);
+
+        // ManaPoolOrb is compact (48px-52px) on the far-left of the Cleric with safe >= 8px left margin
+        expect(manaOrbRect.width, inInclusiveRange(48.0, 52.0));
+        expect(manaOrbRect.height, inInclusiveRange(48.0, 52.0));
+        expect(manaOrbRect.left - arenaRect.left, greaterThanOrEqualTo(8.0));
+        expect(manaOrbRect.right, lessThanOrEqualTo(userHpRect.left));
+        expect(manaOrbRect.center.dx, lessThan(playerSpriteRect.center.dx));
+        expect(manaOrbRect.center.dy, closeTo(userOrbRect.center.dy, 1.0));
+        expect(manaOrbRect.bottom, lessThan(userHpRect.top));
+
+        // Cleric and Boss sprites are both horizontally centered directly above their respective HP bars
+        expect(playerSpriteRect.center.dx, closeTo(userHpRect.center.dx, 0.5));
+        expect(bossSpriteRect.center.dx, closeTo(pcHpRect.center.dx, 0.5));
+
+        // Unobstructed horizontal center of VersusArena remains the Mid-Arena Clash point
+        expect(clashRect.center.dx, closeTo(arenaRect.center.dx, 0.5));
+
+        // Verify safe left edge padding (>= 8px) even on narrow 360px screens
+        final heightAt360 = await pumpArena(mana: 100, width: 360);
+        final narrowArenaRect = tester.getRect(find.byType(VersusArena));
+        final narrowManaRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
+        final narrowPlayerSpriteRect = tester.getRect(
+          find.byKey(const ValueKey('versus_player_sprite')),
+        );
+        final narrowUserHpRect = tester.getRect(find.byKey(const ValueKey('user_hp_bar')));
+        expect(narrowManaRect.left - narrowArenaRect.left, greaterThanOrEqualTo(8.0));
+        expect(narrowManaRect.right, lessThanOrEqualTo(narrowUserHpRect.left));
+        expect(
+          narrowPlayerSpriteRect.center.dx,
+          closeTo(narrowUserHpRect.center.dx, 0.5),
+        );
+        expect(heightAt360, equals(heightAt100));
 
         // Orb containers remain horizontally aligned on the same row
         expect(userOrbRect.top, closeTo(pcOrbRect.top, 0.5));

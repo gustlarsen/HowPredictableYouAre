@@ -25,7 +25,7 @@ class ManaPoolOrb extends StatefulWidget {
     super.key,
     required this.remainingMana,
     this.maxMana = 100,
-    this.size = 46.0,
+    this.size = 50.0,
     this.localization,
     this.animationsEnabled = true,
   });
