@@ -6,44 +6,31 @@ uniform float uTime;
 uniform float uIsFullScreen;
 uniform float uIsCrying;
 uniform float uAbdomenGrowth;
-uniform float uStageBlend;
-uniform float uBlinkEnabled;
+uniform float uBlink;
 
 uniform sampler2D uBackground;
-uniform sampler2D uTextureA;
-uniform sampler2D uTextureB;
+uniform sampler2D uTexture;
 uniform sampler2D uBlinkTexture;
 
 out vec4 fragColor;
 
-float evalBlinkFactor(float time, float enabled) {
-  if (enabled < 0.5) return 0.0;
-  // Natural periodic blink every ~4.2s: quick close (~70ms), brief hold (~60ms), gentle reopen (~90ms)
-  float phase = mod(time + 1.4, 4.2);
-  return smoothstep(0.0, 0.07, phase) * (1.0 - smoothstep(0.13, 0.22, phase));
+// Soft feathered elliptical mask covering strictly her left and right eyes/eyelids
+// in crying-sprite UV space (aligned across Week 1 and Weeks 2..40).
+float evalEyeBlinkMask(vec2 uv) {
+  vec2 dL = (uv - vec2(0.457, 0.316)) / vec2(0.038, 0.018);
+  vec2 dR = (uv - vec2(0.546, 0.313)) / vec2(0.038, 0.018);
+  float mL = 1.0 - smoothstep(0.55, 1.0, length(dL));
+  float mR = 1.0 - smoothstep(0.55, 1.0, length(dR));
+  return max(mL, mR);
 }
 
-vec4 samplePrincess(vec2 uv, float stageBlend, float blinkAmt) {
-  vec4 baseCol;
-  if (stageBlend <= 0.0001) {
-    baseCol = texture(uTextureA, uv);
-  } else if (stageBlend >= 0.9999) {
-    baseCol = texture(uTextureB, uv);
-  } else {
-    vec4 texFrom = texture(uTextureA, uv);
-    vec4 texTo = texture(uTextureB, uv);
-    baseCol = mix(texFrom, texTo, stageBlend);
-  }
-
-  // Softly blend aligned closed-eyes blink frame strictly inside the eye region during early weeks
-  if (blinkAmt > 0.001 &&
+vec4 samplePrincess(vec2 uv, float blink) {
+  vec4 baseCol = texture(uTexture, uv);
+  if (blink > 0.001 &&
       uv.y > 0.292 && uv.y < 0.342 &&
-      uv.x > 0.412 && uv.x < 0.588) {
-    float eyeGate = smoothstep(0.292, 0.305, uv.y)
-                  * smoothstep(0.342, 0.328, uv.y)
-                  * smoothstep(0.412, 0.432, uv.x)
-                  * smoothstep(0.588, 0.568, uv.x);
-    float w = blinkAmt * eyeGate;
+      uv.x > 0.412 && uv.x < 0.590) {
+    float eyeMask = evalEyeBlinkMask(uv);
+    float w = blink * eyeMask;
     if (w > 0.001) {
       vec4 blinkCol = texture(uBlinkTexture, uv);
       baseCol = mix(baseCol, blinkCol, w);
@@ -308,8 +295,7 @@ void main() {
   float isFull = clamp(uIsFullScreen, 0.0, 1.0);
   float isCry = step(0.5, uIsCrying);
   float abdomenGrowth = clamp(uAbdomenGrowth, 0.0, 1.0) * isCry;
-  float stageBlend = clamp(uStageBlend, 0.0, 1.0) * isCry;
-  float blinkAmt = evalBlinkFactor(uTime, uBlinkEnabled * isCry);
+  float blinkAmt = clamp(uBlink, 0.0, 1.0) * isCry;
   float viewAspect = res.x / res.y;
   vec2 centered = uv - 0.5;
 
@@ -591,16 +577,16 @@ void main() {
     }
 
     if (sampleUv.x > 0.003 && sampleUv.x < 0.997 && sampleUv.y > 0.003 && sampleUv.y < 0.997) {
-      vec4 fg = samplePrincess(sampleUv, stageBlend, blinkAmt);
+      vec4 fg = samplePrincess(sampleUv, blinkAmt);
       if (fg.a > 0.004) {
         vec3 fgRgb = clamp(fg.rgb / fg.a, 0.0, 1.0);
 
         // Silhouette edge normals for physical rim lighting
         float eps = 0.0025;
-        float aL = samplePrincess(sampleUv - vec2(eps, 0.0), stageBlend, 0.0).a;
-        float aR = samplePrincess(sampleUv + vec2(eps, 0.0), stageBlend, 0.0).a;
-        float aU = samplePrincess(sampleUv - vec2(0.0, eps), stageBlend, 0.0).a;
-        float aD = samplePrincess(sampleUv + vec2(0.0, eps), stageBlend, 0.0).a;
+        float aL = texture(uTexture, sampleUv - vec2(eps, 0.0)).a;
+        float aR = texture(uTexture, sampleUv + vec2(eps, 0.0)).a;
+        float aU = texture(uTexture, sampleUv - vec2(0.0, eps)).a;
+        float aD = texture(uTexture, sampleUv + vec2(0.0, eps)).a;
 
         // Ambient dungeon shading so princess sits naturally in the stone cell
         float shadeMinY = mix(0.92, 0.82, isCry);
@@ -624,7 +610,7 @@ void main() {
         float dEyeR = length((sampleUv - eyeRUv) * vec2(texAspect, 1.0));
         float irisMask = smoothstep(0.013, 0.002, min(dEyeL, dEyeR))
                        * smoothstep(0.03, 0.12, fgRgb.g - fgRgb.r)
-                       * (1.0 - blinkAmt);
+                       * (1.0 - blinkAmt * evalEyeBlinkMask(sampleUv));
         float eyeSparkle = 0.65 + 0.35 * sin(uTime * 2.1 + 0.7);
         fgRgb += vec3(0.65, 1.0, 0.90) * irisMask * eyeSparkle * 0.28;
 
@@ -916,7 +902,7 @@ void main() {
           float wetAmt = clamp(tearWet, 0.0, 1.0);
           if (wetAmt > 0.01) {
             vec2 refUv = clamp(sampleUv - tearRefract * vec2(0.0024 / texAspect, 0.0024), 0.003, 0.997);
-            vec4 refFg = samplePrincess(refUv, stageBlend, blinkAmt);
+            vec4 refFg = samplePrincess(refUv, blinkAmt);
             if (refFg.a > 0.05) {
               vec3 refCol = clamp(refFg.rgb / refFg.a, 0.0, 1.0);
               fgRgb = mix(fgRgb, refCol * vec3(0.95, 0.99, 1.03), wetAmt * 0.55);
@@ -932,7 +918,7 @@ void main() {
           if (chestWet > 0.005 || chestMeniscus > 0.005 || chestSpec > 0.005) {
             if (chestWet > 0.01) {
               vec2 cRefUv = clamp(sampleUv - chestRefract * vec2(0.0022 / texAspect, 0.0022), 0.003, 0.997);
-              vec4 cRefFg = samplePrincess(cRefUv, stageBlend, 0.0);
+              vec4 cRefFg = texture(uTexture, cRefUv);
               if (cRefFg.a > 0.05) {
                 vec3 cRefCol = clamp(cRefFg.rgb / cRefFg.a, 0.0, 1.0);
                 fgRgb = mix(fgRgb, cRefCol * vec3(0.97, 0.99, 1.02), chestWet * 0.48);

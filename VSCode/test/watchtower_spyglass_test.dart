@@ -948,7 +948,7 @@ void main() {
     );
 
     testWidgets(
-      'Piecewise 5-keyframe Princess week progression (Week 0 -> Week 1 -> Week 2..40) selects adjacent stage textures, uStageBlend, blink, and renders cleanly in modal, full-screen, and fallback modes',
+      'Dedicated weekly Princess sprites (Week 0 -> Week 1 -> Week 2..40) and eye-blink render cleanly in modal, full-screen, and fallback modes',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(412, 915);
         tester.view.devicePixelRatio = 1.0;
@@ -957,31 +957,27 @@ void main() {
           tester.view.resetDevicePixelRatio();
         });
 
-        // 0. Verify all 5 progressive stage PNGs and the blink PNG are registered and loadable
-        for (final stageAsset in WatchtowerCellShaderView.cryingStageAssets) {
-          final bytes = await rootBundle.load(stageAsset);
+        // 0. Verify Week 1, blink, and all 39 weekly PNGs are registered and loadable
+        for (final asset in [
+          WatchtowerCellShaderView.standingAsset,
+          WatchtowerCellShaderView.cryingWeek1Asset,
+          WatchtowerCellShaderView.cryingBlinkAsset,
+          WatchtowerCellShaderView.weeklyAssetForWeek(2),
+          WatchtowerCellShaderView.weeklyAssetForWeek(20),
+          WatchtowerCellShaderView.weeklyAssetForWeek(40),
+        ]) {
+          final bytes = await rootBundle.load(asset);
           expect(bytes.lengthInBytes, greaterThan(1000));
         }
-        final blinkBytes = await rootBundle.load(
-          WatchtowerCellShaderView.cryingBlinkAsset,
-        );
-        expect(blinkBytes.lengthInBytes, greaterThan(1000));
 
-        final stages = WatchtowerCellShaderView.cryingStageAssets;
-
-        // 1. Direct WatchtowerCellShaderView unit/widget checks across Week 0, 1, 2, 10, 11, 20, 21, 31, 40, and clamped >40
+        // 1. Direct WatchtowerCellShaderView checks across Week 0, 1, 2, 20, 40, and clamped >40
         final cases = <({
           int week,
           int expectedClamped,
           WatchtowerPrincessStage expectedStage,
           double expectedProgress,
-          int expectedFromIndex,
-          int expectedToIndex,
-          double expectedStageBlend,
           bool expectedBlinkEnabled,
-          String expectedPrimaryAsset,
-          String? expectedSecondaryAsset,
-          String expectedFallbackAsset,
+          String expectedAsset,
           String expectedImageKey,
         })>[
           (
@@ -989,13 +985,8 @@ void main() {
             expectedClamped: 0,
             expectedStage: WatchtowerPrincessStage.standing,
             expectedProgress: 0.0,
-            expectedFromIndex: 0,
-            expectedToIndex: 0,
-            expectedStageBlend: 0.0,
             expectedBlinkEnabled: false,
-            expectedPrimaryAsset: WatchtowerCellShaderView.standingAsset,
-            expectedSecondaryAsset: null,
-            expectedFallbackAsset: WatchtowerCellShaderView.standingAsset,
+            expectedAsset: WatchtowerCellShaderView.standingAsset,
             expectedImageKey: 'watchtower_spyglass_princess_standing_image',
           ),
           (
@@ -1003,13 +994,8 @@ void main() {
             expectedClamped: 1,
             expectedStage: WatchtowerPrincessStage.cryingWeek1,
             expectedProgress: 0.0,
-            expectedFromIndex: 0,
-            expectedToIndex: 0,
-            expectedStageBlend: 0.0,
             expectedBlinkEnabled: true,
-            expectedPrimaryAsset: stages[0],
-            expectedSecondaryAsset: null,
-            expectedFallbackAsset: stages[0],
+            expectedAsset: WatchtowerCellShaderView.cryingWeek1Asset,
             expectedImageKey: 'watchtower_spyglass_princess_crying_image',
           ),
           (
@@ -1017,112 +1003,36 @@ void main() {
             expectedClamped: 2,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0 / 39.0,
-            expectedFromIndex: 0,
-            expectedToIndex: 1,
-            expectedStageBlend: 4.0 / 39.0,
             expectedBlinkEnabled: true,
-            expectedPrimaryAsset: stages[0],
-            expectedSecondaryAsset: stages[1],
-            expectedFallbackAsset: stages[0],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_0',
-          ),
-          (
-            week: 10,
-            expectedClamped: 10,
-            expectedStage: WatchtowerPrincessStage.cryingPregnant,
-            expectedProgress: 9.0 / 39.0,
-            expectedFromIndex: 0,
-            expectedToIndex: 1,
-            expectedStageBlend: 36.0 / 39.0,
-            expectedBlinkEnabled: true,
-            expectedPrimaryAsset: stages[0],
-            expectedSecondaryAsset: stages[1],
-            expectedFallbackAsset: stages[1],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_1',
-          ),
-          (
-            week: 11,
-            expectedClamped: 11,
-            expectedStage: WatchtowerPrincessStage.cryingPregnant,
-            expectedProgress: 10.0 / 39.0,
-            expectedFromIndex: 1,
-            expectedToIndex: 2,
-            expectedStageBlend: 1.0 / 39.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[1],
-            expectedSecondaryAsset: stages[2],
-            expectedFallbackAsset: stages[1],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_1',
+            expectedAsset: 'assets/images/princess_weeks/princess_week_02.png',
+            expectedImageKey: 'watchtower_spyglass_princess_week_02_image',
           ),
           (
             week: 20,
             expectedClamped: 20,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 19.0 / 39.0,
-            expectedFromIndex: 1,
-            expectedToIndex: 2,
-            expectedStageBlend: 37.0 / 39.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[1],
-            expectedSecondaryAsset: stages[2],
-            expectedFallbackAsset: stages[2],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_2',
-          ),
-          (
-            week: 21,
-            expectedClamped: 21,
-            expectedStage: WatchtowerPrincessStage.cryingPregnant,
-            expectedProgress: 20.0 / 39.0,
-            expectedFromIndex: 2,
-            expectedToIndex: 3,
-            expectedStageBlend: 2.0 / 39.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[2],
-            expectedSecondaryAsset: stages[3],
-            expectedFallbackAsset: stages[2],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_2',
-          ),
-          (
-            week: 31,
-            expectedClamped: 31,
-            expectedStage: WatchtowerPrincessStage.cryingPregnant,
-            expectedProgress: 30.0 / 39.0,
-            expectedFromIndex: 3,
-            expectedToIndex: 4,
-            expectedStageBlend: 3.0 / 39.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[3],
-            expectedSecondaryAsset: stages[4],
-            expectedFallbackAsset: stages[3],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_3',
+            expectedBlinkEnabled: true,
+            expectedAsset: 'assets/images/princess_weeks/princess_week_20.png',
+            expectedImageKey: 'watchtower_spyglass_princess_week_20_image',
           ),
           (
             week: 40,
             expectedClamped: 40,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0,
-            expectedFromIndex: 3,
-            expectedToIndex: 4,
-            expectedStageBlend: 1.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[3],
-            expectedSecondaryAsset: stages[4],
-            expectedFallbackAsset: stages[4],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_4',
+            expectedBlinkEnabled: true,
+            expectedAsset: 'assets/images/princess_weeks/princess_week_40.png',
+            expectedImageKey: 'watchtower_spyglass_princess_week_40_image',
           ),
           (
             week: 41,
             expectedClamped: 40,
             expectedStage: WatchtowerPrincessStage.cryingPregnant,
             expectedProgress: 1.0,
-            expectedFromIndex: 3,
-            expectedToIndex: 4,
-            expectedStageBlend: 1.0,
-            expectedBlinkEnabled: false,
-            expectedPrimaryAsset: stages[3],
-            expectedSecondaryAsset: stages[4],
-            expectedFallbackAsset: stages[4],
-            expectedImageKey: 'watchtower_spyglass_princess_crying_stage_4',
+            expectedBlinkEnabled: true,
+            expectedAsset: 'assets/images/princess_weeks/princess_week_40.png',
+            expectedImageKey: 'watchtower_spyglass_princess_week_40_image',
           ),
         ];
 
@@ -1153,13 +1063,9 @@ void main() {
             expect(view.princessStage, c.expectedStage);
             expect(view.bellyProgress, closeTo(c.expectedProgress, 1e-6));
             expect(view.abdomenGrowth, closeTo(c.expectedProgress, 1e-6));
-            expect(view.stageFromIndex, c.expectedFromIndex);
-            expect(view.stageToIndex, c.expectedToIndex);
-            expect(view.stageBlend, closeTo(c.expectedStageBlend, 1e-6));
             expect(view.blinkEnabled, c.expectedBlinkEnabled);
-            expect(view.primaryPrincessAsset, c.expectedPrimaryAsset);
-            expect(view.secondaryPrincessAsset, c.expectedSecondaryAsset);
-            expect(view.fallbackPrincessAsset, c.expectedFallbackAsset);
+            expect(view.activePrincessAsset, c.expectedAsset);
+            expect(view.primaryPrincessAsset, c.expectedAsset);
             expect(
               find.byKey(const ValueKey('watchtower_spyglass_fallback_stack')),
               findsOneWidget,
@@ -1167,16 +1073,13 @@ void main() {
             final imgFinder = find.byKey(ValueKey(c.expectedImageKey));
             expect(imgFinder, findsOneWidget);
             final img = tester.widget<Image>(imgFinder);
-            expect(
-              (img.image as AssetImage).assetName,
-              c.expectedFallbackAsset,
-            );
+            expect((img.image as AssetImage).assetName, c.expectedAsset);
             expect(tester.takeException(), isNull);
           }
         }
 
-        // 2. Animated piecewise shader lifecycle transitioning across all 4 intervals (Week 0..40)
-        for (final week in [0, 1, 2, 10, 11, 20, 21, 31, 40]) {
+        // 2. Animated single-texture shader lifecycle transitioning across Week 0..40
+        for (final week in [0, 1, 2, 10, 20, 30, 40]) {
           await tester.pumpWidget(
             MaterialApp(
               home: Scaffold(
@@ -1255,7 +1158,7 @@ void main() {
         );
         expect(readDialogShader().bellyProgress, 0.0);
 
-        // Week 2: Piecewise blending stage_0 -> stage_1 (progress 1/39)
+        // Week 2: Dedicated weekly sprite princess_week_02.png
         controller.completeBattleWeek();
         await tester.pumpAndSettle();
         expect(controller.currentWeek, 2);
@@ -1264,10 +1167,12 @@ void main() {
           WatchtowerPrincessStage.cryingPregnant,
         );
         expect(readDialogShader().bellyProgress, closeTo(1.0 / 39.0, 1e-6));
-        expect(readDialogShader().primaryPrincessAsset, stages[0]);
-        expect(readDialogShader().secondaryPrincessAsset, stages[1]);
+        expect(
+          readDialogShader().activePrincessAsset,
+          'assets/images/princess_weeks/princess_week_02.png',
+        );
 
-        // Week 20 (mid-campaign): Piecewise blending stage_1 -> stage_2
+        // Week 20 (mid-campaign): Dedicated weekly sprite princess_week_20.png
         controller.currentWeek = 20;
         controller.notifyListeners();
         await tester.pumpAndSettle();
@@ -1276,11 +1181,12 @@ void main() {
           WatchtowerPrincessStage.cryingPregnant,
         );
         expect(readDialogShader().bellyProgress, closeTo(19.0 / 39.0, 1e-6));
-        expect(readDialogShader().primaryPrincessAsset, stages[1]);
-        expect(readDialogShader().secondaryPrincessAsset, stages[2]);
-        expect(readDialogShader().stageBlend, closeTo(37.0 / 39.0, 1e-6));
+        expect(
+          readDialogShader().activePrincessAsset,
+          'assets/images/princess_weeks/princess_week_20.png',
+        );
 
-        // Week 40: Full 9-month belly growth (1.0, stage_3 -> stage_4 at blend 1.0)
+        // Week 40: Full 9-month belly sprite princess_week_40.png
         controller.currentWeek = 40;
         controller.notifyListeners();
         await tester.pumpAndSettle();
@@ -1289,9 +1195,10 @@ void main() {
           WatchtowerPrincessStage.cryingPregnant,
         );
         expect(readDialogShader().bellyProgress, 1.0);
-        expect(readDialogShader().primaryPrincessAsset, stages[3]);
-        expect(readDialogShader().secondaryPrincessAsset, stages[4]);
-        expect(readDialogShader().stageBlend, 1.0);
+        expect(
+          readDialogShader().activePrincessAsset,
+          'assets/images/princess_weeks/princess_week_40.png',
+        );
 
         // Open FullScreenSpyglassView at Week 40 and verify 1.0x..4.0x InteractiveViewer & double-tap zoom
         await tester.tap(
