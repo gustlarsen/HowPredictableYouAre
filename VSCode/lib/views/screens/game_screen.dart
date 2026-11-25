@@ -2146,47 +2146,31 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(width: 4),
           ],
 
-          // 6. Spiral Arcane Portal Button (Beveled Dark Square)
+          // 6. Unboxed Spiral Arcane Portal Button (slightly larger than top-left Backpack)
           SizedBox(
-            width: 36,
-            height: 36,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: beveledBg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: beveledBorder, width: 1.15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: palette.isDark ? 0.38 : 0.12,
-                    ),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ],
+            width: 58,
+            height: 58,
+            child: IconButton(
+              key: const ValueKey('teleport_portal_button'),
+              padding: EdgeInsets.zero,
+              iconSize: 56,
+              constraints: const BoxConstraints(
+                minWidth: 58,
+                maxWidth: 58,
+                minHeight: 58,
+                maxHeight: 58,
               ),
-              child: IconButton(
-                key: const ValueKey('teleport_portal_button'),
-                padding: EdgeInsets.zero,
-                iconSize: 34,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  maxWidth: 36,
-                  minHeight: 36,
-                  maxHeight: 36,
-                ),
-                tooltip: loc.t(
-                  'teleport_tooltip',
-                  fallback: 'Teleport to World Map (+1 Week)',
-                ),
-                onPressed: inputsLocked
-                    ? null
-                    : () => _handleTeleportTap(context, controller),
-                icon: const SizedBox(
-                  width: 34,
-                  height: 34,
-                  child: RpgTeleportPortalIcon(size: 34),
-                ),
+              tooltip: loc.t(
+                'teleport_tooltip',
+                fallback: 'Teleport to World Map (+1 Week)',
+              ),
+              onPressed: inputsLocked
+                  ? null
+                  : () => _handleTeleportTap(context, controller),
+              icon: const SizedBox(
+                width: 56,
+                height: 56,
+                child: RpgTeleportPortalIcon(size: 56),
               ),
             ),
           ),

@@ -104,14 +104,24 @@ void main() {
 
         expect(find.byType(GameScreen), findsOneWidget);
 
-        // Shopping Cart is removed; Teleport Portal button is present with fixed 36x36 / 28x28 size
+        // Shopping Cart is removed; Teleport Portal button is unboxed with fixed 58x58 / 56x56 size (slightly larger than 54x54 / 52x52 Backpack)
         expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
         final teleportBtn = find.byKey(const ValueKey('teleport_portal_button'));
         final teleportIcon = find.byType(RpgTeleportPortalIcon);
         expect(teleportBtn, findsOneWidget);
         expect(teleportIcon, findsOneWidget);
-        expect(tester.getSize(teleportBtn), equals(const Size(36.0, 36.0)));
-        expect(tester.getSize(teleportIcon), equals(const Size(34.0, 34.0)));
+        expect(tester.getSize(teleportBtn), equals(const Size(58.0, 58.0)));
+        expect(tester.getSize(teleportIcon), equals(const Size(56.0, 56.0)));
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('battle_top_hud_bar')),
+            matching: find.ancestor(
+              of: teleportBtn,
+              matching: find.byType(DecoratedBox),
+            ),
+          ),
+          findsNothing,
+        );
 
         // Play 2 rounds: 1 win (+1 Fire Orb) and 1 loss (-1 Player HP)
         controller.crystalBallMove = HandMove.rock;

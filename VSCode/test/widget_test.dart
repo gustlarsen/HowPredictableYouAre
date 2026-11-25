@@ -2898,8 +2898,22 @@ void main() {
     final teleportIconFinder = find.byType(RpgTeleportPortalIcon);
     expect(teleportFinder, findsOneWidget);
     expect(teleportIconFinder, findsOneWidget);
-    expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(34.0, 34.0)));
+    expect(tester.getSize(teleportFinder), equals(const Size(58.0, 58.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(56.0, 56.0)));
+    expect(
+      tester.getSize(teleportIconFinder).width,
+      greaterThan(initialIconSize.width),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('battle_top_hud_bar')),
+        matching: find.ancestor(
+          of: teleportFinder,
+          matching: find.byType(DecoratedBox),
+        ),
+      ),
+      findsNothing,
+    );
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
 
     // Gift Box starts locked and hidden from the AppBar
@@ -2933,8 +2947,8 @@ void main() {
     expect(crowdedIconSize, equals(const Size(52.0, 52.0)));
     expect(crowdedIconSize, equals(initialIconSize));
 
-    expect(tester.getSize(teleportFinder), equals(const Size(36.0, 36.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(34.0, 34.0)));
+    expect(tester.getSize(teleportFinder), equals(const Size(58.0, 58.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(56.0, 56.0)));
   });
 
   testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {
