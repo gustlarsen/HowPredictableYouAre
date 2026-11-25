@@ -537,6 +537,7 @@ void main() {
 
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
+          'has_shown_week10_archmage_warning': true,
           'animationsEnabled': false,
           'musicEnabled': false,
           'current_week': 10,

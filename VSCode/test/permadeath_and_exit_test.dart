@@ -578,6 +578,7 @@ void main() {
 
         SharedPreferences.setMockInitialValues({
           'has_seen_story_intro': true,
+          'has_shown_week10_archmage_warning': true,
           'animationsEnabled': false,
           'musicEnabled': false,
           'current_week': 40,
@@ -653,7 +654,9 @@ void main() {
 
         // Case B: Completing 100 rounds at Week 40 (and verify pt localization)
         controller.currentWeek = 40;
+        controller.hasShownWeek10ArchmageWarning = true;
         storage.setCurrentWeek(40);
+        storage.setHasShownWeek10ArchmageWarning(true);
         controller.setLanguage('pt');
         await tester.pumpAndSettle();
 

@@ -193,6 +193,10 @@ class CloudSaveData {
   final int currentWeek;
   final bool hasShownWeek0ScreamWarning;
   final bool hasInspectedPrincessCellAfterScream;
+  final bool hasDefeatedRobotArchmage;
+  final bool hasShownWeek10ArchmageWarning;
+  final bool hasUnreadWeek10WatchtowerAlert;
+  final int? savedMetalWizardHp;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -349,6 +353,10 @@ class CloudSaveData {
     this.currentWeek = 0,
     this.hasShownWeek0ScreamWarning = false,
     this.hasInspectedPrincessCellAfterScream = false,
+    this.hasDefeatedRobotArchmage = false,
+    this.hasShownWeek10ArchmageWarning = false,
+    this.hasUnreadWeek10WatchtowerAlert = false,
+    this.savedMetalWizardHp,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -699,6 +707,24 @@ class CloudSaveData {
           ? (hasInspectedPrincessCellAfterScream ||
               local.hasInspectedPrincessCellAfterScream)
           : hasInspectedPrincessCellAfterScream,
+      hasDefeatedRobotArchmage: currentWeek == local.currentWeek
+          ? (hasDefeatedRobotArchmage || local.hasDefeatedRobotArchmage)
+          : hasDefeatedRobotArchmage,
+      hasShownWeek10ArchmageWarning: currentWeek == local.currentWeek
+          ? (hasShownWeek10ArchmageWarning ||
+              local.hasShownWeek10ArchmageWarning)
+          : hasShownWeek10ArchmageWarning,
+      hasUnreadWeek10WatchtowerAlert: currentWeek == local.currentWeek
+          ? (hasShownWeek10ArchmageWarning &&
+                  local.hasShownWeek10ArchmageWarning
+              ? (hasUnreadWeek10WatchtowerAlert &&
+                  local.hasUnreadWeek10WatchtowerAlert)
+              : (hasUnreadWeek10WatchtowerAlert ||
+                  local.hasUnreadWeek10WatchtowerAlert))
+          : hasUnreadWeek10WatchtowerAlert,
+      savedMetalWizardHp: currentWeek == local.currentWeek
+          ? (savedMetalWizardHp ?? local.savedMetalWizardHp)
+          : savedMetalWizardHp,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -872,6 +898,10 @@ class CloudSaveData {
       hasShownWeek0ScreamWarning: storage.hasShownWeek0ScreamWarning,
       hasInspectedPrincessCellAfterScream:
           storage.hasInspectedPrincessCellAfterScream,
+      hasDefeatedRobotArchmage: storage.hasDefeatedRobotArchmage,
+      hasShownWeek10ArchmageWarning: storage.hasShownWeek10ArchmageWarning,
+      hasUnreadWeek10WatchtowerAlert: storage.hasUnreadWeek10WatchtowerAlert,
+      savedMetalWizardHp: storage.savedMetalWizardHp,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -1014,6 +1044,14 @@ class CloudSaveData {
     await storage.setHasInspectedPrincessCellAfterScream(
       hasInspectedPrincessCellAfterScream,
     );
+    await storage.setHasDefeatedRobotArchmage(hasDefeatedRobotArchmage);
+    await storage.setHasShownWeek10ArchmageWarning(
+      hasShownWeek10ArchmageWarning,
+    );
+    await storage.setHasUnreadWeek10WatchtowerAlert(
+      hasUnreadWeek10WatchtowerAlert,
+    );
+    await storage.setSavedMetalWizardHp(savedMetalWizardHp);
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
     await storage.setPendingBattleBlessing(pendingBattleBlessing);
     await storage.setActiveBattleBlessing(activeBattleBlessing);
@@ -1281,6 +1319,10 @@ class CloudSaveData {
       'hasShownWeek0ScreamWarning': hasShownWeek0ScreamWarning,
       'hasInspectedPrincessCellAfterScream':
           hasInspectedPrincessCellAfterScream,
+      'hasDefeatedRobotArchmage': hasDefeatedRobotArchmage,
+      'hasShownWeek10ArchmageWarning': hasShownWeek10ArchmageWarning,
+      'hasUnreadWeek10WatchtowerAlert': hasUnreadWeek10WatchtowerAlert,
+      if (savedMetalWizardHp != null) 'savedMetalWizardHp': savedMetalWizardHp,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -1681,6 +1723,16 @@ class CloudSaveData {
           map['hasShownWeek0ScreamWarning'] as bool? ?? false,
       hasInspectedPrincessCellAfterScream:
           map['hasInspectedPrincessCellAfterScream'] as bool? ?? false,
+      hasDefeatedRobotArchmage:
+          map['hasDefeatedRobotArchmage'] as bool? ?? false,
+      hasShownWeek10ArchmageWarning:
+          map['hasShownWeek10ArchmageWarning'] as bool? ?? false,
+      hasUnreadWeek10WatchtowerAlert:
+          map['hasUnreadWeek10WatchtowerAlert'] as bool? ?? false,
+      savedMetalWizardHp: (() {
+        final raw = (map['savedMetalWizardHp'] as num?)?.toInt();
+        return (raw != null && raw > 0) ? raw : null;
+      })(),
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

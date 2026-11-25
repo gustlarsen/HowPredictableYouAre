@@ -13,6 +13,7 @@ import '../dialogs/settings_dialog.dart';
 import '../dialogs/shop_dialog.dart';
 import '../dialogs/royal_castle_dialog.dart';
 import '../dialogs/week0_scream_warning_dialog.dart';
+import '../dialogs/week10_archmage_warning_dialog.dart';
 import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/royal_castle_icon.dart';
 import '../widgets/rpg_backpack_icon.dart';
@@ -50,6 +51,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
   bool _isWeek0ScreamDialogOpen = false;
+  bool _isWeek10ArchmageDialogOpen = false;
   bool _metricsRebuildScheduled = false;
 
   @override
@@ -220,7 +222,9 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     BuildContext context,
     GameController controller,
   ) {
-    if (!controller.shouldShowWeek0ScreamWarning || _isWeek0ScreamDialogOpen) {
+    if (!controller.shouldShowWeek0ScreamWarning ||
+        _isWeek0ScreamDialogOpen ||
+        _isWeek10ArchmageDialogOpen) {
       return;
     }
     _isWeek0ScreamDialogOpen = true;
@@ -243,6 +247,35 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
+  void _checkWeek10ArchmageWarning(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldShowWeek10ArchmageWarning ||
+        _isWeek0ScreamDialogOpen ||
+        _isWeek10ArchmageDialogOpen) {
+      return;
+    }
+    _isWeek10ArchmageDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !context.mounted) {
+        _isWeek10ArchmageDialogOpen = false;
+        return;
+      }
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) {
+        _isWeek10ArchmageDialogOpen = false;
+        return;
+      }
+      if (!controller.consumePendingWeek10ArchmageWarning()) {
+        _isWeek10ArchmageDialogOpen = false;
+        return;
+      }
+      await Week10ArchmageWarningDialog.show(context, controller: controller);
+      _isWeek10ArchmageDialogOpen = false;
+    });
+  }
+
   Future<void> _enterMetalWizardLair(
     BuildContext context,
     GameController controller,
@@ -256,6 +289,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     );
     if (context.mounted) {
       _checkWeek0ScreamWarning(context, controller);
+      _checkWeek10ArchmageWarning(context, controller);
     }
   }
 
@@ -292,6 +326,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
     _checkWeek0ScreamWarning(context, controller);
+    _checkWeek10ArchmageWarning(context, controller);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0D14),
@@ -377,6 +412,11 @@ class _WorldMapScreenState extends State<WorldMapScreen>
                             accentColor: const Color(0xFF4FC3F7),
                             phaseOffset: 0.25,
                             animationsEnabled: controller.animationsEnabled,
+                            showNotificationBadge:
+                                controller.hasWatchTowerNotification,
+                            notificationBadgeKey: const ValueKey(
+                              'watch_tower_notification_badge',
+                            ),
                             onTap: () => _openObservatory(context, controller),
                           ),
 

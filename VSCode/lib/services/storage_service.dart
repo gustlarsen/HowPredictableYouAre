@@ -387,6 +387,43 @@ class StorageService {
   Future<void> setHasInspectedPrincessCellAfterScream(bool val) =>
       _prefs.setBool(hasInspectedPrincessCellAfterScreamKey, val);
 
+  // Week 10 Robot Archmage Interception & Warning Persistence Flags (per-campaign)
+  static const String hasDefeatedRobotArchmageKey =
+      'has_defeated_robot_archmage';
+  static const String hasShownWeek10ArchmageWarningKey =
+      'has_shown_week10_archmage_warning';
+  static const String hasUnreadWeek10WatchtowerAlertKey =
+      'has_unread_week10_watchtower_alert';
+  static const String savedMetalWizardHpKey = 'saved_metal_wizard_hp';
+
+  bool get hasDefeatedRobotArchmage =>
+      _prefs.getBool(hasDefeatedRobotArchmageKey) ?? false;
+  Future<void> setHasDefeatedRobotArchmage(bool val) =>
+      _prefs.setBool(hasDefeatedRobotArchmageKey, val);
+
+  bool get hasShownWeek10ArchmageWarning =>
+      _prefs.getBool(hasShownWeek10ArchmageWarningKey) ?? false;
+  Future<void> setHasShownWeek10ArchmageWarning(bool val) =>
+      _prefs.setBool(hasShownWeek10ArchmageWarningKey, val);
+
+  bool get hasUnreadWeek10WatchtowerAlert =>
+      _prefs.getBool(hasUnreadWeek10WatchtowerAlertKey) ?? false;
+  Future<void> setHasUnreadWeek10WatchtowerAlert(bool val) =>
+      _prefs.setBool(hasUnreadWeek10WatchtowerAlertKey, val);
+
+  int? get savedMetalWizardHp {
+    final val = _prefs.getInt(savedMetalWizardHpKey);
+    if (val == null || val <= 0) return null;
+    return val;
+  }
+
+  Future<void> setSavedMetalWizardHp(int? val) {
+    if (val == null || val <= 0) {
+      return _prefs.remove(savedMetalWizardHpKey);
+    }
+    return _prefs.setInt(savedMetalWizardHpKey, val);
+  }
+
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Sacred Blessings
   static const String _adConsagrationsThisWeekKey =
       'ad_consagrations_this_week';
@@ -1457,6 +1494,10 @@ class StorageService {
       setHasShownWeek0ScreamWarning(false),
       setPendingWeek0ScreamWarning(false),
       setHasInspectedPrincessCellAfterScream(false),
+      setHasDefeatedRobotArchmage(false),
+      setHasShownWeek10ArchmageWarning(false),
+      setHasUnreadWeek10WatchtowerAlert(false),
+      setSavedMetalWizardHp(null),
       setAdConsagrationsThisWeek(0),
       setPendingBattleBlessing(null),
       setActiveBattleBlessing(null),

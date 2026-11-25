@@ -361,45 +361,69 @@ class ObservatoryDialog extends StatelessWidget {
                           ),
                           const SizedBox(width: 9),
                           Expanded(
-                            child: ElevatedButton(
-                              key: const ValueKey(
-                                'observatory_spy_wizard_button',
-                              ),
-                              style: spyglassButtonStyle(),
-                              onPressed: () {
-                                controller.audio.playTapVibrate();
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => MetalWizardSpyglassDialog(
-                                    controller: controller,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    key: const ValueKey(
+                                      'observatory_spy_wizard_button',
+                                    ),
+                                    style: spyglassButtonStyle(),
+                                    onPressed: () {
+                                      controller.audio.playTapVibrate();
+                                      controller
+                                          .markWeek10WatchtowerAlertRead();
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) =>
+                                            MetalWizardSpyglassDialog(
+                                          controller: controller,
+                                        ),
+                                      );
+                                    },
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons
+                                                .precision_manufacturing_rounded,
+                                            size: 18,
+                                            color: Color(0xFFFFB300),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            loc.t(
+                                              'observatory_spy_wizard_btn',
+                                              fallback: 'Metal Wizard',
+                                            ),
+                                            maxLines: 1,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFFFFE082),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                );
-                              },
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.precision_manufacturing_rounded,
-                                      size: 18,
-                                      color: Color(0xFFFFB300),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      loc.t(
-                                        'observatory_spy_wizard_btn',
-                                        fallback: 'Metal Wizard',
-                                      ),
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFFFFE082),
-                                      ),
-                                    ),
-                                  ],
                                 ),
-                              ),
+                                if (controller.hasUnreadWeek10WatchtowerAlert)
+                                  Positioned(
+                                    top: -5,
+                                    right: -4,
+                                    child: _PulsingScreamAlertBadge(
+                                      key: const ValueKey(
+                                        'observatory_wizard_archmage_badge',
+                                      ),
+                                      animationsEnabled:
+                                          controller.animationsEnabled,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],

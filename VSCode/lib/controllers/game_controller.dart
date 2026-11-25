@@ -670,6 +670,27 @@ class GameController extends ChangeNotifier {
   bool get hasDungeonScreamOccurred =>
       hasShownWeek0ScreamWarning || pendingWeek0ScreamWarning;
 
+  // Week 10 Robot Archmage Interception & Warning State (per-campaign)
+  bool hasDefeatedRobotArchmage = false;
+  bool hasShownWeek10ArchmageWarning = false;
+  bool hasUnreadWeek10WatchtowerAlert = false;
+  int? savedMetalWizardHp;
+
+  bool get hasDefeatedGuardianRobot => enemyStage != 1;
+
+  bool get hasDefeatedMetalWizard =>
+      enemyStage == 4 ||
+      enemyStage == 5 ||
+      (isBossVictoryPending && pendingBossVictoryStage == 3);
+
+  bool get shouldShowWeek10ArchmageWarning =>
+      currentWeek >= phase2StartWeek &&
+      !hasDefeatedMetalWizard &&
+      !hasDefeatedRobotArchmage &&
+      !hasShownWeek10ArchmageWarning;
+
+  bool get hasWatchTowerNotification => hasUnreadWeek10WatchtowerAlert;
+
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
   int adConsagrationsThisWeek = 0;
   SacredBlessing? pendingBattleBlessing;
@@ -1348,6 +1369,10 @@ class GameController extends ChangeNotifier {
     pendingWeek0ScreamWarning = storage.pendingWeek0ScreamWarning;
     hasInspectedPrincessCellAfterScream =
         storage.hasInspectedPrincessCellAfterScream;
+    hasDefeatedRobotArchmage = storage.hasDefeatedRobotArchmage;
+    hasShownWeek10ArchmageWarning = storage.hasShownWeek10ArchmageWarning;
+    hasUnreadWeek10WatchtowerAlert = storage.hasUnreadWeek10WatchtowerAlert;
+    savedMetalWizardHp = storage.savedMetalWizardHp;
     if (storage.userHpRaw != null) {
       userHp = storage.userHp.clamp(0, effectivePlayerMaxHp);
     } else {
@@ -2820,12 +2845,14 @@ class GameController extends ChangeNotifier {
     if (defeatedStage == 1) {
       guardianRobotDefeatedCount += 1;
       storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
-      if (week >= phase2StartWeek) {
+      if (week >= phase2StartWeek && !hasDefeatedRobotArchmage) {
         _markBestiaryEncountered(BestiaryCreature.archmageRobot);
       } else {
         _markBestiaryEncountered(BestiaryCreature.metalWizard);
       }
     } else if (defeatedStage == 2) {
+      hasDefeatedRobotArchmage = true;
+      storage.setHasDefeatedRobotArchmage(true);
       robotArchmageDefeatedCount += 1;
       storage.setRobotArchmageDefeatedCount(robotArchmageDefeatedCount);
       _markBestiaryEncountered(BestiaryCreature.metalWizard);
@@ -2900,6 +2927,10 @@ class GameController extends ChangeNotifier {
       hasShownWeek0ScreamWarning = false;
       pendingWeek0ScreamWarning = false;
       hasInspectedPrincessCellAfterScream = false;
+      hasDefeatedRobotArchmage = false;
+      hasShownWeek10ArchmageWarning = false;
+      hasUnreadWeek10WatchtowerAlert = false;
+      savedMetalWizardHp = null;
       storage.setEnemyStage(1);
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(0);
@@ -2909,6 +2940,10 @@ class GameController extends ChangeNotifier {
       storage.setHasShownWeek0ScreamWarning(false);
       storage.setPendingWeek0ScreamWarning(false);
       storage.setHasInspectedPrincessCellAfterScream(false);
+      storage.setHasDefeatedRobotArchmage(false);
+      storage.setHasShownWeek10ArchmageWarning(false);
+      storage.setHasUnreadWeek10WatchtowerAlert(false);
+      storage.setSavedMetalWizardHp(null);
       _refreshCompletedDecreesAndResetBattleTrackers();
       _resetBattleState();
       recordTurn0OrbSnapshot();
@@ -2917,8 +2952,9 @@ class GameController extends ChangeNotifier {
       return true;
     }
 
+    int? hpToRestore;
     if (defeatedStage == 1) {
-      if (week >= phase2StartWeek) {
+      if (week >= phase2StartWeek && !hasDefeatedRobotArchmage) {
         enemyStage = 2;
         _markBestiaryEncountered(BestiaryCreature.archmageRobot);
       } else {
@@ -2926,6 +2962,11 @@ class GameController extends ChangeNotifier {
         _markBestiaryEncountered(BestiaryCreature.metalWizard);
       }
     } else if (defeatedStage == 2) {
+      hasDefeatedRobotArchmage = true;
+      storage.setHasDefeatedRobotArchmage(true);
+      hpToRestore = savedMetalWizardHp;
+      savedMetalWizardHp = null;
+      storage.setSavedMetalWizardHp(null);
       enemyStage = 3;
       _markBestiaryEncountered(BestiaryCreature.metalWizard);
     } else if (defeatedStage == 3) {
@@ -2946,6 +2987,11 @@ class GameController extends ChangeNotifier {
     storage.setEnemyMaxHp(enemyMaxHp);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
+    if (defeatedStage == 2 && hpToRestore != null && hpToRestore > 0) {
+      final restoredHp = hpToRestore.clamp(1, enemyMaxHp);
+      computerHp = restoredHp;
+      storage.setPcHp(restoredHp);
+    }
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
     notifyListeners();
@@ -3120,6 +3166,39 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Rule 2: If the player already defeated the Phase 1 Guardian Robot before
+  /// Week 10 and is currently in the Metal Wizard stage (`enemyStage == 3`)
+  /// with Robot Archmage not yet defeated (`!hasDefeatedRobotArchmage`),
+  /// as soon as `currentWeek >= 10`, saves the Metal Wizard's remaining HP
+  /// (defaulting to 300 if undamaged) and overrides the active Lair boss to
+  /// Stage 2 Robot Archmage (200 HP).
+  bool interceptMetalWizardForWeek10IfNeeded() {
+    if (currentWeek < phase2StartWeek) return false;
+    if (!hasDefeatedGuardianRobot ||
+        hasDefeatedMetalWizard ||
+        hasDefeatedRobotArchmage) {
+      return false;
+    }
+    if (enemyStage != 3) return false;
+
+    final wizardMaxHp = maxHpForEnemyStage(3);
+    final remainingHp = (computerHp > 0 && computerHp <= wizardMaxHp)
+        ? computerHp
+        : wizardMaxHp;
+    savedMetalWizardHp = remainingHp;
+    enemyStage = 2;
+    enemyMaxHp = maxHpForEnemyStage(2);
+    computerHp = enemyMaxHp;
+    storage.setSavedMetalWizardHp(savedMetalWizardHp);
+    storage.setEnemyStage(2);
+    storage.setEnemyMaxHp(enemyMaxHp);
+    storage.setPcHp(enemyMaxHp);
+    _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    _syncEngineEnemyPool();
+    _computeNextHints();
+    return true;
+  }
+
   /// Starts a fresh battle ([playerMaxMana] Mana, [effectivePlayerMaxHp] HP) from the World Map while
   /// promoting any pending Sacred Blessing into the active expedition buff,
   /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
@@ -3133,8 +3212,22 @@ class GameController extends ChangeNotifier {
     storage.setActiveBattleBlessing(activeBattleBlessing?.id);
     storage.setPendingBattleBlessing(null);
     storage.setBattleBonusTempHp(battleBonusTempHp);
+    interceptMetalWizardForWeek10IfNeeded();
+    if (enemyStage == 2) {
+      _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    }
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
+    if (enemyStage == 3 &&
+        hasDefeatedRobotArchmage &&
+        savedMetalWizardHp != null &&
+        savedMetalWizardHp! > 0) {
+      final restoredHp = savedMetalWizardHp!.clamp(1, enemyMaxHp);
+      computerHp = restoredHp;
+      storage.setPcHp(restoredHp);
+      savedMetalWizardHp = null;
+      storage.setSavedMetalWizardHp(null);
+    }
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
     notifyListeners();
@@ -3167,6 +3260,32 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Triggers the Start-of-Week-10 Robot Archmage alert once per campaign when
+  /// [shouldShowWeek10ArchmageWarning] is true, persisting
+  /// [hasShownWeek10ArchmageWarning] and [hasUnreadWeek10WatchtowerAlert] and
+  /// intercepting any ongoing Metal Wizard battle for Week 10.
+  bool consumePendingWeek10ArchmageWarning() {
+    if (!shouldShowWeek10ArchmageWarning) return false;
+    hasShownWeek10ArchmageWarning = true;
+    hasUnreadWeek10WatchtowerAlert = true;
+    storage.setHasShownWeek10ArchmageWarning(true);
+    storage.setHasUnreadWeek10WatchtowerAlert(true);
+    interceptMetalWizardForWeek10IfNeeded();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Clears [hasUnreadWeek10WatchtowerAlert] as soon as the player opens the
+  /// Metal Wizard spyglass view inside the Watch Tower.
+  void markWeek10WatchtowerAlertRead() {
+    if (!hasUnreadWeek10WatchtowerAlert) return;
+    hasUnreadWeek10WatchtowerAlert = false;
+    storage.setHasUnreadWeek10WatchtowerAlert(false);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
   /// Advances the campaign calendar by +1 Week upon exiting a battle via
   /// battle completion or Teleport, persists locally, resets weekly ad
   /// consagrations and active battle blessings, resets the battle arena for
@@ -3181,6 +3300,7 @@ class GameController extends ChangeNotifier {
       pendingWeek0ScreamWarning = true;
       storage.setPendingWeek0ScreamWarning(true);
     }
+    interceptMetalWizardForWeek10IfNeeded();
     storage.setCurrentWeek(currentWeek);
     storage.setAdConsagrationsThisWeek(0);
     storage.setActiveBattleBlessing(null);

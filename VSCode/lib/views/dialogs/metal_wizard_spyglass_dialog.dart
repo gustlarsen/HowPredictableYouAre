@@ -9,7 +9,7 @@ import 'full_screen_spyglass_view.dart';
 
 /// Focused telescope/spyglass observation modal displaying the animated
 /// underground forge of the Metal Wizard, with dynamic week-based lore.
-class MetalWizardSpyglassDialog extends StatelessWidget {
+class MetalWizardSpyglassDialog extends StatefulWidget {
   final GameController controller;
 
   const MetalWizardSpyglassDialog({super.key, required this.controller});
@@ -43,12 +43,31 @@ class MetalWizardSpyglassDialog extends StatelessWidget {
   }
 
   @override
+  State<MetalWizardSpyglassDialog> createState() =>
+      _MetalWizardSpyglassDialogState();
+}
+
+class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller.hasUnreadWeek10WatchtowerAlert) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.controller.markWeek10WatchtowerAlertRead();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     final loc = controller.localization;
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
-    final coolingDown = isForgeCoolingDown(controller);
-    final caption = resolveNarrativeCaption(controller);
+    final coolingDown = MetalWizardSpyglassDialog.isForgeCoolingDown(controller);
+    final caption =
+        MetalWizardSpyglassDialog.resolveNarrativeCaption(controller);
 
     return Dialog(
       key: const ValueKey('metal_wizard_spyglass_dialog'),
