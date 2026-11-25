@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,59 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/week0_scream_warning_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+
+class _SpyAudioPlayer implements AudioPlayerClient {
+  PlayerState _state = PlayerState.stopped;
+  int playCount = 0;
+  int pauseCount = 0;
+  int resumeCount = 0;
+  int stopCount = 0;
+  final List<String> playedAssetPaths = [];
+
+  @override
+  PlayerState get state => _state;
+
+  @override
+  Future<void> setAudioContext(AudioContext ctx) async {}
+
+  @override
+  Future<void> setReleaseMode(ReleaseMode releaseMode) async {}
+
+  @override
+  Future<void> setVolume(double volume) async {}
+
+  @override
+  Future<void> play(Source source) async {
+    playCount++;
+    _state = PlayerState.playing;
+    if (source is AssetSource) {
+      playedAssetPaths.add(source.path);
+    }
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCount++;
+    _state = PlayerState.paused;
+  }
+
+  @override
+  Future<void> resume() async {
+    resumeCount++;
+    _state = PlayerState.playing;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCount++;
+    _state = PlayerState.stopped;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _state = PlayerState.disposed;
+  }
+}
 
 class _FakePlayGamesClient implements PlayGamesClient {
   final Map<String, String?> _cloudSaves = {};
@@ -49,6 +103,7 @@ Future<({
   Map<String, Object> prefs = const {},
   _FakePlayGamesClient? client,
   bool signIn = false,
+  AudioService? audio,
 }) async {
   SharedPreferences.setMockInitialValues({
     'has_seen_story_intro': true,
@@ -75,7 +130,7 @@ Future<({
   final controller = GameController(
     storage: storage,
     localization: localization,
-    audio: AudioService(),
+    audio: audio ?? AudioService(),
     playGames: playGames,
     adService: AdService(),
   );
@@ -466,6 +521,178 @@ void main() {
             isDark ? const Color(0xFF161A22) : const Color(0xFFF5EFE2),
           );
         }
+      },
+    );
+
+    testWidgets(
+      'Week 1 scream carousel plays princess_scream.mid once, pauses BGM during scream, restores world_map.mid, and respects mute',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final bgmSpy = _SpyAudioPlayer();
+        final sfxSpy = _SpyAudioPlayer();
+        final audio = AudioService(
+          bgmPlayer: bgmSpy,
+          sfxPlayer: sfxSpy,
+          fadeDuration: const Duration(milliseconds: 200),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1600),
+        );
+        await audio.init();
+        addTearDown(audio.dispose);
+
+        final harness = await _createTestHarness(
+          prefs: {
+            'musicEnabled': true,
+            'soundEnabled': true,
+          },
+          audio: audio,
+        );
+        final controller = harness.controller;
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(bgmSpy.playedAssetPaths, ['audio/world_map.mid']);
+        expect(sfxSpy.playedAssetPaths, isEmpty);
+
+        // Enter Lair (battle.mid), teleport back on Week 0 -> Week 1
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        );
+        await tester.pumpAndSettle();
+        expect(bgmSpy.playedAssetPaths.last, 'audio/battle.mid');
+
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // Scream carousel is shown and princess_scream.mid started playing once
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        expect(
+          sfxSpy.playedAssetPaths.where(
+            (p) => p == AudioService.princessScreamAssetPath,
+          ),
+          hasLength(1),
+        );
+        expect(audio.isPrincessScreamPlaying, isTrue);
+        expect(bgmSpy.state, PlayerState.paused);
+
+        // Let the scream finish naturally -> world_map.mid fades back in
+        await tester.pump(const Duration(milliseconds: 1700));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(audio.loadedTrack, BgmTrack.worldMap);
+        expect(bgmSpy.playedAssetPaths.last, 'audio/world_map.mid');
+        expect(bgmSpy.state, PlayerState.playing);
+
+        // Advance Slide 2 and dismiss modal
+        await tester.tap(
+          find.byKey(const ValueKey('week0_scream_next_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('week0_scream_got_it_button')),
+        );
+        await tester.pumpAndSettle();
+
+        // Open and close Watch Tower and Settings -> scream does NOT replay
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_telescope_tower')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('observatory_close_button')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey('world_map_settings_button')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('settings_ok_button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          sfxSpy.playedAssetPaths.where(
+            (p) => p == AudioService.princessScreamAssetPath,
+          ),
+          hasLength(1),
+        );
+      },
+    );
+
+    testWidgets(
+      'Week 1 scream carousel suppresses princess_scream.mid and keeps world_map.mid playing when Sound Effects are muted',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final bgmSpy = _SpyAudioPlayer();
+        final sfxSpy = _SpyAudioPlayer();
+        final audio = AudioService(
+          bgmPlayer: bgmSpy,
+          sfxPlayer: sfxSpy,
+          fadeDuration: const Duration(milliseconds: 200),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1600),
+        );
+        await audio.init();
+        addTearDown(audio.dispose);
+
+        final harness = await _createTestHarness(
+          prefs: {
+            'musicEnabled': true,
+            'soundEnabled': false,
+          },
+          audio: audio,
+        );
+        final controller = harness.controller;
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        expect(sfxSpy.playedAssetPaths, isEmpty);
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(bgmSpy.pauseCount, 0);
+        expect(bgmSpy.state, PlayerState.playing);
       },
     );
   });

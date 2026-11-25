@@ -176,6 +176,26 @@ void main() {
       }
     });
 
+    test('princess_scream.mid and all 4 alternative scream MIDI assets exist with valid SMF headers', () async {
+      const screamAssets = [
+        'assets/${AudioService.princessScreamAssetPath}',
+        'assets/audio/princess_scream_alt1_spectral_shriek.mid',
+        'assets/audio/princess_scream_alt2_dungeon_echo.mid',
+        'assets/audio/princess_scream_alt3_16bit_rpg.mid',
+        'assets/audio/princess_scream_alt4_trembling_hybrid.mid',
+      ];
+      expect(
+        AudioService.princessScreamAssetPath,
+        'audio/princess_scream.mid',
+      );
+      for (final assetPath in screamAssets) {
+        final data = await rootBundle.load(assetPath);
+        expect(data.lengthInBytes, greaterThan(1000), reason: assetPath);
+        final header = String.fromCharCodes(data.buffer.asUint8List(0, 4));
+        expect(header, 'MThd', reason: '$assetPath must be valid SMF');
+      }
+    });
+
     testWidgets(
       'smoothly fades volume down, switches source in loop mode, and fades back up without duplicate restarts',
       (WidgetTester tester) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../theme/app_theme.dart';
@@ -40,11 +41,11 @@ class Week0ScreamWarningDialog extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     required GameController controller,
-  }) {
-    controller.audio.playStoryChime();
+  }) async {
+    unawaited(controller.audio.playPrincessScream());
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
 
-    return showGeneralDialog<void>(
+    await showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Watch Tower Alert',
@@ -70,6 +71,7 @@ class Week0ScreamWarningDialog extends StatefulWidget {
         );
       },
     );
+    unawaited(controller.audio.finishPrincessScreamAndRestoreBgm());
   }
 
   @override

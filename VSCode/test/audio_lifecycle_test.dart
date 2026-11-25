@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -550,6 +551,189 @@ void main() {
         expect(harness.bgmPlayer.resumeCount, 1);
         expect(harness.bgmPlayer.playCount, 1);
         expect(harness.bgmPlayer.state, PlayerState.playing);
+      },
+    );
+  });
+
+  group('AudioService Princess Scream & BGM Coexistence Tests', () {
+    testWidgets(
+      'pauses worldMap BGM while princess_scream.mid plays and smoothly resumes worldMap afterward',
+      (WidgetTester tester) async {
+        final bgmPlayer = _SpyAudioPlayerClient();
+        final sfxPlayer = _SpyAudioPlayerClient();
+        final audio = AudioService(
+          bgmPlayer: bgmPlayer,
+          sfxPlayer: sfxPlayer,
+          fadeDuration: const Duration(milliseconds: 240),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1600),
+        );
+        addTearDown(audio.dispose);
+
+        await audio.init();
+        await audio.playTrack(BgmTrack.worldMap, fade: false);
+        expect(bgmPlayer.state, PlayerState.playing);
+        expect(bgmPlayer.playCount, 1);
+
+        await audio.playPrincessScream();
+        expect(audio.isPrincessScreamPlaying, isTrue);
+        expect(audio.isBgmDuckPausedForScream, isTrue);
+        expect(bgmPlayer.pauseCount, 1);
+        expect(bgmPlayer.state, PlayerState.paused);
+        expect(sfxPlayer.playCount, 1);
+        expect(sfxPlayer.lastReleaseMode, ReleaseMode.release);
+        expect(
+          (sfxPlayer.lastSource as AssetSource).path,
+          AudioService.princessScreamAssetPath,
+        );
+
+        // Pump halfway through scream -> BGM remains paused so Android MIDI voices don't drop
+        await tester.pump(const Duration(milliseconds: 900));
+        expect(audio.isPrincessScreamPlaying, isTrue);
+        expect(bgmPlayer.state, PlayerState.paused);
+
+        // Complete scream duration + fade-in -> worldMap resumes smoothly without restarting
+        await tester.pump(const Duration(milliseconds: 800));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(audio.isBgmDuckPausedForScream, isFalse);
+        expect(bgmPlayer.resumeCount, 1);
+        expect(bgmPlayer.playCount, 1);
+        expect(bgmPlayer.state, PlayerState.playing);
+        expect(audio.currentBgmVolume, closeTo(AudioService.targetBgmVolume, 0.001));
+      },
+    );
+
+    testWidgets(
+      'stops scream early and restores worldMap BGM when pop-up is dismissed before scream ends',
+      (WidgetTester tester) async {
+        final bgmPlayer = _SpyAudioPlayerClient();
+        final sfxPlayer = _SpyAudioPlayerClient();
+        final audio = AudioService(
+          bgmPlayer: bgmPlayer,
+          sfxPlayer: sfxPlayer,
+          fadeDuration: const Duration(milliseconds: 200),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1600),
+        );
+        addTearDown(audio.dispose);
+
+        await audio.init();
+        await audio.playTrack(BgmTrack.worldMap, fade: false);
+        await audio.playPrincessScream();
+        expect(audio.isPrincessScreamPlaying, isTrue);
+        expect(bgmPlayer.state, PlayerState.paused);
+
+        await tester.pump(const Duration(milliseconds: 400));
+        unawaited(audio.finishPrincessScreamAndRestoreBgm());
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(sfxPlayer.state, PlayerState.stopped);
+        expect(bgmPlayer.resumeCount, 1);
+        expect(bgmPlayer.state, PlayerState.playing);
+      },
+    );
+
+    testWidgets(
+      'interrupting battle -> worldMap fade transition loads worldMap instead of resuming battle after scream',
+      (WidgetTester tester) async {
+        final bgmPlayer = _SpyAudioPlayerClient();
+        final sfxPlayer = _SpyAudioPlayerClient();
+        final audio = AudioService(
+          bgmPlayer: bgmPlayer,
+          sfxPlayer: sfxPlayer,
+          fadeDuration: const Duration(milliseconds: 240),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1200),
+        );
+        addTearDown(audio.dispose);
+
+        await audio.init();
+        await audio.playTrack(BgmTrack.battle, fade: false);
+        expect(audio.loadedTrack, BgmTrack.battle);
+
+        // Start fading from battle -> worldMap, then trigger scream mid-fade-out
+        final switchFuture = audio.playTrack(BgmTrack.worldMap);
+        await tester.pump(const Duration(milliseconds: 80));
+        expect(audio.loadedTrack, BgmTrack.battle);
+        expect(audio.currentTrack, BgmTrack.worldMap);
+
+        await audio.playPrincessScream();
+        await switchFuture;
+        expect(bgmPlayer.state, PlayerState.paused);
+        expect(audio.isPrincessScreamPlaying, isTrue);
+
+        // Let scream finish and worldMap fade in
+        await tester.pump(const Duration(milliseconds: 1300));
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(audio.loadedTrack, BgmTrack.worldMap);
+        expect((bgmPlayer.lastSource as AssetSource).path, 'audio/world_map.mid');
+        expect(bgmPlayer.state, PlayerState.playing);
+      },
+    );
+
+    testWidgets(
+      'respects soundEnabled=false, musicEnabled=false, and background lifecycle states',
+      (WidgetTester tester) async {
+        final bgmPlayer = _SpyAudioPlayerClient();
+        final sfxPlayer = _SpyAudioPlayerClient();
+        final audio = AudioService(
+          bgmPlayer: bgmPlayer,
+          sfxPlayer: sfxPlayer,
+          fadeDuration: const Duration(milliseconds: 160),
+          fadeSteps: 4,
+          princessScreamDuration: const Duration(milliseconds: 1200),
+        );
+        addTearDown(audio.dispose);
+
+        await audio.init();
+        await audio.playTrack(BgmTrack.worldMap, fade: false);
+
+        // 1. Sound muted -> does NOT play scream and does NOT pause BGM
+        audio.soundEnabled = false;
+        await audio.playPrincessScream();
+        expect(sfxPlayer.playCount, 0);
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(bgmPlayer.pauseCount, 0);
+        expect(bgmPlayer.state, PlayerState.playing);
+
+        // 2. Backgrounded mid-scream -> stops scream immediately and resumes BGM on foreground
+        audio.soundEnabled = true;
+        await audio.playPrincessScream();
+        expect(sfxPlayer.playCount, 1);
+        expect(audio.isPrincessScreamPlaying, isTrue);
+        expect(bgmPlayer.pauseCount, 1);
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(sfxPlayer.state, PlayerState.stopped);
+        expect(audio.wasPlayingBeforeBackground, isTrue);
+
+        // Scream requested while backgrounded is ignored
+        await audio.playPrincessScream();
+        expect(sfxPlayer.playCount, 1);
+
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(bgmPlayer.resumeCount, 1);
+        expect(bgmPlayer.state, PlayerState.playing);
+
+        // 3. Music muted + sound enabled -> plays scream, leaves BGM stopped afterward
+        audio.musicEnabled = false;
+        await audio.stopMusic();
+        await audio.playPrincessScream();
+        expect(sfxPlayer.playCount, 2);
+        expect(audio.isPrincessScreamPlaying, isTrue);
+
+        await tester.pump(const Duration(milliseconds: 1300));
+        expect(audio.isPrincessScreamPlaying, isFalse);
+        expect(bgmPlayer.state, PlayerState.stopped);
       },
     );
   });
