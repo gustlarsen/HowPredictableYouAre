@@ -48,8 +48,11 @@ class UpdateService extends ChangeNotifier {
       'Update ready! Restart to apply the latest version.';
   static const String restartActionLabel = 'RESTART';
 
+  static const Duration defaultCompleteUpdateTimeout = Duration(seconds: 12);
+
   final InAppUpdateClient _client;
   final bool? _isAndroidOverride;
+  final Duration _completeUpdateTimeout;
   StreamSubscription<InstallStatus>? _installStatusSubscription;
 
   bool _isChecking = false;
@@ -70,9 +73,11 @@ class UpdateService extends ChangeNotifier {
   UpdateService({
     InAppUpdateClient? client,
     bool? isAndroidOverride,
+    Duration completeUpdateTimeout = defaultCompleteUpdateTimeout,
     this.onUpdateDownloaded,
   }) : _client = client ?? const DefaultInAppUpdateClient(),
-       _isAndroidOverride = isAndroidOverride;
+       _isAndroidOverride = isAndroidOverride,
+       _completeUpdateTimeout = completeUpdateTimeout;
 
   /// Restricts all Play Core update checks strictly to Android devices,
   /// returning false on non-Android or web platforms.
@@ -327,38 +332,89 @@ class UpdateService extends ChangeNotifier {
     }
   }
 
+  bool _isDisposed = false;
+
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
   /// Triggers the final installation and restart for a downloaded flexible
   /// update via Play Core's `completeFlexibleUpdate()`.
   ///
   /// Guards against duplicate calls and background invocations so Play Core
-  /// restarts the Activity cleanly while the Flutter window is active.
+  /// restarts the Activity cleanly while the Flutter window is active. Also
+  /// applies a foreground timeout guard because `in_app_update` does not
+  /// resolve its MethodChannel `Future` if Play Core cancels silently.
   Future<bool> completeFlexibleUpdate() async {
-    if (!isSupportedPlatform || _isCompletingUpdate || !_isAppForeground) {
+    if (!isSupportedPlatform ||
+        _isDisposed ||
+        _isCompletingUpdate ||
+        !_isAppForeground) {
       return false;
     }
     final wasDownloaded = _isUpdateDownloaded;
     _isCompletingUpdate = true;
     _isUpdateDownloaded = false;
     _installStatus = InstallStatus.installing;
-    notifyListeners();
+    _safeNotifyListeners();
     try {
-      await _client.completeFlexibleUpdate();
+      await _client.completeFlexibleUpdate().timeout(_completeUpdateTimeout);
       _isCompletingUpdate = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return true;
+    } on TimeoutException {
+      if (_isDisposed) return false;
+      if (_isCompletingUpdate) {
+        _isCompletingUpdate = false;
+        if (_isAppForeground) {
+          await _reconcileAfterStalledComplete(wasDownloaded: wasDownloaded);
+        } else {
+          _safeNotifyListeners();
+        }
+      }
+      return false;
     } catch (_) {
       _isCompletingUpdate = false;
       _isUpdateDownloaded = wasDownloaded;
       _installStatus = wasDownloaded
           ? InstallStatus.downloaded
           : InstallStatus.unknown;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
 
+  Future<void> _reconcileAfterStalledComplete({
+    required bool wasDownloaded,
+  }) async {
+    try {
+      final info = await _client.checkForUpdate();
+      if (_isDisposed) return;
+      _updateInfo = info;
+      _installStatus = info.installStatus;
+      if (info.installStatus == InstallStatus.downloaded) {
+        _isUpdateDownloaded = true;
+      } else if (info.installStatus == InstallStatus.installed ||
+          info.updateAvailability == UpdateAvailability.updateNotAvailable) {
+        _isUpdateDownloaded = false;
+      } else {
+        _isUpdateDownloaded = wasDownloaded;
+      }
+    } catch (_) {
+      if (_isDisposed) return;
+      _isUpdateDownloaded = wasDownloaded;
+      _installStatus = wasDownloaded
+          ? InstallStatus.downloaded
+          : InstallStatus.unknown;
+    }
+    _safeNotifyListeners();
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     _installStatusSubscription?.cancel();
     _installStatusSubscription = null;
     super.dispose();

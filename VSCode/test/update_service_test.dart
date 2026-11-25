@@ -24,6 +24,7 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
   bool shouldThrowOnComplete;
   Completer<AppUpdateInfo>? checkForUpdateCompleter;
   Completer<AppUpdateResult>? flexibleUpdateCompleter;
+  Completer<void>? completeFlexibleCompleter;
 
   int checkForUpdateCallCount = 0;
   int startFlexibleUpdateCallCount = 0;
@@ -37,6 +38,7 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
     this.shouldThrowOnComplete = false,
     this.checkForUpdateCompleter,
     this.flexibleUpdateCompleter,
+    this.completeFlexibleCompleter,
   }) : updateInfo =
            updateInfo ??
            AppUpdateInfo(
@@ -94,6 +96,9 @@ class FakeInAppUpdateClient implements InAppUpdateClient {
         code: 'COMPLETE_UPDATE_FAILED',
         message: 'Could not complete flexible update.',
       );
+    }
+    if (completeFlexibleCompleter != null) {
+      return completeFlexibleCompleter!.future;
     }
   }
 
@@ -746,6 +751,47 @@ void main() {
 
         await updateService.handleAppResumed();
         expect(updateService.isCompletingUpdate, isFalse);
+      },
+    );
+
+    test(
+      '11. completeFlexibleUpdate unlocks and reconciles state if native MethodChannel never resolves',
+      () async {
+        final stalledCompleter = Completer<void>();
+        final fakeClient = FakeInAppUpdateClient(
+          updateInfo: AppUpdateInfo(
+            updateAvailability:
+                UpdateAvailability.developerTriggeredUpdateInProgress,
+            immediateUpdateAllowed: false,
+            immediateAllowedPreconditions: const [],
+            flexibleUpdateAllowed: true,
+            flexibleAllowedPreconditions: const [],
+            availableVersionCode: 105,
+            installStatus: InstallStatus.downloaded,
+            packageName: 'com.howpredictable.app',
+            clientVersionStalenessDays: 1,
+            updatePriority: 2,
+          ),
+          completeFlexibleCompleter: stalledCompleter,
+        );
+        addTearDown(fakeClient.dispose);
+
+        final updateService = UpdateService(
+          client: fakeClient,
+          completeUpdateTimeout: const Duration(milliseconds: 25),
+        );
+        addTearDown(updateService.dispose);
+
+        await updateService.checkForUpdate();
+        expect(updateService.isUpdateDownloaded, isTrue);
+
+        // Stalled completeFlexibleUpdate times out cleanly instead of locking forever
+        final completed = await updateService.completeFlexibleUpdate();
+        expect(completed, isFalse);
+        expect(updateService.isCompletingUpdate, isFalse);
+        expect(updateService.isUpdateDownloaded, isTrue);
+        expect(updateService.installStatus, InstallStatus.downloaded);
+        expect(fakeClient.checkForUpdateCallCount, 2);
       },
     );
   });

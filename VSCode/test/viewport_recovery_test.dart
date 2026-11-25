@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -243,6 +244,71 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         expect(adClient.loadBannerCount, 2);
         expect(adService.bannerViewGeneration, 1);
+      },
+    );
+  });
+
+  group('Android Manifest, Game Mode & MainActivity Regression Guardrails', () {
+    test(
+      'AndroidManifest.xml enforces singleTask, default package affinity, DPI recreation, and Game Mode opt-out',
+      () {
+        final manifestFile = File('android/app/src/main/AndroidManifest.xml');
+        expect(manifestFile.existsSync(), isTrue);
+        final manifest = manifestFile.readAsStringSync();
+
+        // Single-task consolidation prevents Recents duplication on Play Core & notification launches
+        expect(manifest, contains('android:launchMode="singleTask"'));
+        expect(manifest, isNot(contains('android:taskAffinity=""')));
+
+        // `density` must NOT be suppressed in configChanges so Android recreates Activity/Resources cleanly
+        final configChangesMatch = RegExp(
+          r'android:configChanges="([^"]+)"',
+        ).firstMatch(manifest);
+        expect(configChangesMatch, isNotNull);
+        final configTokens = configChangesMatch!.group(1)!.split('|');
+        expect(configTokens, isNot(contains('density')));
+
+        // Game Mode opt-out metadata must be declared for Android 13+ / OEM Game Boosters
+        expect(manifest, contains('android:appCategory="game"'));
+        expect(manifest, contains('android:name="android.game_mode_config"'));
+        expect(manifest, contains('android:resource="@xml/game_mode_config"'));
+      },
+    );
+
+    test(
+      'game_mode_config.xml opts out of OEM backbuffer downscaling and FPS overrides',
+      () {
+        final configFile = File(
+          'android/app/src/main/res/xml/game_mode_config.xml',
+        );
+        expect(configFile.existsSync(), isTrue);
+        final xml = configFile.readAsStringSync();
+
+        expect(xml, contains('<game-mode-config'));
+        expect(xml, contains('android:allowGameDownscaling="false"'));
+        expect(xml, contains('android:allowGameFpsOverride="false"'));
+      },
+    );
+
+    test(
+      'MainActivity.kt sweeps stale appTasks, updates intent in onNewIntent, and avoids SurfaceView hacks',
+      () {
+        final activityFile = File(
+          'android/app/src/main/kotlin/com/gustlarsen/howpredictable/MainActivity.kt',
+        );
+        expect(activityFile.existsSync(), isTrue);
+        final kotlin = activityFile.readAsStringSync();
+
+        // Single-task & orphan Recents task cleanup invariants
+        expect(kotlin, contains('isDuplicateLauncherRoot()'));
+        expect(kotlin, contains('cleanupStaleAppTasks()'));
+        expect(kotlin, contains('finishAndRemoveTask()'));
+        expect(kotlin, contains('setIntent(intent)'));
+
+        // Never mutate SurfaceView buffer sizing or visibility as a viewport workaround
+        expect(kotlin, isNot(contains('setSizeFromLayout')));
+        expect(kotlin, isNot(contains('View.INVISIBLE')));
+        expect(kotlin, isNot(contains('SurfaceView')));
       },
     );
   });

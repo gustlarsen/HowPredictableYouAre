@@ -1,5 +1,6 @@
 package com.gustlarsen.howpredictable
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -11,14 +12,10 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
-import android.view.SurfaceView
-import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -29,14 +26,17 @@ class MainActivity : FlutterActivity() {
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val viewportSyncRunnable = Runnable { syncViewportAndInsets(allowSurfaceReset = true) }
-    private var decorLayoutListener: View.OnLayoutChangeListener? = null
-    private var isResettingSurface = false
+    private val insetsSyncRunnable = Runnable { syncEdgeToEdgeInsets() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isDuplicateLauncherRoot()) {
+            finish()
+            return
+        }
+        cleanupStaleAppTasks()
         configureEdgeToEdgeWindow()
-        attachDecorLayoutSyncListener()
+        scheduleInsetsSync()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -55,7 +55,7 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VIEWPORT_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "syncViewport") {
-                    scheduleViewportSync()
+                    scheduleInsetsSync()
                     result.success(true)
                 } else {
                     result.notImplemented()
@@ -65,44 +65,85 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        scheduleViewportSync()
+        scheduleInsetsSync()
     }
 
     override fun onPostResume() {
         super.onPostResume()
-        scheduleViewportSync()
+        scheduleInsetsSync()
     }
 
     override fun onNewIntent(intent: Intent) {
+        setIntent(intent)
         super.onNewIntent(intent)
-        scheduleViewportSync()
+        cleanupStaleAppTasks()
+        scheduleInsetsSync()
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         configureEdgeToEdgeWindow()
-        scheduleViewportSync()
+        scheduleInsetsSync()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            scheduleViewportSync()
+            scheduleInsetsSync()
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        scheduleViewportSync()
+        scheduleInsetsSync()
     }
 
     override fun onDestroy() {
-        mainHandler.removeCallbacks(viewportSyncRunnable)
-        decorLayoutListener?.let { listener ->
-            window?.decorView?.removeOnLayoutChangeListener(listener)
-        }
-        decorLayoutListener = null
+        mainHandler.removeCallbacks(insetsSyncRunnable)
         super.onDestroy()
+    }
+
+    /**
+     * Guards against Android stacking a duplicate launcher Activity onto an
+     * existing task when launched from external entry points (e.g., Play Store).
+     */
+    private fun isDuplicateLauncherRoot(): Boolean {
+        if (isTaskRoot) return false
+        val launchIntent = intent ?: return false
+        return launchIntent.action == Intent.ACTION_MAIN &&
+            launchIntent.hasCategory(Intent.CATEGORY_LAUNCHER)
+    }
+
+    /**
+     * Removes any orphaned Recents tasks belonging exclusively to this app
+     * (such as a legacy pre-update task created with empty taskAffinity) after
+     * a clean launch or singleTask handoff.
+     */
+    private fun cleanupStaleAppTasks() {
+        try {
+            val activityManager =
+                getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return
+            val currentTaskId = taskId
+            if (currentTaskId == -1) return
+            for (appTask in activityManager.appTasks) {
+                val info = try {
+                    appTask.taskInfo
+                } catch (_: Throwable) {
+                    null
+                } ?: continue
+                val existingTaskId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    info.taskId
+                } else {
+                    @Suppress("DEPRECATION")
+                    info.id
+                }
+                if (existingTaskId != currentTaskId) {
+                    appTask.finishAndRemoveTask()
+                }
+            }
+        } catch (_: Throwable) {
+            // Fail safely if ActivityManager task inspection is unavailable.
+        }
     }
 
     private fun configureEdgeToEdgeWindow() {
@@ -122,139 +163,20 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun attachDecorLayoutSyncListener() {
-        val decor = window?.decorView ?: return
-        if (decorLayoutListener != null) return
-        val listener = View.OnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-            val newW = right - left
-            val newH = bottom - top
-            val oldW = oldRight - oldLeft
-            val oldH = oldBottom - oldTop
-            if (newW > 0 && newH > 0 && (newW != oldW || newH != oldH)) {
-                syncViewportAndInsets(allowSurfaceReset = false)
-            }
-        }
-        decorLayoutListener = listener
-        decor.addOnLayoutChangeListener(listener)
+    private fun scheduleInsetsSync() {
+        mainHandler.removeCallbacks(insetsSyncRunnable)
+        mainHandler.post(insetsSyncRunnable)
+        // Re-apply WindowInsets after transient Play Core / system overlay transitions settle.
+        mainHandler.postDelayed(insetsSyncRunnable, 120L)
+        mainHandler.postDelayed(insetsSyncRunnable, 350L)
     }
 
-    private fun scheduleViewportSync() {
-        mainHandler.removeCallbacks(viewportSyncRunnable)
-        mainHandler.post(viewportSyncRunnable)
-        // Re-check after Play Core overlay transitions / Samsung Game Booster scaling settle
-        mainHandler.postDelayed(viewportSyncRunnable, 120L)
-        mainHandler.postDelayed(viewportSyncRunnable, 350L)
-    }
-
-    private fun syncViewportAndInsets(allowSurfaceReset: Boolean) {
+    private fun syncEdgeToEdgeInsets() {
         if (isFinishing || isDestroyed) return
         val win = window ?: return
         val decor = win.decorView
         WindowCompat.setDecorFitsSystemWindows(win, false)
         ViewCompat.requestApplyInsets(decor)
-
-        val flutterView = findFlutterView(decor) ?: return
-        val parentView = (flutterView.parent as? View) ?: decor
-        val targetWidth = parentView.width
-        val targetHeight = parentView.height
-
-        val lp = flutterView.layoutParams
-        if (lp != null &&
-            (lp.width != ViewGroup.LayoutParams.MATCH_PARENT ||
-                lp.height != ViewGroup.LayoutParams.MATCH_PARENT)
-        ) {
-            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-            lp.height = ViewGroup.LayoutParams.MATCH_PARENT
-            flutterView.layoutParams = lp
-        }
-
-        var needsRelayout = targetWidth > 0 &&
-            targetHeight > 0 &&
-            (flutterView.width != targetWidth || flutterView.height != targetHeight)
-
-        var needsSurfaceReset = false
-        val surfaceViews = mutableListOf<SurfaceView>()
-        collectSurfaceViews(flutterView, surfaceViews)
-        for (surfaceView in surfaceViews) {
-            surfaceView.holder.setSizeFromLayout()
-            val svLp = surfaceView.layoutParams
-            if (svLp != null &&
-                (svLp.width != ViewGroup.LayoutParams.MATCH_PARENT ||
-                    svLp.height != ViewGroup.LayoutParams.MATCH_PARENT)
-            ) {
-                svLp.width = ViewGroup.LayoutParams.MATCH_PARENT
-                svLp.height = ViewGroup.LayoutParams.MATCH_PARENT
-                surfaceView.layoutParams = svLp
-                needsRelayout = true
-            }
-            if (targetWidth > 0 && targetHeight > 0) {
-                if (surfaceView.width != targetWidth || surfaceView.height != targetHeight) {
-                    needsRelayout = true
-                }
-                val frame = surfaceView.holder.surfaceFrame
-                if (frame.width() > 0 &&
-                    frame.height() > 0 &&
-                    (frame.width() != targetWidth || frame.height() != targetHeight)
-                ) {
-                    needsRelayout = true
-                    needsSurfaceReset = true
-                }
-            }
-        }
-
-        if (needsRelayout) {
-            for (surfaceView in surfaceViews) {
-                surfaceView.requestLayout()
-            }
-            flutterView.requestLayout()
-            decor.requestLayout()
-        }
-
-        if (allowSurfaceReset && needsSurfaceReset && !isResettingSurface) {
-            isResettingSurface = true
-            for (surfaceView in surfaceViews) {
-                if (surfaceView.visibility == View.VISIBLE) {
-                    surfaceView.visibility = View.INVISIBLE
-                    surfaceView.post {
-                        if (!isFinishing && !isDestroyed) {
-                            surfaceView.visibility = View.VISIBLE
-                            surfaceView.requestLayout()
-                            ViewCompat.requestApplyInsets(flutterView)
-                        }
-                        isResettingSurface = false
-                    }
-                } else {
-                    isResettingSurface = false
-                }
-            }
-            if (surfaceViews.isEmpty()) {
-                isResettingSurface = false
-            }
-        }
-
-        ViewCompat.requestApplyInsets(flutterView)
-    }
-
-    private fun findFlutterView(root: View): FlutterView? {
-        if (root is FlutterView) return root
-        if (root is ViewGroup) {
-            for (i in 0 until root.childCount) {
-                val found = findFlutterView(root.getChildAt(i))
-                if (found != null) return found
-            }
-        }
-        return null
-    }
-
-    private fun collectSurfaceViews(root: View, out: MutableList<SurfaceView>) {
-        if (root is SurfaceView) {
-            out.add(root)
-        }
-        if (root is ViewGroup) {
-            for (i in 0 until root.childCount) {
-                collectSurfaceViews(root.getChildAt(i), out)
-            }
-        }
     }
 
     private fun vibrateDevice(durationMs: Long) {
