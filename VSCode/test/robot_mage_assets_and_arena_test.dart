@@ -249,7 +249,8 @@ void main() {
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
-      expect(find.text('PLAYER'), findsOneWidget);
+      expect(find.text('PLAYER'), findsNothing);
+      expect(find.byKey(const ValueKey('user_mana_bar')), findsOneWidget);
       expect(find.text('GUARDIAN ROBOT'), findsOneWidget);
 
       // PC wins round 1 -> guardian_robot_attack.png active for ~450ms, then reverts to idle

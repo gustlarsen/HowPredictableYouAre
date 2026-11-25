@@ -1,5 +1,5 @@
 {
-  "summary": "- Repositioned ManaPoolOrb in VersusArena from the horizontal center to a compact 50px position on the far-left side of the Cleric (Player) with safe >= 8px left edge padding across narrow 360px screens\n- Kept the Cleric sprite centered directly above his HP bar and PLAYER label while leaving the opponent side without a mana pool\n- Preserved the unobstructed horizontal center of VersusArena for Mid-Arena Clash VFX (~300ms) and parabolic Elemental Orb flight arcs into the top-left Backpack\n- Updated ManaPoolOrb and VersusArena widget tests and verified flutter analyze and all 399 tests pass",
+  "summary": "- Created animated horizontal crystal-vial RpgManaBar widget with CustomPainter rippling sine-wave liquid edge, glowing meniscus crest, drifting micro-bubbles, 3D glass sheen, mana crystal accent, numeric readout, and low-mana amber/violet tension pulse\n- Removed ManaPoolOrb from VersusArena flank and replaced the PLAYER text label directly underneath the Cleric's RpgHpBar with RpgManaBar (104x17px) while keeping the enemy side unchanged (HP bar + Boss Name, no enemy mana bar)\n- Restored symmetric arena positioning for Cleric and Opponent sprites with unobstructed mid-arena clash VFX and parabolic Elemental Orb flight arc\n- Added dedicated RpgManaBar tests and updated existing VersusArena/GameScreen widget tests; verified flutter analyze and full test suite pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-25T19:37:46Z"
+  "updated_at_utc": "2026-11-25T20:59:44Z"
 }

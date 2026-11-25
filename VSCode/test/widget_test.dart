@@ -3696,7 +3696,7 @@ void main() {
   });
 
   testWidgets(
-    'ManaPoolOrb inside VersusArena counts down 100->99->98 in GameScreen, preserves pinned bottom buttons & ScoreHeader Total, and resets to 100',
+    'RpgManaBar inside VersusArena replaces PLAYER label beneath user HP bar, counts down 100->99->98 in GameScreen, preserves pinned bottom buttons & ScoreHeader Total, and resets to 100',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
         'has_seen_story_intro': true,
@@ -3735,30 +3735,32 @@ void main() {
       final initialMoveCardRect = tester.getRect(moveCardFinder);
       final initialRockRect = tester.getRect(rockBtnFinder);
 
-      // Mana Pool Orb sits cleanly on the left side of the Cleric inside VersusArena without a VS badge, starting at 100
-      final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
+      // RpgManaBar sits directly underneath user_hp_bar (replacing PLAYER) without a VS badge or ManaPoolOrb
+      final manaBarFinder = find.byKey(const ValueKey('user_mana_bar'));
       final playerSpriteFinder = find.byKey(const ValueKey('versus_player_sprite'));
       final userHpFinder = find.byKey(const ValueKey('user_hp_bar'));
       expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
       expect(find.text('VS'), findsNothing);
+      expect(find.byKey(const ValueKey('mana_pool_orb')), findsNothing);
+      expect(find.text('PLAYER'), findsNothing);
       expect(
-        find.descendant(of: arenaFinder, matching: manaOrbFinder),
+        find.descendant(of: arenaFinder, matching: manaBarFinder),
         findsOneWidget,
       );
       expect(
-        tester.getRect(manaOrbFinder).left - tester.getRect(arenaFinder).left,
-        greaterThanOrEqualTo(8.0),
+        tester.getRect(manaBarFinder).width,
+        closeTo(tester.getRect(userHpFinder).width, 0.5),
       );
       expect(
-        tester.getRect(manaOrbFinder).right,
-        lessThanOrEqualTo(tester.getRect(userHpFinder).left),
+        tester.getRect(manaBarFinder).top,
+        greaterThanOrEqualTo(tester.getRect(userHpFinder).bottom),
       );
       expect(
         tester.getRect(playerSpriteFinder).center.dx,
         closeTo(tester.getRect(userHpFinder).center.dx, 0.5),
       );
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('100')),
+        find.descendant(of: manaBarFinder, matching: find.text('100 / 100')),
         findsOneWidget,
       );
       expect(
@@ -3773,7 +3775,7 @@ void main() {
       expect(controller.remainingMana, 99);
       expect(controller.totalRounds, 1);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('99')),
+        find.descendant(of: manaBarFinder, matching: find.text('99 / 100')),
         findsOneWidget,
       );
       expect(
@@ -3788,7 +3790,7 @@ void main() {
       expect(controller.remainingMana, 98);
       expect(controller.totalRounds, 2);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('98')),
+        find.descendant(of: manaBarFinder, matching: find.text('98 / 100')),
         findsOneWidget,
       );
       expect(
@@ -3803,7 +3805,7 @@ void main() {
         equals(initialMoveCardRect.bottom),
       );
 
-      // Trigger AppBar Reset -> shows -1 Wood loss, Mana Pool resets back to 100 and woodOrbs reverts to 0
+      // Trigger AppBar Reset -> shows -1 Wood loss, Mana Bar resets back to 100 / 100 and woodOrbs reverts to 0
       expect(controller.woodOrbs, 1);
       await tester.tap(find.byKey(const ValueKey('battle_reset_button')));
       await tester.pumpAndSettle();
@@ -3818,7 +3820,7 @@ void main() {
       expect(controller.userHp, 50);
       expect(controller.computerHp, 100);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('100')),
+        find.descendant(of: manaBarFinder, matching: find.text('100 / 100')),
         findsOneWidget,
       );
       expect(tester.getSize(arenaFinder).height, equals(initialArenaHeight));
@@ -3858,7 +3860,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      final manaOrbFinder = find.byKey(const ValueKey('mana_pool_orb'));
+      final manaBarFinder = find.byKey(const ValueKey('user_mana_bar'));
       final rockBtnFinder = find.byKey(const ValueKey('hand_button_rock'));
 
       // Round 1 (Draw): Mana decrements 100 -> 99, no floating -1 indicator appears, Player HP stays 50, Gauge = --%
@@ -3873,18 +3875,18 @@ void main() {
       expect(controller.userHp, 50);
       expect(controller.computerHp, 100);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('99')),
+        find.descendant(of: manaBarFinder, matching: find.text('99 / 100')),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: manaOrbFinder,
+          of: manaBarFinder,
           matching: find.byKey(const ValueKey('mana_drain_indicator')),
         ),
         findsNothing,
       );
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('-1')),
+        find.descendant(of: manaBarFinder, matching: find.text('-1')),
         findsNothing,
       );
       expect(
@@ -3919,18 +3921,18 @@ void main() {
       expect(controller.userHp, 50);
       expect(controller.computerHp, 99);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('97')),
+        find.descendant(of: manaBarFinder, matching: find.text('97 / 100')),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: manaOrbFinder,
+          of: manaBarFinder,
           matching: find.byKey(const ValueKey('mana_drain_indicator')),
         ),
         findsNothing,
       );
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('-1')),
+        find.descendant(of: manaBarFinder, matching: find.text('-1')),
         findsNothing,
       );
       expect(
@@ -3977,7 +3979,7 @@ void main() {
       expect(controllerAt99.totalRounds, 100);
       expect(controllerAt99.remainingMana, 0);
       expect(
-        find.descendant(of: manaOrbFinder, matching: find.text('0')),
+        find.descendant(of: manaBarFinder, matching: find.text('0 / 100')),
         findsOneWidget,
       );
       // 100-round completion dialog fires with fair decisive win rate (60 / 80 = 75.0%)

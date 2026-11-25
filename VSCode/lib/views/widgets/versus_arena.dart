@@ -5,9 +5,9 @@ import '../../models/move.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import 'elemental_symbol_icon.dart';
-import 'mana_pool_orb.dart';
 import 'metal_wizard_lair_icon.dart';
 import 'rpg_hp_bar.dart';
+import 'rpg_mana_bar.dart';
 
 /// Phases of the 750ms VersusArena projectile clash & impact VFX sequence.
 enum BattleVfxPhase {
@@ -780,9 +780,6 @@ class _VersusArenaState extends State<VersusArena>
           palette.isDark ? const Color(0xFFD6DCE8) : palette.secondaryText;
     }
 
-    final playerCombatantTitle = widget.localization
-        .t('arena_player_label', fallback: 'PLAYER')
-        .toUpperCase();
     final bossCombatantTitle = _resolveBossCombatantTitle();
 
     // Transparent floor container: combatants stand directly on the forge stone floor
@@ -799,19 +796,13 @@ class _VersusArenaState extends State<VersusArena>
               const totalItemsWidth = cardWidth * 2 + vsWidth;
               const spriteWidth = 112.0;
               const spriteHeight = 112.0;
-              const manaOrbSize = 50.0;
               final arenaStackHeight = widget.compactHeight ? 132.0 : 140.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
               final freeSpace = math.max(0.0, rowWidth - totalItemsWidth);
               final spaceUnit = freeSpace / 3.0;
 
-              final desiredPlayerLeftX = 0.5 * spaceUnit;
-              final minPlayerLeftX = math.min(
-                maxCardLeft,
-                math.max(desiredPlayerLeftX, manaOrbSize + 2.0),
-              );
-              final leftX = minPlayerLeftX.clamp(0.0, maxCardLeft);
+              final leftX = (0.5 * spaceUnit).clamp(0.0, maxCardLeft);
               final rightX = rowWidth >= totalItemsWidth
                   ? (2.5 * spaceUnit + cardWidth + vsWidth)
                       .clamp(0.0, maxCardLeft)
@@ -822,7 +813,7 @@ class _VersusArenaState extends State<VersusArena>
               final leftCenterX = leftX + cardWidth / 2.0;
               final rightCenterX = rightX + cardWidth / 2.0;
               final centerX = rowWidth / 2.0;
-              final orbCenterY = arenaStackHeight - 80.0;
+              final orbCenterY = arenaStackHeight - 81.0;
               final floorRunesCenterY = widget.compactHeight ? 90.0 : 96.0;
               final spriteTop = widget.compactHeight ? -4.0 : 0.0;
 
@@ -831,12 +822,6 @@ class _VersusArenaState extends State<VersusArena>
                   .toDouble();
               final bossLeft = (rightCenterX - spriteWidth / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
-                  .toDouble();
-              final manaOrbLeft = (leftX - manaOrbSize - 4.0)
-                  .clamp(0.0, math.max(0.0, rowWidth - manaOrbSize))
-                  .toDouble();
-              final manaOrbTop = (orbCenterY - manaOrbSize / 2.0)
-                  .clamp(0.0, math.max(0.0, arenaStackHeight - manaOrbSize))
                   .toDouble();
 
               final sanctuaryRunesLayer = Positioned.fill(
@@ -933,21 +918,6 @@ class _VersusArenaState extends State<VersusArena>
                 ),
               );
 
-              final playerManaOrb = Positioned(
-                top: manaOrbTop,
-                left: manaOrbLeft,
-                width: manaOrbSize,
-                height: manaOrbSize,
-                child: ManaPoolOrb(
-                  key: const ValueKey('mana_pool_orb'),
-                  size: manaOrbSize,
-                  remainingMana: widget.remainingMana,
-                  maxMana: widget.maxMana,
-                  localization: widget.localization,
-                  animationsEnabled: widget.animationsEnabled,
-                ),
-              );
-
               // Anchor for mid-arena projectile clash and parabolic orb-collection flight arc
               final clashCenterAnchor = Positioned(
                 top: orbCenterY - 18.0,
@@ -983,9 +953,6 @@ class _VersusArenaState extends State<VersusArena>
                               : (userWins ? _punchAnim.value : 0.0))
                           : 0.0;
                       return _MoveCard(
-                        combatantName: playerCombatantTitle,
-                        combatantNameKey:
-                            const ValueKey('arena_player_name_label'),
                         move: widget.userMove,
                         isLeft: true,
                         isWinner: userWins,
@@ -995,6 +962,9 @@ class _VersusArenaState extends State<VersusArena>
                         hp: displayedPlayerHp,
                         maxHp: widget.playerMaxHp,
                         hpBarKey: const ValueKey('user_hp_bar'),
+                        remainingMana: widget.remainingMana,
+                        maxMana: widget.maxMana,
+                        manaBarKey: const ValueKey('user_mana_bar'),
                         animationsEnabled: widget.animationsEnabled,
                         isDamaged: isDamaged,
                         flashOpacity: _calculateFlash(isDamaged),
@@ -1152,7 +1122,6 @@ class _VersusArenaState extends State<VersusArena>
                       sanctuaryRunesLayer,
                       playerSprite,
                       bossSprite,
-                      playerManaOrb,
                       clashCenterAnchor,
                       pcCard,
                       userCard,
@@ -1162,7 +1131,6 @@ class _VersusArenaState extends State<VersusArena>
                       sanctuaryRunesLayer,
                       playerSprite,
                       bossSprite,
-                      playerManaOrb,
                       clashCenterAnchor,
                       userCard,
                       pcCard,
@@ -2737,7 +2705,7 @@ class _ElementPalette {
 }
 
 class _MoveCard extends StatelessWidget {
-  final String combatantName;
+  final String? combatantName;
   final Key? combatantNameKey;
   final HandMove? move;
   final HandMove? secondaryMove;
@@ -2749,6 +2717,9 @@ class _MoveCard extends StatelessWidget {
   final int hp;
   final int maxHp;
   final Key? hpBarKey;
+  final int? remainingMana;
+  final int? maxMana;
+  final Key? manaBarKey;
   final bool animationsEnabled;
   final bool isDamaged;
   final double flashOpacity;
@@ -2759,7 +2730,7 @@ class _MoveCard extends StatelessWidget {
   final Widget Function(BuildContext context, Widget handWidget) handBuilder;
 
   const _MoveCard({
-    required this.combatantName,
+    this.combatantName,
     this.combatantNameKey,
     required this.move,
     this.secondaryMove,
@@ -2771,6 +2742,9 @@ class _MoveCard extends StatelessWidget {
     required this.hp,
     required this.maxHp,
     this.hpBarKey,
+    this.remainingMana,
+    this.maxMana,
+    this.manaBarKey,
     this.animationsEnabled = true,
     required this.isDamaged,
     required this.flashOpacity,
@@ -3040,7 +3014,7 @@ class _MoveCard extends StatelessWidget {
             padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
             child: handBuilder(context, handCircle),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
@@ -3113,34 +3087,44 @@ class _MoveCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          SizedBox(
-            width: 104,
-            height: 14,
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  combatantName,
-                  key: combatantNameKey,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 10.5,
-                    height: 1.1,
-                    letterSpacing: 0.5,
-                    color: palette.isDark ? Colors.white : palette.primaryText,
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black,
-                        blurRadius: 4,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
+          if (remainingMana != null && maxMana != null)
+            RpgManaBar(
+              key: manaBarKey,
+              width: 104.0,
+              height: 17.0,
+              remainingMana: remainingMana!,
+              maxMana: maxMana!,
+              animationsEnabled: animationsEnabled,
+            )
+          else
+            SizedBox(
+              width: 104,
+              height: 17,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    combatantName ?? '',
+                    key: combatantNameKey,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10.5,
+                      height: 1.1,
+                      letterSpacing: 0.5,
+                      color: palette.isDark ? Colors.white : palette.primaryText,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
                   ),
-                  maxLines: 1,
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

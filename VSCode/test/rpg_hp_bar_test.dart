@@ -119,12 +119,25 @@ void main() {
         ),
       );
 
-      // Both user and computer HP bars are present with their designated keys
+      // Both user and computer HP bars are present with their designated keys, plus user mana bar
       expect(find.byKey(const ValueKey('user_hp_bar')), findsOneWidget);
       expect(find.byKey(const ValueKey('pc_hp_bar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('user_mana_bar')), findsOneWidget);
 
-      expect(find.text('100 / 100'), findsOneWidget);
-      expect(find.text('95 / 100'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('user_hp_bar')),
+          matching: find.text('100 / 100'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('pc_hp_bar')),
+          matching: find.text('95 / 100'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('Damaged hand triggers micro-shake, flash, and floating damage indicator (-1)', (

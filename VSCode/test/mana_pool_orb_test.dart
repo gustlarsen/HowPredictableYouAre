@@ -265,7 +265,7 @@ void main() {
     );
 
     testWidgets(
-      'ManaPoolOrb sits cleanly on the left side of the Cleric while Cleric sprite is centered above his HP bar and mid-arena center stays unobstructed',
+      'VersusArena removes ManaPoolOrb and PLAYER label, renders RpgManaBar directly underneath the Cleric HP bar, and keeps mid-arena center unobstructed with fixed height',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
@@ -308,7 +308,7 @@ void main() {
 
         final heightAt100 = await pumpArena(mana: 100);
         final arenaRect = tester.getRect(find.byType(VersusArena));
-        final manaOrbRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
+        final manaBarRect = tester.getRect(find.byKey(const ValueKey('user_mana_bar')));
         final playerSpriteRect = tester.getRect(
           find.byKey(const ValueKey('versus_player_sprite')),
         );
@@ -321,48 +321,52 @@ void main() {
         final pcOrbRect = tester.getRect(find.byKey(const ValueKey('pc_orb_container')));
         final clashRect = tester.getRect(find.byKey(clashKey));
 
-        // Central VS badge, "You Chose:", and "PC Chose:" are completely removed; only 1 ManaPoolOrb exists (none on enemy side)
+        // Central VS badge, ManaPoolOrb, PLAYER label, "You Chose:", and "PC Chose:" are removed from VersusArena
         expect(find.byKey(const ValueKey('vs_badge')), findsNothing);
         expect(find.text('VS'), findsNothing);
         expect(find.text('You Chose:'), findsNothing);
         expect(find.text('PC Chose:'), findsNothing);
-        expect(find.byType(ManaPoolOrb), findsOneWidget);
+        expect(find.byType(ManaPoolOrb), findsNothing);
+        expect(find.byKey(const ValueKey('mana_pool_orb')), findsNothing);
+        expect(find.byKey(const ValueKey('arena_player_name_label')), findsNothing);
+        expect(find.text('PLAYER'), findsNothing);
+        expect(find.text('GUARDIAN ROBOT'), findsOneWidget);
 
-        // ManaPoolOrb is compact (48px-52px) on the far-left of the Cleric with safe >= 8px left margin
-        expect(manaOrbRect.width, inInclusiveRange(48.0, 52.0));
-        expect(manaOrbRect.height, inInclusiveRange(48.0, 52.0));
-        expect(manaOrbRect.left - arenaRect.left, greaterThanOrEqualTo(8.0));
-        expect(manaOrbRect.right, lessThanOrEqualTo(userHpRect.left));
-        expect(manaOrbRect.center.dx, lessThan(playerSpriteRect.center.dx));
-        expect(manaOrbRect.center.dy, closeTo(userOrbRect.center.dy, 1.0));
-        expect(manaOrbRect.bottom, lessThan(userHpRect.top));
+        // RpgManaBar sits directly underneath user_hp_bar with matching width and compact height (16-18px)
+        expect(manaBarRect.width, closeTo(userHpRect.width, 0.5));
+        expect(manaBarRect.height, inInclusiveRange(16.0, 18.0));
+        expect(manaBarRect.left, closeTo(userHpRect.left, 0.5));
+        expect(manaBarRect.top, greaterThanOrEqualTo(userHpRect.bottom));
+        expect(manaBarRect.top - userHpRect.bottom, lessThanOrEqualTo(4.0));
 
-        // Cleric and Boss sprites are both horizontally centered directly above their respective HP bars
+        // Both HP bars and orb containers stay horizontally aligned on the same row
+        expect(userHpRect.top, closeTo(pcHpRect.top, 0.5));
+        expect(userOrbRect.top, closeTo(pcOrbRect.top, 0.5));
+
+        // Cleric and Boss sprites are symmetrically centered directly above their respective bars
         expect(playerSpriteRect.center.dx, closeTo(userHpRect.center.dx, 0.5));
         expect(bossSpriteRect.center.dx, closeTo(pcHpRect.center.dx, 0.5));
+        expect(
+          (userHpRect.center.dx + pcHpRect.center.dx) * 0.5,
+          closeTo(arenaRect.center.dx, 0.5),
+        );
 
         // Unobstructed horizontal center of VersusArena remains the Mid-Arena Clash point
         expect(clashRect.center.dx, closeTo(arenaRect.center.dx, 0.5));
-
-        // Verify safe left edge padding (>= 8px) even on narrow 360px screens
-        final heightAt360 = await pumpArena(mana: 100, width: 360);
-        final narrowArenaRect = tester.getRect(find.byType(VersusArena));
-        final narrowManaRect = tester.getRect(find.byKey(const ValueKey('mana_pool_orb')));
-        final narrowPlayerSpriteRect = tester.getRect(
-          find.byKey(const ValueKey('versus_player_sprite')),
-        );
-        final narrowUserHpRect = tester.getRect(find.byKey(const ValueKey('user_hp_bar')));
-        expect(narrowManaRect.left - narrowArenaRect.left, greaterThanOrEqualTo(8.0));
-        expect(narrowManaRect.right, lessThanOrEqualTo(narrowUserHpRect.left));
+        expect(clashRect.center.dy, closeTo(userOrbRect.center.dy, 0.5));
+        final manaBarFinder = find.byKey(const ValueKey('user_mana_bar'));
         expect(
-          narrowPlayerSpriteRect.center.dx,
-          closeTo(narrowUserHpRect.center.dx, 0.5),
+          find.descendant(of: manaBarFinder, matching: find.text('100 / 100')),
+          findsOneWidget,
         );
-        expect(heightAt360, equals(heightAt100));
 
-        // Orb containers remain horizontally aligned on the same row
-        expect(userOrbRect.top, closeTo(pcOrbRect.top, 0.5));
-        expect(find.text('100'), findsOneWidget);
+        // Narrow 360px screen preserves fixed height and clean alignment without clipping
+        final heightAt360 = await pumpArena(mana: 100, width: 360);
+        final narrowManaRect = tester.getRect(manaBarFinder);
+        final narrowUserHpRect = tester.getRect(find.byKey(const ValueKey('user_hp_bar')));
+        expect(narrowManaRect.width, closeTo(narrowUserHpRect.width, 0.5));
+        expect(narrowManaRect.left, closeTo(narrowUserHpRect.left, 0.5));
+        expect(heightAt360, equals(heightAt100));
 
         // Height remains strictly identical across remainingMana values and match states
         final heightAt99 = await pumpArena(
@@ -372,7 +376,10 @@ void main() {
           winner: RoundWinner.user,
           roundId: 1,
         );
-        expect(find.text('99'), findsOneWidget);
+        expect(
+          find.descendant(of: manaBarFinder, matching: find.text('99 / 100')),
+          findsOneWidget,
+        );
         expect(heightAt99, equals(heightAt100));
 
         final heightAt15 = await pumpArena(
@@ -382,7 +389,10 @@ void main() {
           winner: RoundWinner.user,
           roundId: 85,
         );
-        expect(find.text('15'), findsOneWidget);
+        expect(
+          find.descendant(of: manaBarFinder, matching: find.text('15 / 100')),
+          findsOneWidget,
+        );
         expect(heightAt15, equals(heightAt100));
 
         final heightAt0 = await pumpArena(
@@ -392,7 +402,10 @@ void main() {
           winner: RoundWinner.computer,
           roundId: 100,
         );
-        expect(find.text('0'), findsOneWidget);
+        expect(
+          find.descendant(of: manaBarFinder, matching: find.text('0 / 100')),
+          findsOneWidget,
+        );
         expect(heightAt0, equals(heightAt100));
       },
     );
