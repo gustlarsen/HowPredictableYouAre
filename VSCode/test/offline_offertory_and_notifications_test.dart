@@ -342,14 +342,24 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
 
-        // Dialog appears automatically with Welcome Back title, icon, formatted duration & 3D orbs
+        // Dialog appears automatically with Welcome Back title, icon, 8h fill progress & single-row 3D orbs
         expect(
           find.byKey(const ValueKey('offline_offertory_dialog')),
           findsOneWidget,
         );
+        expect(find.byType(SingleChildScrollView), findsNothing);
         expect(find.byType(OffertoryVaultIcon), findsOneWidget);
         expect(find.text('Welcome Back!'), findsOneWidget);
-        expect(find.text('Offline for 3h 42m'), findsOneWidget);
+        // 3h 42m = 222m / 480m = 46.25% -> 46% Full
+        expect(find.text('Offline for 3h 42m • 46% Full'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('offline_offertory_fill_progress')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('offline_offertory_orbs_row')),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('offline_offertory_sphere_fire')),
           findsOneWidget,
@@ -364,7 +374,21 @@ void main() {
         );
         expect(find.byType(ElementalEnergySphere), findsNWidgets(3));
         expect(find.text('+44'), findsNWidgets(3));
-        expect(find.text('2x Harvest: +88 per element'), findsOneWidget);
+        // Separate 2x pill & redundant Later footer button are removed
+        expect(
+          find.byKey(const ValueKey('offline_offertory_2x_preview')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('offline_offertory_later_button')),
+          findsNothing,
+        );
+
+        // Unified 2x hero button shows Watch Ad • 2x Collect + exact doubled/bonus breakdown
+        expect(find.text('Watch Ad • 2x Collect'), findsOneWidget);
+        expect(find.text('+88 per element (+44 bonus)'), findsOneWidget);
+        // Secondary button shows Collect (+44 each)
+        expect(find.text('Collect (+44 each)'), findsOneWidget);
 
         // Tap Collect (1x) -> grants 44 orbs per active element, preserves ~0.4 remainder, closes dialog & reschedules 8h notification
         await tester.tap(
@@ -400,9 +424,9 @@ void main() {
     );
 
     testWidgets(
-      'Shows golden 8h 00m Storage Full (100%) badge in Light Mode (#F5EFE2) for Phase 2+ (5 elements) and respects Watch Ad (2x) inside onUserEarnedReward',
+      'Shows golden 8h 00m • 100% FULL (Paused) bar in Light Mode (#F5EFE2) for Phase 2+ (5 elements) on single row without scroll, and respects Watch Ad (2x) inside onUserEarnedReward',
       (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(360, 800);
+        tester.view.physicalSize = const Size(360, 640);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(() {
           tester.view.resetPhysicalSize();
@@ -410,14 +434,14 @@ void main() {
         });
 
         // Away for 10 hours (> 8h cap) in Phase 2 (enemy_stage = 2 -> 5 elements)
-        // Lv. 1 * 12/h * 8h = 96 whole orbs per element
+        // High level (Lv. 30 with +75% milestone = 630/h -> 5,040 orbs at 8h cap) to verify 4/5-digit single-row fit on 360dp width
         final now = DateTime.utc(2026, 11, 24, 22, 0, 0);
         final pausedAt = DateTime.utc(2026, 11, 24, 12, 0, 0);
         final h = await _createHarness(
           prefs: {
             'darkMode': false,
             'enemy_stage': 2,
-            'offertory_level': 1,
+            'offertory_level': 30,
             'offertory_last_collected_at': pausedAt.millisecondsSinceEpoch,
             'last_app_paused_at': pausedAt.millisecondsSinceEpoch,
             'orbs_fire': 10,
@@ -445,26 +469,41 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
 
-        // Verify Light Mode parchment surface (#F5EFE2)
+        // Verify Light Mode parchment surface (#F5EFE2) and zero vertical scrolling
         final dialogWidget = tester.widget<Dialog>(
           find.byKey(const ValueKey('offline_offertory_dialog')),
         );
         expect(dialogWidget.backgroundColor, equals(const Color(0xFFF5EFE2)));
+        expect(find.byType(SingleChildScrollView), findsNothing);
 
-        // Verify capped 8h 00m Storage Full (100%) badge & all 5 active elements
+        // Verify capped 8h 00m • 100% FULL (Paused) & all 5 active elements in a single horizontal Row
         expect(
-          find.text('Offline for 8h 00m • Storage Full (100%)'),
+          find.text('Offline for 8h 00m • 100% FULL (Paused)'),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('offline_offertory_orbs_row')),
           findsOneWidget,
         );
         expect(find.byType(ElementalEnergySphere), findsNWidgets(5));
-        for (final move in GameController.allElementPool) {
-          expect(
-            find.byKey(ValueKey('offline_offertory_orb_${move.orbKey}')),
-            findsOneWidget,
-          );
-        }
-        expect(find.text('+96'), findsNWidgets(5));
-        expect(find.text('Watch Ad (2x Collect)'), findsOneWidget);
+        final orbCentersY = GameController.allElementPool
+            .map(
+              (move) => tester
+                  .getCenter(
+                    find.byKey(ValueKey('offline_offertory_orb_${move.orbKey}')),
+                  )
+                  .dy,
+            )
+            .toSet();
+        expect(orbCentersY.length, equals(1));
+
+        expect(find.text('+5,040'), findsNWidgets(5));
+        expect(find.text('Watch Ad • 2x Collect'), findsOneWidget);
+        expect(
+          find.text('+10,080 per element (+5,040 bonus)'),
+          findsOneWidget,
+        );
+        expect(find.text('Collect (+5,040 each)'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('offline_offertory_ad_disclosure')),
           findsOneWidget,
@@ -484,18 +523,18 @@ void main() {
           findsOneWidget,
         );
 
-        // 2. User completes rewarded ad -> onUserEarnedReward grants 2x (192 orbs per element) & closes dialog
+        // 2. User completes rewarded ad -> onUserEarnedReward grants 2x (10,080 orbs per element) & closes dialog
         h.adClient.earnRewardOnShow = true;
         await tester.tap(
           find.byKey(const ValueKey('offline_offertory_collect_2x_button')),
         );
         await tester.pumpAndSettle();
         expect(h.adClient.showRewardedCalls, equals(2));
-        expect(c.fireOrbs, equals(10 + 192));
-        expect(c.waterOrbs, equals(10 + 192));
-        expect(c.woodOrbs, equals(10 + 192));
-        expect(c.earthOrbs, equals(10 + 192));
-        expect(c.metalOrbs, equals(10 + 192));
+        expect(c.fireOrbs, equals(10 + 10080));
+        expect(c.waterOrbs, equals(10 + 10080));
+        expect(c.woodOrbs, equals(10 + 10080));
+        expect(c.earthOrbs, equals(10 + 10080));
+        expect(c.metalOrbs, equals(10 + 10080));
         expect(
           find.byKey(const ValueKey('offline_offertory_dialog')),
           findsNothing,
@@ -504,7 +543,59 @@ void main() {
     );
 
     testWidgets(
-      'Respects Remove Ads: shows Sanctuary Grace 2x off cooldown without ad prompts, and hides 2x button cleanly while on 4h cooldown',
+      'Ticks live every second when under 8h cap and updates orb counts & fill percentage in real time',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // Lv. 20 (with +50% milestone = 360/h = 0.1 orbs/sec) -> every 10s generates +1 orb
+        DateTime fakeNow = DateTime.utc(2026, 11, 24, 14, 0, 0);
+        final pausedAt = DateTime.utc(2026, 11, 24, 12, 0, 0); // 2h -> 720 orbs, 25% Full
+        final h = await _createHarness(
+          prefs: {
+            'offertory_level': 20,
+            'offertory_last_collected_at': pausedAt.millisecondsSinceEpoch,
+            'last_app_paused_at': pausedAt.millisecondsSinceEpoch,
+          },
+          clock: () => fakeNow,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: OfflineOffertoryDialog(
+                controller: c,
+                offlineDuration: const Duration(hours: 2),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Offline for 2h 00m • 25% Full'), findsOneWidget);
+        expect(find.text('+720'), findsNWidgets(3));
+        expect(find.text('+1,440 per element (+720 bonus)'), findsOneWidget);
+        expect(find.text('Collect (+720 each)'), findsOneWidget);
+
+        // Advance fake clock by 60 seconds and pump 1s timer tick -> 726 orbs!
+        fakeNow = fakeNow.add(const Duration(seconds: 60));
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(find.text('+726'), findsNWidgets(3));
+        expect(find.text('+1,452 per element (+726 bonus)'), findsOneWidget);
+        expect(find.text('Collect (+726 each)'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Respects Remove Ads: shows Sanctuary Grace • 2x Collect off cooldown without ad prompts, and hides 2x button cleanly while on 4h cooldown',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -540,8 +631,9 @@ void main() {
         await tester.pumpAndSettle();
 
         // Remove Ads active & off cooldown -> shows Sanctuary Grace, ZERO ad prompts
-        expect(find.text('2x Collect (Sanctuary Grace)'), findsOneWidget);
-        expect(find.text('Watch Ad (2x Collect)'), findsNothing);
+        expect(find.text('Sanctuary Grace • 2x Collect'), findsOneWidget);
+        expect(find.text('+48 per element (+24 bonus)'), findsOneWidget);
+        expect(find.text('Watch Ad • 2x Collect'), findsNothing);
         expect(
           find.byKey(const ValueKey('offline_offertory_ad_disclosure')),
           findsNothing,
@@ -567,7 +659,7 @@ void main() {
           find.byKey(const ValueKey('offline_offertory_dialog')),
           findsOneWidget,
         );
-        expect(find.text('Offline for 1h 00m'), findsOneWidget);
+        expect(find.text('Offline for 1h 00m • 13% Full'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('offline_offertory_collect_2x_button')),
           findsNothing,
@@ -576,7 +668,7 @@ void main() {
           find.byKey(const ValueKey('offline_offertory_ad_disclosure')),
           findsNothing,
         );
-        expect(find.text('Watch Ad (2x Collect)'), findsNothing);
+        expect(find.text('Watch Ad • 2x Collect'), findsNothing);
       },
     );
 
@@ -624,7 +716,7 @@ void main() {
           findsNothing,
         );
 
-        // 2. Away for 10 minutes -> opens, then dismissing via Later prevents re-opening during same session
+        // 2. Away for 10 minutes -> opens, then dismissing via top-right X prevents re-opening during same session
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
         fakeNow = fakeNow.add(const Duration(minutes: 10));
         tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -635,7 +727,7 @@ void main() {
         );
 
         await tester.tap(
-          find.byKey(const ValueKey('offline_offertory_later_button')),
+          find.byKey(const ValueKey('offline_offertory_close_button')),
         );
         await tester.pumpAndSettle();
         expect(
@@ -666,6 +758,26 @@ void main() {
         );
       },
     );
+
+    test('All 4 languages (en, pt, es, de) have refined OfflineOffertoryDialog strings', () async {
+      final loc = LocalizationService();
+      await loc.load();
+      for (final lang in LocalizationService.supportedLanguages) {
+        loc.setLanguage(lang);
+        for (final key in const [
+          'offertory_offline_duration_progress',
+          'offertory_offline_storage_full',
+          'offertory_watch_ad_2x_hero_title',
+          'offertory_sanctuary_grace_2x_hero_title',
+          'offertory_offline_2x_subline',
+          'offertory_collect_each_btn',
+        ]) {
+          final val = loc.t(key);
+          expect(val, isNot(equals(key)), reason: 'Missing $lang/$key');
+          expect(val.trim(), isNotEmpty, reason: 'Empty $lang/$key');
+        }
+      }
+    });
   });
 
   group('Local Notification Scheduling, Permission & SettingsDialog Toggle', () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
@@ -69,10 +70,89 @@ class OfflineOffertoryDialog extends StatefulWidget {
   State<OfflineOffertoryDialog> createState() => _OfflineOffertoryDialogState();
 }
 
-class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
+class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmerController;
+  Timer? _liveTickTimer;
+  int _elapsedOpenSeconds = 0;
   bool _isProcessingAd = false;
 
   GameController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _syncLiveTickTimer();
+    _syncShimmerAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant OfflineOffertoryDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncLiveTickTimer();
+    _syncShimmerAnimation();
+  }
+
+  @override
+  void dispose() {
+    _liveTickTimer?.cancel();
+    _liveTickTimer = null;
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  bool get _isAtStorageCap =>
+      controller.isOffertoryFull ||
+      widget.offlineDuration + Duration(seconds: _elapsedOpenSeconds) >=
+          GameController.offertoryMaxCapDuration;
+
+  void _syncLiveTickTimer() {
+    if (_isAtStorageCap) {
+      _liveTickTimer?.cancel();
+      _liveTickTimer = null;
+      return;
+    }
+    _liveTickTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _elapsedOpenSeconds++;
+      });
+      if (_isAtStorageCap) {
+        _liveTickTimer?.cancel();
+        _liveTickTimer = null;
+      }
+    });
+  }
+
+  void _syncShimmerAnimation() {
+    final isRemoveAds = controller.isRemoveAdsActive;
+    final isFreeDoubleReady = controller.isOffertoryFreeDoubleReady();
+    final showDoubleButton = !isRemoveAds || isFreeDoubleReady;
+    final doubleEnabled = isRemoveAds
+        ? controller.canClaimRemoveAdsDoubleCollectOffertory()
+        : controller.canWatchAdDoubleCollectOffertory();
+
+    final shouldAnimate =
+        controller.animationsEnabled &&
+        showDoubleButton &&
+        doubleEnabled &&
+        !_isProcessingAd;
+
+    if (shouldAnimate) {
+      if (!_shimmerController.isAnimating) {
+        _shimmerController.repeat();
+      }
+    } else {
+      if (_shimmerController.isAnimating || _shimmerController.value != 0.0) {
+        _shimmerController.stop();
+        _shimmerController.value = 0.0;
+      }
+    }
+  }
 
   void _showCollectedSnackBar(int granted) {
     if (!mounted || granted <= 0) return;
@@ -128,6 +208,7 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
     setState(() {
       _isProcessingAd = true;
     });
+    _syncShimmerAnimation();
     int earned = 0;
     try {
       earned = await controller.watchAdToDoubleCollectOffertory();
@@ -136,6 +217,7 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
         setState(() {
           _isProcessingAd = false;
         });
+        _syncShimmerAnimation();
       }
     }
     if (earned > 0 && mounted) {
@@ -148,7 +230,11 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: controller,
-      builder: (context, _) => _buildDialog(context),
+      builder: (context, _) {
+        _syncLiveTickTimer();
+        _syncShimmerAnimation();
+        return _buildDialog(context);
+      },
     );
   }
 
@@ -168,30 +254,42 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
     final canRemoveAds2x =
         controller.canClaimRemoveAdsDoubleCollectOffertory() && !_isProcessingAd;
     final showDoubleButton = !isRemoveAds || isFreeDoubleReady;
+    final doubleEnabled = isRemoveAds ? canRemoveAds2x : canWatchAd2x;
 
+    final liveOfflineDuration =
+        widget.offlineDuration + Duration(seconds: _elapsedOpenSeconds);
     final reachedCap =
-        widget.offlineDuration >= GameController.offertoryMaxCapDuration ||
+        liveOfflineDuration >= GameController.offertoryMaxCapDuration ||
         controller.isOffertoryFull;
-    final displayDuration =
-        widget.offlineDuration >= GameController.offertoryMaxCapDuration
-            ? GameController.offertoryMaxCapDuration
-            : widget.offlineDuration;
+    final displayDuration = reachedCap &&
+            liveOfflineDuration >= GameController.offertoryMaxCapDuration
+        ? GameController.offertoryMaxCapDuration
+        : liveOfflineDuration;
     final formattedDuration = OfflineOffertoryDialog.formatOfflineDuration(
       displayDuration,
     );
-    final durationLabel = reachedCap
+
+    final fillProgress = reachedCap
+        ? 1.0
+        : controller.offertoryFillProgress().clamp(0.0, 1.0);
+    final fillPercent = reachedCap
+        ? 100
+        : (fillProgress * 100).round().clamp(0, 99);
+
+    final progressLabel = reachedCap
         ? loc
               .t(
                 'offertory_offline_storage_full',
-                fallback: 'Offline for {time} • Storage Full (100%)',
+                fallback: 'Offline for {time} • 100% FULL (Paused)',
               )
               .replaceAll('{time}', formattedDuration)
         : loc
               .t(
-                'offertory_offline_duration',
-                fallback: 'Offline for {time}',
+                'offertory_offline_duration_progress',
+                fallback: 'Offline for {time} • {percent}% Full',
               )
-              .replaceAll('{time}', formattedDuration);
+              .replaceAll('{time}', formattedDuration)
+              .replaceAll('{percent}', '$fillPercent');
 
     final dialogBg = isDark
         ? palette.dialogSurface
@@ -200,22 +298,54 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
         ? const Color(0xFF1C202B)
         : const Color(0xFFFAF6EE);
 
+    final formattedStored = OfflineOffertoryDialog.formatGroupedInt(
+      storedOrbs,
+      loc,
+    );
+    final formattedDoubled = OfflineOffertoryDialog.formatGroupedInt(
+      doubledOrbs,
+      loc,
+    );
+
+    final heroTitle = isRemoveAds
+        ? loc.t(
+            'offertory_sanctuary_grace_2x_hero_title',
+            fallback: 'Sanctuary Grace • 2x Collect',
+          )
+        : loc.t(
+            'offertory_watch_ad_2x_hero_title',
+            fallback: 'Watch Ad • 2x Collect',
+          );
+    final heroSubline = loc
+        .t(
+          'offertory_offline_2x_subline',
+          fallback: '+{total} per element (+{bonus} bonus)',
+        )
+        .replaceAll('{total}', formattedDoubled)
+        .replaceAll('{bonus}', formattedStored);
+    final collectEachLabel = loc
+        .t(
+          'offertory_collect_each_btn',
+          fallback: 'Collect (+{amount} each)',
+        )
+        .replaceAll('{amount}', formattedStored);
+
     return Dialog(
       key: const ValueKey('offline_offertory_dialog'),
       backgroundColor: dialogBg,
       surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
         side: BorderSide(
-          color: palette.amberBorder.withValues(alpha: isDark ? 0.60 : 0.78),
+          color: palette.amberBorder.withValues(alpha: isDark ? 0.65 : 0.80),
           width: 1.5,
         ),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,17 +355,17 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       color: palette.amberBorder.withValues(
                         alpha: isDark ? 0.16 : 0.14,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(11),
                       border: Border.all(
                         color: palette.amberBorder.withValues(alpha: 0.50),
                       ),
                     ),
-                    child: const OffertoryVaultIcon(size: 32),
+                    child: const OffertoryVaultIcon(size: 28),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -248,20 +378,23 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
                             fallback: 'Welcome Back!',
                           ),
                           key: const ValueKey('offline_offertory_title'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.w800,
                             color: palette.primaryText,
                           ),
                         ),
-                        const SizedBox(height: 1),
                         Text(
                           loc.t(
                             'offertory_harvest_subtitle',
                             fallback: 'Offertory Harvest',
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: palette.amberText,
                           ),
@@ -282,35 +415,37 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
                       size: 20,
                     ),
                     visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
                   ),
                 ],
               ),
 
               const SizedBox(height: 10),
 
-              // Offline Duration Pill (with warm golden Storage Full badge at 8h cap)
+              // 8-Hour Capacity Progress Bar & Urgency Pill
               Container(
                 key: const ValueKey('offline_offertory_duration_pill'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
+                height: 28,
                 decoration: BoxDecoration(
-                  color: reachedCap
-                      ? OfflineOffertoryDialog._goldFill
-                      : palette.rewardedAdCardSurface,
-                  borderRadius: BorderRadius.circular(12),
+                  color: isDark
+                      ? const Color(0xFF281F0C)
+                      : const Color(0xFFDCC99E),
+                  borderRadius: BorderRadius.circular(11),
                   border: Border.all(
                     color: reachedCap
-                        ? const Color(0xFFB8860B)
-                        : palette.amberBorder.withValues(alpha: 0.55),
-                    width: reachedCap ? 1.4 : 1.0,
+                        ? OfflineOffertoryDialog._goldFill
+                        : palette.amberBorder.withValues(alpha: 0.72),
+                    width: reachedCap ? 1.5 : 1.2,
                   ),
                   boxShadow: reachedCap
                       ? [
                           BoxShadow(
                             color: OfflineOffertoryDialog._goldFill.withValues(
-                              alpha: 0.30,
+                              alpha: isDark ? 0.36 : 0.28,
                             ),
                             blurRadius: 8,
                             spreadRadius: 0.5,
@@ -318,53 +453,101 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
                         ]
                       : null,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      reachedCap
-                          ? Icons.workspace_premium_rounded
-                          : Icons.hourglass_bottom_rounded,
-                      size: 16,
-                      color: reachedCap
-                          ? OfflineOffertoryDialog._goldDarkInk
-                          : palette.amberIcon,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        durationLabel,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: reachedCap
-                              ? OfflineOffertoryDialog._goldDarkInk
-                              : palette.amberText,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      FractionallySizedBox(
+                        key: const ValueKey('offline_offertory_fill_progress'),
+                        alignment: Alignment.centerLeft,
+                        widthFactor: fillProgress,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: reachedCap
+                                  ? const [
+                                      Color(0xFFFFA000),
+                                      Color(0xFFFFE082),
+                                    ]
+                                  : const [
+                                      Color(0xFFD97B12),
+                                      OfflineOffertoryDialog._goldFill,
+                                    ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                reachedCap
+                                    ? Icons.workspace_premium_rounded
+                                    : Icons.hourglass_bottom_rounded,
+                                size: 15,
+                                color: reachedCap
+                                    ? OfflineOffertoryDialog._goldDarkInk
+                                    : (isDark
+                                          ? Colors.white
+                                          : OfflineOffertoryDialog._goldDarkInk),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    progressLabel,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: reachedCap
+                                          ? OfflineOffertoryDialog._goldDarkInk
+                                          : (isDark
+                                                ? Colors.white
+                                                : OfflineOffertoryDialog
+                                                      ._goldDarkInk),
+                                      shadows: !reachedCap && isDark
+                                          ? const [
+                                              Shadow(
+                                                color: Colors.black87,
+                                                blurRadius: 4,
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // Accumulated Orbs Breakdown Card (3D Elemental Orbs + 2x Preview)
+              // Single-Row 3D Collectible Elemental Orbs Card
               Container(
                 key: const ValueKey('offline_offertory_orbs_card'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.fromLTRB(8, 9, 8, 10),
                 decoration: BoxDecoration(
                   color: innerCardBg,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: palette.amberBorder.withValues(alpha: 0.35),
+                    color: palette.amberBorder.withValues(alpha: 0.38),
                   ),
                 ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
@@ -373,224 +556,125 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
                         fallback: 'Accumulated Elemental Orbs',
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: palette.secondaryText,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      alignment: WrapAlignment.spaceEvenly,
-                      spacing: 12,
-                      runSpacing: 10,
+                    const SizedBox(height: 8),
+                    Row(
+                      key: const ValueKey('offline_offertory_orbs_row'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         for (final move in activeMoves)
-                          _buildOrbItem(
-                            move: move,
-                            amount: storedOrbs,
-                            palette: palette,
-                            loc: loc,
+                          Expanded(
+                            child: _buildSingleRowOrbColumn(
+                              move: move,
+                              formattedAmount: formattedStored,
+                              palette: palette,
+                            ),
                           ),
                       ],
                     ),
-                    if (showDoubleButton && storedOrbs >= 1) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        key: const ValueKey('offline_offertory_2x_preview'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.amberBorder.withValues(
-                            alpha: isDark ? 0.14 : 0.12,
-                          ),
-                          borderRadius: BorderRadius.circular(9),
-                          border: Border.all(
-                            color: palette.amberBorder.withValues(alpha: 0.45),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 14,
-                              color: palette.amberIcon,
-                            ),
-                            const SizedBox(width: 5),
-                            Flexible(
-                              child: Text(
-                                loc
-                                    .t(
-                                      'offertory_offline_2x_preview',
-                                      fallback:
-                                          '2x Harvest: +{amount} per element',
-                                    )
-                                    .replaceAll(
-                                      '{amount}',
-                                      OfflineOffertoryDialog.formatGroupedInt(
-                                        doubledOrbs,
-                                        loc,
-                                      ),
-                                    ),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: palette.amberText,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // Primary Action 1: Collect (1x)
+              // Primary Hero CTA: Glowing Gold Gradient 2x Collect Button with Shimmer
+              if (showDoubleButton) ...[
+                _buildHeroDoubleButton(
+                  palette: palette,
+                  isDark: isDark,
+                  isRemoveAds: isRemoveAds,
+                  enabled: doubleEnabled,
+                  title: heroTitle,
+                  subline: heroSubline,
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // Secondary Action Button: Collect (+X each)
               ElevatedButton.icon(
                 key: const ValueKey('offline_offertory_collect_1x_button'),
                 onPressed: canCollect1x ? _handleCollect1x : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: OfflineOffertoryDialog._goldFill,
-                  foregroundColor: OfflineOffertoryDialog._goldDarkInk,
+                  backgroundColor: isDark
+                      ? const Color(0xFF1E2430)
+                      : const Color(0xFFFAF6EE),
+                  foregroundColor: isDark
+                      ? const Color(0xFFFFE082)
+                      : palette.amberText,
                   disabledBackgroundColor: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
+                      ? Colors.white.withValues(alpha: 0.06)
                       : palette.sandCardSurface,
                   disabledForegroundColor: palette.mutedText,
+                  elevation: 0,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 11,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: canCollect1x
+                          ? palette.amberBorder
+                          : palette.sandCardBorder,
+                      width: 1.5,
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.download_done_rounded, size: 18),
-                label: Text(
-                  loc.t('offertory_collect_btn', fallback: 'Collect'),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    collectEachLabel,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
 
-              // Primary Action 2: Watch Ad (2x Collect) OR Sanctuary Grace (2x)
-              if (showDoubleButton) ...[
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  key: const ValueKey('offline_offertory_collect_2x_button'),
-                  onPressed: isRemoveAds
-                      ? (canRemoveAds2x ? _handleCollect2x : null)
-                      : (canWatchAd2x ? _handleCollect2x : null),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark
-                        ? const Color(0xFF2B3447)
-                        : const Color(0xFFE6D5B2),
-                    foregroundColor: palette.amberText,
-                    disabledBackgroundColor: isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : palette.sandCardSurface,
-                    disabledForegroundColor: palette.mutedText,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: (isRemoveAds ? canRemoveAds2x : canWatchAd2x)
-                            ? palette.amberBorder.withValues(alpha: 0.80)
-                            : palette.sandCardBorder,
-                        width: 1.2,
+              // Compact AdMob Rewarded Video Disclosure Footer
+              if (showDoubleButton && !isRemoveAds) ...[
+                const SizedBox(height: 7),
+                Row(
+                  key: const ValueKey('offline_offertory_ad_disclosure'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.ondemand_video_rounded,
+                        size: 12.5,
+                        color: palette.amberIcon,
                       ),
                     ),
-                  ),
-                  icon: Icon(
-                    isRemoveAds
-                        ? Icons.auto_awesome_rounded
-                        : Icons.play_circle_fill_rounded,
-                    size: 18,
-                  ),
-                  label: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      isRemoveAds
-                          ? loc.t(
-                              'offertory_sanctuary_grace_2x_btn',
-                              fallback: '2x Collect (Sanctuary Grace)',
-                            )
-                          : loc.t(
-                              'offertory_watch_ad_2x_btn',
-                              fallback: 'Watch Ad (2x Collect)',
-                            ),
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        loc.t(
+                          'offertory_ad_disclosure',
+                          fallback:
+                              'Rewarded Video Ad: watch an ad to double (2x) your accumulated Offertory orbs upon collection.',
+                        ),
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.2,
+                          color: palette.secondaryText,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                if (!isRemoveAds) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    key: const ValueKey('offline_offertory_ad_disclosure'),
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Icon(
-                          Icons.ondemand_video_rounded,
-                          size: 13,
-                          color: palette.amberIcon,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          loc.t(
-                            'offertory_ad_disclosure',
-                            fallback:
-                                'Rewarded Video Ad: watch an ad to double (2x) your accumulated Offertory orbs upon collection.',
-                          ),
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            height: 1.25,
-                            color: palette.secondaryText,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
-
-              const SizedBox(height: 4),
-
-              // Secondary dismiss action: Later
-              TextButton(
-                key: const ValueKey('offline_offertory_later_button'),
-                onPressed: _handleDismiss,
-                style: TextButton.styleFrom(
-                  foregroundColor: palette.secondaryText,
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: Text(
-                  loc.t('offertory_offline_later_btn', fallback: 'Later'),
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -598,43 +682,222 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog> {
     );
   }
 
-  Widget _buildOrbItem({
-    required HandMove move,
-    required int amount,
+  Widget _buildHeroDoubleButton({
     required AppPalette palette,
-    required LocalizationService loc,
+    required bool isDark,
+    required bool isRemoveAds,
+    required bool enabled,
+    required String title,
+    required String subline,
   }) {
+    final titleColor = enabled
+        ? OfflineOffertoryDialog._goldDarkInk
+        : palette.mutedText;
+    final subColor = enabled
+        ? OfflineOffertoryDialog._goldDarkInk
+        : palette.mutedText;
+
     return Container(
-      key: ValueKey('offline_offertory_orb_${move.orbKey}'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: palette.elementalCardBackground(move),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(
-          color: palette.elementalCardBorder(move),
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: OfflineOffertoryDialog._goldFill.withValues(
+                    alpha: isDark ? 0.34 : 0.28,
+                  ),
+                  blurRadius: 12,
+                  spreadRadius: 0.5,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: ElevatedButton(
+        key: const ValueKey('offline_offertory_collect_2x_button'),
+        onPressed: enabled ? _handleCollect2x : null,
+        style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(13),
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  gradient: enabled
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFFFE57F),
+                            OfflineOffertoryDialog._goldFill,
+                            Color(0xFFFFB300),
+                          ],
+                        )
+                      : null,
+                  color: enabled
+                      ? null
+                      : (isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : palette.sandCardSurface),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: enabled
+                        ? const Color(0xFFFFF3C4)
+                        : palette.sandCardBorder,
+                    width: 1.2,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isRemoveAds
+                              ? Icons.auto_awesome_rounded
+                              : Icons.play_circle_fill_rounded,
+                          size: 18,
+                          color: titleColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: titleColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3.5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: enabled
+                            ? OfflineOffertoryDialog._goldDarkInk.withValues(
+                                alpha: 0.12,
+                              )
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          subline,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: subColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (enabled && controller.animationsEnabled)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _shimmerController,
+                      builder: (context, _) {
+                        // Sweep a diagonal sheen across 42% of the cycle, resting cleanly in between.
+                        final t = _shimmerController.value;
+                        if (t > 0.42) return const SizedBox.shrink();
+                        final sweep = (t / 0.42) * 2.6 - 1.3;
+                        return FractionalTranslation(
+                          translation: Offset(sweep, 0),
+                          child: Transform.rotate(
+                            angle: -0.35,
+                            child: Container(
+                              width: 56,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withValues(alpha: 0.0),
+                                    Colors.white.withValues(alpha: 0.34),
+                                    Colors.white.withValues(alpha: 0.0),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ElementalEnergySphere(
-            key: ValueKey('offline_offertory_sphere_${move.orbKey}'),
-            size: 24,
-            primaryColor: move.elementalPrimaryColor,
-            secondaryColor: move.elementalSecondaryColor,
-            isDark: palette.isDark,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '+${OfflineOffertoryDialog.formatGroupedInt(amount, loc)}',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: palette.elementalText(move),
+    );
+  }
+
+  Widget _buildSingleRowOrbColumn({
+    required HandMove move,
+    required String formattedAmount,
+    required AppPalette palette,
+  }) {
+    return Column(
+      key: ValueKey('offline_offertory_orb_${move.orbKey}'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ElementalEnergySphere(
+          key: ValueKey('offline_offertory_sphere_${move.orbKey}'),
+          size: 34,
+          primaryColor: move.elementalPrimaryColor,
+          secondaryColor: move.elementalSecondaryColor,
+          isDark: palette.isDark,
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '+$formattedAmount',
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: palette.elementalText(move),
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
