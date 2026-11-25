@@ -220,8 +220,12 @@ class _InventoryDialogState extends State<InventoryDialog>
                                               move == HandMove.spock) &&
                                           !isNewHandsActive,
                                       lockedStatusText: loc.t(
-                                        'inventory_locked_combat',
-                                        fallback: 'Locked (Unlock Earth & Metal)',
+                                        'inventory_locked_status',
+                                        fallback: 'Locked',
+                                      ),
+                                      lockedRequirementText: loc.t(
+                                        'inventory_locked_requirement',
+                                        fallback: '(Unlock Earth & Metal)',
                                       ),
                                       activeStatusText: loc.t(
                                         'inventory_active_combat',
@@ -367,6 +371,7 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
   final String orbName;
   final bool isCombatLocked;
   final String lockedStatusText;
+  final String lockedRequirementText;
   final String activeStatusText;
 
   const _ElementalOrbInventoryCard({
@@ -375,6 +380,7 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
     required this.orbName,
     required this.isCombatLocked,
     required this.lockedStatusText,
+    required this.lockedRequirementText,
     required this.activeStatusText,
   });
 
@@ -384,11 +390,20 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
     final primaryColor = move.elementalPrimaryColor;
     final secondaryColor = move.elementalSecondaryColor;
     final textElementColor = palette.elementalText(move);
+    final lockedLineColor = palette.isDark
+        ? Colors.amber.withValues(alpha: 0.78)
+        : palette.amberText;
+    final lockedRequirementColor = palette.isDark
+        ? Colors.amber.withValues(alpha: 0.68)
+        : palette.amberText.withValues(alpha: 0.82);
 
     return Container(
       key: ValueKey('inventory_orb_row_${move.orbKey}'),
       margin: const EdgeInsets.symmetric(vertical: 4.5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: isCombatLocked ? 8.5 : 10,
+      ),
       decoration: BoxDecoration(
         color: palette.elementalCardBackground(move, locked: isCombatLocked),
         borderRadius: BorderRadius.circular(14),
@@ -454,27 +469,52 @@ class _ElementalOrbInventoryCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        isCombatLocked ? lockedStatusText : activeStatusText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: palette.isDark
-                              ? FontWeight.normal
-                              : FontWeight.w500,
-                          color: isCombatLocked
-                              ? (palette.isDark
-                                    ? Colors.amber.withValues(alpha: 0.78)
-                                    : palette.amberText)
-                              : (palette.isDark
-                                    ? Colors.white.withValues(alpha: 0.65)
-                                    : palette.secondaryText),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          isCombatLocked ? lockedStatusText : activeStatusText,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: palette.isDark
+                                ? FontWeight.normal
+                                : FontWeight.w500,
+                            color: isCombatLocked
+                                ? lockedLineColor
+                                : (palette.isDark
+                                      ? Colors.white.withValues(alpha: 0.65)
+                                      : palette.secondaryText),
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
+                if (isCombatLocked) ...[
+                  const SizedBox(height: 1.5),
+                  FittedBox(
+                    key: ValueKey(
+                      'inventory_orb_locked_requirement_fit_${move.orbKey}',
+                    ),
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      lockedRequirementText,
+                      key: ValueKey(
+                        'inventory_orb_locked_requirement_${move.orbKey}',
+                      ),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: palette.isDark
+                            ? FontWeight.normal
+                            : FontWeight.w500,
+                        color: lockedRequirementColor,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

@@ -1,5 +1,5 @@
 {
-  "summary": "- Synthesized 5 General MIDI princess scream variations (princess_scream.mid + 4 alt .mid assets) and registered them in VSCode/pubspec.yaml\n- Added playPrincessScream and finishPrincessScreamAndRestoreBgm in AudioService with BGM pause/resume coexistence and mute/background lifecycle guards\n- Wired Week0ScreamWarningDialog.show to play princess_scream.mid once at Week 1 and restore world_map.mid cleanly\n- Added unit and widget tests in audio_lifecycle_test.dart, bgm_track_routing_test.dart, and week0_scream_warning_test.dart (396 tests passing)",
+  "summary": "- Split locked orb status in InventoryDialog into two lines: lock icon + Locked, with (Unlock Earth & Metal) on its own line below\n- Added inventory_locked_status and inventory_locked_requirement localizations for en, pt, es, and de\n- Wrapped locked status and requirement text with FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) without ellipsis truncation and balanced locked card vertical padding\n- Updated InventoryDialog widget tests and verified with flutter analyze and full flutter test (397 passed)",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-25T16:17:27Z"
+  "updated_at_utc": "2026-11-25T17:51:53Z"
 }

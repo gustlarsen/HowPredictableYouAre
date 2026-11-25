@@ -2439,11 +2439,9 @@ void main() {
       '8',
     );
 
-    // Earth and Metal show simplified Locked status while showNewHands is false
-    expect(
-      find.text('Locked (Unlock Earth & Metal)'),
-      findsNWidgets(2),
-    );
+    // Earth and Metal show two-line Locked status while showNewHands is false
+    expect(find.text('Locked'), findsNWidgets(2));
+    expect(find.text('(Unlock Earth & Metal)'), findsNWidgets(2));
     expect(find.text('Active'), findsNWidgets(3));
     expect(find.textContaining('in combat'), findsNothing);
 
@@ -3379,8 +3377,43 @@ void main() {
     }
 
     expect(find.text('Active'), findsNWidgets(3));
-    expect(find.text('Locked (Unlock Earth & Metal)'), findsNWidgets(2));
+    expect(find.text('Locked'), findsNWidgets(2));
+    expect(find.text('(Unlock Earth & Metal)'), findsNWidgets(2));
     expect(find.textContaining('in combat'), findsNothing);
+
+    // Verify requirement line is rendered on its own line below Locked without ellipsis truncation
+    for (final orbKey in ['earth', 'metal']) {
+      final rowFinder = find.byKey(ValueKey('inventory_orb_row_$orbKey'));
+      final lockedFinder = find.descendant(
+        of: rowFinder,
+        matching: find.text('Locked'),
+      );
+      final reqFinder = find.byKey(
+        ValueKey('inventory_orb_locked_requirement_$orbKey'),
+      );
+      final fitFinder = find.byKey(
+        ValueKey('inventory_orb_locked_requirement_fit_$orbKey'),
+      );
+      expect(lockedFinder, findsOneWidget);
+      expect(reqFinder, findsOneWidget);
+      expect(fitFinder, findsOneWidget);
+
+      expect(
+        tester.getTopLeft(reqFinder).dy,
+        greaterThan(tester.getBottomLeft(lockedFinder).dy - 2.0),
+      );
+      expect(
+        tester.widget<Text>(lockedFinder).overflow,
+        isNot(TextOverflow.ellipsis),
+      );
+      expect(
+        tester.widget<Text>(reqFinder).overflow,
+        isNot(TextOverflow.ellipsis),
+      );
+      final fittedBox = tester.widget<FittedBox>(fitFinder);
+      expect(fittedBox.fit, equals(BoxFit.scaleDown));
+      expect(fittedBox.alignment, equals(Alignment.centerLeft));
+    }
 
     final darkCard = tester.widget<Container>(
       find.byKey(const ValueKey('inventory_dialog_card')),
@@ -3409,23 +3442,103 @@ void main() {
       equals(const Color(0xFF231F1A)),
     );
 
-    const expectedByLang = <String, (String, String)>{
-      'pt': ('Ativo', 'Bloqueado (Desbloquear Terra e Metal)'),
-      'es': ('Activo', 'Bloqueado (Desbloquear Tierra y Metal)'),
-      'de': ('Aktiv', 'Gesperrt (Erde & Metall freischalten)'),
+    const expectedByLang = <String, (String, String, String)>{
+      'pt': ('Ativo', 'Bloqueado', '(Desbloquear Terra e Metal)'),
+      'es': ('Activo', 'Bloqueado', '(Desbloquear Tierra y Metal)'),
+      'de': ('Aktiv', 'Gesperrt', '(Erde & Metall freischalten)'),
     };
 
     for (final entry in expectedByLang.entries) {
       controller.setLanguage(entry.key);
       await tester.pumpAndSettle();
-      final (expectedActive, expectedLocked) = entry.value;
+      final (expectedActive, expectedLocked, expectedReq) = entry.value;
       expect(find.text(expectedActive), findsNWidgets(3));
       expect(find.text(expectedLocked), findsNWidgets(2));
+      expect(find.text(expectedReq), findsNWidgets(2));
       expect(find.textContaining('combate'), findsNothing);
       expect(find.textContaining('Kampf'), findsNothing);
     }
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('InventoryDialog renders Locked and parenthetical unlock requirement on separate lines without truncation for 6-digit orb counts across en/pt/es/de on small screens', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({
+      'orbs_fire': 100000,
+      'orbs_water': 100000,
+      'orbs_wood': 100000,
+      'orbs_earth': 100000,
+      'orbs_metal': 100000,
+      'showNewHands': false,
+      'animationsEnabled': false,
+    });
+    final storage = StorageService();
+    await storage.init();
+    final localization = LocalizationService();
+    await tester.runAsync(() => localization.load());
+    final audio = AudioService();
+    final controller = GameController(
+      storage: storage,
+      localization: localization,
+      audio: audio,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          body: InventoryDialog(controller: controller),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const expectedByLang = <String, (String, String)>{
+      'en': ('Locked', '(Unlock Earth & Metal)'),
+      'pt': ('Bloqueado', '(Desbloquear Terra e Metal)'),
+      'es': ('Bloqueado', '(Desbloquear Tierra y Metal)'),
+      'de': ('Gesperrt', '(Erde & Metall freischalten)'),
+    };
+
+    for (final entry in expectedByLang.entries) {
+      controller.setLanguage(entry.key);
+      await tester.pumpAndSettle();
+
+      final (expectedLocked, expectedReq) = entry.value;
+      expect(find.text('100000'), findsNWidgets(5));
+      expect(find.text(expectedLocked), findsNWidgets(2));
+      expect(find.text(expectedReq), findsNWidgets(2));
+
+      for (final orbKey in ['earth', 'metal']) {
+        final rowFinder = find.byKey(ValueKey('inventory_orb_row_$orbKey'));
+        final lockedFinder = find.descendant(
+          of: rowFinder,
+          matching: find.text(expectedLocked),
+        );
+        final reqFinder = find.descendant(
+          of: rowFinder,
+          matching: find.text(expectedReq),
+        );
+        expect(lockedFinder, findsOneWidget);
+        expect(reqFinder, findsOneWidget);
+        expect(
+          tester.getTopLeft(reqFinder).dy,
+          greaterThan(tester.getTopLeft(lockedFinder).dy),
+        );
+        expect(
+          tester.widget<Text>(reqFinder).overflow,
+          isNot(TextOverflow.ellipsis),
+        );
+      }
+
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('Gift Box Shop unlock, toggle ON/OFF, AppBar visibility, cooldown pause/resume, and localization', (WidgetTester tester) async {

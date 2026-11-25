@@ -198,9 +198,18 @@ void main() {
         expect(activeStatus.style?.color, lightPalette.secondaryText);
 
         final lockedStatus = tester.widget<Text>(
-          find.text('Locked (Unlock Earth & Metal)').first,
+          find.text('Locked').first,
         );
         expect(lockedStatus.style?.color, lightPalette.amberText);
+
+        final lockedRequirement = tester.widget<Text>(
+          find.text('(Unlock Earth & Metal)').first,
+        );
+        expect(
+          lockedRequirement.style?.color,
+          lightPalette.amberText.withValues(alpha: 0.82),
+        );
+        expect(lockedRequirement.overflow, isNot(TextOverflow.ellipsis));
 
         // Verify Dark Mode still renders dark card surface
         await tester.pumpWidget(
