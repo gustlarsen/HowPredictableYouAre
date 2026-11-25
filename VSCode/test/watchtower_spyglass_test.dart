@@ -411,7 +411,7 @@ void main() {
     );
 
     testWidgets(
-      'Tapping circular Princess Cell spyglass lens opens FullScreenSpyglassView with InteractiveViewer, double-tap zoom, reset button, and closes cleanly',
+      'Tapping circular Princess Cell spyglass lens opens FullScreenSpyglassView with InteractiveViewer, double-tap zoom/reset, no Reset Zoom button, and closes cleanly',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(412, 915);
         tester.view.devicePixelRatio = 1.0;
@@ -455,6 +455,10 @@ void main() {
         expect(viewer.maxScale, 4.0);
         expect(viewer.panEnabled, isTrue);
         expect(viewer.scaleEnabled, isTrue);
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
+        );
 
         // Full-screen shader view uses isFullScreen: true
         final fullShaderFinder = find.descendant(
@@ -467,31 +471,56 @@ void main() {
           isTrue,
         );
 
-        // Reset Zoom button is hidden at 1.0x
+        // Reset Zoom button is completely removed at 1.0x and when zoomed in
         final resetBtnFinder = find.byKey(
           const ValueKey('full_screen_spyglass_reset_zoom_button'),
         );
         expect(resetBtnFinder, findsNothing);
+        expect(find.text('Reset Zoom'), findsNothing);
+        expect(find.byIcon(Icons.center_focus_strong_rounded), findsNothing);
 
-        // Double-tap center of InteractiveViewer -> zooms in to 2.2x and reveals Reset Zoom
+        // Double-tap center of InteractiveViewer -> zooms in to 2.2x without showing Reset Zoom
         final center = tester.getCenter(viewerFinder);
         await tester.tapAt(center);
         await tester.pump(const Duration(milliseconds: 50));
         await tester.tapAt(center);
         await tester.pumpAndSettle();
 
-        expect(resetBtnFinder, findsOneWidget);
-
-        // Tap Reset Zoom -> animates back to 1.0x and hides Reset Zoom button
-        await tester.tap(resetBtnFinder);
-        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(2.2, 1e-3),
+        );
         expect(resetBtnFinder, findsNothing);
+        expect(find.text('Reset Zoom'), findsNothing);
+        expect(find.byIcon(Icons.center_focus_strong_rounded), findsNothing);
 
-        // Close full-screen view -> returns cleanly to WatchtowerSpyglassDialog
+        // Panning across the zoomed illustration shifts translation
+        final beforePanTx =
+            viewer.transformationController!.value.getTranslation().x;
+        await tester.dragFrom(center, const Offset(40, 0));
+        await tester.pumpAndSettle();
+        final afterPanTx =
+            viewer.transformationController!.value.getTranslation().x;
+        expect(afterPanTx, isNot(closeTo(beforePanTx, 0.5)));
+
+        // Double-tap again -> animates smoothly back to 1.0x
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
+        );
+
+        // Close (X) button remains anchored in top-right and exits cleanly
         final fullCloseBtn = find.byKey(
           const ValueKey('full_screen_spyglass_close_button'),
         );
         expect(fullCloseBtn, findsOneWidget);
+        final closeRect = tester.getRect(fullCloseBtn);
+        expect(closeRect.top, lessThan(80));
+        expect(closeRect.right, greaterThan(340));
         await tester.tap(fullCloseBtn);
         await tester.pumpAndSettle();
 
@@ -560,22 +589,38 @@ void main() {
           findsOneWidget,
         );
 
-        // Double-tap zoom toggles 1.0x -> 2.2x and reveals Reset Zoom
+        // Double-tap zoom toggles 1.0x -> 2.2x -> 1.0x without any Reset Zoom button
+        final viewer = tester.widget<InteractiveViewer>(viewerFinder);
         final resetBtnFinder = find.byKey(
           const ValueKey('full_screen_spyglass_reset_zoom_button'),
         );
         expect(resetBtnFinder, findsNothing);
+        expect(find.text('Reset Zoom'), findsNothing);
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
+        );
 
         final center = tester.getCenter(viewerFinder);
         await tester.tapAt(center);
         await tester.pump(const Duration(milliseconds: 50));
         await tester.tapAt(center);
         await tester.pumpAndSettle();
-        expect(resetBtnFinder, findsOneWidget);
-
-        await tester.tap(resetBtnFinder);
-        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(2.2, 1e-3),
+        );
         expect(resetBtnFinder, findsNothing);
+        expect(find.text('Reset Zoom'), findsNothing);
+
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
+        );
 
         await tester.tap(
           find.byKey(const ValueKey('full_screen_spyglass_close_button')),
@@ -749,21 +794,31 @@ void main() {
         expect(viewer.panEnabled, isTrue);
         expect(viewer.scaleEnabled, isTrue);
 
-        // Double-tap zoom & Reset Zoom still work cleanly in crying state
+        // Double-tap zoom in & reset still work cleanly in crying state without Reset Zoom button
         final resetBtnFinder = find.byKey(
           const ValueKey('full_screen_spyglass_reset_zoom_button'),
         );
         expect(resetBtnFinder, findsNothing);
+        expect(find.text('Reset Zoom'), findsNothing);
         final center = tester.getCenter(viewerFinder);
         await tester.tapAt(center);
         await tester.pump(const Duration(milliseconds: 50));
         await tester.tapAt(center);
         await tester.pumpAndSettle();
-        expect(resetBtnFinder, findsOneWidget);
-
-        await tester.tap(resetBtnFinder);
-        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(2.2, 1e-3),
+        );
         expect(resetBtnFinder, findsNothing);
+
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
+        );
 
         await tester.tap(
           find.byKey(const ValueKey('full_screen_spyglass_close_button')),
@@ -1172,8 +1227,22 @@ void main() {
         await tester.tapAt(center);
         await tester.pumpAndSettle();
         expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(2.2, 1e-3),
+        );
+        expect(
           find.byKey(const ValueKey('full_screen_spyglass_reset_zoom_button')),
-          findsOneWidget,
+          findsNothing,
+        );
+        expect(find.text('Reset Zoom'), findsNothing);
+
+        await tester.tapAt(center);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+        expect(
+          viewer.transformationController!.value.getMaxScaleOnAxis(),
+          closeTo(1.0, 1e-3),
         );
 
         await tester.tap(

@@ -122,11 +122,6 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
     _animateToMatrix(target);
   }
 
-  void _handleResetZoom() {
-    widget.controller.audio.playTapVibrate();
-    _animateToMatrix(Matrix4.identity());
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = widget.controller.localization;
@@ -246,96 +241,39 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
               ),
             ),
 
-          // Minimal floating top controls
+          // Minimal floating top close button
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ValueListenableBuilder<Matrix4>(
-                    valueListenable: _transformationController,
-                    builder: (context, matrix, _) {
-                      final scale = matrix.getMaxScaleOnAxis();
-                      if (scale <= 1.05) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: Material(
-                          color: Colors.black.withValues(alpha: 0.62),
-                          shape: StadiumBorder(
-                            side: BorderSide(
-                              color: const Color(0xFF00E5FF)
-                                  .withValues(alpha: 0.65),
-                            ),
-                          ),
-                          child: InkWell(
-                            key: const ValueKey(
-                              'full_screen_spyglass_reset_zoom_button',
-                            ),
-                            customBorder: const StadiumBorder(),
-                            onTap: _handleResetZoom,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.center_focus_strong_rounded,
-                                    size: 16,
-                                    color: Color(0xFF00E5FF),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    loc.t(
-                                      'observatory_spyglass_reset_zoom',
-                                      fallback: 'Reset Zoom',
-                                    ),
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFE082),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: const Color(0xFFFFB300).withValues(alpha: 0.72),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: IconButton(
+                    key: const ValueKey('full_screen_spyglass_close_button'),
+                    tooltip: loc.t(
+                      'observatory_spyglass_close_btn',
+                      fallback: 'Close',
+                    ),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFFFFE082),
+                    ),
+                    onPressed: () {
+                      widget.controller.audio.playTapVibrate();
+                      Navigator.of(context).pop();
                     },
                   ),
-
-                  // Close (X) button
-                  Material(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    shape: CircleBorder(
-                      side: BorderSide(
-                        color: const Color(0xFFFFB300).withValues(alpha: 0.72),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: IconButton(
-                      key: const ValueKey('full_screen_spyglass_close_button'),
-                      tooltip: loc.t(
-                        'observatory_spyglass_close_btn',
-                        fallback: 'Close',
-                      ),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Color(0xFFFFE082),
-                      ),
-                      onPressed: () {
-                        widget.controller.audio.playTapVibrate();
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
