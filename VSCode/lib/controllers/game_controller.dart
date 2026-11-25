@@ -679,14 +679,23 @@ class GameController extends ChangeNotifier {
   bool hasUnreadWeek10WatchtowerAlert = false;
   int? savedMetalWizardHp;
 
+  // Week 40+ Sacred Temple Siege (Last Stand) State (per-campaign)
+  bool isTempleSiegeActive = false;
+  bool hasShownTempleSiegeIntro = false;
+
+  bool get shouldShowTempleSiegeIntro =>
+      isTempleSiegeActive && !hasShownTempleSiegeIntro;
+
   bool get hasDefeatedGuardianRobot => enemyStage != 1;
 
-  bool get hasDefeatedMetalWizard =>
-      enemyStage == 4 ||
-      enemyStage == 5 ||
-      (isBossVictoryPending && pendingBossVictoryStage == 3);
+  bool get hasDefeatedMetalWizard => isTempleSiegeActive
+      ? (isBossVictoryPending && pendingBossVictoryStage == 3)
+      : (enemyStage == 4 ||
+          enemyStage == 5 ||
+          (isBossVictoryPending && pendingBossVictoryStage == 3));
 
   bool get shouldShowWeek10ArchmageWarning =>
+      !isTempleSiegeActive &&
       currentWeek >= phase2StartWeek &&
       !hasDefeatedMetalWizard &&
       !hasDefeatedRobotArchmage &&
@@ -1358,8 +1367,10 @@ class GameController extends ChangeNotifier {
   bool get isTempleMasterBoss => enemyStage == 5;
 
   /// True when fighting inside the Sacred Temple arena (`temple_arena_bg`),
-  /// which applies to both the Temple High Master (`350 HP`) and the Baby Mage Robot (`400 HP`).
-  bool get isSacredTempleArena => isTempleMasterBoss || isBabyMageBoss;
+  /// which applies to the entire Week 40+ Temple Siege, the Temple High Master
+  /// (`350 HP`), and the Baby Mage Robot (`400 HP`).
+  bool get isSacredTempleArena =>
+      isTempleSiegeActive || isTempleMasterBoss || isBabyMageBoss;
 
   String enemyNameForStage(int stage) {
     switch (stage) {
@@ -1505,6 +1516,8 @@ class GameController extends ChangeNotifier {
     hasShownWeek10ArchmageWarning = storage.hasShownWeek10ArchmageWarning;
     hasUnreadWeek10WatchtowerAlert = storage.hasUnreadWeek10WatchtowerAlert;
     savedMetalWizardHp = storage.savedMetalWizardHp;
+    isTempleSiegeActive = storage.isTempleSiegeActive;
+    hasShownTempleSiegeIntro = storage.hasShownTempleSiegeIntro;
     if (storage.userHpRaw != null) {
       userHp = storage.userHp.clamp(0, effectivePlayerMaxHp);
     } else {
@@ -1589,7 +1602,10 @@ class GameController extends ChangeNotifier {
       computerHp =
           math.max(0, enemyMaxHp - userScore * playerWinDamageToBoss);
     }
-    isDeathAlertPending = userHp <= 0;
+    isDeathAlertPending = userHp <= 0 ||
+        (isTempleSiegeActive &&
+            computerHp > 0 &&
+            totalRounds >= playerMaxMana);
     isBossVictoryPending = !isDeathAlertPending && computerHp <= 0;
     if (isBossVictoryPending) {
       pendingBossVictoryPhase = enemyPhase;
@@ -1600,6 +1616,7 @@ class GameController extends ChangeNotifier {
     }
     is100RoundsAlertPending = !isDeathAlertPending &&
         !isBossVictoryPending &&
+        !isTempleSiegeActive &&
         totalRounds >= playerMaxMana;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
@@ -2727,7 +2744,12 @@ class GameController extends ChangeNotifier {
       return;
     }
     if (totalRounds >= playerMaxMana) {
-      is100RoundsAlertPending = true;
+      if (isTempleSiegeActive) {
+        isDeathAlertPending = true;
+        is100RoundsAlertPending = false;
+      } else {
+        is100RoundsAlertPending = true;
+      }
       audio.playVibrate();
       notifyListeners();
       return;
@@ -2933,7 +2955,13 @@ class GameController extends ChangeNotifier {
       audio.playWinVibrate();
       audio.playStoryChime();
     } else if (totalRounds >= playerMaxMana) {
-      is100RoundsAlertPending = true;
+      if (isTempleSiegeActive) {
+        isDeathAlertPending = true;
+        is100RoundsAlertPending = false;
+        isBossVictoryPending = false;
+      } else {
+        is100RoundsAlertPending = true;
+      }
     }
 
     if (lastWinner == RoundWinner.user ||
@@ -2985,6 +3013,34 @@ class GameController extends ChangeNotifier {
   }
 
   void _applyImmediateBossDefeatMetadata(int defeatedStage, int week) {
+    if (isTempleSiegeActive) {
+      if (defeatedStage == 1) {
+        guardianRobotDefeatedCount += 1;
+        storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
+        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+      } else if (defeatedStage == 2) {
+        hasDefeatedRobotArchmage = true;
+        storage.setHasDefeatedRobotArchmage(true);
+        robotArchmageDefeatedCount += 1;
+        storage.setRobotArchmageDefeatedCount(robotArchmageDefeatedCount);
+        _markBestiaryEncountered(BestiaryCreature.babyRobot);
+      } else if (defeatedStage == 4) {
+        babyMageRobotDefeatedCount += 1;
+        storage.setBabyMageRobotDefeatedCount(babyMageRobotDefeatedCount);
+        _markBestiaryEncountered(BestiaryCreature.metalWizard);
+      } else if (defeatedStage == 3) {
+        metalWizardDefeatedCount += 1;
+        storage.setMetalWizardDefeatedCount(metalWizardDefeatedCount);
+        _markEndingUnlocked(NarrativeEnding.standardVictory);
+        standardVictoryCount += 1;
+        totalCyclesCount += 1;
+        storage.setStandardVictoryCount(standardVictoryCount);
+        storage.setTotalCyclesCount(totalCyclesCount);
+        _recordFastestVictoryWeek(week);
+      }
+      return;
+    }
+
     if (defeatedStage == 1) {
       guardianRobotDefeatedCount += 1;
       storage.setGuardianRobotDefeatedCount(guardianRobotDefeatedCount);
@@ -3038,8 +3094,9 @@ class GameController extends ChangeNotifier {
     await applyPermadeathReset(cause: PermadeathCause.sacredSacrifice);
   }
 
-  /// Flees the Sacred Temple via Teleport during the Baby Mage Robot final battle,
-  /// unlocking **Ending: The Deserter** and resetting the campaign cycle.
+  /// Flees the Sacred Temple via Teleport during the Baby Mage Robot final battle
+  /// or during the Week 40+ Temple Siege, unlocking **Ending: The Deserter** and
+  /// resetting the campaign cycle.
   Future<void> triggerDeserterEnding() async {
     isBossVictoryPending = false;
     pendingBossVictoryStage = null;
@@ -3049,17 +3106,20 @@ class GameController extends ChangeNotifier {
 
   /// Advances the campaign state after the user confirms the Boss Defeated modal
   /// (and any ending cutscene). Returns `true` if the campaign cycle concluded
-  /// (Secret Week-0 Ending on Stage 3 in Week 0, or Stage 4 Standard Victory Ending)
-  /// so the caller can return to the World Map.
+  /// (Secret Week-0 Ending on Stage 3 in Week 0, Stage 4 Standard Victory Ending,
+  /// or defeating Stage 3 Metal Wizard during Temple Siege) so the caller can
+  /// return to the World Map.
   bool advanceAfterBossVictory() {
     final defeatedStage = pendingBossVictoryStage ?? enemyStage;
     final week = pendingBossVictoryWeek ?? currentWeek;
+    final wasTempleSiege = isTempleSiegeActive;
     isBossVictoryPending = false;
     pendingBossVictoryStage = null;
     pendingBossVictoryWeek = null;
 
-    final bool concludesCycle =
-        (defeatedStage == 3 && week == 0) || defeatedStage == 4;
+    final bool concludesCycle = wasTempleSiege
+        ? (defeatedStage == 3)
+        : ((defeatedStage == 3 && week == 0) || defeatedStage == 4);
     if (concludesCycle) {
       enemyStage = 1;
       enemyMaxHp = pcMaxHp;
@@ -3074,6 +3134,8 @@ class GameController extends ChangeNotifier {
       hasShownWeek10ArchmageWarning = false;
       hasUnreadWeek10WatchtowerAlert = false;
       savedMetalWizardHp = null;
+      isTempleSiegeActive = false;
+      hasShownTempleSiegeIntro = false;
       storage.setEnemyStage(1);
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(0);
@@ -3087,6 +3149,8 @@ class GameController extends ChangeNotifier {
       storage.setHasShownWeek10ArchmageWarning(false);
       storage.setHasUnreadWeek10WatchtowerAlert(false);
       storage.setSavedMetalWizardHp(null);
+      storage.setIsTempleSiegeActive(false);
+      storage.setHasShownTempleSiegeIntro(false);
       _refreshCompletedDecreesAndResetBattleTrackers();
       _resetBattleState();
       recordTurn0OrbSnapshot();
@@ -3096,7 +3160,25 @@ class GameController extends ChangeNotifier {
     }
 
     int? hpToRestore;
-    if (defeatedStage == 1) {
+    if (wasTempleSiege) {
+      // Reordered Temple Siege gauntlet (No Temple Master):
+      // Guardian Robot (1) -> Robot Archmage (2) -> Baby Mage Robot (4) -> Metal Wizard (3)
+      if (defeatedStage == 1) {
+        enemyStage = 2;
+        _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+      } else if (defeatedStage == 2) {
+        hasDefeatedRobotArchmage = true;
+        storage.setHasDefeatedRobotArchmage(true);
+        enemyStage = 4;
+        _markBestiaryEncountered(BestiaryCreature.babyRobot);
+      } else if (defeatedStage == 4) {
+        enemyStage = 3;
+        _markBestiaryEncountered(BestiaryCreature.metalWizard);
+      } else {
+        enemyStage = 4;
+        _markBestiaryEncountered(BestiaryCreature.babyRobot);
+      }
+    } else if (defeatedStage == 1) {
       if (week >= phase2StartWeek && !hasDefeatedRobotArchmage) {
         enemyStage = 2;
         _markBestiaryEncountered(BestiaryCreature.archmageRobot);
@@ -3130,7 +3212,10 @@ class GameController extends ChangeNotifier {
     storage.setEnemyMaxHp(enemyMaxHp);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
-    if (defeatedStage == 2 && hpToRestore != null && hpToRestore > 0) {
+    if (!wasTempleSiege &&
+        defeatedStage == 2 &&
+        hpToRestore != null &&
+        hpToRestore > 0) {
       final restoredHp = hpToRestore.clamp(1, enemyMaxHp);
       computerHp = restoredHp;
       storage.setPcHp(restoredHp);
@@ -3316,6 +3401,7 @@ class GameController extends ChangeNotifier {
   /// (defaulting to 300 if undamaged) and overrides the active Lair boss to
   /// Stage 2 Robot Archmage (200 HP).
   bool interceptMetalWizardForWeek10IfNeeded() {
+    if (isTempleSiegeActive) return false;
     if (currentWeek < phase2StartWeek) return false;
     if (!hasDefeatedGuardianRobot ||
         hasDefeatedMetalWizard ||
@@ -3471,6 +3557,59 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Activates the playable Week 40+ Sacred Temple Siege (Last Stand) event
+  /// when Week 40 expires without defeating all enemies.
+  ///
+  /// - Sets [isTempleSiegeActive] = `true`, [hasShownTempleSiegeIntro] = `false`,
+  ///   and [currentWeek] = [siegeInvasionWeek] (41).
+  /// - Preserves the exact active opponent (1 = Guardian Robot, 2 = Robot Archmage,
+  ///   3 = Metal Wizard, 4 = Baby Mage Robot), skipping Stage 5 (Temple Master).
+  /// - Restores Cleric HP & Mana and boss HP for the Temple Siege battle while
+  ///   preserving Elemental Orbs and shop upgrades.
+  void activateTempleSiege() {
+    isTempleSiegeActive = true;
+    hasShownTempleSiegeIntro = false;
+    currentWeek = siegeInvasionWeek;
+    adConsagrationsThisWeek = 0;
+    activeBattleBlessing = null;
+    battleBonusTempHp = 0;
+    savedMetalWizardHp = null;
+    if (enemyStage == 5) {
+      enemyStage = 4;
+    }
+    if (enemyStage == 1) {
+      _markBestiaryEncountered(BestiaryCreature.guardianRobot);
+    } else if (enemyStage == 2) {
+      _markBestiaryEncountered(BestiaryCreature.archmageRobot);
+    } else if (enemyStage == 3) {
+      _markBestiaryEncountered(BestiaryCreature.metalWizard);
+    } else if (enemyStage == 4) {
+      _markBestiaryEncountered(BestiaryCreature.babyRobot);
+    }
+    storage.setIsTempleSiegeActive(true);
+    storage.setHasShownTempleSiegeIntro(false);
+    storage.setCurrentWeek(siegeInvasionWeek);
+    storage.setAdConsagrationsThisWeek(0);
+    storage.setActiveBattleBlessing(null);
+    storage.setBattleBonusTempHp(0);
+    storage.setSavedMetalWizardHp(null);
+    _refreshCompletedDecreesAndResetBattleTrackers();
+    _resetBattleState();
+    recordTurn0OrbSnapshot();
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
+  /// Marks the Temple Siege invasion announcement modal as shown for this run.
+  bool consumeTempleSiegeIntro() {
+    if (!shouldShowTempleSiegeIntro) return false;
+    hasShownTempleSiegeIntro = true;
+    storage.setHasShownTempleSiegeIntro(true);
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
   /// Revives the Cleric after watching a rewarded video ad upon death:
   /// restores HP and battle Mana to [playerMaxHp] / [playerMaxMana], keeps all Elemental Orbs collected,
   /// preserves unlocks and current campaign week, persists & syncs to Cloud Save.
@@ -3501,12 +3640,12 @@ class GameController extends ChangeNotifier {
     return shown && earned;
   }
 
-  /// Centralized permadeath hard reset used by both unrevived death (HP == 0)
-  /// and Week > 40 Kingdom Fall defeat:
+  /// Centralized permadeath hard reset used by unrevived death (HP == 0),
+  /// Week > 40 Temple Siege Heroic Death, Sacred Sacrifice, and Deserter endings:
   /// 1. Snapshots lost orbs into Spoils of War, lost orb-bought upgrades into
   ///    Relic Chamber, accumulated HP/Mana stat levels into Hall of Heroes, and
-  ///    records the Kingdom Fall narrative ending.
-  /// 2. Resets campaign week to 0 (Week 0 / 40).
+  ///    records the corresponding narrative ending.
+  /// 2. Resets campaign week to 0 (Week 0 / 40) and [isTempleSiegeActive] to false.
   /// 3. Wipes all 5 Elemental Orb balances & Turn 0 snapshots & turn stats to 0.
   /// 4. Locks all orb-bought upgrades & artifacts EXCEPT real-money Google Play
   ///    IAP purchases persisted in [StorageService] or verified by [BillingService].
@@ -3521,11 +3660,13 @@ class GameController extends ChangeNotifier {
     isGiftAvailable = true;
 
     final resolvedCause = cause ??
-        (currentWeek >= maxCampaignWeeks && userHp > 0
+        (isTempleSiegeActive
             ? PermadeathCause.deadlineExceeded
-            : (enemyStage == 5
-                ? PermadeathCause.sacredSacrifice
-                : PermadeathCause.battleDefeat));
+            : (currentWeek >= maxCampaignWeeks && userHp > 0
+                ? PermadeathCause.deadlineExceeded
+                : (enemyStage == 5
+                    ? PermadeathCause.sacredSacrifice
+                    : PermadeathCause.battleDefeat)));
 
     final nextTotalCycles = totalCyclesCount + 1;
     final nextDeathDefeats = resolvedCause == PermadeathCause.battleDefeat

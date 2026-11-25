@@ -9,6 +9,8 @@ enum VictoryCutsceneType {
   standardVictory,
   sacredSacrifice,
   theDeserter,
+  templeSiegeVictory,
+  templeSiegeDeserter,
 }
 
 class _VictoryPanelData {
@@ -238,6 +240,79 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
                 'The Deserter ending has been recorded in the Royal Library. The chronicle resets to Week 0 for another chance at redemption.',
           ),
         ];
+      case VictoryCutsceneType.templeSiegeVictory:
+        return const [
+          _VictoryPanelData(
+            icon: Icons.shield_rounded,
+            iconWidget: SacredTempleIcon(size: 42),
+            accentColor: Color(0xFFFFCA28),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'siege_victory_cutscene_p1_title',
+            fallbackTitle: 'The Siege Is Broken!',
+            bodyKey: 'siege_victory_cutscene_p1_body',
+            fallbackBody:
+                'Inside the Sacred Temple, your last stand shatters the Metal Wizard and his invading army at the very gates of the sanctuary!',
+          ),
+          _VictoryPanelData(
+            icon: Icons.favorite_rounded,
+            accentColor: Color(0xFF69F0AE),
+            speakerKey: 'victory_cutscene_princess',
+            fallbackSpeaker: 'Princess Aria',
+            titleKey: 'siege_victory_cutscene_p2_title',
+            fallbackTitle: 'City & Princess Saved',
+            bodyKey: 'siege_victory_cutscene_p2_body',
+            fallbackBody:
+                'With the Metal Wizard defeated and his troop routed, the Sacred City endures and Princess Aria is freed without harm.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.emoji_events_rounded,
+            accentColor: Color(0xFF4FC3F7),
+            speakerKey: 'victory_cutscene_king',
+            fallbackSpeaker: 'King Aldric',
+            titleKey: 'siege_victory_cutscene_p3_title',
+            fallbackTitle: 'Savior of the Realm',
+            bodyKey: 'siege_victory_cutscene_p3_body',
+            fallbackBody:
+                'Your heroic defense of the Sacred Temple is inscribed in the Royal Library as the Victory Ending, and a new cycle begins at Week 0.',
+          ),
+        ];
+      case VictoryCutsceneType.templeSiegeDeserter:
+        return const [
+          _VictoryPanelData(
+            icon: Icons.directions_run_rounded,
+            accentColor: Color(0xFFBA68C8),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'siege_deserter_cutscene_p1_title',
+            fallbackTitle: 'Cowardly Escape',
+            bodyKey: 'siege_deserter_cutscene_p1_body',
+            fallbackBody:
+                'When the city needed you most, you fled through an arcane portal from the Sacred Temple—sparing your own life in cowardice.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.whatshot_rounded,
+            accentColor: Color(0xFFEF5350),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'siege_deserter_cutscene_p2_title',
+            fallbackTitle: 'The City Is Destroyed',
+            bodyKey: 'siege_deserter_cutscene_p2_body',
+            fallbackBody:
+                'With no defender left in the sanctuary, the Metal Wizard and his troop storm the Sacred Temple and burn the city to ashes.',
+          ),
+          _VictoryPanelData(
+            icon: Icons.history_edu_rounded,
+            accentColor: Color(0xFFAB47BC),
+            speakerKey: 'victory_cutscene_narrator',
+            fallbackSpeaker: 'Royal Chronicler',
+            titleKey: 'siege_deserter_cutscene_p3_title',
+            fallbackTitle: 'Ending: The Deserter',
+            bodyKey: 'siege_deserter_cutscene_p3_body',
+            fallbackBody:
+                'Your shameful flight is recorded in the Royal Library as The Deserter ending. Time rewinds to Week 0 for a chance at redemption.',
+          ),
+        ];
     }
   }
 
@@ -271,9 +346,16 @@ class _VictoryCutsceneDialogState extends State<VictoryCutsceneDialog> {
         );
         break;
       case VictoryCutsceneType.theDeserter:
+      case VictoryCutsceneType.templeSiegeDeserter:
         cutsceneBanner = loc.t(
           'deserter_cutscene_header',
           fallback: 'THE DESERTER',
+        );
+        break;
+      case VictoryCutsceneType.templeSiegeVictory:
+        cutsceneBanner = loc.t(
+          'siege_victory_cutscene_header',
+          fallback: 'TEMPLE SIEGE VICTORY',
         );
         break;
     }

@@ -29,7 +29,6 @@ import '../dialogs/temple_moral_choice_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/story_dialog.dart';
 import '../dialogs/victory_cutscene_dialog.dart';
-import '../dialogs/world_map_war_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   static const int orbSpawnDelayMs = VersusArena.clashTimeMs;
@@ -75,7 +74,7 @@ class _GameScreenState extends State<GameScreen>
   bool _isInventoryDialogOpen = false;
   bool _isDeathSequenceActive = false;
   bool _isDeathDialogOpen = false;
-  bool _isKingdomFallDialogOpen = false;
+  bool _isTempleSiegeInvasionDialogOpen = false;
   bool _isBossVictoryDialogOpen = false;
   bool _metricsRebuildScheduled = false;
   Timer? _deathDialogTimer;
@@ -203,6 +202,7 @@ class _GameScreenState extends State<GameScreen>
         controller.isBossVictoryPending ||
         controller.totalRounds >= controller.playerMaxMana ||
         _isDeathSequenceActive ||
+        _isTempleSiegeInvasionDialogOpen ||
         _isBossVictoryDialogOpen;
   }
 
@@ -223,7 +223,7 @@ class _GameScreenState extends State<GameScreen>
     if (_isDeathSequenceActive ||
         _isDeathDialogOpen ||
         _isBossVictoryDialogOpen ||
-        _isKingdomFallDialogOpen ||
+        _isTempleSiegeInvasionDialogOpen ||
         _isInventoryDialogOpen) {
       return true;
     }
@@ -418,15 +418,33 @@ class _GameScreenState extends State<GameScreen>
     controller.audio.playTapVibrate();
     if (controller.userHp <= 0 || _isDeathSequenceActive) return;
 
-    final isTempleMaster = controller.isTempleMasterBoss;
-    final isBabyMage = controller.isBabyMageBoss;
+    final isTempleSiege = controller.isTempleSiegeActive;
+    final isTempleMaster = !isTempleSiege && controller.isTempleMasterBoss;
+    final isBabyMage = !isTempleSiege && controller.isBabyMageBoss;
 
-    if (isTempleMaster || isBabyMage || controller.confirmBattleTeleport) {
+    if (isTempleSiege ||
+        isTempleMaster ||
+        isBabyMage ||
+        controller.confirmBattleTeleport) {
       final confirmed = await TeleportConfirmDialog.show(
         context,
         controller: controller,
       );
       if (!confirmed || !context.mounted) return;
+    }
+
+    if (isTempleSiege) {
+      await controller.triggerDeserterEnding();
+      if (!context.mounted) return;
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.templeSiegeDeserter,
+        controller: controller,
+      );
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
     }
 
     if (isTempleMaster) {
@@ -513,8 +531,8 @@ class _GameScreenState extends State<GameScreen>
     BuildContext context,
     GameController controller,
   ) {
-    if (controller.willNextWeekExceedLimit) {
-      _triggerWeek40KingdomFall(context, controller);
+    if (controller.willNextWeekExceedLimit && !controller.isTempleSiegeActive) {
+      _triggerWeek40TempleSiege(context, controller);
       return;
     }
     controller.completeBattleWeek();
@@ -523,24 +541,231 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// Modular handler for campaign week > 40 (Week 41 Siege / Ending 2: Invasion) defeat events.
-  /// Advances the calendar to Week 41 (where the Cleric's Sacred Capital is
-  /// completely besieged on all sides), allows inspecting the Week 41 World Map
-  /// state, and triggers Ending 2 (Invasion) via [applyPermadeathReset].
-  Future<void> _triggerWeek40KingdomFall(
+  /// Replaces the old automatic Week-40 Game Over with the playable
+  /// **Week 40+ Sacred Temple Siege (Last Stand)** transition.
+  Future<void> _triggerWeek40TempleSiege(
     BuildContext context,
     GameController controller,
   ) async {
-    if (_isKingdomFallDialogOpen || !mounted) return;
-    _isKingdomFallDialogOpen = true;
-    controller.enterSiegeInvasionWeek();
+    if (_isTempleSiegeInvasionDialogOpen || !mounted) return;
+    _isTempleSiegeInvasionDialogOpen = true;
+    controller.activateTempleSiege();
+    controller.consumeTempleSiegeIntro();
+    await _showTempleSiegeInvasionDialog(context, controller);
+  }
+
+  void _checkTempleSiegeIntroModal(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldShowTempleSiegeIntro ||
+        _isTempleSiegeInvasionDialogOpen ||
+        _isDeathSequenceActive ||
+        _isDeathDialogOpen ||
+        _isBossVictoryDialogOpen) {
+      return;
+    }
+    _isTempleSiegeInvasionDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _isTempleSiegeInvasionDialogOpen = false;
+        return;
+      }
+      if (!controller.consumeTempleSiegeIntro()) {
+        _isTempleSiegeInvasionDialogOpen = false;
+        return;
+      }
+      await _showTempleSiegeInvasionDialog(context, controller);
+    });
+  }
+
+  Future<void> _showTempleSiegeInvasionDialog(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    if (!mounted) {
+      _isTempleSiegeInvasionDialogOpen = false;
+      return;
+    }
+    _stopOverchargedHold(notifyUi: false);
+    controller.audio.playStoryChime();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        final loc = controller.localization;
+        final palette = AppPalette.of(dialogCtx);
+        final activeBossName = controller.currentEnemyName;
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            key: const ValueKey('temple_siege_invasion_dialog'),
+            backgroundColor: palette.isDark
+                ? const Color(0xFF1A1216)
+                : palette.dialogSurface,
+            surfaceTintColor: palette.isDark ? null : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: const Color(0xFFFF7043).withValues(alpha: 0.78),
+                width: 1.6,
+              ),
+            ),
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  key: const ValueKey('temple_siege_invasion_badge'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF7043).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFFFF7043).withValues(alpha: 0.65),
+                    ),
+                  ),
+                  child: Text(
+                    loc.t(
+                      'temple_siege_invasion_badge',
+                      fallback: 'WEEK 40 EXPIRED — FINAL STAND',
+                    ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.9,
+                      color: Color(0xFFFF7043),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text('⚔️🏛️🔥', style: TextStyle(fontSize: 30)),
+                const SizedBox(height: 6),
+                Text(
+                  loc.t(
+                    'temple_siege_invasion_title',
+                    fallback: 'The Metal Wizard Attacks!',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 19,
+                    color: palette.isDark
+                        ? const Color(0xFFFFCC80)
+                        : const Color(0xFF8E2400),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  loc
+                      .t(
+                        'temple_siege_invasion_body',
+                        fallback:
+                            'Week 40 has passed! The Metal Wizard and his troop are marching to attack the Cleric\'s city. Make your final stand inside the Sacred Temple—starting against {boss}!',
+                      )
+                      .replaceAll('{boss}', activeBossName),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.42,
+                    color: palette.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  key: const ValueKey('temple_siege_begin_button'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF7043),
+                    foregroundColor: const Color(0xFF14161D),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    controller.audio.playTapVibrate();
+                    Navigator.of(dialogCtx).pop();
+                  },
+                  child: Text(
+                    loc.t(
+                      'temple_siege_invasion_btn',
+                      fallback: 'Defend the Temple!',
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    _isTempleSiegeInvasionDialogOpen = false;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _checkDeathAlert(BuildContext context, GameController controller) {
+    if (!controller.isDeathAlertPending ||
+        _isDeathSequenceActive ||
+        _isDeathDialogOpen) {
+      return;
+    }
+    controller.isDeathAlertPending = false;
+    _isDeathSequenceActive = true;
+
+    void openAppropriateDeathDialog() {
+      if (!mounted || _isDeathDialogOpen) return;
+      if (controller.isTempleSiegeActive) {
+        _showTempleSiegeHeroicDeathDialog(context, controller);
+      } else {
+        _showYouDiedDialog(context, controller);
+      }
+    }
+
+    if (!controller.animationsEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        openAppropriateDeathDialog();
+      });
+      return;
+    }
+
+    _deathDialogTimer?.cancel();
+    _deathDialogTimer = Timer(
+      const Duration(milliseconds: 650),
+      openAppropriateDeathDialog,
+    );
+  }
+
+  Future<void> _showTempleSiegeHeroicDeathDialog(
+    BuildContext context,
+    GameController controller,
+  ) async {
+    if (_isDeathDialogOpen || !mounted) return;
+    _isDeathDialogOpen = true;
     controller.audio.playDefeat();
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) {
-        bool isResetting = false;
+        bool isProcessing = false;
+        final isManaExhausted =
+            controller.remainingMana <= 0 && controller.userHp > 0;
         return StatefulBuilder(
           builder: (innerCtx, setDialogState) {
             final loc = controller.localization;
@@ -548,17 +773,16 @@ class _GameScreenState extends State<GameScreen>
             return PopScope(
               canPop: false,
               child: AlertDialog(
-                key: const ValueKey('week40_kingdom_fall_dialog'),
+                key: const ValueKey('temple_siege_heroic_death_dialog'),
                 backgroundColor: palette.isDark
-                    ? const Color(0xFF1A1014)
+                    ? const Color(0xFF191116)
                     : palette.dialogSurface,
-                surfaceTintColor:
-                    palette.isDark ? null : Colors.transparent,
+                surfaceTintColor: palette.isDark ? null : Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: Colors.redAccent.withValues(alpha: 0.65),
-                    width: 1.5,
+                    color: Colors.redAccent.withValues(alpha: 0.72),
+                    width: 1.6,
                   ),
                 ),
                 title: Column(
@@ -578,37 +802,24 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       child: Text(
                         loc.t(
-                          'kingdom_fall_badge',
-                          fallback: 'WEEK 40 EXPIRED',
+                          'temple_siege_heroic_death_badge',
+                          fallback: 'HEROIC LAST STAND',
                         ),
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 1.0,
+                          letterSpacing: 0.9,
                           color: Colors.redAccent,
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      '${loc.t('map_week_label', fallback: 'Week')} ${GameController.siegeInvasionWeek} — ${loc.t('world_map_status_besieged', fallback: 'Besieged — Week 41')}',
-                      key: const ValueKey('week41_siege_subtitle_badge'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: palette.isDark
-                            ? const Color(0xFFFFAB40)
-                            : const Color(0xFFB84A00),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('🏰🔥', style: TextStyle(fontSize: 32)),
+                    const Text('⚔️💀🏰', style: TextStyle(fontSize: 32)),
                     const SizedBox(height: 6),
                     Text(
                       loc.t(
-                        'kingdom_fall_title',
-                        fallback: 'The Kingdom Has Fallen',
+                        'temple_siege_heroic_death_title',
+                        fallback: 'Heroic Death — City Destroyed',
                       ),
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -619,58 +830,39 @@ class _GameScreenState extends State<GameScreen>
                             : const Color(0xFF8E1B1B),
                       ),
                     ),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                    const SizedBox(height: 3),
                     Text(
                       loc.t(
-                        'kingdom_fall_body',
-                        fallback:
-                            'Time has run out. The Metal Wizard has taken over all neighboring kingdoms and destroyed the Cleric\'s kingdom!',
+                        'temple_siege_heroic_death_subtitle',
+                        fallback: 'The Cleric Fought Until the End',
                       ),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13.5,
-                        height: 1.4,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
                         color: palette.secondaryText,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      key: const ValueKey('week41_inspect_world_map_button'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: palette.isDark
-                            ? const Color(0xFFF5C22B)
-                            : const Color(0xFF8A5A00),
-                        side: BorderSide(
-                          color: (palette.isDark
-                                  ? const Color(0xFFF5C22B)
-                                  : const Color(0xFFC8961E))
-                              .withValues(alpha: 0.75),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        controller.audio.playTapVibrate();
-                        showDialog<void>(
-                          context: innerCtx,
-                          builder: (_) => WorldMapWarDialog(
-                            controller: controller,
-                            initialWeek: GameController.siegeInvasionWeek,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.map_outlined, size: 17),
-                      label: Text(
-                        loc.t('observatory_world_map_btn', fallback: 'World Map'),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
                   ],
+                ),
+                content: Text(
+                  isManaExhausted
+                      ? loc.t(
+                          'temple_siege_heroic_death_body_mana',
+                          fallback:
+                              'With no weeks left to retreat, you fought courageously inside the Sacred Temple until your Mana ran dry. Unable to escape, you die in battle and the Metal Wizard destroys the city.',
+                        )
+                      : loc.t(
+                          'temple_siege_heroic_death_body_hp',
+                          fallback:
+                              'With no weeks left to retreat, you fought courageously inside the Sacred Temple until your HP fell to 0. With the Cleric fallen in battle, the Metal Wizard destroys the city.',
+                        ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.42,
+                    color: palette.secondaryText,
+                  ),
                 ),
                 actionsAlignment: MainAxisAlignment.center,
                 actions: [
@@ -678,7 +870,7 @@ class _GameScreenState extends State<GameScreen>
                     width: double.infinity,
                     child: ElevatedButton(
                       key: const ValueKey(
-                        'week40_kingdom_fall_confirm_button',
+                        'temple_siege_heroic_death_confirm_button',
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFB71C1C),
@@ -688,14 +880,15 @@ class _GameScreenState extends State<GameScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: isResetting
+                      onPressed: isProcessing
                           ? null
                           : () async {
-                              setDialogState(() => isResetting = true);
+                              setDialogState(() => isProcessing = true);
                               await controller.applyPermadeathReset(
                                 cause: PermadeathCause.deadlineExceeded,
                               );
-                              _isKingdomFallDialogOpen = false;
+                              _isDeathDialogOpen = false;
+                              _isDeathSequenceActive = false;
                               if (dialogCtx.mounted) {
                                 Navigator.of(dialogCtx).pop();
                               }
@@ -706,7 +899,7 @@ class _GameScreenState extends State<GameScreen>
                             },
                       child: Text(
                         loc.t(
-                          'kingdom_fall_confirm_btn',
+                          'temple_siege_heroic_death_btn',
                           fallback: 'Return to Week 0',
                         ),
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -720,31 +913,8 @@ class _GameScreenState extends State<GameScreen>
         );
       },
     );
-    _isKingdomFallDialogOpen = false;
-  }
-
-  void _checkDeathAlert(BuildContext context, GameController controller) {
-    if (!controller.isDeathAlertPending ||
-        _isDeathSequenceActive ||
-        _isDeathDialogOpen) {
-      return;
-    }
-    controller.isDeathAlertPending = false;
-    _isDeathSequenceActive = true;
-
-    if (!controller.animationsEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _isDeathDialogOpen) return;
-        _showYouDiedDialog(context, controller);
-      });
-      return;
-    }
-
-    _deathDialogTimer?.cancel();
-    _deathDialogTimer = Timer(const Duration(milliseconds: 650), () {
-      if (!mounted || _isDeathDialogOpen) return;
-      _showYouDiedDialog(context, controller);
-    });
+    _isDeathDialogOpen = false;
+    _isDeathSequenceActive = false;
   }
 
   Future<void> _showYouDiedDialog(
@@ -964,13 +1134,18 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _check100RoundAlert(BuildContext context, GameController controller) {
-    if (controller.is100RoundsAlertPending &&
+    if (!controller.isTempleSiegeActive &&
+        controller.is100RoundsAlertPending &&
         controller.userHp > 0 &&
         !_isDeathSequenceActive &&
         !_isDeathDialogOpen) {
       controller.is100RoundsAlertPending = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || controller.userHp <= 0) return;
+        if (!mounted ||
+            controller.userHp <= 0 ||
+            controller.isTempleSiegeActive) {
+          return;
+        }
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -1084,11 +1259,17 @@ class _GameScreenState extends State<GameScreen>
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  loc.t(
-                                    'battle_week_advanced',
-                                    fallback:
-                                        '+1 Week Passed — Returning to the Kingdom Map',
-                                  ),
+                                  controller.willNextWeekExceedLimit
+                                      ? loc.t(
+                                          'temple_siege_week40_ended_banner',
+                                          fallback:
+                                              'Week 40 Ended — Enemy Troops March on the Temple!',
+                                        )
+                                      : loc.t(
+                                          'battle_week_advanced',
+                                          fallback:
+                                              '+1 Week Passed — Returning to the Kingdom Map',
+                                        ),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
@@ -1115,7 +1296,15 @@ class _GameScreenState extends State<GameScreen>
                           _handleExitViaWeekProgression(context, controller);
                         },
                         child: Text(
-                          loc.t('map_return_to_map', fallback: 'Return to Map'),
+                          controller.willNextWeekExceedLimit
+                              ? loc.t(
+                                  'temple_siege_invasion_btn',
+                                  fallback: 'Defend the Temple!',
+                                )
+                              : loc.t(
+                                  'map_return_to_map',
+                                  fallback: 'Return to Map',
+                                ),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1128,6 +1317,61 @@ class _GameScreenState extends State<GameScreen>
         );
       });
     }
+  }
+
+  Widget _buildTempleSiegeBanner(
+    BuildContext context,
+    GameController controller,
+    LocalizationService loc,
+  ) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Center(
+        child: Container(
+          key: const ValueKey('temple_siege_hud_badge'),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: palette.isDark
+                ? const Color(0xFF2B1418).withValues(alpha: 0.90)
+                : const Color(0xFFFFEDE8).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: const Color(0xFFFF7043).withValues(alpha: 0.80),
+              width: 1.15,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF5722).withValues(alpha: 0.24),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.shield_rounded,
+                size: 13,
+                color: Color(0xFFFF7043),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                loc.t('temple_siege_hud_badge', fallback: 'TEMPLE SIEGE'),
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.9,
+                  color: palette.isDark
+                      ? const Color(0xFFFFCC80)
+                      : const Color(0xFF9A2B00),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSacredBlessingPill(
@@ -1234,18 +1478,25 @@ class _GameScreenState extends State<GameScreen>
     final defeatedStage =
         controller.pendingBossVictoryStage ?? controller.enemyStage;
     final week = controller.pendingBossVictoryWeek ?? controller.currentWeek;
+    final bool isTempleSiege = controller.isTempleSiegeActive;
 
     final bool isStage1ToMetalWizard =
-        defeatedStage == 1 && week < GameController.phase2StartWeek;
+        !isTempleSiege &&
+        defeatedStage == 1 &&
+        week < GameController.phase2StartWeek;
     final bool isStage1ToArchmage =
-        defeatedStage == 1 && week >= GameController.phase2StartWeek;
+        defeatedStage == 1 &&
+        (isTempleSiege || week >= GameController.phase2StartWeek);
     final bool isStage2Defeat = defeatedStage == 2;
-    final bool isSecretWeek1 = defeatedStage == 3 && week == 0;
-    final bool isStage3ToTemple = defeatedStage == 3 && week >= 1;
-    final bool isStage5ToBabyMage = defeatedStage == 5;
-    final bool isStage4Defeat = defeatedStage == 4;
+    final bool isSecretWeek1 = !isTempleSiege && defeatedStage == 3 && week == 0;
+    final bool isStage3ToTemple =
+        !isTempleSiege && defeatedStage == 3 && week >= 1;
+    final bool isStage5ToBabyMage = !isTempleSiege && defeatedStage == 5;
+    final bool isStage4Defeat = !isTempleSiege && defeatedStage == 4;
+    final bool isSiegeStage4ToMetalWizard = isTempleSiege && defeatedStage == 4;
+    final bool isSiegeMetalWizardVictory = isTempleSiege && defeatedStage == 3;
 
-    // Post-Week-0 Metal Wizard defeat -> Sacred Temple Sanctuary Moral Choice Cutscene
+    // Post-Week-0 Metal Wizard defeat (outside Temple Siege) -> Sacred Temple Moral Choice Cutscene
     if (isStage3ToTemple) {
       final choice = await TempleMoralChoiceDialog.show(
         context,
@@ -1325,6 +1576,26 @@ class _GameScreenState extends State<GameScreen>
         'boss_victory_face_archmage_btn',
         fallback: 'Challenge Robot Archmage',
       );
+    } else if (isStage2Defeat && isTempleSiege) {
+      emoji = '⚡🤖';
+      accent = const Color(0xFFFF7043);
+      title = loc.t(
+        'boss_victory_p2_defeated_title',
+        fallback: 'Robot Archmage Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_siege_s2_to_s4_subtitle',
+        fallback: 'Baby Mage Robot Storms the Temple!',
+      );
+      body = loc.t(
+        'boss_victory_siege_s2_to_s4_body',
+        fallback:
+            'The Robot Archmage is destroyed! Before you can reach the Metal Wizard, the Baby Mage Robot (400 HP, 5 elements, Dual Harmonic π Spells) advances to block your path!',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_baby_mage_btn',
+        fallback: 'Face Baby Mage Robot',
+      );
     } else if (isStage2Defeat) {
       emoji = '⚔️🧙';
       accent = const Color(0xFF90A4AE);
@@ -1344,6 +1615,46 @@ class _GameScreenState extends State<GameScreen>
       buttonLabel = loc.t(
         'boss_victory_face_metal_wizard_btn',
         fallback: 'Face Metal Wizard',
+      );
+    } else if (isSiegeStage4ToMetalWizard) {
+      emoji = '⚔️🧙';
+      accent = const Color(0xFF90A4AE);
+      title = loc.t(
+        'boss_victory_p3_defeated_title',
+        fallback: 'Baby Mage Robot Destroyed!',
+      );
+      subtitle = loc.t(
+        'boss_victory_siege_s4_to_s3_subtitle',
+        fallback: 'Final Boss: The Metal Wizard!',
+      );
+      body = loc.t(
+        'boss_victory_siege_s4_to_s3_body',
+        fallback:
+            'The Baby Mage Robot shatters inside the Sacred Temple! Now the Metal Wizard (300 HP, Metal & Earth + Anti-Metal Shield) steps forward for the decisive final battle!',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_face_metal_wizard_btn',
+        fallback: 'Face Metal Wizard',
+      );
+    } else if (isSiegeMetalWizardVictory) {
+      emoji = '🏆';
+      accent = const Color(0xFFFFCA28);
+      title = loc.t(
+        'boss_victory_siege_s3_defeated_title',
+        fallback: 'Metal Wizard Defeated!',
+      );
+      subtitle = loc.t(
+        'boss_victory_siege_s3_defeated_subtitle',
+        fallback: 'Temple Siege Repelled — The City & Princess Are Saved!',
+      );
+      body = loc.t(
+        'boss_victory_siege_s3_defeated_body',
+        fallback:
+            'You defeated the Metal Wizard inside the Sacred Temple, broke the siege, and saved the city and Princess Aria! Victory Ending unlocked.',
+      );
+      buttonLabel = loc.t(
+        'boss_victory_watch_cutscene_btn',
+        fallback: 'Watch Ending Cutscene',
       );
     } else if (isSecretWeek1) {
       emoji = '👑';
@@ -1517,6 +1828,24 @@ class _GameScreenState extends State<GameScreen>
       await VictoryCutsceneDialog.show(
         context,
         type: VictoryCutsceneType.standardVictory,
+        controller: controller,
+      );
+      if (!mounted) {
+        _isBossVictoryDialogOpen = false;
+        return;
+      }
+      controller.advanceAfterBossVictory();
+      _isBossVictoryDialogOpen = false;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+      return;
+    }
+
+    if (isSiegeMetalWizardVictory) {
+      await VictoryCutsceneDialog.show(
+        context,
+        type: VictoryCutsceneType.templeSiegeVictory,
         controller: controller,
       );
       if (!mounted) {
@@ -1933,6 +2262,7 @@ class _GameScreenState extends State<GameScreen>
 
     _syncAtmosphereAnimations(controller);
     _checkIntroStory(context, controller);
+    _checkTempleSiegeIntroModal(context, controller);
     _checkDeathAlert(context, controller);
     _checkBossVictoryAlert(context, controller);
     _check100RoundAlert(context, controller);
@@ -1951,7 +2281,7 @@ class _GameScreenState extends State<GameScreen>
         body: Stack(
           key: _rootStackKey,
           children: [
-            // Full-Screen Battle Background (Sacred Temple for Temple High Master & Baby Mage Robot; Dark Stone Forge for Lair bosses)
+            // Full-Screen Battle Background (Sacred Temple for Temple Siege, Temple High Master & Baby Mage Robot; Dark Stone Forge for Lair bosses)
             Positioned.fill(
               child: AnimatedSwitcher(
                 duration: switcherDuration,
@@ -2051,6 +2381,8 @@ class _GameScreenState extends State<GameScreen>
                 children: [
                   // 0. Custom RPG Top HUD Bar
                   _buildTopHudBar(context, controller, loc, inputsLocked),
+                  if (controller.isTempleSiegeActive)
+                    _buildTempleSiegeBanner(context, controller, loc),
 
                   // 1. Bounded Top Scrollable HUD + Stationary Grounded VersusArena
                   Expanded(
@@ -2213,6 +2545,7 @@ class _GameScreenState extends State<GameScreen>
                                             : controller.playerWinDamageToBoss,
                                     isPhase2: controller.enemyUses5Elements,
                                     enemyStage: controller.enemyStage,
+                                    isSacredTempleArena: isSacredTempleArena,
                                     isAntiMetalShieldBlocked: controller
                                         .lastRoundBlockedByAntiMetalShield,
                                     pcSlotKey: _pcSlotKey,

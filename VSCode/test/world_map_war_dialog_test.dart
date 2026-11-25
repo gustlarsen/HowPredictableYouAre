@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/main.dart';
+import 'package:how_predictable/models/move.dart';
 import 'package:how_predictable/services/ad_service.dart';
 import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
@@ -303,7 +304,7 @@ void main() {
     );
 
     testWidgets(
-      'Advancing past Week 40 triggers Week 41 Siege state, allows inspecting Week 41 in WorldMapWarDialog with Besieged status, and records Ending 2 (Invasion)',
+      'Advancing past Week 40 triggers Week 41 Temple Siege state, allows inspecting Week 41 in WorldMapWarDialog with Besieged status, and records Ending 2 (Invasion) on Heroic Death',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(430, 932);
         tester.view.devicePixelRatio = 1.0;
@@ -342,7 +343,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Enter battle at Week 40 and teleport out to advance to Week 41
+        // Enter battle at Week 40 and teleport out to advance to Week 41 (Temple Siege)
         await tester.tap(
           find.byKey(const ValueKey('landmark_metal_wizard_lair')),
         );
@@ -353,20 +354,27 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
         await tester.pumpAndSettle();
 
-        // Kingdom Fall / Week 41 Siege modal is shown and currentWeek advanced to 41
+        // Temple Siege Invasion modal is shown and currentWeek advanced to 41
         expect(
-          find.byKey(const ValueKey('week40_kingdom_fall_dialog')),
+          find.byKey(const ValueKey('temple_siege_invasion_dialog')),
           findsOneWidget,
         );
+        expect(controller.isTempleSiegeActive, isTrue);
         expect(controller.currentWeek, GameController.siegeInvasionWeek);
-        expect(
-          find.byKey(const ValueKey('week41_siege_subtitle_badge')),
-          findsOneWidget,
-        );
+        expect(controller.maxInspectableWorldMapWeek, 41);
 
-        // Tap "World Map" inside the Week 41 Siege dialog to inspect Week 41
         await tester.tap(
-          find.byKey(const ValueKey('week41_inspect_world_map_button')),
+          find.byKey(const ValueKey('temple_siege_begin_button')),
+        );
+        await tester.pumpAndSettle();
+
+        // Inspect WorldMapWarDialog at Week 41 while Siege is active
+        final battleCtx = tester.element(
+          find.byKey(const ValueKey('temple_siege_hud_badge')),
+        );
+        showDialog<void>(
+          context: battleCtx,
+          builder: (_) => WorldMapWarDialog(controller: controller),
         );
         await tester.pumpAndSettle();
 
@@ -378,21 +386,29 @@ void main() {
         );
         expect(find.text('Besieged — Week 41'), findsWidgets);
 
-        // Close WorldMapWarDialog and confirm Kingdom Fall reset
         await tester.tap(
           find.byKey(const ValueKey('world_map_war_close_button')),
         );
         await tester.pumpAndSettle();
 
-        // Before confirming reset, currentWeek == 41 -> maxInspectableWorldMapWeek == 41
-        expect(controller.maxInspectableWorldMapWeek, 41);
+        // Exhaust all Mana in Temple Siege to suffer Heroic Death -> records Ending 2 (Invasion)
+        for (var i = 0; i < controller.playerMaxMana; i++) {
+          controller.playTurn(controller.crystalBallMove ?? HandMove.rock);
+        }
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
+        expect(
+          find.byKey(const ValueKey('temple_siege_heroic_death_dialog')),
+          findsOneWidget,
+        );
         await tester.tap(
-          find.byKey(const ValueKey('week40_kingdom_fall_confirm_button')),
+          find.byKey(const ValueKey('temple_siege_heroic_death_confirm_button')),
         );
         await tester.pumpAndSettle();
 
         expect(controller.timeoutDefeatCount, 1);
+        expect(controller.isTempleSiegeActive, isFalse);
         // After reset to Week 0, maxInspectableWorldMapWeek clamps safely to 1 (no future spoilers)
         expect(controller.maxInspectableWorldMapWeek, 1);
       },

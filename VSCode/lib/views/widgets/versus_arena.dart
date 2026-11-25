@@ -59,6 +59,7 @@ class VersusArena extends StatefulWidget {
   final int computerDamageAmount;
   final bool isPhase2;
   final int enemyStage;
+  final bool isSacredTempleArena;
   final bool isAntiMetalShieldBlocked;
   final VoidCallback? onImpactHaptic;
   final Key? pcSlotKey;
@@ -86,6 +87,7 @@ class VersusArena extends StatefulWidget {
     this.computerDamageAmount = 1,
     this.isPhase2 = false,
     this.enemyStage = 1,
+    this.isSacredTempleArena = false,
     this.isAntiMetalShieldBlocked = false,
     this.onImpactHaptic,
     this.pcSlotKey,
@@ -848,7 +850,9 @@ class _VersusArenaState extends State<VersusArena>
                           clashPulse: clashPulse,
                           isDark: palette.isDark,
                           suppressRunesGeometry:
-                              widget.enemyStage == 4 || widget.enemyStage == 5,
+                              widget.isSacredTempleArena ||
+                              widget.enemyStage == 4 ||
+                              widget.enemyStage == 5,
                           leftCenterX: leftCenterX,
                           rightCenterX: rightCenterX,
                         ),

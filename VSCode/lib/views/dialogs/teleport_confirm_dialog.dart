@@ -56,15 +56,18 @@ class _TeleportConfirmDialogState extends State<TeleportConfirmDialog> {
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
     final isDark = palette.isDark;
-    final isTempleMaster = widget.controller.isTempleMasterBoss;
-    final isBabyMage = widget.controller.isBabyMageBoss;
-    final isMoralWarning = isTempleMaster || isBabyMage;
+    final isTempleSiege = widget.controller.isTempleSiegeActive;
+    final isTempleMaster = !isTempleSiege && widget.controller.isTempleMasterBoss;
+    final isBabyMage = !isTempleSiege && widget.controller.isBabyMageBoss;
+    final isMoralWarning = isTempleSiege || isTempleMaster || isBabyMage;
 
-    final Color accentColor = isTempleMaster
-        ? const Color(0xFFFFB74D)
-        : (isBabyMage
-            ? const Color(0xFFBA68C8)
-            : (isDark ? const Color(0xFF00E5FF) : palette.amberBorder));
+    final Color accentColor = isTempleSiege
+        ? const Color(0xFFFF7043)
+        : (isTempleMaster
+            ? const Color(0xFFFFB74D)
+            : (isBabyMage
+                ? const Color(0xFFBA68C8)
+                : (isDark ? const Color(0xFF00E5FF) : palette.amberBorder)));
 
     final Color weekBadgeBg = isDark
         ? (isMoralWarning ? const Color(0xFF22161E) : const Color(0xFF1C202B))
@@ -86,7 +89,25 @@ class _TeleportConfirmDialogState extends State<TeleportConfirmDialog> {
     final String badgeText;
     final String confirmLabel;
 
-    if (isTempleMaster) {
+    if (isTempleSiege) {
+      titleText = loc.t(
+        'teleport_temple_siege_title',
+        fallback: 'Flee in Cowardice?',
+      );
+      bodyText = loc.t(
+        'teleport_temple_siege_body',
+        fallback:
+            'Fleeing through an arcane portal now is a cowardly escape! You will save your own life, but the Metal Wizard and his troop will destroy the city.\n\nConfirming will end your run as a Deserter.',
+      );
+      badgeText = loc.t(
+        'teleport_temple_siege_badge',
+        fallback: 'Cowardly Escape — City Destroyed (Ending: The Deserter)',
+      );
+      confirmLabel = loc.t(
+        'teleport_temple_siege_confirm_action',
+        fallback: 'Flee in Cowardice',
+      );
+    } else if (isTempleMaster) {
       titleText = loc.t(
         'teleport_temple_master_title',
         fallback: 'Abandon the Princess to Sacrifice?',

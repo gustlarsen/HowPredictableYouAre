@@ -424,6 +424,21 @@ class StorageService {
     return _prefs.setInt(savedMetalWizardHpKey, val);
   }
 
+  // Week 40+ Sacred Temple Siege (Last Stand) Persistence Flags (per-campaign)
+  static const String isTempleSiegeActiveKey = 'is_temple_siege_active';
+  static const String hasShownTempleSiegeIntroKey =
+      'has_shown_temple_siege_intro';
+
+  bool get isTempleSiegeActive =>
+      _prefs.getBool(isTempleSiegeActiveKey) ?? false;
+  Future<void> setIsTempleSiegeActive(bool val) =>
+      _prefs.setBool(isTempleSiegeActiveKey, val);
+
+  bool get hasShownTempleSiegeIntro =>
+      _prefs.getBool(hasShownTempleSiegeIntroKey) ?? false;
+  Future<void> setHasShownTempleSiegeIntro(bool val) =>
+      _prefs.setBool(hasShownTempleSiegeIntroKey, val);
+
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Sacred Blessings
   static const String _adConsagrationsThisWeekKey =
       'ad_consagrations_this_week';
@@ -1521,6 +1536,8 @@ class StorageService {
       setHasShownWeek10ArchmageWarning(false),
       setHasUnreadWeek10WatchtowerAlert(false),
       setSavedMetalWizardHp(null),
+      setIsTempleSiegeActive(false),
+      setHasShownTempleSiegeIntro(false),
       setAdConsagrationsThisWeek(0),
       setPendingBattleBlessing(null),
       setActiveBattleBlessing(null),

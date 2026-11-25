@@ -197,6 +197,8 @@ class CloudSaveData {
   final bool hasShownWeek10ArchmageWarning;
   final bool hasUnreadWeek10WatchtowerAlert;
   final int? savedMetalWizardHp;
+  final bool isTempleSiegeActive;
+  final bool hasShownTempleSiegeIntro;
 
   // Unlocks (Purchased in shop)
   final bool unlockedReset;
@@ -358,6 +360,8 @@ class CloudSaveData {
     this.hasShownWeek10ArchmageWarning = false,
     this.hasUnreadWeek10WatchtowerAlert = false,
     this.savedMetalWizardHp,
+    this.isTempleSiegeActive = false,
+    this.hasShownTempleSiegeIntro = false,
     this.unlockedReset = false,
     this.unlockedPredictability = false,
     this.unlockedRandom = false,
@@ -580,6 +584,7 @@ class CloudSaveData {
     if (unlockedCount == local.unlockedCount &&
         totalOrbs == local.totalOrbs &&
         (currentWeek > local.currentWeek ||
+            (isTempleSiegeActive && !local.isTempleSiegeActive) ||
             enemyPhase > local.enemyPhase ||
             total > local.total ||
             userScore > local.userScore ||
@@ -727,6 +732,12 @@ class CloudSaveData {
       savedMetalWizardHp: currentWeek == local.currentWeek
           ? (savedMetalWizardHp ?? local.savedMetalWizardHp)
           : savedMetalWizardHp,
+      isTempleSiegeActive: currentWeek == local.currentWeek
+          ? (isTempleSiegeActive || local.isTempleSiegeActive)
+          : isTempleSiegeActive,
+      hasShownTempleSiegeIntro: currentWeek == local.currentWeek
+          ? (hasShownTempleSiegeIntro || local.hasShownTempleSiegeIntro)
+          : hasShownTempleSiegeIntro,
       unlockedReset: unlockedReset || local.unlockedReset,
       unlockedPredictability:
           unlockedPredictability || local.unlockedPredictability,
@@ -905,6 +916,8 @@ class CloudSaveData {
       hasShownWeek10ArchmageWarning: storage.hasShownWeek10ArchmageWarning,
       hasUnreadWeek10WatchtowerAlert: storage.hasUnreadWeek10WatchtowerAlert,
       savedMetalWizardHp: storage.savedMetalWizardHp,
+      isTempleSiegeActive: storage.isTempleSiegeActive,
+      hasShownTempleSiegeIntro: storage.hasShownTempleSiegeIntro,
       unlockedReset: storage.unlockedReset,
       unlockedPredictability: storage.unlockedPredictability,
       unlockedRandom: storage.unlockedRandom,
@@ -1056,6 +1069,8 @@ class CloudSaveData {
       hasUnreadWeek10WatchtowerAlert,
     );
     await storage.setSavedMetalWizardHp(savedMetalWizardHp);
+    await storage.setIsTempleSiegeActive(isTempleSiegeActive);
+    await storage.setHasShownTempleSiegeIntro(hasShownTempleSiegeIntro);
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
     await storage.setPendingBattleBlessing(pendingBattleBlessing);
     await storage.setActiveBattleBlessing(activeBattleBlessing);
@@ -1330,6 +1345,8 @@ class CloudSaveData {
       'hasShownWeek10ArchmageWarning': hasShownWeek10ArchmageWarning,
       'hasUnreadWeek10WatchtowerAlert': hasUnreadWeek10WatchtowerAlert,
       if (savedMetalWizardHp != null) 'savedMetalWizardHp': savedMetalWizardHp,
+      'isTempleSiegeActive': isTempleSiegeActive,
+      'hasShownTempleSiegeIntro': hasShownTempleSiegeIntro,
       'unlockedReset': unlockedReset,
       'unlockedPredictability': unlockedPredictability,
       'unlockedRandom': unlockedRandom,
@@ -1741,6 +1758,9 @@ class CloudSaveData {
         final raw = (map['savedMetalWizardHp'] as num?)?.toInt();
         return (raw != null && raw > 0) ? raw : null;
       })(),
+      isTempleSiegeActive: map['isTempleSiegeActive'] as bool? ?? false,
+      hasShownTempleSiegeIntro:
+          map['hasShownTempleSiegeIntro'] as bool? ?? false,
       unlockedReset: map['unlockedReset'] as bool? ?? false,
       unlockedPredictability: map['unlockedPredictability'] as bool? ?? false,
       unlockedRandom: map['unlockedRandom'] as bool? ?? false,

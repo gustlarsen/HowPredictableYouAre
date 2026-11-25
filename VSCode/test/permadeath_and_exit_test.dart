@@ -567,7 +567,7 @@ void main() {
     );
 
     testWidgets(
-      'Passing Week 40 via Teleport or 100 rounds triggers localized Metal Wizard conquest modal and resets to Week 0 while preserving real-money Remove Ads IAP',
+      'Passing Week 40 via Teleport or 100 rounds activates playable Sacred Temple Siege instead of immediate Game Over, and preserves Remove Ads IAP after siege defeat',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -617,7 +617,7 @@ void main() {
         expect(find.text('Week 40 / 40'), findsOneWidget);
         expect(find.byKey(const ValueKey('bottom_banner_ad_container')), findsNothing);
 
-        // Case A: Teleport at Week 40 pushes week > 40 -> Kingdom Fall modal
+        // Case A: Teleport at Week 40 pushes week > 40 -> Temple Siege activates in GameScreen
         await tester.tap(
           find.byKey(const ValueKey('landmark_metal_wizard_lair')),
         );
@@ -630,29 +630,56 @@ void main() {
 
         expect(
           find.byKey(const ValueKey('week40_kingdom_fall_dialog')),
-          findsOneWidget,
+          findsNothing,
         );
-        expect(find.text('The Kingdom Has Fallen'), findsOneWidget);
         expect(
-          find.textContaining('Metal Wizard has taken over'),
+          find.byKey(const ValueKey('temple_siege_invasion_dialog')),
           findsOneWidget,
         );
+        expect(find.text('The Sacred Temple Is Under Siege!'), findsOneWidget);
+        expect(controller.isTempleSiegeActive, isTrue);
+        expect(controller.currentWeek, GameController.siegeInvasionWeek);
 
         await tester.tap(
-          find.byKey(const ValueKey('week40_kingdom_fall_confirm_button')),
+          find.byKey(const ValueKey('temple_siege_begin_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(GameScreen), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('temple_siege_hud_badge')),
+          findsOneWidget,
+        );
+        expect(find.text('TEMPLE SIEGE'), findsOneWidget);
+
+        // Teleporting during Temple Siege triggers Cowardly Escape (Deserter) ending & resets to Week 0
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cowardly Escape From the Siege?'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('victory_cutscene_dialog')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('victory_cutscene_skip_button')),
         );
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(controller.isTempleSiegeActive, isFalse);
         expect(controller.currentWeek, 0);
         expect(controller.fireOrbs, 0);
         expect(controller.unlockedRandom, isFalse);
         expect(controller.unlockedAds, isTrue);
         expect(controller.isRemoveAdsActive, isTrue);
+        expect(controller.deserterCount, 1);
         expect(find.text('Week 0 / 40'), findsOneWidget);
         expect(find.byKey(const ValueKey('bottom_banner_ad_container')), findsNothing);
 
-        // Case B: Completing 100 rounds at Week 40 (and verify pt localization)
+        // Case B: Completing 100 rounds at Week 40 (and verify pt localization) -> Temple Siege -> 0 Mana Heroic Death
         controller.currentWeek = 40;
         controller.hasShownWeek10ArchmageWarning = true;
         storage.setCurrentWeek(40);
@@ -677,18 +704,41 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.byKey(const ValueKey('week40_kingdom_fall_dialog')),
+          find.byKey(const ValueKey('temple_siege_invasion_dialog')),
           findsOneWidget,
         );
-        expect(find.text('O Reino Caiu'), findsOneWidget);
+        expect(find.text('O Templo Sagrado Está Sob Cerco!'), findsOneWidget);
 
         await tester.tap(
-          find.byKey(const ValueKey('week40_kingdom_fall_confirm_button')),
+          find.byKey(const ValueKey('temple_siege_begin_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('CERCO AO TEMPLO'), findsOneWidget);
+        expect(controller.isTempleSiegeActive, isTrue);
+
+        // Exhausting all 100 Mana rounds during Temple Siege triggers Heroic Death defeat (no escape)
+        for (var i = 0; i < 100; i++) {
+          controller.playTurn(controller.crystalBallMove ?? HandMove.rock);
+        }
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(
+          find.byKey(const ValueKey('temple_siege_heroic_death_dialog')),
+          findsOneWidget,
+        );
+        expect(find.text('Tombado Defendendo o Templo'), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('temple_siege_heroic_death_confirm_button')),
         );
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(controller.isTempleSiegeActive, isFalse);
         expect(controller.currentWeek, 0);
+        expect(controller.timeoutDefeatCount, 1);
         expect(controller.unlockedAds, isTrue);
       },
     );

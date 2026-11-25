@@ -55,6 +55,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _isWeek0ScreamDialogOpen = false;
   bool _isWeek10ArchmageDialogOpen = false;
   bool _isOfflineOffertoryDialogOpen = false;
+  bool _isLaunchingTempleSiege = false;
   bool _metricsRebuildScheduled = false;
 
   @override
@@ -295,15 +296,56 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
+  void _checkTempleSiegeAutoLaunch(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (_isLaunchingTempleSiege) return;
+    final shouldLaunch = controller.isTempleSiegeActive ||
+        controller.currentWeek > GameController.maxCampaignWeeks;
+    if (!shouldLaunch) return;
+
+    _isLaunchingTempleSiege = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !context.mounted) {
+        _isLaunchingTempleSiege = false;
+        return;
+      }
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) {
+        _isLaunchingTempleSiege = false;
+        return;
+      }
+      if (!controller.isTempleSiegeActive) {
+        controller.activateTempleSiege();
+      }
+      try {
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => const GameScreen(),
+          ),
+        );
+        if (mounted) {
+          unawaited(controller.audio.playTrack(BgmTrack.worldMap));
+        }
+      } finally {
+        _isLaunchingTempleSiege = false;
+      }
+    });
+  }
+
   void _checkOfflineOffertoryDialog(
     BuildContext context,
     GameController controller,
   ) {
     if (!controller.shouldShowOfflineOffertoryDialog ||
         _isOfflineOffertoryDialogOpen ||
+        _isLaunchingTempleSiege ||
         _isWeek0ScreamDialogOpen ||
         _isWeek10ArchmageDialogOpen ||
         _isInventoryDialogOpen ||
+        controller.isTempleSiegeActive ||
+        controller.currentWeek > GameController.maxCampaignWeeks ||
         controller.shouldShowWeek0ScreamWarning ||
         controller.shouldShowWeek10ArchmageWarning ||
         controller.pendingStoryChapter != null) {
@@ -346,7 +388,9 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     GameController controller,
   ) async {
     controller.audio.playTapVibrate();
-    controller.startNewBattle();
+    if (!controller.isTempleSiegeActive) {
+      controller.startNewBattle();
+    }
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => const GameScreen(),
@@ -389,11 +433,15 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     final loc = controller.localization;
     _syncPulseAnimation(controller.animationsEnabled);
 
+    _checkTempleSiegeAutoLaunch(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
-    _checkWeek0ScreamWarning(context, controller);
-    _checkWeek10ArchmageWarning(context, controller);
-    _checkOfflineOffertoryDialog(context, controller);
+    if (!controller.isTempleSiegeActive &&
+        controller.currentWeek <= GameController.maxCampaignWeeks) {
+      _checkWeek0ScreamWarning(context, controller);
+      _checkWeek10ArchmageWarning(context, controller);
+      _checkOfflineOffertoryDialog(context, controller);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0D14),
