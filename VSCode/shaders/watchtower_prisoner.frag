@@ -6,20 +6,50 @@ uniform float uTime;
 uniform float uIsFullScreen;
 uniform float uIsCrying;
 uniform float uAbdomenGrowth;
+uniform float uStageBlend;
+uniform float uBlinkEnabled;
 
 uniform sampler2D uBackground;
 uniform sampler2D uTextureA;
 uniform sampler2D uTextureB;
+uniform sampler2D uBlinkTexture;
 
 out vec4 fragColor;
 
-vec4 samplePrincess(vec2 uv, float growth) {
-  vec4 texA = texture(uTextureA, uv);
-  if (growth <= 0.0001) {
-    return texA;
+float evalBlinkFactor(float time, float enabled) {
+  if (enabled < 0.5) return 0.0;
+  // Natural periodic blink every ~4.2s: quick close (~70ms), brief hold (~60ms), gentle reopen (~90ms)
+  float phase = mod(time + 1.4, 4.2);
+  return smoothstep(0.0, 0.07, phase) * (1.0 - smoothstep(0.13, 0.22, phase));
+}
+
+vec4 samplePrincess(vec2 uv, float stageBlend, float blinkAmt) {
+  vec4 baseCol;
+  if (stageBlend <= 0.0001) {
+    baseCol = texture(uTextureA, uv);
+  } else if (stageBlend >= 0.9999) {
+    baseCol = texture(uTextureB, uv);
+  } else {
+    vec4 texFrom = texture(uTextureA, uv);
+    vec4 texTo = texture(uTextureB, uv);
+    baseCol = mix(texFrom, texTo, stageBlend);
   }
-  vec4 texB = texture(uTextureB, uv);
-  return mix(texA, texB, growth);
+
+  // Softly blend aligned closed-eyes blink frame strictly inside the eye region during early weeks
+  if (blinkAmt > 0.001 &&
+      uv.y > 0.292 && uv.y < 0.342 &&
+      uv.x > 0.412 && uv.x < 0.588) {
+    float eyeGate = smoothstep(0.292, 0.305, uv.y)
+                  * smoothstep(0.342, 0.328, uv.y)
+                  * smoothstep(0.412, 0.432, uv.x)
+                  * smoothstep(0.588, 0.568, uv.x);
+    float w = blinkAmt * eyeGate;
+    if (w > 0.001) {
+      vec4 blinkCol = texture(uBlinkTexture, uv);
+      baseCol = mix(baseCol, blinkCol, w);
+    }
+  }
+  return baseCol;
 }
 
 float hash21(vec2 p) {
@@ -242,9 +272,9 @@ void evalChestStream(
   }
 }
 
-// --- DOUBLE-TEXTURE PREGNANCY VOLUMETRIC DOME HELPER (Week 2..40) ---
+// --- PIECEWISE KEYFRAME PREGNANCY VOLUMETRIC DOME HELPER (Week 2..40) ---
 // Computes a smooth C1-continuous spherical dome height in [0, 1] matching the
-// drawn 9-month belly silhouette in princess_captive_crying_preg.png.
+// progressive belly silhouette across princess_crying_stage_0..4.png.
 // Used for synchronized gentle breathing heave and 3D top-down daylight /
 // underside shadow shading with zero UV pixel-stretching distortion.
 float evalAbdomenDomeHeight(vec2 uv, float growth) {
@@ -253,11 +283,11 @@ float evalAbdomenDomeHeight(vec2 uv, float growth) {
   float gSafe = max(growth, 1e-5);
   float radScale = mix(0.76, 1.0, pow(gSafe, 0.45));
 
-  vec2 center = vec2(0.445, 0.605);
+  vec2 center = vec2(0.450, 0.605);
   float rxL = 0.175 * radScale;
   float rxR = 0.175 * radScale;
-  float ryTop = 0.088 * radScale;
-  float ryBot = 0.092 * radScale;
+  float ryTop = 0.090 * radScale;
+  float ryBot = 0.095 * radScale;
 
   vec2 d = uv - center;
   float rx = (d.x < 0.0) ? rxL : rxR;
@@ -278,6 +308,8 @@ void main() {
   float isFull = clamp(uIsFullScreen, 0.0, 1.0);
   float isCry = step(0.5, uIsCrying);
   float abdomenGrowth = clamp(uAbdomenGrowth, 0.0, 1.0) * isCry;
+  float stageBlend = clamp(uStageBlend, 0.0, 1.0) * isCry;
+  float blinkAmt = evalBlinkFactor(uTime, uBlinkEnabled * isCry);
   float viewAspect = res.x / res.y;
   vec2 centered = uv - 0.5;
 
@@ -547,7 +579,7 @@ void main() {
       vec2 bellyBreathDisp = vec2(0.0);
       if (abdomenGrowth > 0.0001) {
         bellyDome = evalAbdomenDomeHeight(bellyAnimUv, abdomenGrowth);
-        vec2 bRel = bellyAnimUv - vec2(0.445, 0.605);
+        vec2 bRel = bellyAnimUv - vec2(0.450, 0.605);
         float breathWave = (breath - 0.5) * abdomenGrowth * bellyDome;
         bellyBreathDisp = vec2(
           bRel.x * 0.014 * breathWave,
@@ -559,16 +591,16 @@ void main() {
     }
 
     if (sampleUv.x > 0.003 && sampleUv.x < 0.997 && sampleUv.y > 0.003 && sampleUv.y < 0.997) {
-      vec4 fg = samplePrincess(sampleUv, abdomenGrowth);
+      vec4 fg = samplePrincess(sampleUv, stageBlend, blinkAmt);
       if (fg.a > 0.004) {
         vec3 fgRgb = clamp(fg.rgb / fg.a, 0.0, 1.0);
 
         // Silhouette edge normals for physical rim lighting
         float eps = 0.0025;
-        float aL = samplePrincess(sampleUv - vec2(eps, 0.0), abdomenGrowth).a;
-        float aR = samplePrincess(sampleUv + vec2(eps, 0.0), abdomenGrowth).a;
-        float aU = samplePrincess(sampleUv - vec2(0.0, eps), abdomenGrowth).a;
-        float aD = samplePrincess(sampleUv + vec2(0.0, eps), abdomenGrowth).a;
+        float aL = samplePrincess(sampleUv - vec2(eps, 0.0), stageBlend, 0.0).a;
+        float aR = samplePrincess(sampleUv + vec2(eps, 0.0), stageBlend, 0.0).a;
+        float aU = samplePrincess(sampleUv - vec2(0.0, eps), stageBlend, 0.0).a;
+        float aD = samplePrincess(sampleUv + vec2(0.0, eps), stageBlend, 0.0).a;
 
         // Ambient dungeon shading so princess sits naturally in the stone cell
         float shadeMinY = mix(0.92, 0.82, isCry);
@@ -591,7 +623,8 @@ void main() {
         float dEyeL = length((sampleUv - eyeLUv) * vec2(texAspect, 1.0));
         float dEyeR = length((sampleUv - eyeRUv) * vec2(texAspect, 1.0));
         float irisMask = smoothstep(0.013, 0.002, min(dEyeL, dEyeR))
-                       * smoothstep(0.03, 0.12, fgRgb.g - fgRgb.r);
+                       * smoothstep(0.03, 0.12, fgRgb.g - fgRgb.r)
+                       * (1.0 - blinkAmt);
         float eyeSparkle = 0.65 + 0.35 * sin(uTime * 2.1 + 0.7);
         fgRgb += vec3(0.65, 1.0, 0.90) * irisMask * eyeSparkle * 0.28;
 
@@ -667,8 +700,8 @@ void main() {
 
           // 3. Gentle curved underside self-shadow and crescent lap shadow tucked beneath the belly
           float underCurve = smoothstep(0.08, 0.58, bNormal.y) * smoothstep(0.05, 0.46, bellyDome);
-          float cySh = 0.605 + 0.086 * radScale;
-          float shU = (sampleUv.x - 0.445) / max(0.162 * radScale, 1e-4);
+          float cySh = 0.605 + 0.088 * radScale;
+          float shU = (sampleUv.x - 0.450) / max(0.162 * radScale, 1e-4);
           float arcY = cySh - 0.022 * shU * shU;
           float shV = (sampleUv.y - arcY) / max(0.024 * radScale, 1e-4);
           float castSh = exp(-(shU * shU * 1.15 + shV * shV * 2.2))
@@ -883,7 +916,7 @@ void main() {
           float wetAmt = clamp(tearWet, 0.0, 1.0);
           if (wetAmt > 0.01) {
             vec2 refUv = clamp(sampleUv - tearRefract * vec2(0.0024 / texAspect, 0.0024), 0.003, 0.997);
-            vec4 refFg = samplePrincess(refUv, abdomenGrowth);
+            vec4 refFg = samplePrincess(refUv, stageBlend, blinkAmt);
             if (refFg.a > 0.05) {
               vec3 refCol = clamp(refFg.rgb / refFg.a, 0.0, 1.0);
               fgRgb = mix(fgRgb, refCol * vec3(0.95, 0.99, 1.03), wetAmt * 0.55);
@@ -899,7 +932,7 @@ void main() {
           if (chestWet > 0.005 || chestMeniscus > 0.005 || chestSpec > 0.005) {
             if (chestWet > 0.01) {
               vec2 cRefUv = clamp(sampleUv - chestRefract * vec2(0.0022 / texAspect, 0.0022), 0.003, 0.997);
-              vec4 cRefFg = samplePrincess(cRefUv, abdomenGrowth);
+              vec4 cRefFg = samplePrincess(cRefUv, stageBlend, 0.0);
               if (cRefFg.a > 0.05) {
                 vec3 cRefCol = clamp(cRefFg.rgb / cRefFg.a, 0.0, 1.0);
                 fgRgb = mix(fgRgb, cRefCol * vec3(0.97, 0.99, 1.02), chestWet * 0.48);
