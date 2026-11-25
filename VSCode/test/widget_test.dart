@@ -2914,6 +2914,22 @@ void main() {
       ),
       findsNothing,
     );
+    final settingsFinder = find.byKey(const ValueKey('battle_settings_button'));
+    final settingsIconFinder = find.byIcon(Icons.settings_outlined);
+    expect(settingsFinder, findsOneWidget);
+    expect(settingsIconFinder, findsOneWidget);
+    expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
+    expect(tester.widget<Icon>(settingsIconFinder).size, equals(30.0));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('battle_top_hud_bar')),
+        matching: find.ancestor(
+          of: settingsFinder,
+          matching: find.byType(DecoratedBox),
+        ),
+      ),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
 
     // Gift Box starts locked and hidden from the AppBar
@@ -2931,14 +2947,20 @@ void main() {
     // Verify all action buttons / items are active and Shopping Cart is absent
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
+    final giftFinder = find.byKey(const ValueKey('gift_box_button'));
+    final resetFinder = find.byKey(const ValueKey('battle_reset_button'));
+    final resetIconFinder = find.byIcon(Icons.restart_alt);
+    expect(giftFinder, findsOneWidget);
     expect(find.text('🎁'), findsOneWidget);
-    expect(find.byIcon(Icons.restart_alt), findsOneWidget);
+    expect(resetFinder, findsOneWidget);
+    expect(resetIconFinder, findsOneWidget);
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
     expect(teleportFinder, findsOneWidget);
     expect(teleportIconFinder, findsOneWidget);
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(settingsFinder, findsOneWidget);
+    expect(settingsIconFinder, findsOneWidget);
 
-    // Both Backpack and Teleport Portal buttons maintain strict fixed size outside any Flexible wrapper
+    // All fixed-size top-bar buttons maintain strict fixed size outside any Flexible wrapper
     final crowdedSize = tester.getSize(backpackFinder);
     expect(crowdedSize, equals(const Size(54.0, 54.0)));
     expect(crowdedSize, equals(initialSize));
@@ -2949,6 +2971,25 @@ void main() {
 
     expect(tester.getSize(teleportFinder), equals(const Size(58.0, 58.0)));
     expect(tester.getSize(teleportIconFinder), equals(const Size(56.0, 56.0)));
+
+    expect(tester.getSize(giftFinder), equals(const Size(44.0, 44.0)));
+    expect(tester.getSize(resetFinder), equals(const Size(44.0, 44.0)));
+    expect(tester.widget<Icon>(resetIconFinder).size, equals(30.0));
+    expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
+    expect(tester.widget<Icon>(settingsIconFinder).size, equals(30.0));
+
+    for (final boxedBtn in [giftFinder, resetFinder, settingsFinder]) {
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('battle_top_hud_bar')),
+          matching: find.ancestor(
+            of: boxedBtn,
+            matching: find.byType(DecoratedBox),
+          ),
+        ),
+        findsOneWidget,
+      );
+    }
   });
 
   testWidgets('Rewarded Ad button switches cleanly between full label and compact video icon +50 based on available horizontal space', (WidgetTester tester) async {

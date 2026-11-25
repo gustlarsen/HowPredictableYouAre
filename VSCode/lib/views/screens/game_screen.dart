@@ -2003,6 +2003,21 @@ class _GameScreenState extends State<GameScreen>
         ? const Color(0xFF8A6D3B)
         : palette.sandCardBorder;
 
+    final actionBoxDecoration = BoxDecoration(
+      color: beveledBg,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: beveledBorder, width: 1.25),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(
+            alpha: palette.isDark ? 0.38 : 0.12,
+          ),
+          blurRadius: 4,
+          offset: const Offset(0, 1.5),
+        ),
+      ],
+    );
+
     return Padding(
       key: const ValueKey('battle_top_hud_bar'),
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
@@ -2095,52 +2110,63 @@ class _GameScreenState extends State<GameScreen>
           ),
           const SizedBox(width: 4),
 
-          // 3. Conditional Periodic Gift Button
+          // 3. Conditional Periodic Gift Button (Fixed 44x44 Beveled Frame)
           if (controller.shouldShowGiftBox) ...[
             SizedBox(
-              width: 36,
-              height: 36,
-              child: IconButton(
-                key: const ValueKey('gift_box_button'),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 36,
-                  height: 36,
+              width: 44,
+              height: 44,
+              child: DecoratedBox(
+                decoration: actionBoxDecoration,
+                child: IconButton(
+                  key: const ValueKey('gift_box_button'),
+                  padding: EdgeInsets.zero,
+                  iconSize: 26,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  icon: const Text('🎁', style: TextStyle(fontSize: 24)),
+                  tooltip: controller.giftTooltipMessage,
+                  onPressed: () {
+                    controller.claimGift();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(controller.giftClaimedMessage),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
                 ),
-                icon: const Text('🎁', style: TextStyle(fontSize: 20)),
-                tooltip: controller.giftTooltipMessage,
-                onPressed: () {
-                  controller.claimGift();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(controller.giftClaimedMessage),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
               ),
             ),
             const SizedBox(width: 4),
           ],
 
-          // 4. Conditional Reset Action Button
+          // 4. Conditional Reset Action Button (Fixed 44x44 Beveled Frame)
           if (controller.showReset) ...[
             SizedBox(
-              width: 36,
-              height: 36,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 36,
-                  height: 36,
+              width: 44,
+              height: 44,
+              child: DecoratedBox(
+                decoration: actionBoxDecoration,
+                child: IconButton(
+                  key: const ValueKey('battle_reset_button'),
+                  padding: EdgeInsets.zero,
+                  iconSize: 30,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  icon: Icon(
+                    Icons.restart_alt,
+                    size: 30,
+                    color: palette.isDark
+                        ? const Color(0xFFFF6B57)
+                        : const Color(0xFFD32F2F),
+                  ),
+                  tooltip: loc.t('string53', fallback: 'RESET'),
+                  onPressed: () => _confirmReset(context, controller, loc),
                 ),
-                icon: const Icon(
-                  Icons.restart_alt,
-                  size: 21,
-                  color: Colors.redAccent,
-                ),
-                tooltip: loc.t('string53', fallback: 'RESET'),
-                onPressed: () => _confirmReset(context, controller, loc),
               ),
             ),
             const SizedBox(width: 4),
@@ -2174,39 +2200,25 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
 
-          // 7. Beveled Dark Square Settings Button
+          // 7. Beveled Dark Square Settings Button (Fixed 44x44 Beveled Frame)
           SizedBox(
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: beveledBg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: beveledBorder, width: 1.15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: palette.isDark ? 0.38 : 0.12,
-                    ),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ],
-              ),
+              decoration: actionBoxDecoration,
               child: IconButton(
                 key: const ValueKey('battle_settings_button'),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  maxWidth: 36,
-                  minHeight: 36,
-                  maxHeight: 36,
+                iconSize: 30,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
                 ),
                 icon: Icon(
                   Icons.settings_outlined,
-                  size: 20,
+                  size: 30,
                   color: palette.isDark
                       ? const Color(0xFFD9C398)
                       : palette.primaryText,
