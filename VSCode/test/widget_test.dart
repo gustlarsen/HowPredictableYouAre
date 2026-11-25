@@ -25,6 +25,7 @@ import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
 import 'package:how_predictable/views/widgets/score_header.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
+import 'package:how_predictable/views/widgets/rpg_gift_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_reset_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_settings_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_teleport_portal_icon.dart';
@@ -2847,7 +2848,7 @@ void main() {
     expect(tester.getRect(find.byType(VersusArena)), equals(arenaRectBeforeScroll));
   });
 
-  testWidgets('Backpack button maintains strict fixed size (36x36 with 28px icon) and does not shrink when all top bar icons are active on narrow screens', (WidgetTester tester) async {
+  testWidgets('All 5 unboxed top-bar buttons (Backpack, Gift, Reset, Teleport, Settings) standardize at 38x38 inside fixed 42x42 tap targets without shrinking on narrow screens', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -2890,23 +2891,19 @@ void main() {
         find.byKey(const ValueKey('backpack_inventory_button'));
     expect(backpackFinder, findsOneWidget);
     final initialSize = tester.getSize(backpackFinder);
-    expect(initialSize, equals(const Size(54.0, 54.0)));
+    expect(initialSize, equals(const Size(42.0, 42.0)));
 
     final backpackIconFinder = find.byType(RpgBackpackIcon);
     expect(backpackIconFinder, findsOneWidget);
     final initialIconSize = tester.getSize(backpackIconFinder);
-    expect(initialIconSize, equals(const Size(52.0, 52.0)));
+    expect(initialIconSize, equals(const Size(38.0, 38.0)));
 
     final teleportFinder = find.byKey(const ValueKey('teleport_portal_button'));
     final teleportIconFinder = find.byType(RpgTeleportPortalIcon);
     expect(teleportFinder, findsOneWidget);
     expect(teleportIconFinder, findsOneWidget);
-    expect(tester.getSize(teleportFinder), equals(const Size(58.0, 58.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(56.0, 56.0)));
-    expect(
-      tester.getSize(teleportIconFinder).width,
-      greaterThan(initialIconSize.width),
-    );
+    expect(tester.getSize(teleportFinder), equals(const Size(42.0, 42.0)));
+    expect(tester.getSize(teleportIconFinder), equals(const Size(38.0, 38.0)));
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('battle_top_hud_bar')),
@@ -2922,7 +2919,7 @@ void main() {
     expect(settingsFinder, findsOneWidget);
     expect(settingsIconFinder, findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsNothing);
-    expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
+    expect(tester.getSize(settingsFinder), equals(const Size(42.0, 42.0)));
     expect(tester.getSize(settingsIconFinder), equals(const Size(38.0, 38.0)));
     expect(
       find.descendant(
@@ -2937,7 +2934,8 @@ void main() {
     expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
 
     // Gift Box starts locked and hidden from the AppBar
-    expect(find.text('🎁'), findsNothing);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+    expect(find.byType(RpgGiftIcon), findsNothing);
 
     // Activate ALL top bar icons: Rewarded Ad, Gift, Reset, Teleport, Settings
     controller.showReset = true;
@@ -2952,10 +2950,12 @@ void main() {
     expect(find.byKey(const ValueKey('backpack_inventory_button')), findsOneWidget);
     expect(find.byKey(const ValueKey('watch_rewarded_ad_button')), findsOneWidget);
     final giftFinder = find.byKey(const ValueKey('gift_box_button'));
+    final giftIconFinder = find.byType(RpgGiftIcon);
     final resetFinder = find.byKey(const ValueKey('battle_reset_button'));
     final resetIconFinder = find.byType(RpgResetIcon);
     expect(giftFinder, findsOneWidget);
-    expect(find.text('🎁'), findsOneWidget);
+    expect(giftIconFinder, findsOneWidget);
+    expect(find.text('🎁'), findsNothing);
     expect(resetFinder, findsOneWidget);
     expect(resetIconFinder, findsOneWidget);
     expect(find.byIcon(Icons.restart_alt), findsNothing);
@@ -2965,55 +2965,48 @@ void main() {
     expect(settingsFinder, findsOneWidget);
     expect(settingsIconFinder, findsOneWidget);
 
-    // All fixed-size top-bar buttons maintain strict fixed size outside any Flexible wrapper
-    final crowdedSize = tester.getSize(backpackFinder);
-    expect(crowdedSize, equals(const Size(54.0, 54.0)));
-    expect(crowdedSize, equals(initialSize));
-
-    final crowdedIconSize = tester.getSize(backpackIconFinder);
-    expect(crowdedIconSize, equals(const Size(52.0, 52.0)));
-    expect(crowdedIconSize, equals(initialIconSize));
-
-    expect(tester.getSize(teleportFinder), equals(const Size(58.0, 58.0)));
-    expect(tester.getSize(teleportIconFinder), equals(const Size(56.0, 56.0)));
-
-    expect(tester.getSize(giftFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.getSize(resetFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.getSize(resetIconFinder), equals(const Size(38.0, 38.0)));
-    expect(tester.getSize(settingsFinder), equals(const Size(44.0, 44.0)));
-    expect(tester.getSize(settingsIconFinder), equals(const Size(38.0, 38.0)));
-
-    // Reset, Teleport, and Settings render unboxed (no surrounding DecoratedBox)
-    for (final unboxedBtn in [resetFinder, teleportFinder, settingsFinder]) {
+    // All 5 top-bar buttons and their icons share exact 42x42 / 38x38 dimensions and vertical alignment
+    final buttonCenterY = tester.getCenter(backpackFinder).dy;
+    for (final btn in [
+      backpackFinder,
+      giftFinder,
+      resetFinder,
+      teleportFinder,
+      settingsFinder,
+    ]) {
+      expect(tester.getSize(btn), equals(const Size(42.0, 42.0)));
+      expect(tester.getCenter(btn).dy, closeTo(buttonCenterY, 0.5));
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('battle_top_hud_bar')),
           matching: find.ancestor(
-            of: unboxedBtn,
+            of: btn,
             matching: find.byType(DecoratedBox),
           ),
         ),
         findsNothing,
       );
     }
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('battle_top_hud_bar')),
-        matching: find.ancestor(
-          of: giftFinder,
-          matching: find.byType(DecoratedBox),
-        ),
-      ),
-      findsOneWidget,
-    );
+
+    for (final icon in [
+      backpackIconFinder,
+      giftIconFinder,
+      resetIconFinder,
+      teleportIconFinder,
+      settingsIconFinder,
+    ]) {
+      expect(tester.getSize(icon), equals(const Size(38.0, 38.0)));
+    }
   });
 
-  testWidgets('RpgResetIcon and RpgSettingsIcon render bespoke CustomPainter RPG illustrations cleanly with and without glow', (WidgetTester tester) async {
+  testWidgets('RpgGiftIcon, RpgResetIcon, and RpgSettingsIcon render bespoke CustomPainter RPG illustrations cleanly with and without glow', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
           body: Row(
             children: [
+              RpgGiftIcon(size: 38),
+              RpgGiftIcon(size: 44, showGlow: false),
               RpgResetIcon(size: 38),
               RpgResetIcon(size: 44, showGlow: false),
               RpgSettingsIcon(size: 38),
@@ -3025,12 +3018,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(RpgGiftIcon), findsNWidgets(2));
     expect(find.byType(RpgResetIcon), findsNWidgets(2));
     expect(find.byType(RpgSettingsIcon), findsNWidgets(2));
+    expect(tester.getSize(find.byType(RpgGiftIcon).first), equals(const Size(38.0, 38.0)));
+    expect(tester.getSize(find.byType(RpgGiftIcon).last), equals(const Size(44.0, 44.0)));
     expect(tester.getSize(find.byType(RpgResetIcon).first), equals(const Size(38.0, 38.0)));
     expect(tester.getSize(find.byType(RpgResetIcon).last), equals(const Size(44.0, 44.0)));
     expect(tester.getSize(find.byType(RpgSettingsIcon).first), equals(const Size(38.0, 38.0)));
     expect(tester.getSize(find.byType(RpgSettingsIcon).last), equals(const Size(44.0, 44.0)));
+    expect(
+      find.descendant(
+        of: find.byType(RpgGiftIcon).first,
+        matching: find.byType(CustomPaint),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.descendant(
         of: find.byType(RpgResetIcon).first,
@@ -3109,10 +3112,11 @@ void main() {
     // 3. As soon as icons are hidden/removed and horizontal space opens up:
     // User claims periodic gift -> Gift icon disappears
     controller.showReset = false;
-    await tester.tap(find.text('🎁'));
+    await tester.tap(find.byKey(const ValueKey('gift_box_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('🎁'), findsNothing);
+    expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
+    expect(find.byType(RpgGiftIcon), findsNothing);
     expect(find.byKey(const ValueKey('battle_reset_button')), findsNothing);
 
     // Space opens up -> automatically switches back to full "Watch Ad +50 Orbs" text pill
@@ -3467,7 +3471,7 @@ void main() {
     expect(controller.giftBoxUnlocked, isFalse);
     expect(controller.giftBoxEnabled, isFalse);
     expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
-    expect(find.text('🎁'), findsNothing);
+    expect(find.byType(RpgGiftIcon), findsNothing);
 
     // 2. Open Shop and scroll to Gift Box
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
@@ -3523,7 +3527,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('shop_close_button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('gift_box_button')), findsOneWidget);
-    expect(find.text('🎁'), findsOneWidget);
+    expect(find.byType(RpgGiftIcon), findsOneWidget);
 
     // 5. Claim periodic gift in Phase 1 -> +5 Fire/Water/Wood (0 Earth/Metal), enters cooldown, hides button
     await tester.tap(find.byKey(const ValueKey('gift_box_button')));

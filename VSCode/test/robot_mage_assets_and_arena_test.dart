@@ -537,7 +537,7 @@ void main() {
         ),
       );
       expect(hudBackpack.isOpen, isTrue);
-      expect(hudBackpack.size, 52.0);
+      expect(hudBackpack.size, 38.0);
       expect(hudBackpack.ownedOrbs, containsAll([HandMove.rock, HandMove.paper]));
       expect(find.byKey(const ValueKey('battle_week_counter_badge')), findsNothing);
       expect(find.text('WEEK 1 / 40'), findsNothing);

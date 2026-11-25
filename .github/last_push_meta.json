@@ -1,5 +1,5 @@
 {
-  "summary": "- Add scripts/update_push_meta.py to capture change summary and Antigravity /quota countdowns into .github/last_push_meta.json\n- Update GEMINI.md, AGENTS.md, and .antigravity/rules.md to generate and stage push metadata before every commit and push\n- Add Notify Telegram - Build Started step in .github/workflows/build_apk.yml to send immediate push summary and quota notification",
+  "summary": "- Created RpgGiftIcon CustomPainter treasure chest matching top-bar RPG art direction\n- Removed surrounding box from Gift button in GameScreen top HUD bar\n- Standardized Backpack, Gift, Reset, Teleport Portal, and Settings icons to 38x38 inside fixed 42x42 tap targets\n- Updated affected widget tests and verified flutter analyze & all 389 tests pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-25T15:08:47Z"
+  "updated_at_utc": "2026-11-25T15:59:19Z"
 }

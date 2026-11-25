@@ -19,6 +19,7 @@ import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
 import '../widgets/markov_matrix_view.dart';
 import '../widgets/rpg_backpack_icon.dart';
+import '../widgets/rpg_gift_icon.dart';
 import '../widgets/rpg_reset_icon.dart';
 import '../widgets/rpg_settings_icon.dart';
 import '../widgets/rpg_teleport_portal_icon.dart';
@@ -1989,7 +1990,6 @@ class _GameScreenState extends State<GameScreen>
     LocalizationService loc,
     bool inputsLocked,
   ) {
-    final palette = AppPalette.of(context);
     final ownedOrbs = <HandMove>{
       if (controller.fireOrbs > 0) HandMove.rock,
       if (controller.waterOrbs > 0) HandMove.paper,
@@ -1998,47 +1998,23 @@ class _GameScreenState extends State<GameScreen>
       if (controller.metalOrbs > 0) HandMove.spock,
     };
 
-    final beveledBg = palette.isDark
-        ? const Color(0xFF151922).withValues(alpha: 0.92)
-        : palette.dialogSurface.withValues(alpha: 0.95);
-    final beveledBorder = palette.isDark
-        ? const Color(0xFF8A6D3B)
-        : palette.sandCardBorder;
-
-    final actionBoxDecoration = BoxDecoration(
-      color: beveledBg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: beveledBorder, width: 1.25),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(
-            alpha: palette.isDark ? 0.38 : 0.12,
-          ),
-          blurRadius: 4,
-          offset: const Offset(0, 1.5),
-        ),
-      ],
-    );
-
     return Padding(
       key: const ValueKey('battle_top_hud_bar'),
       padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Oversized Open Leather Backpack anchored top-left
+          // 1. Unboxed Open Leather Backpack anchored top-left (Fixed 42x42 / 38x38)
           SizedBox(
-            width: 54,
-            height: 54,
+            width: 42,
+            height: 42,
             child: IconButton(
               key: const ValueKey('backpack_inventory_button'),
               padding: EdgeInsets.zero,
-              iconSize: 52,
-              constraints: const BoxConstraints(
-                minWidth: 54,
-                maxWidth: 54,
-                minHeight: 54,
-                maxHeight: 54,
+              iconSize: 38,
+              constraints: const BoxConstraints.tightFor(
+                width: 42,
+                height: 42,
               ),
               tooltip: loc.t(
                 'inventory_title',
@@ -2072,11 +2048,11 @@ class _GameScreenState extends State<GameScreen>
                   return Transform.scale(
                     scale: scale,
                     child: SizedBox(
-                      width: 52,
-                      height: 52,
+                      width: 38,
+                      height: 38,
                       child: RpgBackpackIcon(
                         key: _backpackKey,
-                        size: 52,
+                        size: 38,
                         isOpen: true,
                         ownedOrbs: ownedOrbs,
                         pulseColor: isPulsing ? pulseColor : null,
@@ -2088,7 +2064,7 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
 
           // 2. Adaptive Rewarded Video Pill (🎬 +50)
           Expanded(
@@ -2112,50 +2088,51 @@ class _GameScreenState extends State<GameScreen>
           ),
           const SizedBox(width: 4),
 
-          // 3. Conditional Periodic Gift Button (Fixed 44x44 Beveled Frame)
+          // 3. Conditional Unboxed RPG Treasure Gift Chest Button (Fixed 42x42 / 38x38)
           if (controller.shouldShowGiftBox) ...[
             SizedBox(
-              width: 44,
-              height: 44,
-              child: DecoratedBox(
-                decoration: actionBoxDecoration,
-                child: IconButton(
-                  key: const ValueKey('gift_box_button'),
-                  padding: EdgeInsets.zero,
-                  iconSize: 26,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 44,
-                    height: 44,
-                  ),
-                  icon: const Text('🎁', style: TextStyle(fontSize: 24)),
-                  tooltip: controller.giftTooltipMessage,
-                  onPressed: () {
-                    controller.claimGift();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(controller.giftClaimedMessage),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
+              width: 42,
+              height: 42,
+              child: IconButton(
+                key: const ValueKey('gift_box_button'),
+                padding: EdgeInsets.zero,
+                iconSize: 38,
+                constraints: const BoxConstraints.tightFor(
+                  width: 42,
+                  height: 42,
                 ),
+                icon: const SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: RpgGiftIcon(size: 38),
+                ),
+                tooltip: controller.giftTooltipMessage,
+                onPressed: () {
+                  controller.claimGift();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(controller.giftClaimedMessage),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(width: 4),
           ],
 
-          // 4. Conditional Unboxed Arcane Rewind / Reset Button (Fixed 44x44)
+          // 4. Conditional Unboxed Arcane Rewind / Reset Button (Fixed 42x42 / 38x38)
           if (controller.showReset) ...[
             SizedBox(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               child: IconButton(
                 key: const ValueKey('battle_reset_button'),
                 padding: EdgeInsets.zero,
                 iconSize: 38,
                 constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                 ),
                 icon: const SizedBox(
                   width: 38,
@@ -2169,19 +2146,17 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(width: 4),
           ],
 
-          // 6. Unboxed Spiral Arcane Portal Button (slightly larger than top-left Backpack)
+          // 6. Unboxed Spiral Arcane Portal Button (Fixed 42x42 / 38x38)
           SizedBox(
-            width: 58,
-            height: 58,
+            width: 42,
+            height: 42,
             child: IconButton(
               key: const ValueKey('teleport_portal_button'),
               padding: EdgeInsets.zero,
-              iconSize: 56,
-              constraints: const BoxConstraints(
-                minWidth: 58,
-                maxWidth: 58,
-                minHeight: 58,
-                maxHeight: 58,
+              iconSize: 38,
+              constraints: const BoxConstraints.tightFor(
+                width: 42,
+                height: 42,
               ),
               tooltip: loc.t(
                 'teleport_tooltip',
@@ -2191,25 +2166,25 @@ class _GameScreenState extends State<GameScreen>
                   ? null
                   : () => _handleTeleportTap(context, controller),
               icon: const SizedBox(
-                width: 56,
-                height: 56,
-                child: RpgTeleportPortalIcon(size: 56),
+                width: 38,
+                height: 38,
+                child: RpgTeleportPortalIcon(size: 38),
               ),
             ),
           ),
           const SizedBox(width: 4),
 
-          // 7. Unboxed Forged Arcane Gear Settings Button (Fixed 44x44)
+          // 7. Unboxed Forged Arcane Gear Settings Button (Fixed 42x42 / 38x38)
           SizedBox(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             child: IconButton(
               key: const ValueKey('battle_settings_button'),
               padding: EdgeInsets.zero,
               iconSize: 38,
               constraints: const BoxConstraints.tightFor(
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
               ),
               icon: const SizedBox(
                 width: 38,

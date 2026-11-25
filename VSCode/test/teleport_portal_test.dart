@@ -104,14 +104,14 @@ void main() {
 
         expect(find.byType(GameScreen), findsOneWidget);
 
-        // Shopping Cart is removed; Teleport Portal button is unboxed with fixed 58x58 / 56x56 size (slightly larger than 54x54 / 52x52 Backpack)
+        // Shopping Cart is removed; Teleport Portal button is unboxed with standardized 42x42 / 38x38 size matching the other top-bar icons
         expect(find.byIcon(Icons.shopping_cart_outlined), findsNothing);
         final teleportBtn = find.byKey(const ValueKey('teleport_portal_button'));
         final teleportIcon = find.byType(RpgTeleportPortalIcon);
         expect(teleportBtn, findsOneWidget);
         expect(teleportIcon, findsOneWidget);
-        expect(tester.getSize(teleportBtn), equals(const Size(58.0, 58.0)));
-        expect(tester.getSize(teleportIcon), equals(const Size(56.0, 56.0)));
+        expect(tester.getSize(teleportBtn), equals(const Size(42.0, 42.0)));
+        expect(tester.getSize(teleportIcon), equals(const Size(38.0, 38.0)));
         expect(
           find.descendant(
             of: find.byKey(const ValueKey('battle_top_hud_bar')),
