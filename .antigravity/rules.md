@@ -10,9 +10,10 @@
 3. **Abort & Advise on Conflicts:** If a user prompt asks for something unsupported or prohibited by the platform SDK, do NOT modify any code. Instead, stop immediately, explain the exact SDK/platform limitation clearly, and propose the official compliant UX alternative.
 
 ## Mandatory Git Workflow (Every Prompt)
-Upon completing any code, asset, configuration, test, or documentation changes in this repository:
-1. Stage all changes: `git add .` (or specific modified files).
-2. Commit with a descriptive Conventional Commits message (e.g., `git commit -m "feat: ..."` or `fix: ...`).
-3. Push immediately to the remote branch: `git push origin main`.
+Upon completing any code, asset, configuration, test, or documentation changes in this repository, **before every `git commit` and `git push origin main`**, you must:
+1. Run `python3 scripts/update_push_meta.py --summary "<concise bulleted Summary of Changes>"` summarizing what was implemented or fixed.
+2. Stage all changes and include `.github/last_push_meta.json` in `git add` (e.g., `git add .` or explicitly including `.github/last_push_meta.json` with modified files) so it is pushed with the commit.
+3. Commit with a descriptive Conventional Commits message (e.g., `git commit -m "feat: ..."` or `fix: ...`).
+4. Push immediately to the remote branch: `git push origin main`.
 
 This rule applies to all agents, tools, chats, and CLI sessions working in this repository on any machine. Do not complete a task turn with uncommitted/unpushed changes.

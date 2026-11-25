@@ -1,0 +1,5 @@
+{
+  "summary": "- Add scripts/update_push_meta.py to capture change summary and Antigravity /quota countdowns into .github/last_push_meta.json\n- Update GEMINI.md, AGENTS.md, and .antigravity/rules.md to generate and stage push metadata before every commit and push\n- Add Notify Telegram - Build Started step in .github/workflows/build_apk.yml to send immediate push summary and quota notification",
+  "quota": "Quota status unavailable in this environment",
+  "updated_at_utc": "2026-11-25T15:08:47Z"
+}

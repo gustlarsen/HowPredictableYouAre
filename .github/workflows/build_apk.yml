@@ -25,6 +25,114 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Notify Telegram - Build Started
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.error
+          import urllib.request
+
+          token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+          chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+          if not token or not chat_id:
+              print("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured. Skipping build-started Telegram notification.")
+              sys.exit(0)
+
+          branch = os.environ.get("GITHUB_REF_NAME", "").strip() or "main"
+
+          try:
+              short_commit = subprocess.check_output(
+                  ["git", "rev-parse", "--short", "HEAD"],
+                  text=True,
+                  encoding="utf-8",
+                  errors="replace",
+              ).strip()
+          except Exception:
+              short_commit = "unknown"
+
+          meta_path = os.path.join(".github", "last_push_meta.json")
+          meta_modified = False
+          try:
+              changed_files = subprocess.check_output(
+                  ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+                  text=True,
+                  encoding="utf-8",
+                  errors="replace",
+              ).splitlines()
+              meta_modified = ".github/last_push_meta.json" in [f.strip() for f in changed_files]
+          except Exception as exc:
+              print(f"Warning: could not inspect changed files in HEAD: {exc}", file=sys.stderr)
+
+          summary = ""
+          quota = ""
+          if meta_modified and os.path.isfile(meta_path):
+              try:
+                  with open(meta_path, "r", encoding="utf-8") as f:
+                      meta = json.load(f)
+                  summary = str(meta.get("summary", "")).strip()
+                  quota = str(meta.get("quota", "")).strip()
+              except Exception as exc:
+                  print(f"Warning: failed to read {meta_path}: {exc}", file=sys.stderr)
+
+          if not summary:
+              try:
+                  summary = subprocess.check_output(
+                      ["git", "log", "-1", "--pretty=%B"],
+                      text=True,
+                      encoding="utf-8",
+                      errors="replace",
+                  ).strip()
+              except Exception:
+                  summary = "No commit summary available."
+
+          if not meta_modified or not quota:
+              quota = "Quota status not attached to this commit"
+
+          message = (
+              f"📤 Push Received — GitHub Actions Started!\n\n"
+              f"🌿 Branch: {branch}\n"
+              f"🔗 Commit: {short_commit}\n\n"
+              f"📝 Summary of Changes:\n"
+              f"{summary}\n\n"
+              f"📊 Antigravity Quota Status:\n"
+              f"{quota}\n\n"
+              f"⏳ Building APK & AAB now... You will be notified once the GitHub Release and Google Play upload finish."
+          )
+
+          if len(message) >= 4000:
+              message = message[:3980] + "\n... (truncated)"
+
+          url = f"https://api.telegram.org/bot{token}/sendMessage"
+          payload = json.dumps({
+              "chat_id": chat_id,
+              "text": message,
+              "disable_web_page_preview": True,
+          }).encode("utf-8")
+
+          req = urllib.request.Request(
+              url,
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  body = resp.read().decode("utf-8", errors="replace")
+                  print("Telegram build-started response:", body)
+          except urllib.error.HTTPError as exc:
+              err_body = exc.read().decode("utf-8", errors="replace")
+              print(f"HTTPError sending build-started Telegram notification: {exc.code} - {err_body}", file=sys.stderr)
+          except Exception as exc:
+              print(f"Error sending build-started Telegram notification: {exc}", file=sys.stderr)
+          EOF
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
