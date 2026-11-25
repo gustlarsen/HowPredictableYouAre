@@ -9,6 +9,7 @@ import '../../models/move.dart';
 import '../../models/sacred_blessing.dart';
 import '../../models/story_chapter.dart';
 import '../../services/ad_service.dart';
+import '../../services/audio_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
@@ -173,12 +174,16 @@ class _GameScreenState extends State<GameScreen>
       _lastHandledOrbCollectionEventId = nextController.orbCollectionEventId;
       _lastHandledTurnCount = nextController.turnCount;
       nextController.captureTurn0SnapshotOnBattleEntry();
+      unawaited(nextController.audio.playTrack(BgmTrack.battle));
     }
     _syncAtmosphereAnimations(nextController);
   }
 
   @override
   void dispose() {
+    if (_controller?.audio.currentTrack == BgmTrack.battle) {
+      unawaited(_controller!.audio.playTrack(BgmTrack.worldMap));
+    }
     _cancelOverchargedTimersOnly();
     _overchargedChargeController.dispose();
     _overchargedPulseController.dispose();

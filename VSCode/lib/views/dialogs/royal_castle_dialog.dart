@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../models/royal_castle.dart';
+import '../../services/audio_service.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import '../screens/intro_story_screen.dart';
@@ -27,11 +29,13 @@ enum CastleWing {
 class RoyalCastleDialog extends StatefulWidget {
   final GameController controller;
   final CastleWing initialWing;
+  final BgmTrack? returnTrack;
 
   const RoyalCastleDialog({
     super.key,
     required this.controller,
     this.initialWing = CastleWing.throneRoom,
+    this.returnTrack,
   });
 
   @override
@@ -44,6 +48,7 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   static const Color _alertRed = Color(0xFFE53935);
 
   late CastleWing _selectedWing;
+  late BgmTrack _returnBgmTrack;
   final ScrollController _wingScrollController = ScrollController();
 
   GameController get controller => widget.controller;
@@ -52,10 +57,18 @@ class _RoyalCastleDialogState extends State<RoyalCastleDialog> {
   void initState() {
     super.initState();
     _selectedWing = widget.initialWing;
+    _returnBgmTrack = widget.returnTrack ??
+        (controller.audio.currentTrack == BgmTrack.battle
+            ? BgmTrack.battle
+            : BgmTrack.worldMap);
+    unawaited(controller.audio.playTrack(BgmTrack.royalCastle));
   }
 
   @override
   void dispose() {
+    if (controller.audio.currentTrack == BgmTrack.royalCastle) {
+      unawaited(controller.audio.playTrack(_returnBgmTrack));
+    }
     _wingScrollController.dispose();
     super.dispose();
   }

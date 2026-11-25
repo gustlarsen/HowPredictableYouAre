@@ -56,6 +56,18 @@ class DefaultAudioPlayerClient implements AudioPlayerClient {
   Future<void> dispose() => _player.dispose();
 }
 
+/// Background music tracks routed across the World Map, location hubs, and battles.
+enum BgmTrack {
+  worldMap('audio/world_map.mid'),
+  sacredTemple('audio/sacred_temple.mid'),
+  royalCastle('audio/royal_castle.mid'),
+  watchTower('audio/watch_tower.mid'),
+  battle('audio/battle.mid');
+
+  final String assetPath;
+  const BgmTrack(this.assetPath);
+}
+
 class AudioService with WidgetsBindingObserver {
   static const MethodChannel vibratorChannel = MethodChannel(
     'com.gustlarsen.howpredictable/vibrator',
@@ -70,6 +82,13 @@ class AudioService with WidgetsBindingObserver {
   static const Duration rapidFireHapticMinInterval = Duration(milliseconds: 120);
   static const Duration rapidFireSfxMinInterval = Duration(milliseconds: 120);
 
+  static const double targetBgmVolume = 0.55;
+  static const Duration defaultFadeDuration = Duration(milliseconds: 260);
+  static const int defaultFadeSteps = 8;
+
+  final Duration _fadeDuration;
+  final int _fadeSteps;
+
   AudioPlayerClient? _sfxPlayer;
   AudioPlayerClient? _bgmPlayer;
   bool _isObserverRegistered = false;
@@ -78,6 +97,13 @@ class AudioService with WidgetsBindingObserver {
   bool _isMusicPlaying = false;
   bool _hasLoadedMusicSource = false;
   bool _wasPlayingBeforeBackground = false;
+  BgmTrack _currentTrack = BgmTrack.worldMap;
+  BgmTrack? _loadedTrack;
+  BgmTrack? _activeTransitionTrack;
+  double _currentBgmVolume = targetBgmVolume;
+  int _transitionToken = 0;
+  Timer? _fadeTimer;
+  Completer<void>? _fadeStepCompleter;
   bool _isRapidFireHapticOnCooldown = false;
   Timer? _rapidFireHapticCooldownTimer;
   bool _isRapidFireSfxOnCooldown = false;
@@ -95,6 +121,15 @@ class AudioService with WidgetsBindingObserver {
   @visibleForTesting
   bool get isObserverRegistered => _isObserverRegistered;
 
+  /// The logical BGM track currently selected for the active screen or modal.
+  BgmTrack get currentTrack => _currentTrack;
+
+  @visibleForTesting
+  BgmTrack? get loadedTrack => _loadedTrack;
+
+  @visibleForTesting
+  double get currentBgmVolume => _currentBgmVolume;
+
   bool soundEnabled = true;
   bool _musicEnabled = true;
   bool vibrationEnabled = true;
@@ -104,14 +139,21 @@ class AudioService with WidgetsBindingObserver {
     _musicEnabled = value;
     if (!value) {
       _wasPlayingBeforeBackground = false;
+      _transitionToken++;
+      _activeTransitionTrack = null;
+      _cancelFadeTimer();
     }
   }
 
   AudioService({
     AudioPlayerClient? sfxPlayer,
     AudioPlayerClient? bgmPlayer,
+    Duration fadeDuration = defaultFadeDuration,
+    int fadeSteps = defaultFadeSteps,
   }) : _sfxPlayer = sfxPlayer,
-       _bgmPlayer = bgmPlayer;
+       _bgmPlayer = bgmPlayer,
+       _fadeDuration = fadeDuration,
+       _fadeSteps = fadeSteps < 1 ? 1 : fadeSteps;
 
   Future<void> init({bool observeAppLifecycle = true}) async {
     _isDisposed = false;
@@ -141,11 +183,84 @@ class AudioService with WidgetsBindingObserver {
       await _bgmPlayer!.setAudioContext(audioContext);
       await _sfxPlayer!.setAudioContext(audioContext);
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer!.setVolume(0.55);
+      await _setBgmVolume(targetBgmVolume);
       await _sfxPlayer!.setVolume(1.0);
     } catch (error) {
       debugPrint('Could not initialize audio: $error');
     }
+  }
+
+  Future<void> _setBgmVolume(double volume) async {
+    final clamped = volume.clamp(0.0, 1.0);
+    _currentBgmVolume = clamped;
+    await _bgmPlayer?.setVolume(clamped);
+  }
+
+  void _cancelFadeTimer() {
+    _fadeTimer?.cancel();
+    _fadeTimer = null;
+    final completer = _fadeStepCompleter;
+    _fadeStepCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  Future<void> _waitFadeStep(Duration delay) {
+    _cancelFadeTimer();
+    final completer = Completer<void>();
+    _fadeStepCompleter = completer;
+    _fadeTimer = Timer(delay, () {
+      _fadeTimer = null;
+      if (identical(_fadeStepCompleter, completer)) {
+        _fadeStepCompleter = null;
+      }
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  bool _shouldAbortTransition(int token) {
+    if (token != _transitionToken || _isDisposed) {
+      return true;
+    }
+    if (!musicEnabled) {
+      _isMusicPlaying = false;
+      return true;
+    }
+    if (_isAppInBackground) {
+      _isMusicPlaying = false;
+      _wasPlayingBeforeBackground = true;
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _rampBgmVolume({
+    required double from,
+    required double to,
+    required Duration duration,
+    required int token,
+  }) async {
+    final steps = _fadeSteps;
+    final stepMs = (duration.inMilliseconds / steps).round();
+    final stepDelay = Duration(milliseconds: stepMs < 1 ? 1 : stepMs);
+
+    for (int i = 1; i <= steps; i++) {
+      await _waitFadeStep(stepDelay);
+      if (_shouldAbortTransition(token)) {
+        return false;
+      }
+      final t = i / steps;
+      final nextVolume = (from + (to - from) * t).clamp(0.0, 1.0);
+      await _setBgmVolume(nextVolume);
+      if (_shouldAbortTransition(token)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override
@@ -164,7 +279,11 @@ class AudioService with WidgetsBindingObserver {
       _isAppInBackground = true;
       final isCurrentlyPlaying =
           _isMusicPlaying ||
+          _activeTransitionTrack != null ||
           (!wasAlreadyInBackground && _bgmPlayer?.state == PlayerState.playing);
+      _transitionToken++;
+      _activeTransitionTrack = null;
+      _cancelFadeTimer();
       if (isCurrentlyPlaying) {
         _wasPlayingBeforeBackground = true;
         _isMusicPlaying = false;
@@ -179,9 +298,13 @@ class AudioService with WidgetsBindingObserver {
       if (_wasPlayingBeforeBackground) {
         _wasPlayingBeforeBackground = false;
         if (!musicEnabled || _bgmPlayer == null) return;
-        if (_bgmPlayer!.state == PlayerState.paused || _hasLoadedMusicSource) {
+        final canResumeSameTrack =
+            _loadedTrack == _currentTrack &&
+            (_bgmPlayer!.state == PlayerState.paused || _hasLoadedMusicSource);
+        if (canResumeSameTrack) {
           _isMusicPlaying = true;
           try {
+            await _setBgmVolume(targetBgmVolume);
             await _bgmPlayer!.resume();
             if (_isDisposed || !musicEnabled) {
               _isMusicPlaying = false;
@@ -196,7 +319,7 @@ class AudioService with WidgetsBindingObserver {
             debugPrint('Could not resume background music: $error');
           }
         } else {
-          await startMusic();
+          await playTrack(_currentTrack, fade: false);
         }
       }
     }
@@ -377,54 +500,165 @@ class AudioService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> startMusic() async {
-    if (_isDisposed || !musicEnabled) return;
+  /// Switches background music to [track] with a smooth fade-out / fade-in transition.
+  ///
+  /// - If [track] is already active and playing (or currently transitioning in),
+  ///   keeps it playing seamlessly without restarting from bar 1.
+  /// - Always updates [currentTrack] even if muted or backgrounded so unmuting
+  ///   or foregrounding resumes the right track.
+  Future<void> playTrack(BgmTrack track, {bool fade = true}) async {
+    if (_isDisposed) return;
+
+    final isAlreadyPlayingSameTrack =
+        _currentTrack == track &&
+        (_activeTransitionTrack == track ||
+            (_loadedTrack == track &&
+                _isMusicPlaying &&
+                _bgmPlayer?.state == PlayerState.playing));
+
+    _currentTrack = track;
+
+    if (!musicEnabled) return;
     if (_isAppInBackground) {
       _wasPlayingBeforeBackground = true;
       return;
     }
     if (_bgmPlayer == null) return;
-    if (_isMusicPlaying && _bgmPlayer!.state == PlayerState.playing) return;
+    if (isAlreadyPlayingSameTrack) return;
+
+    // If we were mid-fade-out from `track` and cancelled back to `track`,
+    // keep the loaded source playing without restarting and restore volume.
+    if (_loadedTrack == track &&
+        _hasLoadedMusicSource &&
+        _bgmPlayer!.state == PlayerState.playing) {
+      final token = ++_transitionToken;
+      _cancelFadeTimer();
+      _activeTransitionTrack = track;
+      _isMusicPlaying = true;
+      _wasPlayingBeforeBackground = false;
+      try {
+        if (fade &&
+            _fadeDuration > Duration.zero &&
+            _currentBgmVolume < targetBgmVolume) {
+          await _rampBgmVolume(
+            from: _currentBgmVolume,
+            to: targetBgmVolume,
+            duration: _fadeDuration,
+            token: token,
+          );
+        } else {
+          await _setBgmVolume(targetBgmVolume);
+        }
+      } catch (error) {
+        debugPrint('Could not restore background music volume: $error');
+      } finally {
+        if (token == _transitionToken && _activeTransitionTrack == track) {
+          _activeTransitionTrack = null;
+        }
+      }
+      return;
+    }
+
+    final shouldFade =
+        fade &&
+        _fadeDuration > Duration.zero &&
+        (_isMusicPlaying || _bgmPlayer!.state == PlayerState.playing) &&
+        _loadedTrack != null &&
+        _loadedTrack != track;
+
+    final token = ++_transitionToken;
+    _cancelFadeTimer();
+    _activeTransitionTrack = track;
     _wasPlayingBeforeBackground = false;
-    _isMusicPlaying = true;
+
     try {
+      if (shouldFade) {
+        final fadeOutDone = await _rampBgmVolume(
+          from: _currentBgmVolume,
+          to: 0.0,
+          duration: _fadeDuration,
+          token: token,
+        );
+        if (!fadeOutDone) return;
+      }
+
+      if (_shouldAbortTransition(token)) return;
+
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+      if (_shouldAbortTransition(token)) return;
+
+      if (shouldFade) {
+        await _setBgmVolume(0.0);
+      } else {
+        await _setBgmVolume(targetBgmVolume);
+      }
+      if (_shouldAbortTransition(token)) return;
+
+      _isMusicPlaying = true;
+      await _bgmPlayer!.play(AssetSource(track.assetPath));
+      _hasLoadedMusicSource = true;
+      _loadedTrack = track;
+
       if (_isDisposed || !musicEnabled) {
         _isMusicPlaying = false;
+        _wasPlayingBeforeBackground = false;
+        _hasLoadedMusicSource = false;
+        _loadedTrack = null;
+        if (_activeTransitionTrack == track) {
+          _activeTransitionTrack = null;
+        }
+        await _bgmPlayer!.stop();
         return;
       }
       if (_isAppInBackground) {
         _isMusicPlaying = false;
         _wasPlayingBeforeBackground = true;
+        if (_activeTransitionTrack == track) {
+          _activeTransitionTrack = null;
+        }
+        await _bgmPlayer!.pause();
         return;
       }
-      await _bgmPlayer!.play(AssetSource('audio/battle.mid'));
-      _hasLoadedMusicSource = true;
-      if (_isDisposed || !musicEnabled) {
-        _isMusicPlaying = false;
-        _wasPlayingBeforeBackground = false;
-        _hasLoadedMusicSource = false;
-        await _bgmPlayer!.stop();
-      } else if (_isAppInBackground) {
-        _isMusicPlaying = false;
-        _wasPlayingBeforeBackground = true;
-        await _bgmPlayer!.pause();
+      if (token != _transitionToken) return;
+
+      if (shouldFade) {
+        await _rampBgmVolume(
+          from: 0.0,
+          to: targetBgmVolume,
+          duration: _fadeDuration,
+          token: token,
+        );
       }
     } catch (error) {
-      _isMusicPlaying = false;
-      debugPrint('Could not play background music: $error');
+      if (token == _transitionToken) {
+        _isMusicPlaying = false;
+        _activeTransitionTrack = null;
+      }
+      debugPrint('Could not play background music (${track.assetPath}): $error');
+    } finally {
+      if (token == _transitionToken && _activeTransitionTrack == track) {
+        _activeTransitionTrack = null;
+      }
     }
   }
+
+  Future<void> startMusic() => playTrack(_currentTrack, fade: false);
 
   Future<void> stopMusic() async {
     final wasActive =
         _isMusicPlaying ||
         _hasLoadedMusicSource ||
+        _activeTransitionTrack != null ||
         _bgmPlayer?.state == PlayerState.playing ||
         _bgmPlayer?.state == PlayerState.paused;
+    _transitionToken++;
+    _activeTransitionTrack = null;
+    _cancelFadeTimer();
     _isMusicPlaying = false;
     _wasPlayingBeforeBackground = false;
     _hasLoadedMusicSource = false;
+    _loadedTrack = null;
+    _currentBgmVolume = targetBgmVolume;
     if (!wasActive) return;
     try {
       await _bgmPlayer?.stop();
@@ -434,6 +668,9 @@ class AudioService with WidgetsBindingObserver {
   }
 
   Future<void> pauseMusic() async {
+    _transitionToken++;
+    _activeTransitionTrack = null;
+    _cancelFadeTimer();
     _isMusicPlaying = false;
     try {
       await _bgmPlayer?.pause();
@@ -449,10 +686,18 @@ class AudioService with WidgetsBindingObserver {
       return;
     }
     if (_bgmPlayer == null) return;
-    if (_isMusicPlaying && _bgmPlayer!.state == PlayerState.playing) return;
+    if (_isMusicPlaying &&
+        _loadedTrack == _currentTrack &&
+        _bgmPlayer!.state == PlayerState.playing) {
+      return;
+    }
     try {
-      if (_bgmPlayer!.state == PlayerState.paused || _hasLoadedMusicSource) {
+      final canResumeSameTrack =
+          _loadedTrack == _currentTrack &&
+          (_bgmPlayer!.state == PlayerState.paused || _hasLoadedMusicSource);
+      if (canResumeSameTrack) {
         _isMusicPlaying = true;
+        await _setBgmVolume(targetBgmVolume);
         await _bgmPlayer!.resume();
         if (_isDisposed || !musicEnabled) {
           _isMusicPlaying = false;
@@ -462,8 +707,8 @@ class AudioService with WidgetsBindingObserver {
           _wasPlayingBeforeBackground = true;
           await _bgmPlayer!.pause();
         }
-      } else if (_bgmPlayer!.state != PlayerState.playing) {
-        await startMusic();
+      } else {
+        await playTrack(_currentTrack, fade: false);
       }
     } catch (error) {
       _isMusicPlaying = false;
@@ -473,6 +718,9 @@ class AudioService with WidgetsBindingObserver {
 
   void dispose() {
     _isDisposed = true;
+    _transitionToken++;
+    _activeTransitionTrack = null;
+    _cancelFadeTimer();
     if (_isObserverRegistered) {
       try {
         WidgetsBinding.instance.removeObserver(this);
@@ -482,6 +730,7 @@ class AudioService with WidgetsBindingObserver {
     _wasPlayingBeforeBackground = false;
     _isMusicPlaying = false;
     _hasLoadedMusicSource = false;
+    _loadedTrack = null;
     _rapidFireHapticCooldownTimer?.cancel();
     _rapidFireHapticCooldownTimer = null;
     _isRapidFireHapticOnCooldown = false;

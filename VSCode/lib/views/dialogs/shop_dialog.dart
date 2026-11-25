@@ -5,6 +5,7 @@ import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../models/sacred_blessing.dart';
 import '../../services/ad_service.dart';
+import '../../services/audio_service.dart';
 import '../../services/billing_service.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
@@ -146,10 +147,16 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
 
   bool _restoredDuringCurrentRequest = false;
   bool _errorDuringCurrentRequest = false;
+  late BgmTrack _returnBgmTrack;
+  bool _suppressBgmRestoreOnDispose = false;
 
   @override
   void initState() {
     super.initState();
+    _returnBgmTrack = controller.audio.currentTrack == BgmTrack.battle
+        ? BgmTrack.battle
+        : BgmTrack.worldMap;
+    unawaited(controller.audio.playTrack(BgmTrack.sacredTemple));
     _selectedWing =
         widget.initialWing ??
         (widget.fromTemple ? TempleWing.consagration : TempleWing.offerings);
@@ -209,6 +216,10 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    if (!_suppressBgmRestoreOnDispose &&
+        controller.audio.currentTrack == BgmTrack.sacredTemple) {
+      unawaited(controller.audio.playTrack(_returnBgmTrack));
+    }
     _stopHoldTransmute();
     _stopHoldConsagration();
     _offertoryLiveTimer?.cancel();
@@ -1185,6 +1196,8 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   void _navigateToHallOfHeroes() {
     _stopHoldConsagration();
     controller.audio.playTapVibrate();
+    _suppressBgmRestoreOnDispose = true;
+    unawaited(controller.audio.playTrack(BgmTrack.royalCastle));
     final nav = Navigator.of(context);
     if (nav.canPop()) {
       nav.pop();
@@ -1194,6 +1207,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       builder: (_) => RoyalCastleDialog(
         controller: controller,
         initialWing: CastleWing.hallOfHeroes,
+        returnTrack: _returnBgmTrack,
       ),
     );
   }

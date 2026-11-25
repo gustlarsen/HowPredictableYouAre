@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../services/audio_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/watch_tower_icon.dart';
 import 'help_dialog.dart';
@@ -10,12 +12,37 @@ import 'story_gallery_dialog.dart';
 import 'watchtower_spyglass_dialog.dart';
 import 'world_map_war_dialog.dart';
 
+/// Alias so callers can refer to the Watch Tower hub as [WatchTowerDialog]
+/// or [ObservatoryDialog].
+typedef WatchTowerDialog = ObservatoryDialog;
+
 /// Watch Tower landmark dialog: displays Star-Gazer strategy hints,
 /// Markov Chain insights, dual spyglass observation buttons, and Story Log / Help.
-class ObservatoryDialog extends StatelessWidget {
+class ObservatoryDialog extends StatefulWidget {
   final GameController controller;
 
   const ObservatoryDialog({super.key, required this.controller});
+
+  @override
+  State<ObservatoryDialog> createState() => _ObservatoryDialogState();
+}
+
+class _ObservatoryDialogState extends State<ObservatoryDialog> {
+  GameController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(controller.audio.playTrack(BgmTrack.watchTower));
+  }
+
+  @override
+  void dispose() {
+    if (controller.audio.currentTrack == BgmTrack.watchTower) {
+      unawaited(controller.audio.playTrack(BgmTrack.worldMap));
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

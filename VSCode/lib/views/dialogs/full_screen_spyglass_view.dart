@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
+import '../../services/audio_service.dart';
 import '../widgets/watchtower_cell_shader_view.dart';
 import '../widgets/watchtower_forge_view.dart';
 import 'metal_wizard_spyglass_dialog.dart';
@@ -63,10 +65,14 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
   Animation<Matrix4>? _zoomAnimation;
   Offset _doubleTapLocalPosition = Offset.zero;
   Size _viewportSize = Size.zero;
+  late final bool _openedFromWatchTower;
 
   @override
   void initState() {
     super.initState();
+    _openedFromWatchTower =
+        widget.controller.audio.currentTrack == BgmTrack.watchTower;
+    unawaited(widget.controller.audio.playTrack(BgmTrack.watchTower));
     _zoomAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 260),
@@ -80,6 +86,10 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
 
   @override
   void dispose() {
+    if (!_openedFromWatchTower &&
+        widget.controller.audio.currentTrack == BgmTrack.watchTower) {
+      unawaited(widget.controller.audio.playTrack(BgmTrack.worldMap));
+    }
     _zoomAnimController.dispose();
     _transformationController.dispose();
     super.dispose();

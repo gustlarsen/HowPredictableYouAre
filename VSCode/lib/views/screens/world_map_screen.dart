@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
+import '../../services/audio_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
@@ -81,6 +82,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     final nextController = context.read<GameController>();
     if (_controller != nextController) {
       _controller = nextController;
+      unawaited(nextController.audio.playTrack(BgmTrack.worldMap));
     }
     _syncPulseAnimation(nextController.animationsEnabled);
   }
@@ -350,6 +352,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         builder: (_) => const GameScreen(),
       ),
     );
+    unawaited(controller.audio.playTrack(BgmTrack.worldMap));
     if (context.mounted) {
       _checkWeek0ScreamWarning(context, controller);
       _checkWeek10ArchmageWarning(context, controller);

@@ -87,6 +87,10 @@ flutter:
     - assets/images/story/
     - assets/data/
     - assets/audio/
+    - assets/audio/world_map.mid
+    - assets/audio/sacred_temple.mid
+    - assets/audio/royal_castle.mid
+    - assets/audio/watch_tower.mid
 
   shaders:
     - shaders/watchtower_prisoner.frag
