@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -122,6 +123,53 @@ class _VersusArenaState extends State<VersusArena>
   int? _pendingPcHp;
   bool _activeUserDamage = false;
   bool _activePcDamage = false;
+  int? _precachedBossStage;
+
+  static List<String> _actionSpritesForStage(int enemyStage) {
+    switch (enemyStage) {
+      case 2:
+        return const [
+          'assets/images/enemies/robot_archmage_idle.png',
+          'assets/images/enemies/robot_archmage_hit.png',
+        ];
+      case 4:
+        return const [
+          'assets/images/enemies/baby_robot_mage_idle.png',
+          'assets/images/enemies/baby_robot_mage_hit.png',
+        ];
+      case 3:
+        return const [
+          'assets/images/enemies/metal_wizard_idle.png',
+        ];
+      case 5:
+        return const [
+          'assets/images/enemies/temple_master_idle.png',
+        ];
+      default:
+        return const [
+          'assets/images/enemies/guardian_robot_idle.png',
+          'assets/images/enemies/guardian_robot_attack.png',
+          'assets/images/enemies/guardian_robot_hit.png',
+        ];
+    }
+  }
+
+  void _precacheBossSprites(int stage) {
+    for (final assetPath in _actionSpritesForStage(stage)) {
+      unawaited(
+        precacheImage(AssetImage(assetPath), context).catchError((_) {}),
+      );
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_precachedBossStage != widget.enemyStage) {
+      _precachedBossStage = widget.enemyStage;
+      _precacheBossSprites(widget.enemyStage);
+    }
+  }
 
   bool get _roundDealsPcDamage =>
       widget.dualSpellResult != null
@@ -409,6 +457,8 @@ class _VersusArenaState extends State<VersusArena>
     }
     if (widget.enemyStage != oldWidget.enemyStage) {
       _resetBossAction();
+      _precachedBossStage = widget.enemyStage;
+      _precacheBossSprites(widget.enemyStage);
     }
 
     final bool isMatchReset = widget.roundId == 0 ||
@@ -1530,11 +1580,15 @@ class _BossArenaSprite extends StatelessWidget {
   String? _resolveSpriteAsset() {
     switch (enemyStage) {
       case 2:
-        return 'assets/images/enemies/robot_archmage_idle.png';
+        return actionType == _BossActionType.hit
+            ? 'assets/images/enemies/robot_archmage_hit.png'
+            : 'assets/images/enemies/robot_archmage_idle.png';
       case 3:
         return 'assets/images/enemies/metal_wizard_idle.png';
       case 4:
-        return 'assets/images/enemies/baby_robot_mage_idle.png';
+        return actionType == _BossActionType.hit
+            ? 'assets/images/enemies/baby_robot_mage_hit.png'
+            : 'assets/images/enemies/baby_robot_mage_idle.png';
       case 5:
         return 'assets/images/enemies/temple_master_idle.png';
       default:

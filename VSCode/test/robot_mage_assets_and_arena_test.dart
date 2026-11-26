@@ -119,9 +119,11 @@ void main() {
         'assets/images/enemies/guardian_robot_attack.png',
         'assets/images/enemies/guardian_robot_hit.png',
         'assets/images/enemies/robot_archmage_idle.png',
+        'assets/images/enemies/robot_archmage_hit.png',
         'assets/images/enemies/metal_wizard_idle.png',
         'assets/images/enemies/temple_master_idle.png',
         'assets/images/enemies/baby_robot_mage_idle.png',
+        'assets/images/enemies/baby_robot_mage_hit.png',
       ];
 
       for (final path in expectedSprites) {
@@ -308,7 +310,7 @@ void main() {
       final localization = LocalizationService();
       await localization.load();
 
-      // Stage 2: Robot Archmage
+      // Stage 2: Robot Archmage (idle during PC win / launch, swaps to robot_archmage_hit.png at impact, then reverts)
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData.dark(),
@@ -330,11 +332,49 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 150));
-      expect(
-        find.byKey(const ValueKey('assets/images/enemies/robot_archmage_idle.png')),
-        findsOneWidget,
+      final archmageIdleFinder = find.byKey(
+        const ValueKey('assets/images/enemies/robot_archmage_idle.png'),
       );
+      expect(archmageIdleFinder, findsOneWidget);
+      expect(tester.widget<Image>(archmageIdleFinder).gaplessPlayback, isTrue);
       expect(find.text('ROBOT ARCHMAGE'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 700)); // finish round 1
+
+      // Stage 2 impact damage -> idle during launch/clash, swaps to robot_archmage_hit.png at 550ms impact
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              child: VersusArena(
+                userMove: HandMove.rock,
+                computerMove: HandMove.scissors,
+                winner: RoundWinner.user,
+                localization: localization,
+                animationsEnabled: true,
+                roundId: 2,
+                elementalMode: true,
+                enemyStage: 2,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(archmageIdleFinder, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 360)); // 560ms total -> impact fired!
+      final archmageHitFinder = find.byKey(
+        const ValueKey('assets/images/enemies/robot_archmage_hit.png'),
+      );
+      expect(archmageHitFinder, findsOneWidget);
+      expect(tester.widget<Image>(archmageHitFinder).gaplessPlayback, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 460)); // reverts to idle
+      expect(archmageIdleFinder, findsOneWidget);
       expect(tester.takeException(), isNull);
 
       // Stage 3: Metal Wizard
@@ -350,7 +390,7 @@ void main() {
                 winner: RoundWinner.draw,
                 localization: localization,
                 animationsEnabled: true,
-                roundId: 2,
+                roundId: 3,
                 elementalMode: true,
                 enemyStage: 3,
               ),
@@ -365,7 +405,9 @@ void main() {
       );
       expect(find.text('METAL WIZARD'), findsOneWidget);
 
-      // Stage 4: Baby Mage Robot
+      await tester.pump(const Duration(milliseconds: 700)); // finish round 3
+
+      // Stage 4: Baby Mage Robot (idle during launch/clash, swaps to baby_robot_mage_hit.png at 550ms impact, then reverts)
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData.dark(),
@@ -378,7 +420,7 @@ void main() {
                 winner: RoundWinner.user,
                 localization: localization,
                 animationsEnabled: true,
-                roundId: 3,
+                roundId: 4,
                 elementalMode: true,
                 enemyStage: 4,
               ),
@@ -386,12 +428,24 @@ void main() {
           ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 650));
-      expect(
-        find.byKey(const ValueKey('assets/images/enemies/baby_robot_mage_idle.png')),
-        findsOneWidget,
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final babyIdleFinder = find.byKey(
+        const ValueKey('assets/images/enemies/baby_robot_mage_idle.png'),
       );
+      expect(babyIdleFinder, findsOneWidget);
+      expect(tester.widget<Image>(babyIdleFinder).gaplessPlayback, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 450)); // 650ms total -> inside impact hit window
+      final babyHitFinder = find.byKey(
+        const ValueKey('assets/images/enemies/baby_robot_mage_hit.png'),
+      );
+      expect(babyHitFinder, findsOneWidget);
+      expect(tester.widget<Image>(babyHitFinder).gaplessPlayback, isTrue);
       expect(find.text('BABY MAGE ROBOT'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 460)); // reverts to idle
+      expect(babyIdleFinder, findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
