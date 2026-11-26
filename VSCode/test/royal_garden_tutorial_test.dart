@@ -90,12 +90,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Royal Garden Prologue Visual Assets & 4-Language Localization', () {
-    test('Royal Garden background and all 3 mage PNG assets exist on disk and are non-empty PNGs', () {
+    test('Royal Garden background and all 6 idle/defeated mage PNG assets exist on disk and are non-empty PNGs', () {
       const assets = [
         'assets/images/royal_garden_arena_bg.png',
         'assets/images/enemies/mage_fire_idle.png',
         'assets/images/enemies/mage_water_idle.png',
         'assets/images/enemies/mage_wood_idle.png',
+        'assets/images/enemies/mage_fire_dead.png',
+        'assets/images/enemies/mage_water_dead.png',
+        'assets/images/enemies/mage_wood_dead.png',
       ];
       for (final path in assets) {
         final file = File(path);
@@ -259,10 +262,88 @@ void main() {
       expect(tutorial.mageFor(HandMove.wood).hp, 0);
       expect(tutorial.allMagesKnockedOut, isTrue);
       expect(tutorial.isBattleFinished, isTrue);
-      // Total collected orbs remains strictly 1 Fire, 1 Water, 1 Wood
-      expect(tutorial.collectedFireOrbs, 1);
-      expect(tutorial.collectedWaterOrbs, 1);
-      expect(tutorial.collectedWoodOrbs, 1);
+      expect(tutorial.activeAdvancingMage, isNull);
+      // Continuous orb collection awards at least 1 Fire, 1 Water, 1 Wood from Act 1 + any Act 2 wins
+      expect(tutorial.collectedFireOrbs, greaterThanOrEqualTo(1));
+      expect(tutorial.collectedWaterOrbs, greaterThanOrEqualTo(1));
+      expect(tutorial.collectedWoodOrbs, greaterThanOrEqualTo(1));
+    });
+
+    test('Smarter Act 2 Robot targeting prioritizes surviving mages over already-defeated mages', () {
+      final tutorial = RoyalGardenTutorialController(random: math.Random(13));
+
+      // Move into Act 2
+      tutorial.playTurn(HandMove.fire);
+      tutorial.playTurn(HandMove.water);
+      tutorial.playTurn(HandMove.wood);
+
+      // Suppose Fire Mage is already defeated (0 HP), while Water & Wood survive.
+      tutorial.mageFor(HandMove.fire).hp = 0;
+      tutorial.lastPlayerMove = HandMove.water;
+
+      // Markov row for Water heavily favors dead Fire (10), then surviving Water (4), then Wood (1).
+      // Naive Markov would waste Water (counter to dead Fire); smart targeting must pick Wood (counter to surviving Water)!
+      tutorial.markovEngine.setMatrix([
+        [0, 0, 0], // from Fire
+        [10, 4, 1], // from Water -> [Fire: 10, Water: 4, Wood: 1]
+        [0, 0, 0], // from Wood
+      ]);
+      expect(tutorial.chooseAct2RobotMove(), HandMove.wood);
+
+      // Now flip surviving weights so Wood (6) > Water (2) while dead Fire still leads (12).
+      // Smart targeting must skip dead Fire and pick Fire (counter to surviving Wood)!
+      tutorial.markovEngine.setMatrix([
+        [0, 0, 0],
+        [12, 2, 6], // from Water -> [Fire: 12, Water: 2, Wood: 6]
+        [0, 0, 0],
+      ]);
+      expect(tutorial.chooseAct2RobotMove(), HandMove.fire);
+
+      // When only 1 mage survives (Wood), even with huge Markov weights on dead Fire & Water,
+      // the Robot always picks Fire (exact counter to surviving Wood).
+      tutorial.mageFor(HandMove.water).hp = 0;
+      tutorial.markovEngine.setMatrix([
+        [0, 0, 0],
+        [20, 15, 0],
+        [10, 8, 0],
+      ]);
+      expect(tutorial.chooseAct2RobotMove(), HandMove.fire);
+    });
+
+    test('Active advancing mage tracks selected living element, switches on new element, and clears at 0 HP', () {
+      final tutorial = RoyalGardenTutorialController(random: math.Random(5));
+      expect(tutorial.activeAdvancingMage, isNull);
+
+      tutorial.playTurn(HandMove.fire);
+      expect(tutorial.activeAdvancingMage, HandMove.fire);
+      expect(
+        tutorial.mageFor(HandMove.fire).activeSpriteAsset,
+        'assets/images/enemies/mage_fire_idle.png',
+      );
+
+      tutorial.playTurn(HandMove.water);
+      expect(tutorial.activeAdvancingMage, HandMove.water);
+
+      tutorial.playTurn(HandMove.wood);
+      expect(tutorial.activeAdvancingMage, HandMove.wood);
+
+      // Force Fire Mage to 1 HP and make Robot counter with Water to knock Fire out
+      tutorial.mageFor(HandMove.fire).hp = 1;
+      tutorial.lastPlayerMove = HandMove.wood;
+      tutorial.markovEngine.setMatrix([
+        [0, 0, 0],
+        [0, 0, 0],
+        [9, 0, 0], // from Wood -> expects Fire -> Robot plays Water
+      ]);
+      tutorial.playTurn(HandMove.fire);
+
+      expect(tutorial.mageFor(HandMove.fire).hp, 0);
+      expect(tutorial.mageFor(HandMove.fire).isKnockedOut, isTrue);
+      expect(
+        tutorial.mageFor(HandMove.fire).activeSpriteAsset,
+        'assets/images/enemies/mage_fire_dead.png',
+      );
+      expect(tutorial.activeAdvancingMage, isNull);
     });
 
     test('Failsafe Overdrive Strike triggers if all surviving mages run out of 100 Mana', () {
@@ -354,7 +435,23 @@ void main() {
           '100 / 100',
         );
 
-        // Act 1 Turn 1: Fire burns Wood!
+        // Capture initial grounded Rear-Guard Formation positions
+        final initialFireCenter = tester.getCenter(
+          find.byKey(const ValueKey('tutorial_mage_fire')),
+        );
+        final initialWaterCenter = tester.getCenter(
+          find.byKey(const ValueKey('tutorial_mage_water')),
+        );
+        final initialWoodCenter = tester.getCenter(
+          find.byKey(const ValueKey('tutorial_mage_wood')),
+        );
+        // Fire (upper-left) & Wood (lower-left) hold rear flanks; Water anchors slightly forward
+        expect(initialFireCenter.dy, lessThan(initialWaterCenter.dy));
+        expect(initialWoodCenter.dy, greaterThan(initialWaterCenter.dy));
+        expect(initialWaterCenter.dx, greaterThan(initialFireCenter.dx));
+        expect(initialWaterCenter.dx, greaterThan(initialWoodCenter.dx));
+
+        // Act 1 Turn 1: Fire burns Wood! -> Fire Mage steps forward toward center
         expect(find.text('Fire burns Wood!'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('tutorial_move_highlight_fire')),
@@ -378,8 +475,12 @@ void main() {
           tester.widget<Text>(find.byKey(const ValueKey('tutorial_mage_mana_fire'))).data,
           '99/100',
         );
+        final fireAdvancedCenter = tester.getCenter(
+          find.byKey(const ValueKey('tutorial_mage_fire')),
+        );
+        expect(fireAdvancedCenter.dx, greaterThan(initialFireCenter.dx));
 
-        // Act 1 Turn 2: Water extinguishes Fire!
+        // Act 1 Turn 2: Water extinguishes Fire! -> Fire returns to rear-guard, Water steps forward
         expect(find.text('Water extinguishes Fire!'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
         await tester.pump();
@@ -387,14 +488,30 @@ void main() {
           tester.widget<Text>(find.byKey(const ValueKey('tutorial_robot_hp'))).data,
           '98 / 100',
         );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_fire'))).dx,
+          closeTo(initialFireCenter.dx, 0.5),
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
+          greaterThan(initialWaterCenter.dx),
+        );
 
-        // Act 1 Turn 3: Wood absorbs Water!
+        // Act 1 Turn 3: Wood absorbs Water! -> Water returns to anchor, Wood steps forward
         expect(find.text('Wood absorbs Water!'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
         await tester.pump();
         expect(
           tester.widget<Text>(find.byKey(const ValueKey('tutorial_robot_hp'))).data,
           '97 / 100',
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
+          closeTo(initialWaterCenter.dx, 0.5),
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_wood'))).dx,
+          greaterThan(initialWoodCenter.dx),
         );
 
         // Act 2 Turn 4: Markov Matrix online banner appears
@@ -403,14 +520,24 @@ void main() {
           findsOneWidget,
         );
 
-        // Knock out Fire Mage first and verify clean grayscale disabled button (no cracks/chains)
+        // Knock out Fire Mage -> swaps to mage_fire_dead.png WITHOUT any KO badge,
+        // stays down at base position (does not advance), and disables/grays Fire button.
         while (!deterministicTutorial.mageFor(HandMove.fire).isKnockedOut) {
           await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
           await tester.pump();
         }
+        final deadFireImg = tester.widget<Image>(
+          find.byKey(const ValueKey('tutorial_mage_sprite_fire')),
+        );
         expect(
-          find.byKey(const ValueKey('tutorial_mage_ko_fire')),
-          findsOneWidget,
+          (deadFireImg.image as AssetImage).assetName,
+          'assets/images/enemies/mage_fire_dead.png',
+        );
+        expect(find.byKey(const ValueKey('tutorial_mage_ko_fire')), findsNothing);
+        expect(find.text('KO'), findsNothing);
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_fire'))).dx,
+          closeTo(initialFireCenter.dx, 0.5),
         );
         expect(
           find.byKey(const ValueKey('tutorial_move_grayscale_fire')),
@@ -428,10 +555,30 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
           await tester.pump();
         }
+        final deadWaterImg = tester.widget<Image>(
+          find.byKey(const ValueKey('tutorial_mage_sprite_water')),
+        );
+        expect(
+          (deadWaterImg.image as AssetImage).assetName,
+          'assets/images/enemies/mage_water_dead.png',
+        );
+        expect(find.text('KO'), findsNothing);
+
         while (!deterministicTutorial.isBattleFinished) {
           await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
           await tester.pump();
         }
+        final deadWoodImg = tester.widget<Image>(
+          find.byKey(const ValueKey('tutorial_mage_sprite_wood')),
+        );
+        expect(
+          (deadWoodImg.image as AssetImage).assetName,
+          'assets/images/enemies/mage_wood_dead.png',
+        );
+        expect(find.text('KO'), findsNothing);
+        final expectedFire = deterministicTutorial.collectedFireOrbs;
+        final expectedWater = deterministicTutorial.collectedWaterOrbs;
+        final expectedWood = deterministicTutorial.collectedWoodOrbs;
 
         // Transitions smoothly into closing Intro slides (Card 2 -> Card 3 -> Card 4)
         await tester.pumpAndSettle();
@@ -450,21 +597,24 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
 
-        // Lands on WorldMapScreen at Week 0 with 1 Fire, 1 Water, 1 Wood orb persisted locally & to Cloud Save
+        // Lands on WorldMapScreen at Week 0 with collected orbs persisted locally & to Cloud Save
         expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(controller.currentWeek, 0);
         expect(controller.hasSeenIntro, isTrue);
-        expect(controller.fireOrbs, 1);
-        expect(controller.waterOrbs, 1);
-        expect(controller.woodOrbs, 1);
-        expect(storage.fireOrbs, 1);
-        expect(storage.waterOrbs, 1);
-        expect(storage.woodOrbs, 1);
+        expect(controller.fireOrbs, expectedFire);
+        expect(controller.waterOrbs, expectedWater);
+        expect(controller.woodOrbs, expectedWood);
+        expect(controller.fireOrbs, greaterThanOrEqualTo(1));
+        expect(controller.waterOrbs, greaterThanOrEqualTo(1));
+        expect(controller.woodOrbs, greaterThanOrEqualTo(1));
+        expect(storage.fireOrbs, expectedFire);
+        expect(storage.waterOrbs, expectedWater);
+        expect(storage.woodOrbs, expectedWood);
 
         final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
-        expect(cloud.fireOrbs, 1);
-        expect(cloud.waterOrbs, 1);
-        expect(cloud.woodOrbs, 1);
+        expect(cloud.fireOrbs, expectedFire);
+        expect(cloud.waterOrbs, expectedWater);
+        expect(cloud.woodOrbs, expectedWood);
         expect(cloud.hasSeenStoryIntro, isTrue);
       },
     );

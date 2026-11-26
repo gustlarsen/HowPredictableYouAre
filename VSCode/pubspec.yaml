@@ -76,6 +76,9 @@ flutter:
     - assets/images/enemies/mage_fire_idle.png
     - assets/images/enemies/mage_water_idle.png
     - assets/images/enemies/mage_wood_idle.png
+    - assets/images/enemies/mage_fire_dead.png
+    - assets/images/enemies/mage_water_dead.png
+    - assets/images/enemies/mage_wood_dead.png
     - assets/images/player/
     - assets/images/forge_arena_bg.webp
     - assets/images/temple_arena_bg.webp

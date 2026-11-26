@@ -918,13 +918,13 @@ void main() {
     expect(find.text('4 / 4'), findsOneWidget);
     expect(find.text('Begin Quest'), findsOneWidget);
 
-    // Final tap on Begin Quest persists hasSeenIntro, grants 3 starting orbs, and enters WorldMapScreen
+    // Final tap on Begin Quest persists hasSeenIntro, grants collected orbs, and enters WorldMapScreen
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(storage.hasSeenStoryIntro, isTrue);
-    expect(controller.fireOrbs, 1);
-    expect(controller.waterOrbs, 1);
-    expect(controller.woodOrbs, 1);
+    expect(controller.fireOrbs, greaterThanOrEqualTo(1));
+    expect(controller.waterOrbs, greaterThanOrEqualTo(1));
+    expect(controller.woodOrbs, greaterThanOrEqualTo(1));
     expect(find.byKey(const ValueKey('intro_story_screen')), findsNothing);
     expect(find.byKey(const ValueKey('world_map_screen')), findsOneWidget);
   });

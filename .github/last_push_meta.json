@@ -1,5 +1,5 @@
 {
-  "summary": "- Converted upgraded Baby Mage Robot idle, Robot Archmage hit/recoil, and Baby Mage Robot hit/recoil sprites into 512x512 RGBA PNGs with flood-fill alpha cutouts and anti-aliased edge feathering.\n- Wired robot_archmage_hit.png and baby_robot_mage_hit.png into _BossArenaSprite in versus_arena.dart with gaplessPlayback and stage-level sprite precaching.\n- Updated robot_mage_assets_and_arena_test.dart to verify 512x512 RGBA asset integrity and impact hit-sprite swaps for Robot Archmage and Baby Mage Robot.",
+  "summary": "- Grounded Royal Garden prologue mages into a rear-guard formation (upper-left & lower-left flanks, middle anchor) with smooth forward-center attack stepping and automatic return on element switching\n- Processed and integrated defeated mage sprites (mage_fire_dead.png, mage_water_dead.png, mage_wood_dead.png) in pubspec.yaml, swapping at 0 HP with no KO badge while graying out/disabling defeated buttons\n- Upgraded Act 2 Guardian Robot targeting to rank Markov transition probabilities strictly against surviving mages so it never wastes counter picks on already-defeated mages\n- Preserved continuous orb collection on wins with clash and parabolic/exponential upward flying orb VFX, and added unit & widget tests verifying formation stepping, dead sprite swaps, and smart targeting",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T00:11:04Z"
+  "updated_at_utc": "2026-11-26T12:04:03Z"
 }

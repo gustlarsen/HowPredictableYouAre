@@ -290,20 +290,20 @@ void main() {
         expect(storage.hasSeenIntro, isTrue);
         expect(storage.hasSeenStoryIntro, isTrue);
         expect(controller.currentWeek, 0);
-        expect(controller.fireOrbs, 1);
-        expect(controller.waterOrbs, 1);
-        expect(controller.woodOrbs, 1);
-        expect(storage.fireOrbs, 1);
-        expect(storage.waterOrbs, 1);
-        expect(storage.woodOrbs, 1);
+        expect(controller.fireOrbs, greaterThanOrEqualTo(1));
+        expect(controller.waterOrbs, greaterThanOrEqualTo(1));
+        expect(controller.woodOrbs, greaterThanOrEqualTo(1));
+        expect(storage.fireOrbs, controller.fireOrbs);
+        expect(storage.waterOrbs, controller.waterOrbs);
+        expect(storage.woodOrbs, controller.woodOrbs);
         expect(find.byType(IntroStoryScreen), findsNothing);
         expect(find.byType(WorldMapScreen), findsOneWidget);
 
         final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
         expect(cloud.hasSeenStoryIntro, isTrue);
-        expect(cloud.fireOrbs, 1);
-        expect(cloud.waterOrbs, 1);
-        expect(cloud.woodOrbs, 1);
+        expect(cloud.fireOrbs, controller.fireOrbs);
+        expect(cloud.waterOrbs, controller.waterOrbs);
+        expect(cloud.woodOrbs, controller.woodOrbs);
       },
     );
 

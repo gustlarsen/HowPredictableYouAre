@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../controllers/royal_garden_tutorial_controller.dart';
@@ -15,14 +16,44 @@ import 'elemental_symbol_icon.dart';
 ///
 /// - **Top Bar:** Displays Prologue Act badge, collected tutorial orbs, and a
 ///   top-right `Skip` button. Completely omits the `Teleport` button.
-/// - **Act 1 (Turns 1–3):** Guides the player through the elemental triangle
-///   (`Fire -> Water -> Wood`) with a 1-line tactical banner and single-button
-///   highlighting, awarding `1 Fire`, `1 Water`, and `1 Wood` orb.
-/// - **Act 2 (Turn 4+):** Unlocks all surviving elemental buttons and activates
-///   the Guardian Robot's cumulative 3-element Markov matrix. Knocked-out mages
-///   (`0 HP`) collapse onto the stone floor and their elemental buttons switch
-///   to a clean grayscale disabled state (no cracks or chains).
+/// - **Formation & Advance:** Two mages hold the upper-left and lower-left
+///   rear flanks while the middle mage anchors slightly forward; choosing an
+///   element advances that living mage smoothly toward the center to cast,
+///   returning any previously advanced mage to its base position. Defeated
+///   (`0 HP`) mages swap to their defeated floor sprites without a `KO` badge
+///   and never advance.
+/// - **Act 1 (Turns 1–3):** Guides the elemental triangle (`Fire -> Water -> Wood`)
+///   with a 1-line tactical banner and single-button highlighting, awarding orbs.
+/// - **Act 2 (Turn 4+):** Unlocks surviving buttons and uses smart Markov
+///   targeting that prioritizes surviving mages over already-defeated mages,
+///   continuing orb collection with clash + parabolic/exponential upward flight
+///   on wins and graying out defeated element buttons (no cracks or chains).
 class RoyalGardenTutorialBattle extends StatefulWidget {
+  static const int orbSpawnDelayMs = 260;
+  static const int orbFlightDurationMs = 580;
+  static const int orbPouchPulseMs = 200;
+  static const int orbTotalSequenceMs =
+      orbSpawnDelayMs + orbFlightDurationMs + orbPouchPulseMs;
+
+  static Offset calculateParabolicControlPoint(Offset startPos, Offset endPos) {
+    final midX = ui.lerpDouble(startPos.dx, endPos.dx, 0.35)!;
+    final highY = math.min(startPos.dy, endPos.dy) - 48.0;
+    return Offset(midX, highY);
+  }
+
+  static Offset evaluateQuadraticBezier(
+    Offset p0,
+    Offset p1,
+    Offset p2,
+    double t,
+  ) {
+    final inv = 1.0 - t;
+    return Offset(
+      inv * inv * p0.dx + 2.0 * inv * t * p1.dx + t * t * p2.dx,
+      inv * inv * p0.dy + 2.0 * inv * t * p1.dy + t * t * p2.dy,
+    );
+  }
+
   final GameController gameController;
   final RoyalGardenTutorialController? tutorialController;
   final bool isReplay;
@@ -49,13 +80,17 @@ class RoyalGardenTutorialBattle extends StatefulWidget {
 
 class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     with TickerProviderStateMixin {
-  /// Clean desaturation color matrix for knocked-out mage buttons (no cracks/chains).
+  /// Clean desaturation color matrix for defeated mage buttons (no cracks/chains).
   static const ColorFilter _grayscaleFilter = ColorFilter.matrix(<double>[
     0.2126, 0.7152, 0.0722, 0, 0,
     0.2126, 0.7152, 0.0722, 0, 0,
     0.2126, 0.7152, 0.0722, 0, 0,
     0, 0, 0, 1, 0,
   ]);
+
+  final GlobalKey _rootStackKey = GlobalKey();
+  final GlobalKey _arenaStageKey = GlobalKey();
+  final GlobalKey _orbPouchKey = GlobalKey();
 
   late final RoyalGardenTutorialController _tutorial;
   late final bool _ownsTutorialController;
@@ -64,6 +99,10 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
   late final AnimationController _idleBobController;
   late final AnimationController _highlightPulseController;
   late final AnimationController _clashController;
+  late final AnimationController _flyingOrbController;
+
+  int _lastHandledOrbEventId = 0;
+  HandMove? _activeFlyingOrbMove;
 
   BgmTrack? _previousBgmTrack;
   Timer? _completionTimer;
@@ -75,6 +114,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     _ownsTutorialController = widget.tutorialController == null;
     _tutorial = widget.tutorialController ??
         RoyalGardenTutorialController(isSandboxReplay: widget.isReplay);
+    _lastHandledOrbEventId = _tutorial.orbCollectionEventId;
     _tutorial.addListener(_onTutorialChanged);
 
     _gardenAtmosphereController = AnimationController(
@@ -92,6 +132,12 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     _clashController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 560),
+    );
+    _flyingOrbController = AnimationController(
+      vsync: this,
+      duration: const Duration(
+        milliseconds: RoyalGardenTutorialBattle.orbTotalSequenceMs,
+      ),
     );
 
     _previousBgmTrack = widget.gameController.audio.currentTrack;
@@ -131,6 +177,9 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
       _clashController
         ..stop()
         ..reset();
+      _flyingOrbController
+        ..stop()
+        ..reset();
     }
   }
 
@@ -146,6 +195,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     _idleBobController.dispose();
     _highlightPulseController.dispose();
     _clashController.dispose();
+    _flyingOrbController.dispose();
     final prevTrack = _previousBgmTrack;
     if (prevTrack != null &&
         prevTrack != BgmTrack.battle &&
@@ -157,6 +207,14 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
 
   void _onTutorialChanged() {
     if (!mounted) return;
+    if (_tutorial.orbCollectionEventId != _lastHandledOrbEventId) {
+      _lastHandledOrbEventId = _tutorial.orbCollectionEventId;
+      _activeFlyingOrbMove = _tutorial.lastCollectedOrb;
+      if (widget.gameController.animationsEnabled &&
+          _activeFlyingOrbMove != null) {
+        _flyingOrbController.forward(from: 0.0);
+      }
+    }
     if (_tutorial.isBattleFinished && !_hasReportedCompletion) {
       _scheduleBattleCompletionTransition();
     }
@@ -204,6 +262,25 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     } else {
       audio.playDraw();
     }
+  }
+
+  Offset _resolveCenterInRoot(GlobalKey targetKey, Offset fallback) {
+    final rootBox =
+        _rootStackKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetBox =
+        targetKey.currentContext?.findRenderObject() as RenderBox?;
+    if (rootBox == null ||
+        targetBox == null ||
+        !rootBox.hasSize ||
+        !targetBox.hasSize) {
+      return fallback;
+    }
+    final localCenter = Offset(
+      targetBox.size.width * 0.5,
+      targetBox.size.height * 0.5,
+    );
+    final globalCenter = targetBox.localToGlobal(localCenter);
+    return rootBox.globalToLocal(globalCenter);
   }
 
   String _localizedMageName(
@@ -358,6 +435,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
           ? const Color(0xFF0E1117)
           : const Color(0xFF1F1B18),
       body: Stack(
+        key: _rootStackKey,
         fit: StackFit.expand,
         children: [
           // 1. Royal Garden Arena Background
@@ -433,6 +511,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
                         palette: palette,
                         actBadgeLabel: actBadgeLabel,
                         skipLabel: skipLabel,
+                        animationsEnabled: animationsEnabled,
                       ),
                       const SizedBox(height: 8),
 
@@ -445,7 +524,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
                       const SizedBox(height: 6),
 
                       // Center Stone Circle Battle Stage:
-                      // Left = 3 Royal Guardian Mages in triangular formation
+                      // Left = 3 Royal Guardian Mages (rear-guard flanks + advancing attacker)
                       // Right = Guardian Robot (100 HP)
                       Expanded(
                         child: _buildArenaStage(
@@ -468,6 +547,128 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
               ),
             ),
           ),
+
+          // 5. Parabolic/Exponential Upward Flying Orb VFX on Round Wins
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _flyingOrbController,
+                builder: (context, _) {
+                  final orbMove = _activeFlyingOrbMove;
+                  final elapsedMs = _flyingOrbController.value *
+                      RoyalGardenTutorialBattle.orbTotalSequenceMs;
+                  const flightEndMs = RoyalGardenTutorialBattle.orbSpawnDelayMs +
+                      RoyalGardenTutorialBattle.orbFlightDurationMs;
+                  final isFlying = animationsEnabled &&
+                      orbMove != null &&
+                      _flyingOrbController.isAnimating &&
+                      elapsedMs + 1e-4 >=
+                          RoyalGardenTutorialBattle.orbSpawnDelayMs &&
+                      elapsedMs < flightEndMs - 1e-4;
+                  if (!isFlying) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final fallbackStart = Offset(
+                        constraints.maxWidth * 0.54,
+                        constraints.maxHeight * 0.56,
+                      );
+                      final fallbackEnd = Offset(
+                        constraints.maxWidth * 0.34,
+                        44.0,
+                      );
+                      final startPos = _resolveCenterInRoot(
+                        _arenaStageKey,
+                        fallbackStart,
+                      );
+                      final endPos = _resolveCenterInRoot(
+                        _orbPouchKey,
+                        fallbackEnd,
+                      );
+                      final controlPoint =
+                          RoyalGardenTutorialBattle.calculateParabolicControlPoint(
+                        startPos,
+                        endPos,
+                      );
+                      final rawT = ((elapsedMs -
+                                  RoyalGardenTutorialBattle.orbSpawnDelayMs) /
+                              RoyalGardenTutorialBattle.orbFlightDurationMs)
+                          .clamp(0.0, 1.0);
+                      // Exponential-parabolic acceleration toward the orb pouch
+                      final curvedT = Curves.easeInOutExpo.transform(rawT);
+                      final pos =
+                          RoyalGardenTutorialBattle.evaluateQuadraticBezier(
+                        startPos,
+                        controlPoint,
+                        endPos,
+                        curvedT,
+                      );
+                      final primary = orbMove.elementalPrimaryColor;
+                      final secondary = orbMove.elementalSecondaryColor;
+
+                      return Stack(
+                        key: const ValueKey('tutorial_flying_orb_vfx'),
+                        clipBehavior: Clip.none,
+                        children: [
+                          for (var i = 1; i <= 4; i++)
+                            if (curvedT - i * 0.045 > 0.0)
+                              Builder(
+                                builder: (_) {
+                                  final trailT =
+                                      (curvedT - i * 0.045).clamp(0.0, 1.0);
+                                  final trailPos = RoyalGardenTutorialBattle
+                                      .evaluateQuadraticBezier(
+                                    startPos,
+                                    controlPoint,
+                                    endPos,
+                                    trailT,
+                                  );
+                                  final radius = 8.0 - i * 1.4;
+                                  return Positioned(
+                                    left: trailPos.dx - radius,
+                                    top: trailPos.dy - radius,
+                                    child: Container(
+                                      width: radius * 2,
+                                      height: radius * 2,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: primary.withValues(
+                                          alpha: (0.50 - i * 0.10)
+                                              .clamp(0.06, 0.50),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: primary.withValues(
+                                              alpha: 0.35,
+                                            ),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          Positioned(
+                            left: pos.dx - 13,
+                            top: pos.dy - 13,
+                            child: ElementalEnergySphere(
+                              size: 26,
+                              primaryColor: primary,
+                              secondaryColor: secondary,
+                              isDark: true,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -478,6 +679,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     required AppPalette palette,
     required String actBadgeLabel,
     required String skipLabel,
+    required bool animationsEnabled,
   }) {
     final isDark = palette.isDark;
     final borderColor = isDark
@@ -537,41 +739,64 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
                 ),
               ),
 
-              // Compact Tutorial Orbs Pouch (shows 1 Fire, 1 Water, 1 Wood collected)
-              Container(
-                key: const ValueKey('tutorial_orb_pouch'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF151923).withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(11),
-                  border: Border.all(
-                    color: borderColor.withValues(alpha: 0.45),
+              // Compact Tutorial Orbs Pouch (pulses on orb arrival)
+              AnimatedBuilder(
+                animation: _flyingOrbController,
+                builder: (context, child) {
+                  final elapsedMs = _flyingOrbController.value *
+                      RoyalGardenTutorialBattle.orbTotalSequenceMs;
+                  const pulseStartMs =
+                      RoyalGardenTutorialBattle.orbSpawnDelayMs +
+                          RoyalGardenTutorialBattle.orbFlightDurationMs;
+                  final isPulsing = animationsEnabled &&
+                      _flyingOrbController.isAnimating &&
+                      elapsedMs >= pulseStartMs;
+                  final pulseT = isPulsing
+                      ? ((elapsedMs - pulseStartMs) /
+                              RoyalGardenTutorialBattle.orbPouchPulseMs)
+                          .clamp(0.0, 1.0)
+                      : 0.0;
+                  final scale = isPulsing
+                      ? 1.0 + math.sin(pulseT * math.pi) * 0.12
+                      : 1.0;
+                  return Transform.scale(scale: scale, child: child);
+                },
+                child: Container(
+                  key: _orbPouchKey,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _MiniOrbCount(
-                      key: const ValueKey('tutorial_pouch_fire'),
-                      move: HandMove.fire,
-                      count: _tutorial.collectedFireOrbs,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF151923).withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: borderColor.withValues(alpha: 0.45),
                     ),
-                    const SizedBox(width: 6),
-                    _MiniOrbCount(
-                      key: const ValueKey('tutorial_pouch_water'),
-                      move: HandMove.water,
-                      count: _tutorial.collectedWaterOrbs,
-                    ),
-                    const SizedBox(width: 6),
-                    _MiniOrbCount(
-                      key: const ValueKey('tutorial_pouch_wood'),
-                      move: HandMove.wood,
-                      count: _tutorial.collectedWoodOrbs,
-                    ),
-                  ],
+                  ),
+                  child: Row(
+                    key: const ValueKey('tutorial_orb_pouch'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _MiniOrbCount(
+                        key: const ValueKey('tutorial_pouch_fire'),
+                        move: HandMove.fire,
+                        count: _tutorial.collectedFireOrbs,
+                      ),
+                      const SizedBox(width: 6),
+                      _MiniOrbCount(
+                        key: const ValueKey('tutorial_pouch_water'),
+                        move: HandMove.water,
+                        count: _tutorial.collectedWaterOrbs,
+                      ),
+                      const SizedBox(width: 6),
+                      _MiniOrbCount(
+                        key: const ValueKey('tutorial_pouch_wood'),
+                        move: HandMove.wood,
+                        count: _tutorial.collectedWoodOrbs,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -718,106 +943,145 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
     required bool animationsEnabled,
   }) {
     return LayoutBuilder(
+      key: _arenaStageKey,
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
-        final isCompact = h < 300 || w < 350;
+        final isCompact = h < 310 || w < 350;
 
-        final mageSpriteSize = (h * (isCompact ? 0.28 : 0.30)).clamp(62.0, 108.0);
-        final robotSpriteSize =
-            (h * (isCompact ? 0.38 : 0.42)).clamp(86.0, 152.0);
-        final mageCardWidth = (w * 0.30).clamp(96.0, 136.0);
+        final double mageSpriteSize =
+            (h * (isCompact ? 0.25 : 0.27)).clamp(58.0, 100.0).toDouble();
+        final double robotSpriteSize =
+            (h * (isCompact ? 0.36 : 0.40)).clamp(84.0, 148.0).toDouble();
+        final double mageCardWidth = (w * 0.29).clamp(92.0, 130.0).toDouble();
 
-        final fireMage = _tutorial.mageFor(HandMove.fire);
-        final waterMage = _tutorial.mageFor(HandMove.water);
-        final woodMage = _tutorial.mageFor(HandMove.wood);
+        final double cardEstimatedH = mageSpriteSize + 38.0;
+        final double availH = math.max(0.0, h - cardEstimatedH);
 
-        // Triangular formation on the left side of the stone circle:
-        // Fire (upper-back), Water (front-center apex), Wood (lower-back).
-        final double topY = (h * 0.03).clamp(2.0, 20.0).toDouble();
-        final double midY = ((h - (mageSpriteSize + 36)) * 0.46)
-            .clamp(
-              topY + 26.0,
-              math.max(topY + 26.0, h - (mageSpriteSize + 36.0) - 18.0),
-            )
+        // Grounded Rear-Guard Formation on the Royal Garden stone circle:
+        // - Fire Mage: upper-left rear flank (grounded below top arches)
+        // - Wood Mage: lower-left rear flank
+        // - Water Mage: middle default anchor, slightly more central/forward
+        final double rearFlankLeft = (w * 0.01).clamp(0.0, 8.0).toDouble();
+        final double middleAnchorLeft =
+            (w * 0.12).clamp(32.0, 62.0).toDouble();
+        final double attackStepLeft =
+            (w * 0.27).clamp(74.0, 142.0).toDouble();
+
+        final double upperFlankTop = (availH * 0.24)
+            .clamp(math.min(18.0, availH), availH)
             .toDouble();
-        final double botY = (h - (mageSpriteSize + 40.0))
-            .clamp(
-              midY + 18.0,
-              math.max(midY + 18.0, h - (mageSpriteSize + 36.0)),
-            )
-            .toDouble();
+        final double middleAnchorTop = (availH * 0.56).clamp(0.0, availH).toDouble();
+        final double lowerFlankTop = (availH * 0.90).clamp(0.0, availH).toDouble();
+        final double attackStepTop = (availH * 0.54).clamp(0.0, availH).toDouble();
 
-        const double leftBackX = 0.0;
-        final double leftFrontX = (w * 0.21).clamp(58.0, 118.0).toDouble();
+        final activeAdvancing = _tutorial.activeAdvancingMage;
+
+        ({double left, double top}) positionFor(HandMove element) {
+          final mage = _tutorial.mageFor(element);
+          // Defeated (0 HP) mages stay grounded in their base spot and never advance.
+          if (!mage.isKnockedOut && activeAdvancing == element) {
+            return (left: attackStepLeft, top: attackStepTop);
+          }
+          switch (element) {
+            case HandMove.fire:
+              return (left: rearFlankLeft, top: upperFlankTop);
+            case HandMove.water:
+              return (left: middleAnchorLeft, top: middleAnchorTop);
+            case HandMove.wood:
+              return (left: rearFlankLeft, top: lowerFlankTop);
+            default:
+              return (left: rearFlankLeft, top: middleAnchorTop);
+          }
+        }
+
+        final moveDuration = animationsEnabled
+            ? const Duration(milliseconds: 280)
+            : Duration.zero;
+
+        final firePos = positionFor(HandMove.fire);
+        final woodPos = positionFor(HandMove.wood);
+        final waterPos = positionFor(HandMove.water);
+
+        final robotAvailH = math.max(0.0, h - (robotSpriteSize + 78.0));
+        final double robotTop = (robotAvailH * 0.54).clamp(4.0, h).toDouble();
 
         return AnimatedBuilder(
           animation: Listenable.merge([_idleBobController, _clashController]),
           builder: (context, _) {
             final bobOffset = animationsEnabled
-                ? math.sin(_idleBobController.value * math.pi) * 3.5
+                ? math.sin(_idleBobController.value * math.pi) * 3.0
                 : 0.0;
 
             return Stack(
               key: const ValueKey('tutorial_arena_stage'),
               clipBehavior: Clip.none,
               children: [
-                // Fire Mage (Upper-Left of Triangle)
-                Positioned(
-                  left: leftBackX,
-                  top: topY,
+                // Fire Mage (Upper-Left Rear Flank -> steps forward-center on Fire attack)
+                AnimatedPositioned(
+                  key: const ValueKey('tutorial_mage_pos_fire'),
+                  duration: moveDuration,
+                  curve: Curves.easeOutCubic,
+                  left: firePos.left,
+                  top: firePos.top,
                   width: mageCardWidth,
                   child: _RoyalMageCombatant(
-                    mage: fireMage,
+                    mage: _tutorial.mageFor(HandMove.fire),
                     spriteSize: mageSpriteSize,
                     bobOffset: bobOffset,
+                    isAdvancing: activeAdvancing == HandMove.fire,
                     isCasting: _isMageCasting(HandMove.fire),
                     isHit: _isMageHit(HandMove.fire),
                     clashProgress: _clashController.value,
                     animationsEnabled: animationsEnabled,
-                    loc: loc,
                   ),
                 ),
 
-                // Wood Mage (Lower-Left of Triangle)
-                Positioned(
-                  left: leftBackX,
-                  top: botY,
+                // Wood Mage (Lower-Left Rear Flank -> steps forward-center on Wood attack)
+                AnimatedPositioned(
+                  key: const ValueKey('tutorial_mage_pos_wood'),
+                  duration: moveDuration,
+                  curve: Curves.easeOutCubic,
+                  left: woodPos.left,
+                  top: woodPos.top,
                   width: mageCardWidth,
                   child: _RoyalMageCombatant(
-                    mage: woodMage,
+                    mage: _tutorial.mageFor(HandMove.wood),
                     spriteSize: mageSpriteSize,
                     bobOffset: -bobOffset * 0.85,
+                    isAdvancing: activeAdvancing == HandMove.wood,
                     isCasting: _isMageCasting(HandMove.wood),
                     isHit: _isMageHit(HandMove.wood),
                     clashProgress: _clashController.value,
                     animationsEnabled: animationsEnabled,
-                    loc: loc,
                   ),
                 ),
 
-                // Water Mage (Front-Center Apex of Left Triangle)
-                Positioned(
-                  left: leftFrontX,
-                  top: midY,
+                // Water Mage (Middle Default Anchor -> steps forward-center on Water attack)
+                AnimatedPositioned(
+                  key: const ValueKey('tutorial_mage_pos_water'),
+                  duration: moveDuration,
+                  curve: Curves.easeOutCubic,
+                  left: waterPos.left,
+                  top: waterPos.top,
                   width: mageCardWidth,
                   child: _RoyalMageCombatant(
-                    mage: waterMage,
+                    mage: _tutorial.mageFor(HandMove.water),
                     spriteSize: mageSpriteSize,
                     bobOffset: bobOffset * 0.9,
+                    isAdvancing: activeAdvancing == HandMove.water,
                     isCasting: _isMageCasting(HandMove.water),
                     isHit: _isMageHit(HandMove.water),
                     clashProgress: _clashController.value,
                     animationsEnabled: animationsEnabled,
-                    loc: loc,
                   ),
                 ),
 
                 // Guardian Robot (Right Side of Stone Circle)
                 Positioned(
                   right: 0,
-                  top: ((h - (robotSpriteSize + 76)) * 0.45).clamp(4.0, h),
-                  width: (w * 0.40).clamp(124.0, 180.0),
+                  top: robotTop,
+                  width: (w * 0.39).clamp(122.0, 174.0),
                   child: _buildGuardianRobotSide(
                     loc: loc,
                     spriteSize: robotSpriteSize,
@@ -856,7 +1120,8 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
   bool _isMageCasting(HandMove element) {
     return widget.gameController.animationsEnabled &&
         _clashController.isAnimating &&
-        _tutorial.lastPlayerMove == element;
+        _tutorial.lastPlayerMove == element &&
+        !_tutorial.mageFor(element).isKnockedOut;
   }
 
   bool _isMageHit(HandMove element) {
@@ -878,7 +1143,8 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
       fallback: 'Guardian Robot',
     );
     final telegraphedMove = _tutorial.act1TelegraphedRobotMove;
-    final hpRatio = (_tutorial.robotHp / _tutorial.robotMaxHp).clamp(0.0, 1.0);
+    final double hpRatio =
+        (_tutorial.robotHp / _tutorial.robotMaxHp).clamp(0.0, 1.0).toDouble();
     final isHit = animationsEnabled &&
         _clashController.isAnimating &&
         _tutorial.lastRoundWinner == RoundWinner.user &&
@@ -951,7 +1217,6 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
               alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                // Subtle shadow oval under feet
                 Positioned(
                   bottom: 2,
                   child: Container(
@@ -1263,64 +1528,40 @@ class _MiniOrbCount extends StatelessWidget {
 }
 
 class _RoyalMageCombatant extends StatelessWidget {
-  static const ColorFilter _koGrayscale = ColorFilter.matrix(<double>[
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0, 0, 0, 1, 0,
-  ]);
-
   final RoyalGuardianMageState mage;
   final double spriteSize;
   final double bobOffset;
+  final bool isAdvancing;
   final bool isCasting;
   final bool isHit;
   final double clashProgress;
   final bool animationsEnabled;
-  final LocalizationService loc;
 
   const _RoyalMageCombatant({
     required this.mage,
     required this.spriteSize,
     required this.bobOffset,
+    required this.isAdvancing,
     required this.isCasting,
     required this.isHit,
     required this.clashProgress,
     required this.animationsEnabled,
-    required this.loc,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isKo = mage.isKnockedOut;
-    final hpRatio = (mage.hp / mage.maxHp).clamp(0.0, 1.0);
-    final manaRatio = (mage.mana / mage.maxMana).clamp(0.0, 1.0);
+    final isDefeated = mage.isKnockedOut;
+    final double hpRatio = (mage.hp / mage.maxHp).clamp(0.0, 1.0).toDouble();
+    final double manaRatio =
+        (mage.mana / mage.maxMana).clamp(0.0, 1.0).toDouble();
     final accent = mage.element.elementalPrimaryColor;
 
-    final lungeX = isCasting && !isKo
-        ? math.sin(clashProgress * math.pi) * 10.0
+    final lungeX = isCasting && !isDefeated
+        ? math.sin(clashProgress * math.pi) * 8.0
         : 0.0;
-    final shakeX = isHit
+    final shakeX = isHit && !isDefeated
         ? math.sin(clashProgress * math.pi * 10) * 4.0
         : 0.0;
-
-    Widget sprite = Image.asset(
-      mage.spriteAsset,
-      key: ValueKey('tutorial_mage_sprite_${mage.element.orbKey}'),
-      width: spriteSize,
-      height: spriteSize,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      errorBuilder: (context, error, stackTrace) => Icon(
-        mage.element.elementalIcon,
-        size: spriteSize * 0.65,
-        color: accent,
-      ),
-    );
-
-    if (isKo) {
-      sprite = ColorFiltered(colorFilter: _koGrayscale, child: sprite);
-    }
 
     return Column(
       key: ValueKey('tutorial_mage_${mage.element.orbKey}'),
@@ -1329,81 +1570,71 @@ class _RoyalMageCombatant extends StatelessWidget {
         Transform.translate(
           offset: Offset(
             lungeX + shakeX,
-            isKo ? 8.0 : bobOffset,
+            isDefeated ? 4.0 : bobOffset,
           ),
-          child: AnimatedRotation(
-            turns: isKo ? -0.20 : 0.0,
+          child: AnimatedScale(
+            scale: isAdvancing && !isDefeated ? 1.08 : 1.0,
             duration: animationsEnabled
-                ? const Duration(milliseconds: 360)
+                ? const Duration(milliseconds: 240)
                 : Duration.zero,
             curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: isKo ? 0.52 : 1.0,
-              duration: animationsEnabled
-                  ? const Duration(milliseconds: 300)
-                  : Duration.zero,
-              child: SizedBox(
-                width: spriteSize,
-                height: spriteSize,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Ground shadow ellipse
+            child: SizedBox(
+              width: isDefeated ? spriteSize * 1.12 : spriteSize,
+              height: spriteSize,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                clipBehavior: Clip.none,
+                children: [
+                  // Ground shadow ellipse anchored under feet or fallen body
+                  Positioned(
+                    bottom: 2,
+                    child: Container(
+                      width: isDefeated ? spriteSize * 0.96 : spriteSize * 0.65,
+                      height: isDefeated ? 10 : 9,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.40),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  // Active sprite: swaps directly to mage_<element>_dead.png at 0 HP (no KO badge)
+                  Align(
+                    alignment: isDefeated
+                        ? Alignment.bottomCenter
+                        : Alignment.center,
+                    child: Image.asset(
+                      mage.activeSpriteAsset,
+                      key: ValueKey(
+                        'tutorial_mage_sprite_${mage.element.orbKey}',
+                      ),
+                      width: isDefeated ? spriteSize * 1.12 : spriteSize,
+                      height: isDefeated ? spriteSize * 0.78 : spriteSize,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        mage.element.elementalIcon,
+                        size: spriteSize * 0.65,
+                        color: accent,
+                      ),
+                    ),
+                  ),
+                  if (isHit && !isDefeated)
                     Positioned(
-                      bottom: 2,
-                      child: Container(
-                        width: spriteSize * 0.65,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.38),
-                          borderRadius: BorderRadius.circular(999),
+                      top: -2,
+                      right: 2,
+                      child: Text(
+                        '-1',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.redAccent.shade100,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 4),
+                          ],
                         ),
                       ),
                     ),
-                    sprite,
-                    if (isKo)
-                      Container(
-                        key: ValueKey('tutorial_mage_ko_${mage.element.orbKey}'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.78),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.redAccent.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        child: Text(
-                          loc.t('tutorial_mage_ko_badge', fallback: 'KO'),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.redAccent,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                    if (isHit && !isKo)
-                      Positioned(
-                        top: -2,
-                        right: 2,
-                        child: Text(
-                          '-1',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.redAccent.shade100,
-                            shadows: const [
-                              Shadow(color: Colors.black, blurRadius: 4),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
@@ -1415,13 +1646,16 @@ class _RoyalMageCombatant extends StatelessWidget {
           key: ValueKey('tutorial_mage_stats_${mage.element.orbKey}'),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFF141822).withValues(alpha: isKo ? 0.62 : 0.88),
+            color: const Color(0xFF141822)
+                .withValues(alpha: isDefeated ? 0.68 : 0.88),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isKo
+              color: isDefeated
                   ? Colors.white24
-                  : accent.withValues(alpha: 0.72),
-              width: 1.0,
+                  : (isAdvancing
+                        ? Colors.amber.withValues(alpha: 0.92)
+                        : accent.withValues(alpha: 0.72)),
+              width: isAdvancing && !isDefeated ? 1.3 : 1.0,
             ),
           ),
           child: Column(
@@ -1445,7 +1679,7 @@ class _RoyalMageCombatant extends StatelessWidget {
                         minHeight: 4,
                         backgroundColor: Colors.white12,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          isKo
+                          isDefeated
                               ? Colors.grey
                               : (mage.hp <= 2
                                     ? const Color(0xFFFF5252)
@@ -1461,7 +1695,7 @@ class _RoyalMageCombatant extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w800,
-                      color: isKo ? Colors.white54 : Colors.white,
+                      color: isDefeated ? Colors.white54 : Colors.white,
                     ),
                   ),
                 ],
@@ -1498,7 +1732,8 @@ class _RoyalMageCombatant extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 8.5,
                       fontWeight: FontWeight.w700,
-                      color: isKo ? Colors.white38 : const Color(0xFFB3E5FC),
+                      color:
+                          isDefeated ? Colors.white38 : const Color(0xFFB3E5FC),
                     ),
                   ),
                 ],
@@ -1583,7 +1818,6 @@ class RoyalGardenAtmospherePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
 
-    // 1. Warm golden sunlight dust motes
     final dustBaseAlpha = isDark ? 0.62 : 0.52;
     for (final mote in _sunDustSpecs) {
       final t = (progress + mote.phase) % 1.0;
@@ -1610,7 +1844,6 @@ class RoyalGardenAtmospherePainter extends CustomPainter {
       );
     }
 
-    // 2. Gently drifting rose petals
     final petalBaseAlpha = isDark ? 0.78 : 0.84;
     for (final petal in _petalSpecs) {
       final t = (progress + petal.phase) % 1.0;
@@ -1669,9 +1902,9 @@ class _TutorialSpellClashPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
 
-    final leftOrigin = Offset(size.width * 0.34, size.height * 0.50);
-    final rightOrigin = Offset(size.width * 0.72, size.height * 0.50);
-    final center = Offset(size.width * 0.53, size.height * 0.50);
+    final leftOrigin = Offset(size.width * 0.42, size.height * 0.56);
+    final rightOrigin = Offset(size.width * 0.74, size.height * 0.56);
+    final center = Offset(size.width * 0.58, size.height * 0.56);
 
     if (progress < 0.45) {
       final t = (progress / 0.45).clamp(0.0, 1.0);

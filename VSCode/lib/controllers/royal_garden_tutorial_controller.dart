@@ -8,6 +8,7 @@ import '../services/markov_engine.dart';
 class RoyalGuardianMageState {
   final HandMove element;
   final String spriteAsset;
+  final String deadSpriteAsset;
   final String nameKey;
   final String fallbackName;
   final int maxHp;
@@ -18,6 +19,7 @@ class RoyalGuardianMageState {
   RoyalGuardianMageState({
     required this.element,
     required this.spriteAsset,
+    required this.deadSpriteAsset,
     required this.nameKey,
     required this.fallbackName,
     this.maxHp = RoyalGardenTutorialController.initialMageHp,
@@ -30,6 +32,9 @@ class RoyalGuardianMageState {
   bool get isKnockedOut => hp <= 0;
   bool get isOutOfMana => mana <= 0;
   bool get canCast => hp > 0 && mana > 0;
+
+  /// Active sprite asset: switches immediately to [deadSpriteAsset] at `0 HP`.
+  String get activeSpriteAsset => isKnockedOut ? deadSpriteAsset : spriteAsset;
 }
 
 /// Isolated sandbox state controller for the playable Royal Garden Prologue
@@ -51,6 +56,7 @@ class RoyalGardenTutorialController extends ChangeNotifier {
 
   final MarkovEngine markovEngine;
   final bool isSandboxReplay;
+  final math.Random _random;
 
   late final Map<HandMove, RoyalGuardianMageState> _mages;
 
@@ -59,11 +65,13 @@ class RoyalGardenTutorialController extends ChangeNotifier {
 
   int turnCount = 0;
   int roundId = 0;
+  int orbCollectionEventId = 0;
   HandMove? lastPlayerMove;
   HandMove? lastRobotMove;
   RoundWinner? lastRoundWinner;
   HandMove? lastCollectedOrb;
   HandMove? lastKnockedOutMage;
+  HandMove? _activeAdvancingMage;
   bool triggeredOverdriveFailsafe = false;
   bool isBattleFinished = false;
 
@@ -74,7 +82,8 @@ class RoyalGardenTutorialController extends ChangeNotifier {
   RoyalGardenTutorialController({
     this.isSandboxReplay = false,
     math.Random? random,
-  }) : markovEngine = MarkovEngine(
+  }) : _random = random ?? math.Random(),
+       markovEngine = MarkovEngine(
          enableExtendedHands: false,
          enableElementalMode: true,
          random: random,
@@ -83,18 +92,21 @@ class RoyalGardenTutorialController extends ChangeNotifier {
       HandMove.fire: RoyalGuardianMageState(
         element: HandMove.fire,
         spriteAsset: 'assets/images/enemies/mage_fire_idle.png',
+        deadSpriteAsset: 'assets/images/enemies/mage_fire_dead.png',
         nameKey: 'tutorial_mage_fire_name',
         fallbackName: 'Fire Mage',
       ),
       HandMove.water: RoyalGuardianMageState(
         element: HandMove.water,
         spriteAsset: 'assets/images/enemies/mage_water_idle.png',
+        deadSpriteAsset: 'assets/images/enemies/mage_water_dead.png',
         nameKey: 'tutorial_mage_water_name',
         fallbackName: 'Water Mage',
       ),
       HandMove.wood: RoyalGuardianMageState(
         element: HandMove.wood,
         spriteAsset: 'assets/images/enemies/mage_wood_idle.png',
+        deadSpriteAsset: 'assets/images/enemies/mage_wood_dead.png',
         nameKey: 'tutorial_mage_wood_name',
         fallbackName: 'Wood Mage',
       ),
@@ -110,6 +122,15 @@ class RoyalGardenTutorialController extends ChangeNotifier {
     _mages[HandMove.water]!,
     _mages[HandMove.wood]!,
   ];
+
+  /// The element of the living mage currently stepped forward toward the center
+  /// to cast/attack. Defeated (`0 HP`) mages never advance.
+  HandMove? get activeAdvancingMage {
+    final current = _activeAdvancingMage;
+    if (current == null) return null;
+    if (mageFor(current).isKnockedOut) return null;
+    return current;
+  }
 
   bool get isAct1 => turnCount < act1TotalTurns;
   bool get isAct2 => turnCount >= act1TotalTurns;
@@ -206,6 +227,100 @@ class RoyalGardenTutorialController extends ChangeNotifier {
     return mage == null || mage.isKnockedOut;
   }
 
+  /// Selects the Guardian Robot's Act 2 move by ranking Markov transition
+  /// probabilities against **surviving mages** so the Robot never wastes its
+  /// counter pick on an already-defeated (`0 HP`) mage.
+  HandMove chooseAct2RobotMove() {
+    final livingMoves = mages
+        .where((m) => m.canCast)
+        .map((m) => m.element)
+        .toList(growable: false);
+    if (livingMoves.isEmpty) {
+      return markovEngine.computeSmartChoice(lastPlayerMove);
+    }
+
+    // All 3 mages alive: every element threatens an active mage, so standard
+    // cumulative Markov applies directly.
+    if (livingMoves.length == tutorialElements.length) {
+      return markovEngine.computeSmartChoice(lastPlayerMove);
+    }
+
+    // Exactly 1 surviving mage: always counter that final living mage.
+    if (livingMoves.length == 1) {
+      return livingMoves.first.counterForMode(elemental: true);
+    }
+
+    // 2 surviving mages: inspect the current Markov row strictly across the
+    // surviving mages, skipping transitions toward already-defeated mages.
+    final activeMoves = markovEngine.activeMoves;
+    final matrix = markovEngine.matrix;
+    final rowIdx = lastPlayerMove == null
+        ? -1
+        : activeMoves.indexOf(lastPlayerMove!);
+
+    int maxRowCount = -1;
+    List<HandMove> topLivingTargets = [];
+    if (rowIdx >= 0 && rowIdx < matrix.length) {
+      final row = matrix[rowIdx];
+      for (final target in livingMoves) {
+        final colIdx = activeMoves.indexOf(target);
+        final count = (colIdx >= 0 && colIdx < row.length) ? row[colIdx] : 0;
+        if (count > maxRowCount) {
+          maxRowCount = count;
+          topLivingTargets = [target];
+        } else if (count == maxRowCount) {
+          topLivingTargets.add(target);
+        }
+      }
+    }
+
+    if (maxRowCount > 0 && topLivingTargets.length == 1) {
+      return topLivingTargets.first.counterForMode(elemental: true);
+    }
+
+    // Secondary tie-breaker: overall cumulative column frequency across the
+    // Markov matrix for the tied surviving targets.
+    final tiedCandidates =
+        topLivingTargets.isNotEmpty ? topLivingTargets : livingMoves;
+    int maxTotalCount = -1;
+    List<HandMove> topByTotal = [];
+    for (final target in tiedCandidates) {
+      final colIdx = activeMoves.indexOf(target);
+      int total = 0;
+      if (colIdx >= 0) {
+        for (final row in matrix) {
+          if (colIdx < row.length) total += row[colIdx];
+        }
+      }
+      if (total > maxTotalCount) {
+        maxTotalCount = total;
+        topByTotal = [target];
+      } else if (total == maxTotalCount) {
+        topByTotal.add(target);
+      }
+    }
+
+    if (maxTotalCount > 0 && topByTotal.length == 1) {
+      return topByTotal.first.counterForMode(elemental: true);
+    }
+
+    // Final tie-breaker when both surviving targets have identical Markov
+    // weights: prefer the safe dominant counter that beats one living mage
+    // and never loses to the other.
+    final validCounters = tiedCandidates
+        .map((target) => target.counterForMode(elemental: true))
+        .toList(growable: false);
+    for (final counter in validCounters) {
+      final losesToAnyLiving = livingMoves.any(
+        (living) => living.beats(counter, elemental: true),
+      );
+      if (!losesToAnyLiving) {
+        return counter;
+      }
+    }
+    return validCounters[_random.nextInt(validCounters.length)];
+  }
+
   /// Executes a single combat turn with the mage corresponding to [playerMove].
   /// Returns `true` if the turn was accepted and resolved.
   bool playTurn(HandMove playerMove) {
@@ -216,7 +331,7 @@ class RoyalGardenTutorialController extends ChangeNotifier {
 
     final HandMove robotMove = wasAct1
         ? act1TelegraphedRobotMove!
-        : markovEngine.computeSmartChoice(lastPlayerMove);
+        : chooseAct2RobotMove();
 
     // Record player transition into the isolated 3-element cumulative Markov
     // matrix after the Robot locks in its choice (matching GameController).
@@ -234,10 +349,10 @@ class RoyalGardenTutorialController extends ChangeNotifier {
 
     if (winner == RoundWinner.user) {
       robotHp = math.max(0, robotHp - 1);
-      if (wasAct1) {
-        _awardAct1Orb(robotMove);
-        lastCollectedOrb = robotMove;
-      }
+      // Continuous orb collection on every winning round (Act 1 & Act 2).
+      _awardOrb(robotMove);
+      lastCollectedOrb = robotMove;
+      orbCollectionEventId += 1;
     } else if (winner == RoundWinner.computer) {
       mage.hp = math.max(0, mage.hp - 1);
       if (mage.isKnockedOut) {
@@ -245,10 +360,15 @@ class RoyalGardenTutorialController extends ChangeNotifier {
       }
     }
 
+    // Advance the chosen living mage forward toward center; if it fell to 0 HP,
+    // it remains down in its defeated state and must not advance.
+    _activeAdvancingMage = mage.isKnockedOut ? null : playerMove;
+
     turnCount += 1;
     roundId += 1;
 
     if (allMagesKnockedOut) {
+      _activeAdvancingMage = null;
       isBattleFinished = true;
     } else if (!hasAnyCastableMage || robotHp <= 0) {
       // Failsafe: if all surviving mages ever run out of 100 Mana (or if the
@@ -258,6 +378,7 @@ class RoyalGardenTutorialController extends ChangeNotifier {
       for (final m in mages) {
         m.hp = 0;
       }
+      _activeAdvancingMage = null;
       isBattleFinished = true;
     }
 
@@ -265,7 +386,7 @@ class RoyalGardenTutorialController extends ChangeNotifier {
     return true;
   }
 
-  void _awardAct1Orb(HandMove defeatedRobotElement) {
+  void _awardOrb(HandMove defeatedRobotElement) {
     switch (defeatedRobotElement) {
       case HandMove.fire:
         collectedFireOrbs += 1;
