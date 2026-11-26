@@ -2818,6 +2818,8 @@ class _MoveCard extends StatelessWidget {
   Widget _buildElementalCrestBadge(
     HandMove badgeMove, {
     required double orbScale,
+    double badgeSize = 28.0,
+    double iconSize = 18.0,
     Key? badgeKey,
   }) {
     final bool isEarth = badgeMove == HandMove.lizard;
@@ -2827,8 +2829,8 @@ class _MoveCard extends StatelessWidget {
 
     return Container(
       key: badgeKey,
-      width: 28,
-      height: 28,
+      width: badgeSize,
+      height: badgeSize,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFF0E121B).withValues(alpha: 0.84),
@@ -2853,7 +2855,7 @@ class _MoveCard extends StatelessWidget {
       child: Center(
         child: ElementalSymbolIcon(
           move: badgeMove,
-          size: 18 * orbScale,
+          size: iconSize * orbScale,
         ),
       ),
     );
@@ -2946,21 +2948,26 @@ class _MoveCard extends StatelessWidget {
                   child: move == null
                       ? const SizedBox.shrink()
                       : secondaryMove != null
-                          ? Row(
+                          ? Column(
                               key: const ValueKey('pc_dual_elemental_badges'),
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 _buildElementalCrestBadge(
                                   move!,
                                   orbScale: orbScale,
+                                  badgeSize: 26.0,
+                                  iconSize: 16.5,
                                   badgeKey: const ValueKey(
                                     'pc_primary_elemental_badge',
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(height: 4),
                                 _buildElementalCrestBadge(
                                   secondaryMove!,
                                   orbScale: orbScale,
+                                  badgeSize: 26.0,
+                                  iconSize: 16.5,
                                   badgeKey: const ValueKey(
                                     'pc_secondary_elemental_badge',
                                   ),

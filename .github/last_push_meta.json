@@ -1,5 +1,5 @@
 {
-  "summary": "- Converted Metal Wizard idle/hit and Temple High Master hit sprites into clean 512x512 RGBA transparent PNGs with anti-aliased edges and preserved glows\n- Registered metal_wizard_idle.png, metal_wizard_hit.png, and temple_master_hit.png in VSCode/pubspec.yaml\n- Wired Metal Wizard and Temple High Master hit sprite swaps and precaching into _BossArenaSprite in versus_arena.dart\n- Extended robot_mage_assets_and_arena_test.dart to verify 512x512 RGBA integrity and VersusArena hit transitions for stages 3 and 5",
+  "summary": "- Stack Baby Mage Robot dual-element badges vertically in VersusArena near its staff instead of horizontally over its face/visor\\n- Compact dual badges to 26px with 4px vertical spacing to stay clear of the HP bar and shield badge\\n- Add widget test verifying vertical Column layout, spacing, bounds, and null visibility states in both normal and compactHeight modes",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T14:38:34Z"
+  "updated_at_utc": "2026-11-26T14:57:47Z"
 }

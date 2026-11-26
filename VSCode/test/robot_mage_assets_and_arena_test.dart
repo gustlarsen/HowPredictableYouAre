@@ -19,6 +19,7 @@ import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/dialogs/victory_cutscene_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/rpg_backpack_icon.dart';
 import 'package:how_predictable/views/widgets/versus_arena.dart';
 
@@ -556,6 +557,147 @@ void main() {
       expect(templeMasterIdleFinder, findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'Baby Mage Robot dual elemental badges stack vertically near staff without overlapping face, shield, or HP bar',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        await localization.load();
+
+        for (final compactHeight in [false, true]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: Scaffold(
+                body: SizedBox(
+                  width: 390,
+                  child: VersusArena(
+                    userMove: HandMove.scissors,
+                    computerMove: HandMove.water,
+                    secondaryComputerMove: HandMove.earth,
+                    winner: RoundWinner.user,
+                    localization: localization,
+                    animationsEnabled: false,
+                    roundId: 1,
+                    elementalMode: true,
+                    isPhase2: true,
+                    enemyStage: 4,
+                    compactHeight: compactHeight,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          final dualBadgesFinder = find.byKey(
+            const ValueKey('pc_dual_elemental_badges'),
+          );
+          final primaryBadgeFinder = find.byKey(
+            const ValueKey('pc_primary_elemental_badge'),
+          );
+          final secondaryBadgeFinder = find.byKey(
+            const ValueKey('pc_secondary_elemental_badge'),
+          );
+          final orbContainerFinder = find.byKey(
+            const ValueKey('pc_orb_container'),
+          );
+          final hpBarFinder = find.byKey(const ValueKey('pc_hp_bar'));
+          final shieldBadgeFinder = find.byKey(
+            const ValueKey('phase2_boss_shield_badge'),
+          );
+          final bossSpriteFinder = find.byKey(
+            const ValueKey('versus_boss_sprite_stage_4'),
+          );
+
+          expect(dualBadgesFinder, findsOneWidget);
+          expect(tester.widget<Widget>(dualBadgesFinder), isA<Column>());
+          expect(primaryBadgeFinder, findsOneWidget);
+          expect(secondaryBadgeFinder, findsOneWidget);
+
+          // Verify icons inside top and bottom badges
+          expect(
+            find.descendant(
+              of: primaryBadgeFinder,
+              matching: find.byWidgetPredicate(
+                (w) => w is ElementalSymbolIcon && w.move == HandMove.water,
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: secondaryBadgeFinder,
+              matching: find.byWidgetPredicate(
+                (w) => w is ElementalSymbolIcon && w.move == HandMove.earth,
+              ),
+            ),
+            findsOneWidget,
+          );
+
+          final primaryRect = tester.getRect(primaryBadgeFinder);
+          final secondaryRect = tester.getRect(secondaryBadgeFinder);
+          final orbRect = tester.getRect(orbContainerFinder);
+          final hpBarRect = tester.getRect(hpBarFinder);
+          final shieldRect = tester.getRect(shieldBadgeFinder);
+          final bossRect = tester.getRect(bossSpriteFinder);
+
+          // Stacked vertically with ~4px gap, same horizontal center
+          expect(secondaryRect.center.dx, closeTo(primaryRect.center.dx, 0.1));
+          expect(secondaryRect.top - primaryRect.bottom, closeTo(4.0, 0.1));
+
+          // Anchored on left/staff side of pc_orb_container, leaving center/face unobstructed
+          expect(primaryRect.left, closeTo(orbRect.left, 0.1));
+          expect(secondaryRect.left, closeTo(orbRect.left, 0.1));
+          expect(primaryRect.right, lessThan(bossRect.center.dx));
+          expect(secondaryRect.right, lessThan(bossRect.center.dx));
+
+          // Fits cleanly above the HP bar and separate from top-right shield badge
+          expect(secondaryRect.bottom, lessThanOrEqualTo(orbRect.bottom));
+          expect(secondaryRect.bottom, lessThan(hpBarRect.top));
+          expect(primaryRect.overlaps(shieldRect), isFalse);
+          expect(secondaryRect.overlaps(shieldRect), isFalse);
+          expect(tester.takeException(), isNull);
+        }
+
+        // Visibility states: null secondaryComputerMove renders single badge, null computerMove renders none
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 390,
+                child: VersusArena(
+                  userMove: null,
+                  computerMove: null,
+                  secondaryComputerMove: null,
+                  winner: null,
+                  localization: localization,
+                  animationsEnabled: false,
+                  roundId: 0,
+                  elementalMode: true,
+                  isPhase2: true,
+                  enemyStage: 4,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('pc_dual_elemental_badges')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('pc_primary_elemental_badge')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('pc_secondary_elemental_badge')),
+          findsNothing,
+        );
+      },
+    );
   });
 
   group('Arcane Bestiary Portrait & Silhouette Tests', () {
