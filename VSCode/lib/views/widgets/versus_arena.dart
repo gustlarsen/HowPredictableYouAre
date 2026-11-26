@@ -639,7 +639,7 @@ class _VersusArenaState extends State<VersusArena>
       localization: loc,
     );
 
-    if (dual.defeatedEnemySpells.length == 2 && dual.playerDamage == 0) {
+    if (dual.isCommonWeaknessHit && dual.bossDamage > 0) {
       return loc
           .t(
             'battle_dual_beats_both',
@@ -650,34 +650,12 @@ class _VersusArenaState extends State<VersusArena>
           .replaceAll('{spellA}', aLabel)
           .replaceAll('{spellB}', bLabel);
     }
-    if (dual.bossDamage > 0 && dual.playerDamage == 0) {
-      final beaten = dual.defeatedEnemySpells.first.displayLabel(
-        elemental: widget.elementalMode,
-        localization: loc,
-      );
-      final tied = (dual.defeatedEnemySpells.first == dual.spellA
-              ? dual.spellB
-              : dual.spellA)
-          .displayLabel(
-        elemental: widget.elementalMode,
-        localization: loc,
-      );
+    if (dual.playerDamage == 0) {
       return loc
           .t(
-            'battle_dual_win_tie',
+            'battle_dual_blocked_neutral',
             fallback:
-                '{player} overcomes {beaten} and neutralizes {tied}! (-1 Boss HP)',
-          )
-          .replaceAll('{player}', pLabel)
-          .replaceAll('{beaten}', beaten)
-          .replaceAll('{tied}', tied);
-    }
-    if (dual.isSimultaneousClash) {
-      return loc
-          .t(
-            'battle_dual_simultaneous_clash',
-            fallback:
-                'Harmonic Clash! {player} vs {spellA} + {spellB} (-1 HP each)',
+                '{spellA} + {spellB} block {player}! Only the common weakness strikes true.',
           )
           .replaceAll('{player}', pLabel)
           .replaceAll('{spellA}', aLabel)
@@ -688,7 +666,7 @@ class _VersusArenaState extends State<VersusArena>
           .t(
             'battle_dual_double_loss',
             fallback:
-                'Twin Overload! {spellA} + {spellB} overwhelm {player} (-2 HP)',
+                'Dual spell blocks damage! Twin Overload: {spellA} + {spellB} overwhelm {player} (-2 HP)',
           )
           .replaceAll('{player}', pLabel)
           .replaceAll('{spellA}', aLabel)
@@ -697,7 +675,8 @@ class _VersusArenaState extends State<VersusArena>
     return loc
         .t(
           'battle_dual_tie_loss',
-          fallback: '{spellA} + {spellB} pierce {player}! (-1 HP)',
+          fallback:
+              'Dual spell blocks damage! {spellA} + {spellB} pierce {player} (-1 HP)',
         )
         .replaceAll('{player}', pLabel)
         .replaceAll('{spellA}', aLabel)
@@ -720,12 +699,12 @@ class _VersusArenaState extends State<VersusArena>
     Color battleDescColor;
     if (dualRes != null && widget.userMove != null) {
       battleDescription = _formatDualSpellBattleDescription(dualRes);
-      if (dualRes.bossDamage > 0 && dualRes.playerDamage == 0) {
+      if (dualRes.isCommonWeaknessHit && dualRes.bossDamage > 0) {
         battleDescColor = widget.elementalMode
             ? palette.elementalText(widget.userMove!)
             : palette.successText;
-      } else if (dualRes.isSimultaneousClash) {
-        battleDescColor = palette.isDark ? Colors.amberAccent : palette.amberText;
+      } else if (dualRes.playerDamage == 0) {
+        battleDescColor = palette.isDark ? Colors.white : palette.amberText;
       } else {
         battleDescColor = palette.dangerText;
       }

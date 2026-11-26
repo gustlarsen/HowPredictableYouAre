@@ -436,7 +436,9 @@ class DualSpellMatchupResult {
   bool get isSimultaneousClash => bossDamage > 0 && playerDamage > 0;
   bool get isDoubleBossWin => playerDamage >= 2;
   bool get isDoubleLoss => playerDamage >= 2;
-  bool get isCommonWeaknessHit => defeatedEnemySpells.length == 2;
+  bool get isCommonWeaknessHit =>
+      outcomeA == RoundWinner.user && outcomeB == RoundWinner.user;
+  bool get isBlocked => !isCommonWeaknessHit;
 
   RoundWinner get primaryWinner {
     if (bossDamage > 0 && playerDamage == 0) return RoundWinner.user;
@@ -444,13 +446,13 @@ class DualSpellMatchupResult {
     return RoundWinner.draw;
   }
 
-  /// Evaluates [playerMove] independently against [spellA] and [spellB]
+  /// Evaluates [playerMove] against [spellA] and [spellB] simultaneously
   /// according to the 5-element Wu Xing / RPSLS rules:
-  /// - Beats BOTH spells: 1 HP damage to boss, 0 HP to player, +1 Orb of EACH defeated element.
-  /// - Beats 1 & Ties 1: 1 HP damage to boss, 0 HP to player, +1 Orb of defeated element.
-  /// - Beats 1 & Loses to 1: 1 HP damage to boss AND 1 HP damage to player, +1 Orb of defeated element.
-  /// - Ties 1 & Loses to 1: 0 HP to boss, 1 HP damage to player.
-  /// - Loses to BOTH spells: 0 HP to boss, 2 HP damage to player.
+  /// - Unique common weakness (beats BOTH spells): 1 HP damage to boss,
+  ///   0 HP to player, +1 Orb of EACH defeated element.
+  /// - Any other element (even beating 1 & tying 1, or beating 1 & losing 1):
+  ///   0 HP damage to boss (blocked by dual spell), 0 orbs, and 1 HP damage to
+  ///   player per losing matchup (0, 1, or 2 HP).
   factory DualSpellMatchupResult.evaluate({
     required HandMove playerMove,
     required HandMove spellA,
@@ -460,15 +462,17 @@ class DualSpellMatchupResult {
     final outcomeA = playerMove.resolvesAgainst(spellA, elemental: elemental);
     final outcomeB = playerMove.resolvesAgainst(spellB, elemental: elemental);
 
-    final defeated = <HandMove>[
-      if (outcomeA == RoundWinner.user) spellA,
-      if (outcomeB == RoundWinner.user) spellB,
-    ];
+    final isCommonWeakness =
+        outcomeA == RoundWinner.user && outcomeB == RoundWinner.user;
+
+    final defeated = isCommonWeakness
+        ? <HandMove>[spellA, spellB]
+        : const <HandMove>[];
     final losses =
         (outcomeA == RoundWinner.computer ? 1 : 0) +
         (outcomeB == RoundWinner.computer ? 1 : 0);
 
-    final bossDamage = defeated.isNotEmpty ? 1 : 0;
+    final bossDamage = isCommonWeakness ? 1 : 0;
     final playerDamage = losses;
 
     return DualSpellMatchupResult(

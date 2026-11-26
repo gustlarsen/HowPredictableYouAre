@@ -1,5 +1,5 @@
 {
-  "summary": "- Deleted guardian_robot_attack.png and standardized Guardian Robot sprites to idle + hit only in VersusArena and RoyalGardenTutorialBattle\n- Removed the glowing yellow circular shield badge (phase2_boss_shield_badge) next to enemies in VersusArena\n- Updated Phase 2 and Guardian Robot arena widget tests and verified flutter analyze and flutter test (421 passed)",
+  "summary": "- Enforce Baby Mage Robot unique common-weakness damage rule so only elements beating both simultaneous Pi spells deal -1 HP and award +2 orbs, while all other choices deal 0 boss damage (blocked) and apply 1 player HP loss per losing matchup\n- Update optimalCountersForDualSpells tier scoring to prioritize common weakness and safe 0-damage fallback\n- Update VersusArena combat feedback and MarkovMatrixView Irrational Pi Core Decoder with localized en/pt/es/de explanations\n- Expand unit and widget tests across all 5 dual-spell pairs, Wood+Metal cases, HintsBar, VersusArena, and Pi Decoder",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T16:48:38Z"
+  "updated_at_utc": "2026-11-26T19:05:42Z"
 }

@@ -142,9 +142,15 @@ class MarkovMatrixView extends StatelessWidget {
         'Dual Harmonic Spells';
     final counterHeader = loc?.t(
           'markov_pi_decoder_col_counter',
-          fallback: 'Weakness',
+          fallback: 'Common Weakness',
         ) ??
-        'Weakness';
+        'Common Weakness';
+    final weaknessRuleNote = loc?.t(
+          'markov_baby_mage_common_weakness_note',
+          fallback:
+              'Dual-Spell Shield: Only the unique common weakness that defeats both spells deals -1 HP to Baby Mage Robot (all other elements deal 0 boss damage).',
+        ) ??
+        'Dual-Spell Shield: Only the unique common weakness that defeats both spells deals -1 HP to Baby Mage Robot (all other elements deal 0 boss damage).';
 
     const rows = <({
       String range,
@@ -237,6 +243,32 @@ class MarkovMatrixView extends StatelessWidget {
                         height: 1.3,
                         color: palette.secondaryText,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.shield_rounded,
+                          size: 13,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            weaknessRuleNote,
+                            key: const ValueKey(
+                              'markov_baby_mage_common_weakness_note',
+                            ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                              color: palette.primaryText,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

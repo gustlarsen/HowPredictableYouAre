@@ -12,6 +12,7 @@ import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
+import 'package:how_predictable/views/widgets/versus_arena.dart';
 
 Future<GameController> _createController({
   Map<String, Object> prefs = const {},
@@ -204,7 +205,90 @@ void main() {
 
   group('2. Dual-Element Combat Resolution & Orb Rewards', () {
     test(
-      'Evaluates all 5 dual-spell outcomes (beats both, beats 1 & ties 1, beats 1 & loses 1, ties 1 & loses 1, loses to both) with exact HP and Orb changes',
+      'Only the unique common weakness damages Baby Mage Robot (-1 HP, 0 player HP, +2 orbs); all other choices deal 0 boss HP (blocked) and apply 1 player HP loss per losing matchup',
+      () async {
+        final controller = await _createController(
+          prefs: {
+            'current_week': 5,
+            'enemy_stage': 4,
+            'enemy_max_hp': 400,
+            'pcHp': 400,
+            'unlockedNewHands': true,
+            'showNewHands': true,
+          },
+        );
+        addTearDown(controller.dispose);
+        final initialMana = controller.remainingMana;
+
+        // 1) Beats BOTH spells (Unique common weakness): Fire vs Wood + Metal
+        // -> -1 HP boss, 0 HP player, +1 Wood orb AND +1 Metal orb, -1 Mana
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.fire);
+        expect(controller.computerHp, 399);
+        expect(controller.userHp, 50);
+        expect(controller.woodOrbs, 1);
+        expect(controller.metalOrbs, 1);
+        expect(controller.remainingMana, initialMana - 1);
+        expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isTrue);
+        expect(controller.lastDualSpellResult!.isBlocked, isFalse);
+        expect(controller.lastRoundComputerDamage, 1);
+        expect(controller.lastRoundUserDamage, 0);
+        expect(controller.lastWinner, RoundWinner.user);
+
+        // 2) Beats 1 & Ties 1: Metal vs Wood + Metal
+        // (Metal beats Wood, ties Metal) -> 0 HP boss (BLOCKED!), 0 HP player, 0 orbs
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.metal);
+        expect(controller.computerHp, 399);
+        expect(controller.userHp, 50);
+        expect(controller.woodOrbs, 1);
+        expect(controller.metalOrbs, 1);
+        expect(controller.remainingMana, initialMana - 2);
+        expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isFalse);
+        expect(controller.lastDualSpellResult!.isBlocked, isTrue);
+        expect(controller.lastRoundComputerDamage, 0);
+        expect(controller.lastRoundUserDamage, 0);
+        expect(controller.lastWinner, RoundWinner.draw);
+
+        // 3) Beats 1 & Loses to 1: Water vs Wood + Metal
+        // (Water loses to Wood, beats Metal) -> 0 HP boss (BLOCKED!), -1 HP player, 0 orbs
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.water);
+        expect(controller.computerHp, 399);
+        expect(controller.userHp, 49);
+        expect(controller.woodOrbs, 1);
+        expect(controller.metalOrbs, 1);
+        expect(controller.remainingMana, initialMana - 3);
+        expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isFalse);
+        expect(controller.lastRoundComputerDamage, 0);
+        expect(controller.lastRoundUserDamage, 1);
+        expect(controller.lastWinner, RoundWinner.computer);
+
+        // 4) Ties 1 & Loses to 1: Wood vs Wood + Metal
+        // (Wood ties Wood, loses to Metal) -> 0 HP boss (BLOCKED!), -1 HP player, 0 orbs
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.wood);
+        expect(controller.computerHp, 399);
+        expect(controller.userHp, 48);
+        expect(controller.lastRoundComputerDamage, 0);
+        expect(controller.lastRoundUserDamage, 1);
+        expect(controller.lastWinner, RoundWinner.computer);
+
+        // 5) Loses to BOTH spells (Double Damage): Earth vs Wood + Metal
+        // (Earth loses to Wood AND loses to Metal) -> 0 HP boss (BLOCKED!), -2 HP player, 0 orbs
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.earth);
+        expect(controller.computerHp, 399);
+        expect(controller.userHp, 46); // 48 - 2 = 46!
+        expect(controller.lastDualSpellResult!.isDoubleLoss, isTrue);
+        expect(controller.lastRoundComputerDamage, 0);
+        expect(controller.lastRoundUserDamage, 2);
+        expect(controller.lastWinner, RoundWinner.computer);
+      },
+    );
+
+    test(
+      'Across all 5 Pi dual-spell pairs, ONLY the single common weakness deals -1 HP to Baby Mage Robot and every non-common-weakness element deals 0 boss HP',
       () async {
         final controller = await _createController(
           prefs: {
@@ -218,65 +302,124 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        // 1) Beats BOTH spells: Earth (lizard) vs Fire + Water
-        // -> -1 HP boss, 0 HP player, +1 Fire orb AND +1 Water orb
-        controller.setCrystalBallDualMoves(HandMove.fire, HandMove.water);
-        controller.playTurn(HandMove.earth);
-        expect(controller.computerHp, 399);
-        expect(controller.userHp, 50);
-        expect(controller.fireOrbs, 1);
-        expect(controller.waterOrbs, 1);
-        expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isTrue);
-        expect(controller.lastRoundComputerDamage, 1);
-        expect(controller.lastRoundUserDamage, 0);
+        final cases = <({
+          int digit,
+          HandMove spellA,
+          HandMove spellB,
+          HandMove commonWeakness,
+          HandMove safeBlock,
+          HandMove doubleLoss,
+        })>[
+          (
+            digit: 0,
+            spellA: HandMove.fire,
+            spellB: HandMove.water,
+            commonWeakness: HandMove.earth,
+            safeBlock: HandMove.water,
+            doubleLoss: HandMove.metal,
+          ),
+          (
+            digit: 2,
+            spellA: HandMove.water,
+            spellB: HandMove.earth,
+            commonWeakness: HandMove.wood,
+            safeBlock: HandMove.earth,
+            doubleLoss: HandMove.fire,
+          ),
+          (
+            digit: 4,
+            spellA: HandMove.earth,
+            spellB: HandMove.wood,
+            commonWeakness: HandMove.metal,
+            safeBlock: HandMove.wood,
+            doubleLoss: HandMove.fire, // loses to Earth, beats Wood -> 1 loss
+          ),
+          (
+            digit: 6,
+            spellA: HandMove.wood,
+            spellB: HandMove.metal,
+            commonWeakness: HandMove.fire,
+            safeBlock: HandMove.metal,
+            doubleLoss: HandMove.earth,
+          ),
+          (
+            digit: 8,
+            spellA: HandMove.metal,
+            spellB: HandMove.fire,
+            commonWeakness: HandMove.water,
+            safeBlock: HandMove.fire,
+            doubleLoss: HandMove.wood,
+          ),
+        ];
 
-        // 2) Beats 1 & Ties 1: Water (paper) vs Fire + Water
-        // -> -1 HP boss, 0 HP player, +1 Fire orb only
-        controller.setCrystalBallDualMoves(HandMove.fire, HandMove.water);
-        controller.playTurn(HandMove.water);
-        expect(controller.computerHp, 398);
-        expect(controller.userHp, 50);
-        expect(controller.fireOrbs, 2);
-        expect(controller.waterOrbs, 1);
-        expect(controller.lastRoundComputerDamage, 1);
-        expect(controller.lastRoundUserDamage, 0);
+        for (final c in cases) {
+          expect(
+            GameController.dualElementsForPiDigit(c.digit),
+            [c.spellA, c.spellB],
+          );
+          expect(
+            GameController.dualElementsForPiDigit(c.digit + 1),
+            [c.spellA, c.spellB],
+          );
 
-        // 3) Beats 1 & Loses to 1 (Simultaneous Clash): Fire (rock) vs Water + Wood
-        // (Fire loses to Water, beats Wood) -> -1 HP boss AND -1 HP player, +1 Wood orb
-        controller.setCrystalBallDualMoves(HandMove.water, HandMove.wood);
-        controller.playTurn(HandMove.fire);
-        expect(controller.computerHp, 397);
-        expect(controller.userHp, 49);
-        expect(controller.woodOrbs, 1);
-        expect(controller.lastDualSpellResult!.isSimultaneousClash, isTrue);
-        expect(controller.lastRoundComputerDamage, 1);
-        expect(controller.lastRoundUserDamage, 1);
+          for (final playerChoice in HandMove.values) {
+            controller.userHp = controller.effectivePlayerMaxHp;
+            controller.computerHp = 400;
+            controller.totalRounds = 0;
+            controller.setCrystalBallDualMoves(c.spellA, c.spellB);
 
-        // 4) Ties 1 & Loses to 1: Fire (rock) vs Fire + Water
-        // (Fire ties Fire, loses to Water) -> 0 HP boss, -1 HP player, 0 orbs
-        controller.setCrystalBallDualMoves(HandMove.fire, HandMove.water);
-        controller.playTurn(HandMove.fire);
-        expect(controller.computerHp, 397);
-        expect(controller.userHp, 48);
-        expect(controller.lastRoundComputerDamage, 0);
-        expect(controller.lastRoundUserDamage, 1);
+            final expectedLosses =
+                (c.spellA.beats(playerChoice, elemental: true) ? 1 : 0) +
+                (c.spellB.beats(playerChoice, elemental: true) ? 1 : 0);
 
-        // 5) Loses to BOTH spells (Double Damage): Wood (scissors) vs Fire + Metal
-        // (Wood loses to Fire AND loses to Metal) -> 0 HP boss, -2 HP player, 0 orbs
-        controller.setCrystalBallDualMoves(HandMove.fire, HandMove.metal);
-        controller.playTurn(HandMove.wood);
-        expect(controller.computerHp, 397);
-        expect(controller.userHp, 46); // 48 - 2 = 46!
-        expect(controller.lastDualSpellResult!.isDoubleLoss, isTrue);
-        expect(controller.lastRoundComputerDamage, 0);
-        expect(controller.lastRoundUserDamage, 2);
+            controller.playTurn(playerChoice);
+
+            if (playerChoice == c.commonWeakness) {
+              expect(
+                controller.computerHp,
+                399,
+                reason:
+                    '$playerChoice is common weakness of ${c.spellA} + ${c.spellB}',
+              );
+              expect(controller.lastRoundComputerDamage, 1);
+              expect(controller.userHp, controller.effectivePlayerMaxHp);
+              expect(controller.lastRoundUserDamage, 0);
+              expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isTrue);
+              expect(
+                controller.lastDualSpellResult!.defeatedEnemySpells,
+                [c.spellA, c.spellB],
+              );
+            } else {
+              expect(
+                controller.computerHp,
+                400,
+                reason:
+                    '$playerChoice must deal 0 boss damage against ${c.spellA} + ${c.spellB}',
+              );
+              expect(controller.lastRoundComputerDamage, 0);
+              expect(controller.lastDualSpellResult!.bossDamage, 0);
+              expect(controller.lastDualSpellResult!.isCommonWeaknessHit, isFalse);
+              expect(controller.lastDualSpellResult!.defeatedEnemySpells, isEmpty);
+              expect(
+                controller.lastRoundUserDamage,
+                expectedLosses,
+                reason:
+                    '$playerChoice against ${c.spellA} + ${c.spellB} should deal $expectedLosses player damage',
+              );
+              expect(
+                controller.userHp,
+                controller.effectivePlayerMaxHp - expectedLosses,
+              );
+            }
+          }
+        }
       },
     );
   });
 
-  group('3. Deterministic Pi Sequence AI, HintsBar & Pi Decoder View', () {
+  group('3. Deterministic Pi Sequence AI, HintsBar, VersusArena & Pi Decoder View', () {
     testWidgets(
-      'Baby Mage Robot follows Pi digits (3, 1, 4, 1, 5, 9, 2, 6, 5, 3...) and synchronizes HintsBar and Irrational Pi Core Decoder',
+      'Baby Mage Robot follows Pi digits (3, 1, 4, 1, 5, 9, 2, 6, 5, 3...) and synchronizes HintsBar, VersusArena blocked feedback, and Irrational Pi Core Decoder across en/pt/es/de',
       (WidgetTester tester) async {
         final controller = await _createController(
           prefs: {
@@ -369,41 +512,83 @@ void main() {
           expect(controller.lastRoundUserDamage, 0);
         }
 
-        // Render HintsBar & MarkovMatrixView (Irrational Pi Core Decoder)
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: ThemeData.dark(),
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    HintsBar(controller: controller),
-                    MarkovMatrixView(
-                      engine: controller.engine,
-                      lastUserMove: controller.lastUserMove,
-                      elementalMode: true,
-                      localization: controller.localization,
-                      isBabyMageRandomView: controller.isBabyMageBoss,
-                      currentPiDigit: controller.currentPiDigit,
+        // Play a non-common-weakness move (Metal vs Wood + Metal on digit 6) and check VersusArena feedback
+        controller.setCrystalBallDualMoves(HandMove.wood, HandMove.metal);
+        controller.playTurn(HandMove.metal);
+        expect(controller.lastRoundComputerDamage, 0);
+        expect(controller.lastRoundUserDamage, 0);
+
+        for (final entry in {
+          'en': 'common weakness',
+          'pt': 'fraqueza comum',
+          'es': 'debilidad común',
+          'de': 'gemeinsame Schwäche',
+        }.entries) {
+          controller.setLanguage(entry.key);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: Scaffold(
+                body: SizedBox(
+                  width: 390,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        HintsBar(controller: controller),
+                        VersusArena(
+                          userMove: controller.currentUserMove,
+                          computerMove: controller.currentComputerMove,
+                          secondaryComputerMove:
+                              controller.currentSecondaryComputerMove,
+                          dualSpellResult: controller.lastDualSpellResult,
+                          winner: controller.lastWinner,
+                          localization: controller.localization,
+                          animationsEnabled: false,
+                          roundId: controller.turnCount,
+                          userHp: controller.userHp,
+                          playerMaxHp: controller.effectivePlayerMaxHp,
+                          computerHp: controller.computerHp,
+                          computerMaxHp: controller.enemyMaxHp,
+                          remainingMana: controller.remainingMana,
+                          maxMana: controller.playerMaxMana,
+                          elementalMode: true,
+                          enemyStage: 4,
+                          isSacredTempleArena: true,
+                        ),
+                        MarkovMatrixView(
+                          engine: controller.engine,
+                          lastUserMove: controller.lastUserMove,
+                          elementalMode: true,
+                          localization: controller.localization,
+                          isBabyMageRandomView: controller.isBabyMageBoss,
+                          currentPiDigit: controller.currentPiDigit,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
+          );
+          await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const ValueKey('markov_baby_mage_pi_decoder')),
-          findsOneWidget,
-        );
-        expect(find.textContaining('3.14159'), findsWidgets);
-        expect(find.byKey(const ValueKey('pi_decoder_row_0_1')), findsOneWidget);
-        expect(find.byKey(const ValueKey('pi_decoder_row_2_3')), findsOneWidget);
-        expect(find.byKey(const ValueKey('pi_decoder_row_4_5')), findsOneWidget);
-        expect(find.byKey(const ValueKey('pi_decoder_row_6_7')), findsOneWidget);
-        expect(find.byKey(const ValueKey('pi_decoder_row_8_9')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('markov_baby_mage_pi_decoder')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('markov_baby_mage_common_weakness_note')),
+            findsOneWidget,
+          );
+          expect(find.textContaining(entry.value), findsWidgets);
+          expect(find.textContaining('3.14159'), findsWidgets);
+          expect(find.byKey(const ValueKey('pi_decoder_row_0_1')), findsOneWidget);
+          expect(find.byKey(const ValueKey('pi_decoder_row_2_3')), findsOneWidget);
+          expect(find.byKey(const ValueKey('pi_decoder_row_4_5')), findsOneWidget);
+          expect(find.byKey(const ValueKey('pi_decoder_row_6_7')), findsOneWidget);
+          expect(find.byKey(const ValueKey('pi_decoder_row_8_9')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
       },
     );
   });

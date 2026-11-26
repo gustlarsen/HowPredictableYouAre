@@ -174,7 +174,7 @@ void main() {
         controller.userHp = 2;
         controller.totalRounds = 8;
         controller.computerHp = 1;
-        final dualSpells = controller.currentBabyMageDualSpells;
+        final dualSpells = controller.crystalBallMoves;
         final dualWinner = HandMove.values.firstWhere(
           (m) {
             final res = DualSpellMatchupResult.evaluate(

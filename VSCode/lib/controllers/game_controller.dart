@@ -122,8 +122,8 @@ class GameController extends ChangeNotifier {
 
   /// Computes the optimal counter move(s) from [activePlayerDeck] against a
   /// dual-element pair (`[spellA, spellB]`), prioritizing the unique common
-  /// weakness that beats BOTH spells (score +4), then the safe win+tie counter
-  /// that deals 1 HP without taking damage (score +2).
+  /// weakness that beats BOTH spells (score +4, deals -1 Boss HP), then a safe
+  /// 0-damage defensive move when the common weakness is unavailable (score +3).
   static List<HandMove> optimalCountersForDualSpells(
     List<HandMove> dualSpells,
     List<HandMove> activePlayerDeck, {
@@ -149,18 +149,15 @@ class GameController extends ChangeNotifier {
         elemental: elemental,
       );
       // Tier scoring:
-      // 4 = Beats both spells (2 orbs, -1 boss HP, 0 player damage)
-      // 3 = Beats 1 & Ties 1 (1 orb, -1 boss HP, 0 player damage)
-      // 1 = Beats 1 & Loses 1 (1 orb, -1 boss HP, -1 player damage)
-      // -1 = Ties 1 & Loses 1 (0 boss damage, -1 player damage)
-      // -2 = Loses to both (0 boss damage, -2 player damage)
+      // 4 = Beats both spells (unique common weakness: -1 boss HP, 0 player HP, +2 orbs)
+      // 3 = Blocked dual spell with 0 player damage (safe fallback if common weakness not in deck)
+      // -1 = Blocked dual spell with 1 player damage (-1 HP)
+      // -2 = Blocked dual spell with 2 player damage (-2 HP)
       final int tierScore;
-      if (res.defeatedEnemySpells.length == 2 && res.playerDamage == 0) {
+      if (res.isCommonWeaknessHit && res.bossDamage > 0 && res.playerDamage == 0) {
         tierScore = 4;
-      } else if (res.bossDamage > 0 && res.playerDamage == 0) {
+      } else if (res.playerDamage == 0) {
         tierScore = 3;
-      } else if (res.bossDamage > 0 && res.playerDamage == 1) {
-        tierScore = 1;
       } else if (res.playerDamage == 1) {
         tierScore = -1;
       } else {
@@ -2835,7 +2832,7 @@ class GameController extends ChangeNotifier {
         }
         audio.playDefeat(vibrate: !isRapidFire, throttleSfx: isRapidFire);
       } else {
-        // Simultaneous clash (-1 HP both)
+        // Dual spell blocked with 0 damage to either side (e.g., beats 1 & ties 1)
         lastWinner = RoundWinner.draw;
         decreeWinStreak = 0;
         if (previousMove != null && userChoice == previousMove) {
