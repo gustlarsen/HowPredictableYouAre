@@ -140,10 +140,12 @@ class _VersusArenaState extends State<VersusArena>
       case 3:
         return const [
           'assets/images/enemies/metal_wizard_idle.png',
+          'assets/images/enemies/metal_wizard_hit.png',
         ];
       case 5:
         return const [
           'assets/images/enemies/temple_master_idle.png',
+          'assets/images/enemies/temple_master_hit.png',
         ];
       default:
         return const [
@@ -1584,13 +1586,17 @@ class _BossArenaSprite extends StatelessWidget {
             ? 'assets/images/enemies/robot_archmage_hit.png'
             : 'assets/images/enemies/robot_archmage_idle.png';
       case 3:
-        return 'assets/images/enemies/metal_wizard_idle.png';
+        return actionType == _BossActionType.hit
+            ? 'assets/images/enemies/metal_wizard_hit.png'
+            : 'assets/images/enemies/metal_wizard_idle.png';
       case 4:
         return actionType == _BossActionType.hit
             ? 'assets/images/enemies/baby_robot_mage_hit.png'
             : 'assets/images/enemies/baby_robot_mage_idle.png';
       case 5:
-        return 'assets/images/enemies/temple_master_idle.png';
+        return actionType == _BossActionType.hit
+            ? 'assets/images/enemies/temple_master_hit.png'
+            : 'assets/images/enemies/temple_master_idle.png';
       default:
         switch (actionType) {
           case _BossActionType.attack:

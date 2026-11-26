@@ -1,5 +1,5 @@
 {
-  "summary": "- Filter out risky Suggestion moves that lose to any anticipated PC candidate move in MarkovEngine.computeSuggestions, keeping only win-or-draw safe moves with a loss-minimizing fallback when no 0-loss move exists.\n- Update and expand unit and widget tests in markov_engine_test.dart, game_controller_test.dart, hints_bar_layout_test.dart, and widget_test.dart verifying multi-candidate safe Suggestion filtering and fixed-height (34.0) HintsBar rendering.\n- Verified with flutter analyze (0 issues) and full flutter test suite (419 tests passing).",
+  "summary": "- Converted Metal Wizard idle/hit and Temple High Master hit sprites into clean 512x512 RGBA transparent PNGs with anti-aliased edges and preserved glows\n- Registered metal_wizard_idle.png, metal_wizard_hit.png, and temple_master_hit.png in VSCode/pubspec.yaml\n- Wired Metal Wizard and Temple High Master hit sprite swaps and precaching into _BossArenaSprite in versus_arena.dart\n- Extended robot_mage_assets_and_arena_test.dart to verify 512x512 RGBA integrity and VersusArena hit transitions for stages 3 and 5",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T14:18:30Z"
+  "updated_at_utc": "2026-11-26T14:38:34Z"
 }

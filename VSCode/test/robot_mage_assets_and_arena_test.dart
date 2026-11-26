@@ -112,6 +112,9 @@ void main() {
       expect(pubspecText.contains('assets/images/player/'), isTrue);
       expect(pubspecText.contains('assets/images/forge_arena_bg.webp'), isTrue);
       expect(pubspecText.contains('assets/images/story/'), isTrue);
+      expect(pubspecText.contains('assets/images/enemies/metal_wizard_idle.png'), isTrue);
+      expect(pubspecText.contains('assets/images/enemies/metal_wizard_hit.png'), isTrue);
+      expect(pubspecText.contains('assets/images/enemies/temple_master_hit.png'), isTrue);
 
       const expectedSprites = [
         'assets/images/player/cleric_idle.png',
@@ -121,7 +124,9 @@ void main() {
         'assets/images/enemies/robot_archmage_idle.png',
         'assets/images/enemies/robot_archmage_hit.png',
         'assets/images/enemies/metal_wizard_idle.png',
+        'assets/images/enemies/metal_wizard_hit.png',
         'assets/images/enemies/temple_master_idle.png',
+        'assets/images/enemies/temple_master_hit.png',
         'assets/images/enemies/baby_robot_mage_idle.png',
         'assets/images/enemies/baby_robot_mage_hit.png',
       ];
@@ -377,7 +382,7 @@ void main() {
       expect(archmageIdleFinder, findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      // Stage 3: Metal Wizard
+      // Stage 3: Metal Wizard (idle on draw, swaps to metal_wizard_hit.png at 550ms impact on player win, then reverts)
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData.dark(),
@@ -399,13 +404,50 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 100));
-      expect(
-        find.byKey(const ValueKey('assets/images/enemies/metal_wizard_idle.png')),
-        findsOneWidget,
+      final metalWizardIdleFinder = find.byKey(
+        const ValueKey('assets/images/enemies/metal_wizard_idle.png'),
       );
+      expect(metalWizardIdleFinder, findsOneWidget);
+      expect(tester.widget<Image>(metalWizardIdleFinder).gaplessPlayback, isTrue);
       expect(find.text('METAL WIZARD'), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 700)); // finish round 3
+
+      // Stage 3 impact damage -> idle during launch/clash, swaps to metal_wizard_hit.png at 550ms impact
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              child: VersusArena(
+                userMove: HandMove.rock,
+                computerMove: HandMove.spock,
+                winner: RoundWinner.user,
+                localization: localization,
+                animationsEnabled: true,
+                roundId: 4,
+                elementalMode: true,
+                enemyStage: 3,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(metalWizardIdleFinder, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 360)); // 560ms total -> impact fired!
+      final metalWizardHitFinder = find.byKey(
+        const ValueKey('assets/images/enemies/metal_wizard_hit.png'),
+      );
+      expect(metalWizardHitFinder, findsOneWidget);
+      expect(tester.widget<Image>(metalWizardHitFinder).gaplessPlayback, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 460)); // reverts to idle
+      expect(metalWizardIdleFinder, findsOneWidget);
+      expect(tester.takeException(), isNull);
 
       // Stage 4: Baby Mage Robot (idle during launch/clash, swaps to baby_robot_mage_hit.png at 550ms impact, then reverts)
       await tester.pumpWidget(
@@ -420,7 +462,7 @@ void main() {
                 winner: RoundWinner.user,
                 localization: localization,
                 animationsEnabled: true,
-                roundId: 4,
+                roundId: 5,
                 elementalMode: true,
                 enemyStage: 4,
               ),
@@ -446,6 +488,72 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 460)); // reverts to idle
       expect(babyIdleFinder, findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Stage 5: Temple High Master (idle during PC win / launch, swaps to temple_master_hit.png at 550ms impact, then reverts)
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              child: VersusArena(
+                userMove: HandMove.rock,
+                computerMove: HandMove.paper,
+                winner: RoundWinner.computer,
+                localization: localization,
+                animationsEnabled: true,
+                roundId: 6,
+                elementalMode: true,
+                enemyStage: 5,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 150));
+      final templeMasterIdleFinder = find.byKey(
+        const ValueKey('assets/images/enemies/temple_master_idle.png'),
+      );
+      expect(templeMasterIdleFinder, findsOneWidget);
+      expect(tester.widget<Image>(templeMasterIdleFinder).gaplessPlayback, isTrue);
+      expect(find.text('TEMPLE HIGH MASTER'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 700)); // finish round 6
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              child: VersusArena(
+                userMove: HandMove.rock,
+                computerMove: HandMove.scissors,
+                winner: RoundWinner.user,
+                localization: localization,
+                animationsEnabled: true,
+                roundId: 7,
+                elementalMode: true,
+                enemyStage: 5,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(templeMasterIdleFinder, findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 360)); // 560ms total -> impact fired!
+      final templeMasterHitFinder = find.byKey(
+        const ValueKey('assets/images/enemies/temple_master_hit.png'),
+      );
+      expect(templeMasterHitFinder, findsOneWidget);
+      expect(tester.widget<Image>(templeMasterHitFinder).gaplessPlayback, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 460)); // reverts to idle
+      expect(templeMasterIdleFinder, findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
