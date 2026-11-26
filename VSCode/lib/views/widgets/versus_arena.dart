@@ -150,7 +150,6 @@ class _VersusArenaState extends State<VersusArena>
       default:
         return const [
           'assets/images/enemies/guardian_robot_idle.png',
-          'assets/images/enemies/guardian_robot_attack.png',
           'assets/images/enemies/guardian_robot_hit.png',
         ];
     }
@@ -1099,7 +1098,6 @@ class _VersusArenaState extends State<VersusArena>
                           damageIndicatorProgress:
                               _calculateDamageProgress(isUser: false),
                           damageAmount: widget.computerDamageAmount,
-                          showElementalShield: widget.isPhase2,
                           handBuilder: (context, handWidget) {
                             Widget animatedChild = handWidget;
                             if (!widget.elementalMode &&
@@ -1598,14 +1596,9 @@ class _BossArenaSprite extends StatelessWidget {
             ? 'assets/images/enemies/temple_master_hit.png'
             : 'assets/images/enemies/temple_master_idle.png';
       default:
-        switch (actionType) {
-          case _BossActionType.attack:
-            return 'assets/images/enemies/guardian_robot_attack.png';
-          case _BossActionType.hit:
-            return 'assets/images/enemies/guardian_robot_hit.png';
-          case _BossActionType.none:
-            return 'assets/images/enemies/guardian_robot_idle.png';
-        }
+        return actionType == _BossActionType.hit
+            ? 'assets/images/enemies/guardian_robot_hit.png'
+            : 'assets/images/enemies/guardian_robot_idle.png';
     }
   }
 
@@ -1694,7 +1687,7 @@ class _BossArenaSprite extends StatelessWidget {
           glowColor = Colors.redAccent;
         }
       } else {
-        // Phase 1 Guardian Robot: attack swap + subtle lunge pulse; hit swap + horizontal shake
+        // Phase 1 Guardian Robot: subtle lunge pulse on attack; hit swap + horizontal shake
         if (actionType == _BossActionType.attack) {
           dx = -4.5 * arc;
           scale += 0.07 * arc;
@@ -2786,7 +2779,6 @@ class _MoveCard extends StatelessWidget {
   final double shakeOffset;
   final double? damageIndicatorProgress;
   final int damageAmount;
-  final bool showElementalShield;
   final Widget Function(BuildContext context, Widget handWidget) handBuilder;
 
   const _MoveCard({
@@ -2811,7 +2803,6 @@ class _MoveCard extends StatelessWidget {
     required this.shakeOffset,
     required this.damageIndicatorProgress,
     required this.damageAmount,
-    this.showElementalShield = false,
     required this.handBuilder,
   });
 
@@ -3032,37 +3023,6 @@ class _MoveCard extends StatelessWidget {
                         (elementalMode ? 0.32 : 0.65),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-        // Phase 2 Archmage Elemental Shield badge (overlay, zero layout height change)
-        if (showElementalShield)
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              key: const ValueKey('phase2_boss_shield_badge'),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF14161D),
-                border: Border.all(
-                  color: Colors.amber,
-                  width: 1.4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.amber.withValues(alpha: 0.55),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.shield_rounded,
-                size: 13,
-                color: Colors.amber,
               ),
             ),
           ),

@@ -1,5 +1,5 @@
 {
-  "summary": "- Lowered and tightened the 3 Royal Guardian Mages onto the Royal Garden stone circle floor so the upper mage's Mana bar sits tightly right above the lower mage without overlap and the front/active mage centers midway between both rear mages.\n- Lowered and vertically centered the Guardian Robot onto the stone circle floor aligned with the vertical midpoint of the 3-mage group, reserving a fixed 26px telegraph header slot and non-wrapping HP counter so its position stays steady across Act 1 and Act 2.\n- Added horizontal clearance between rear mages, front mage, and Guardian Robot across compact (360x640) and standard (390x844) viewports.\n- Added widget test verifying lower courtyard grounding, tight upper-to-lower spacing, vertical centering, zero overlap, and Act 1->2 stability.",
+  "summary": "- Deleted guardian_robot_attack.png and standardized Guardian Robot sprites to idle + hit only in VersusArena and RoyalGardenTutorialBattle\n- Removed the glowing yellow circular shield badge (phase2_boss_shield_badge) next to enemies in VersusArena\n- Updated Phase 2 and Guardian Robot arena widget tests and verified flutter analyze and flutter test (421 passed)",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T15:27:15Z"
+  "updated_at_utc": "2026-11-26T16:48:38Z"
 }

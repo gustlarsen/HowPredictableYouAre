@@ -662,15 +662,9 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
   }
 
   String _resolveRobotSpriteAsset() {
-    if (widget.gameController.animationsEnabled) {
-      switch (_bossActionType) {
-        case _CombatActionType.attack:
-          return 'assets/images/enemies/guardian_robot_attack.png';
-        case _CombatActionType.hit:
-          return 'assets/images/enemies/guardian_robot_hit.png';
-        case _CombatActionType.none:
-          break;
-      }
+    if (widget.gameController.animationsEnabled &&
+        _bossActionType == _CombatActionType.hit) {
+      return 'assets/images/enemies/guardian_robot_hit.png';
     }
     return 'assets/images/enemies/guardian_robot_idle.png';
   }

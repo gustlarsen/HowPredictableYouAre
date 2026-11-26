@@ -289,7 +289,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('Phase 2 GameScreen renders shield badge and hides locked Earth & Metal buttons', (WidgetTester tester) async {
+    testWidgets('Phase 2 GameScreen omits boss shield badge and hides locked Earth & Metal buttons', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -326,8 +326,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Phase 2 boss elemental shield badge renders in GameScreen/VersusArena
-      expect(find.byKey(const ValueKey('phase2_boss_shield_badge')), findsOneWidget);
+      // Phase 2 boss yellow shield badge is no longer rendered in GameScreen/VersusArena
+      expect(find.byKey(const ValueKey('phase2_boss_shield_badge')), findsNothing);
       // Player still only sees 3 elemental buttons while Unlock Earth & Metal is OFF
       expect(find.text('Earth'), findsNothing);
       expect(find.text('Metal'), findsNothing);

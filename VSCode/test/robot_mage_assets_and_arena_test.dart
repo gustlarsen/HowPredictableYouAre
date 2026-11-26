@@ -120,7 +120,6 @@ void main() {
       const expectedSprites = [
         'assets/images/player/cleric_idle.png',
         'assets/images/enemies/guardian_robot_idle.png',
-        'assets/images/enemies/guardian_robot_attack.png',
         'assets/images/enemies/guardian_robot_hit.png',
         'assets/images/enemies/robot_archmage_idle.png',
         'assets/images/enemies/robot_archmage_hit.png',
@@ -205,7 +204,7 @@ void main() {
   });
 
   group('VersusArena Player & Boss Sprite Animation Tests', () {
-    testWidgets('Phase 1 Guardian Robot shows idle by default, swaps to attack (~450ms) on PC win, and swaps to hit (~450ms) on Player impact while Cleric sprite and Sanctuary Runes render cleanly', (WidgetTester tester) async {
+    testWidgets('Phase 1 Guardian Robot stays on idle during PC win and swaps to hit (~450ms) on Player impact while Cleric sprite and Sanctuary Runes render cleanly', (WidgetTester tester) async {
       final localization = LocalizationService();
       await localization.load();
 
@@ -261,7 +260,7 @@ void main() {
       expect(find.byKey(const ValueKey('user_mana_bar')), findsOneWidget);
       expect(find.text('GUARDIAN ROBOT'), findsOneWidget);
 
-      // PC wins round 1 -> guardian_robot_attack.png active for ~450ms, then reverts to idle
+      // PC wins round 1 -> guardian_robot_idle.png stays active (no attack sprite swap)
       await pumpArena(
         roundId: 1,
         winner: RoundWinner.computer,
@@ -271,7 +270,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 120));
       expect(
-        find.byKey(const ValueKey('assets/images/enemies/guardian_robot_attack.png')),
+        find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
 
@@ -559,7 +558,7 @@ void main() {
     });
 
     testWidgets(
-      'Baby Mage Robot dual elemental badges stack vertically near staff without overlapping face, shield, or HP bar',
+      'Baby Mage Robot dual elemental badges stack vertically near staff without overlapping face or HP bar',
       (WidgetTester tester) async {
         final localization = LocalizationService();
         await localization.load();
@@ -603,9 +602,6 @@ void main() {
             const ValueKey('pc_orb_container'),
           );
           final hpBarFinder = find.byKey(const ValueKey('pc_hp_bar'));
-          final shieldBadgeFinder = find.byKey(
-            const ValueKey('phase2_boss_shield_badge'),
-          );
           final bossSpriteFinder = find.byKey(
             const ValueKey('versus_boss_sprite_stage_4'),
           );
@@ -614,6 +610,10 @@ void main() {
           expect(tester.widget<Widget>(dualBadgesFinder), isA<Column>());
           expect(primaryBadgeFinder, findsOneWidget);
           expect(secondaryBadgeFinder, findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('phase2_boss_shield_badge')),
+            findsNothing,
+          );
 
           // Verify icons inside top and bottom badges
           expect(
@@ -639,7 +639,6 @@ void main() {
           final secondaryRect = tester.getRect(secondaryBadgeFinder);
           final orbRect = tester.getRect(orbContainerFinder);
           final hpBarRect = tester.getRect(hpBarFinder);
-          final shieldRect = tester.getRect(shieldBadgeFinder);
           final bossRect = tester.getRect(bossSpriteFinder);
 
           // Stacked vertically with ~4px gap, same horizontal center
@@ -652,11 +651,9 @@ void main() {
           expect(primaryRect.right, lessThan(bossRect.center.dx));
           expect(secondaryRect.right, lessThan(bossRect.center.dx));
 
-          // Fits cleanly above the HP bar and separate from top-right shield badge
+          // Fits cleanly above the HP bar
           expect(secondaryRect.bottom, lessThanOrEqualTo(orbRect.bottom));
           expect(secondaryRect.bottom, lessThan(hpBarRect.top));
-          expect(primaryRect.overlaps(shieldRect), isFalse);
-          expect(secondaryRect.overlaps(shieldRect), isFalse);
           expect(tester.takeException(), isNull);
         }
 
