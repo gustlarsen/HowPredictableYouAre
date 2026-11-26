@@ -1207,33 +1207,46 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
         final h = constraints.maxHeight;
         final isCompact = h < 310 || w < 350;
 
-        final double mageSpriteSize =
-            (h * (isCompact ? 0.24 : 0.26)).clamp(56.0, 96.0).toDouble();
+        final double maxMageSpriteForStack =
+            ((h - 78.0) * 0.5).clamp(48.0, 94.0).toDouble();
+        final double mageSpriteSize = (h * (isCompact ? 0.22 : 0.25))
+            .clamp(48.0, math.min(94.0, maxMageSpriteForStack))
+            .toDouble();
         final double robotSpriteSize =
-            (h * (isCompact ? 0.34 : 0.38)).clamp(80.0, 142.0).toDouble();
-        final double mageCardWidth = (w * 0.285).clamp(96.0, 126.0).toDouble();
-        final double robotCardWidth = (w * 0.35).clamp(114.0, 160.0).toDouble();
+            (h * (isCompact ? 0.30 : 0.34)).clamp(72.0, 136.0).toDouble();
+        final double mageCardWidth = (w * 0.285).clamp(96.0, 124.0).toDouble();
+        final double robotCardWidth =
+            (w * 0.34).clamp(112.0, 152.0).toDouble();
 
-        final double cardEstimatedH = mageSpriteSize + 38.0;
-        final double availH = math.max(0.0, h - cardEstimatedH);
+        // Compact rendered card height (sprite + 2px gap + tight HP/Mana pill)
+        final double cardEstimatedH = mageSpriteSize + 32.0;
+        const double rearVerticalGap = 2.0;
+        final double verticalPairStep = cardEstimatedH + rearVerticalGap;
+        final double bottomMargin = (h * 0.025).clamp(6.0, 16.0).toDouble();
 
         // 3 distinct non-overlapping grounded slots on the Royal Garden stone circle:
-        // - upperRear: upper-left rear flank (grounded below top arches)
-        // - frontActive: front-center active casting slot facing the Guardian Robot
-        // - lowerRear: lower-left rear flank
-        final double rearLeft = (w * 0.01).clamp(0.0, 6.0).toDouble();
-        final double frontLeft = math.max(
-          rearLeft + mageCardWidth * 0.86,
-          (w * 0.26).clamp(84.0, 140.0).toDouble(),
+        // - lowerRear: anchored down on the lower-left courtyard floor
+        // - upperRear: tightly above lowerRear so its Mana bar sits right above
+        //   (almost touching) the lower mage's head/hood
+        // - frontActive: centered midway between upperRear and lowerRear facing the Robot
+        final double rearLeft = (w * 0.008).clamp(0.0, 5.0).toDouble();
+        final double rawFrontLeft = math.max(
+          rearLeft + mageCardWidth + 4.0,
+          (w * 0.295).clamp(96.0, 140.0).toDouble(),
         );
+        final double maxSafeFrontLeft = math.max(
+          rearLeft + 60.0,
+          w - robotCardWidth - mageCardWidth - 8.0,
+        );
+        final double frontLeft = math.min(rawFrontLeft, maxSafeFrontLeft);
 
-        final double upperRearTop = (availH * 0.16)
-            .clamp(math.min(12.0, availH), availH)
-            .toDouble();
-        final double frontActiveTop =
-            (availH * 0.54).clamp(0.0, availH).toDouble();
+        final double maxTop = math.max(0.0, h - cardEstimatedH);
         final double lowerRearTop =
-            (availH * 0.92).clamp(0.0, availH).toDouble();
+            (h - bottomMargin - cardEstimatedH).clamp(0.0, maxTop).toDouble();
+        final double upperRearTop =
+            (lowerRearTop - verticalPairStep).clamp(0.0, lowerRearTop).toDouble();
+        final double frontActiveTop =
+            ((upperRearTop + lowerRearTop) * 0.5).clamp(0.0, maxTop).toDouble();
 
         ({double left, double top}) coordsForSlot(RoyalGardenMageSlot slot) {
           switch (slot) {
@@ -1258,8 +1271,16 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
         final woodPos = coordsForSlot(woodSlot);
         final waterPos = coordsForSlot(waterSlot);
 
-        final robotAvailH = math.max(0.0, h - (robotSpriteSize + 78.0));
-        final double robotTop = (robotAvailH * 0.54).clamp(4.0, h).toDouble();
+        // Ground and vertically center the Guardian Robot on the courtyard floor
+        // aligned with the vertical midpoint of the 3-mage formation on the left.
+        final double magesClusterCenterY =
+            frontActiveTop + cardEstimatedH * 0.5;
+        final double robotTotalH = robotSpriteSize + 78.0;
+        final double maxRobotTop =
+            math.max(4.0, h - robotTotalH - bottomMargin * 0.5);
+        final double robotTop = (magesClusterCenterY - robotTotalH * 0.5)
+            .clamp(4.0, maxRobotTop)
+            .toDouble();
 
         // Exact horizontal clash axis linking the front/active mage and Guardian Robot
         final double leftCenterX = frontLeft + mageCardWidth * 0.5;
@@ -1473,55 +1494,63 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
       key: const ValueKey('tutorial_guardian_robot'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Act 1 Telegraph Chip (e.g. "Preparing Wood")
-        if (telegraphedMove != null)
-          Container(
-            key: const ValueKey('tutorial_robot_telegraph'),
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF141822).withValues(alpha: 0.90),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: telegraphedMove.elementalPrimaryColor.withValues(
-                  alpha: 0.85,
-                ),
-                width: 1.2,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ElementalSymbolIcon(move: telegraphedMove, size: 13),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    loc
-                        .t(
-                          'tutorial_robot_preparing',
-                          fallback: 'Preparing {element}',
-                        )
-                        .replaceAll(
-                          '{element}',
-                          telegraphedMove.displayLabel(
-                            elemental: true,
-                            localization: loc,
+        // Act 1 Telegraph Chip slot (fixed 26px height so Robot never shifts vertically in Act 2)
+        SizedBox(
+          height: 26,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: telegraphedMove != null
+                ? Container(
+                    key: const ValueKey('tutorial_robot_telegraph'),
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141822).withValues(alpha: 0.90),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: telegraphedMove.elementalPrimaryColor.withValues(
+                          alpha: 0.85,
+                        ),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElementalSymbolIcon(move: telegraphedMove, size: 13),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            loc
+                                .t(
+                                  'tutorial_robot_preparing',
+                                  fallback: 'Preparing {element}',
+                                )
+                                .replaceAll(
+                                  '{element}',
+                                  telegraphedMove.displayLabel(
+                                    elemental: true,
+                                    localization: loc,
+                                  ),
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: telegraphedMove.elementalPrimaryColor,
+                            ),
                           ),
                         ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: telegraphedMove.elementalPrimaryColor,
+                      ],
                     ),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          const SizedBox(height: 6),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
 
         // Guardian Robot Sprite with VersusArena lunge, hit recoil, shake & flash
         Transform.translate(
@@ -1638,6 +1667,7 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
+                    height: 1.15,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
@@ -1655,13 +1685,19 @@ class _RoyalGardenTutorialBattleState extends State<RoyalGardenTutorialBattle>
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '$_displayedRobotHp / ${_tutorial.robotMaxHp}',
-                  key: const ValueKey('tutorial_robot_hp'),
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFFFCDD2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '$_displayedRobotHp / ${_tutorial.robotMaxHp}',
+                    key: const ValueKey('tutorial_robot_hp'),
+                    maxLines: 1,
+                    softWrap: false,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFFFCDD2),
+                    ),
                   ),
                 ),
               ],
@@ -2128,6 +2164,7 @@ class _RoyalMageCombatant extends StatelessWidget {
                       key: ValueKey('tutorial_mage_hp_${mage.element.orbKey}'),
                       style: TextStyle(
                         fontSize: 8.5,
+                        height: 1.1,
                         fontWeight: FontWeight.w800,
                         color: isDefeated ? Colors.white54 : Colors.white,
                       ),
@@ -2165,6 +2202,7 @@ class _RoyalMageCombatant extends StatelessWidget {
                       key: ValueKey('tutorial_mage_mana_${mage.element.orbKey}'),
                       style: TextStyle(
                         fontSize: 8.0,
+                        height: 1.1,
                         fontWeight: FontWeight.w700,
                         color: isDefeated
                             ? Colors.white38

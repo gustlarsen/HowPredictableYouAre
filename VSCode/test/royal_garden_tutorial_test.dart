@@ -962,5 +962,122 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'All 3 mages and Guardian Robot sit grounded on the lower Royal Garden courtyard with tight upper-to-lower spacing, centered front mage & Robot, zero overlap, and Act 1->2 stability',
+      (WidgetTester tester) async {
+        for (final viewport in [
+          const Size(390, 844),
+          const Size(360, 640),
+        ]) {
+          tester.view.physicalSize = viewport;
+          tester.view.devicePixelRatio = 1.0;
+
+          final harness = await _createHarness();
+          final controller = harness.controller;
+          final tutorial = RoyalGardenTutorialController(
+            random: math.Random(19),
+          );
+
+          await tester.pumpWidget(
+            ChangeNotifierProvider.value(
+              value: controller,
+              child: MaterialApp(
+                home: RoyalGardenTutorialBattle(
+                  key: ValueKey(
+                    'tutorial_grounding_${viewport.width}_${viewport.height}',
+                  ),
+                  gameController: controller,
+                  tutorialController: tutorial,
+                  onSkip: () {},
+                  onBattleCompleted: ({
+                    required int fireOrbs,
+                    required int waterOrbs,
+                    required int woodOrbs,
+                  }) {},
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final stageRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_arena_stage')),
+          );
+          final deckRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_action_deck')),
+          );
+          final upperRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_mage_fire')),
+          );
+          final upperStatsRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_mage_stats_fire')),
+          );
+          final frontRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_mage_water')),
+          );
+          final lowerRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_mage_wood')),
+          );
+          final robotRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_guardian_robot')),
+          );
+
+          // 1. Upper mage is lowered well down onto the courtyard (not high near top arches)
+          final minUpperRatio = viewport.height >= 800 ? 0.48 : 0.30;
+          expect(
+            upperRect.top,
+            greaterThan(stageRect.top + stageRect.height * minUpperRatio),
+          );
+
+          // 2. Upper mage's Mana bar sits tightly right above (almost touching) lower mage without overlap
+          final verticalGap = lowerRect.top - upperStatsRect.bottom;
+          expect(verticalGap, greaterThanOrEqualTo(0.0));
+          expect(verticalGap, lessThanOrEqualTo(10.0));
+
+          // 3. Front/active mage is vertically centered midway between upper and lower mages
+          final rearMidpointY = (upperRect.center.dy + lowerRect.center.dy) / 2;
+          expect(frontRect.center.dy, closeTo(rearMidpointY, 1.0));
+
+          // 4. Zero horizontal overlap between rear column, front mage, and Guardian Robot
+          expect(frontRect.left, greaterThanOrEqualTo(upperRect.right));
+          expect(frontRect.left, greaterThanOrEqualTo(lowerRect.right));
+          expect(robotRect.left, greaterThanOrEqualTo(frontRect.right));
+
+          // 5. All combatants sit cleanly grounded above the bottom elemental buttons
+          expect(lowerRect.bottom, lessThanOrEqualTo(stageRect.bottom));
+          expect(lowerRect.bottom, lessThan(deckRect.top));
+          expect(robotRect.bottom, lessThanOrEqualTo(stageRect.bottom));
+          expect(robotRect.bottom, lessThan(deckRect.top));
+
+          // 6. Guardian Robot is lowered onto the courtyard & vertically centered with the 3-mage cluster
+          final magesClusterCenterY = (upperRect.top + lowerRect.bottom) / 2;
+          expect(robotRect.center.dy, closeTo(magesClusterCenterY, 8.0));
+          expect(
+            robotRect.top,
+            greaterThan(stageRect.top + stageRect.height * minUpperRatio),
+          );
+
+          // 7. Complete Act 1 (Turns 1-3) into Act 2 and confirm Guardian Robot stays vertically steady
+          await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+          await tester.pump();
+          await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
+          await tester.pump();
+          await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
+          await tester.pump();
+
+          final act2RobotRect = tester.getRect(
+            find.byKey(const ValueKey('tutorial_guardian_robot')),
+          );
+          expect(act2RobotRect.center.dy, closeTo(robotRect.center.dy, 1.0));
+
+          tutorial.dispose();
+          controller.dispose();
+        }
+
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      },
+    );
   });
 }

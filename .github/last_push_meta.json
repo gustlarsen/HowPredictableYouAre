@@ -1,5 +1,5 @@
 {
-  "summary": "- Stack Baby Mage Robot dual-element badges vertically in VersusArena near its staff instead of horizontally over its face/visor\\n- Compact dual badges to 26px with 4px vertical spacing to stay clear of the HP bar and shield badge\\n- Add widget test verifying vertical Column layout, spacing, bounds, and null visibility states in both normal and compactHeight modes",
+  "summary": "- Lowered and tightened the 3 Royal Guardian Mages onto the Royal Garden stone circle floor so the upper mage's Mana bar sits tightly right above the lower mage without overlap and the front/active mage centers midway between both rear mages.\n- Lowered and vertically centered the Guardian Robot onto the stone circle floor aligned with the vertical midpoint of the 3-mage group, reserving a fixed 26px telegraph header slot and non-wrapping HP counter so its position stays steady across Act 1 and Act 2.\n- Added horizontal clearance between rear mages, front mage, and Guardian Robot across compact (360x640) and standard (390x844) viewports.\n- Added widget test verifying lower courtyard grounding, tight upper-to-lower spacing, vertical centering, zero overlap, and Act 1->2 stability.",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-26T14:57:47Z"
+  "updated_at_utc": "2026-11-26T15:27:15Z"
 }
