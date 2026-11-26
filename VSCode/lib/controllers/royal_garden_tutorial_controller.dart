@@ -3,6 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../models/move.dart';
 import '../services/markov_engine.dart';
 
+/// Grounded formation slots on the left side of the Royal Garden stone circle.
+///
+/// The three Royal Guardian Mages occupy a bijection across these three
+/// non-overlapping slots (`upperRear`, `frontActive`, `lowerRear`). Selecting
+/// a non-front living mage performs a true coordinated position swap with the
+/// living mage occupying [frontActive].
+enum RoyalGardenMageSlot {
+  upperRear,
+  frontActive,
+  lowerRear,
+}
+
 /// Per-mage combat state for the three Royal Guardian Mages defending the
 /// Royal Garden during the playable prologue battle.
 class RoyalGuardianMageState {
@@ -59,6 +71,7 @@ class RoyalGardenTutorialController extends ChangeNotifier {
   final math.Random _random;
 
   late final Map<HandMove, RoyalGuardianMageState> _mages;
+  late final Map<HandMove, RoyalGardenMageSlot> _mageSlots;
 
   int robotHp = initialRobotHp;
   final int robotMaxHp = initialRobotHp;
@@ -111,6 +124,11 @@ class RoyalGardenTutorialController extends ChangeNotifier {
         fallbackName: 'Wood Mage',
       ),
     };
+    _mageSlots = {
+      HandMove.fire: RoyalGardenMageSlot.upperRear,
+      HandMove.water: RoyalGardenMageSlot.frontActive,
+      HandMove.wood: RoyalGardenMageSlot.lowerRear,
+    };
   }
 
   RoyalGuardianMageState mageFor(HandMove element) {
@@ -123,8 +141,23 @@ class RoyalGardenTutorialController extends ChangeNotifier {
     _mages[HandMove.wood]!,
   ];
 
-  /// The element of the living mage currently stepped forward toward the center
-  /// to cast/attack. Defeated (`0 HP`) mages never advance.
+  /// Returns the current formation slot occupied by [element]'s mage.
+  RoyalGardenMageSlot slotOf(HandMove element) {
+    return _mageSlots[element] ?? RoyalGardenMageSlot.frontActive;
+  }
+
+  /// Returns the element of the mage currently occupying [RoyalGardenMageSlot.frontActive].
+  HandMove? get frontMageElement {
+    for (final entry in _mageSlots.entries) {
+      if (entry.value == RoyalGardenMageSlot.frontActive) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  /// The element of the living mage currently active in the front slot after
+  /// casting. Defeated (`0 HP`) mages are never returned as active attackers.
   HandMove? get activeAdvancingMage {
     final current = _activeAdvancingMage;
     if (current == null) return null;
@@ -321,10 +354,59 @@ class RoyalGardenTutorialController extends ChangeNotifier {
     return validCounters[_random.nextInt(validCounters.length)];
   }
 
+  /// Performs a real coordinated position swap between [chosenElement] (which
+  /// must be alive) and whichever living mage currently occupies
+  /// [RoyalGardenMageSlot.frontActive]. Knocked-out (`0 HP`) mages never
+  /// participate in active attack swaps.
+  void _swapChosenMageToFront(HandMove chosenElement) {
+    final chosenMage = _mages[chosenElement];
+    if (chosenMage == null || chosenMage.isKnockedOut) return;
+
+    final chosenSlot = _mageSlots[chosenElement];
+    if (chosenSlot == null || chosenSlot == RoyalGardenMageSlot.frontActive) {
+      return;
+    }
+
+    final currentFront = frontMageElement;
+    if (currentFront == null || currentFront == chosenElement) {
+      _mageSlots[chosenElement] = RoyalGardenMageSlot.frontActive;
+      return;
+    }
+
+    // Only swap with a living occupant of the front slot; never move a 0 HP mage.
+    if (!mageFor(currentFront).isKnockedOut) {
+      _mageSlots[chosenElement] = RoyalGardenMageSlot.frontActive;
+      _mageSlots[currentFront] = chosenSlot;
+    }
+  }
+
+  /// When the mage in [RoyalGardenMageSlot.frontActive] falls to `0 HP` and
+  /// another living mage still stands in a rear flank, collapses the defeated
+  /// mage back into that vacated rear flank and advances the living mage to
+  /// [RoyalGardenMageSlot.frontActive] so fallen mages never overlap living
+  /// attackers or participate in subsequent swaps.
+  void _settleDefeatedFrontMage(HandMove defeatedElement) {
+    if (_mageSlots[defeatedElement] != RoyalGardenMageSlot.frontActive) return;
+    for (final candidate in tutorialElements) {
+      if (candidate == defeatedElement) continue;
+      final candidateMage = _mages[candidate]!;
+      final candidateSlot = _mageSlots[candidate]!;
+      if (!candidateMage.isKnockedOut &&
+          candidateSlot != RoyalGardenMageSlot.frontActive) {
+        _mageSlots[defeatedElement] = candidateSlot;
+        _mageSlots[candidate] = RoyalGardenMageSlot.frontActive;
+        return;
+      }
+    }
+  }
+
   /// Executes a single combat turn with the mage corresponding to [playerMove].
   /// Returns `true` if the turn was accepted and resolved.
   bool playTurn(HandMove playerMove) {
     if (!isElementButtonEnabled(playerMove)) return false;
+
+    // 1. Perform true coordinated position swap with the living front mage.
+    _swapChosenMageToFront(playerMove);
 
     final mage = _mages[playerMove]!;
     final wasAct1 = isAct1;
@@ -357,11 +439,11 @@ class RoyalGardenTutorialController extends ChangeNotifier {
       mage.hp = math.max(0, mage.hp - 1);
       if (mage.isKnockedOut) {
         lastKnockedOutMage = playerMove;
+        _settleDefeatedFrontMage(playerMove);
       }
     }
 
-    // Advance the chosen living mage forward toward center; if it fell to 0 HP,
-    // it remains down in its defeated state and must not advance.
+    // Track living active caster; if defeated, clear so 0 HP mage never advances.
     _activeAdvancingMage = mage.isKnockedOut ? null : playerMove;
 
     turnCount += 1;

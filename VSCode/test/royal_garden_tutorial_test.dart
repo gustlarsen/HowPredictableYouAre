@@ -18,6 +18,7 @@ import 'package:how_predictable/views/screens/intro_story_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
 import 'package:how_predictable/views/widgets/royal_garden_tutorial_battle.dart';
 import 'package:how_predictable/views/widgets/rpg_teleport_portal_icon.dart';
+import 'package:how_predictable/views/widgets/versus_arena.dart';
 
 class _FakePlayGamesClient implements PlayGamesClient {
   String? savedPayload;
@@ -310,21 +311,36 @@ void main() {
       expect(tutorial.chooseAct2RobotMove(), HandMove.fire);
     });
 
-    test('Active advancing mage tracks selected living element, switches on new element, and clears at 0 HP', () {
+    test('Choosing a non-front living mage performs a true position swap with the front mage, while 0 HP mages stay down and never swap', () {
       final tutorial = RoyalGardenTutorialController(random: math.Random(5));
+      expect(tutorial.slotOf(HandMove.fire), RoyalGardenMageSlot.upperRear);
+      expect(tutorial.slotOf(HandMove.water), RoyalGardenMageSlot.frontActive);
+      expect(tutorial.slotOf(HandMove.wood), RoyalGardenMageSlot.lowerRear);
       expect(tutorial.activeAdvancingMage, isNull);
 
+      // Turn 1: Fire (upperRear) swaps with Water (frontActive)
       tutorial.playTurn(HandMove.fire);
+      expect(tutorial.slotOf(HandMove.fire), RoyalGardenMageSlot.frontActive);
+      expect(tutorial.slotOf(HandMove.water), RoyalGardenMageSlot.upperRear);
+      expect(tutorial.slotOf(HandMove.wood), RoyalGardenMageSlot.lowerRear);
       expect(tutorial.activeAdvancingMage, HandMove.fire);
       expect(
         tutorial.mageFor(HandMove.fire).activeSpriteAsset,
         'assets/images/enemies/mage_fire_idle.png',
       );
 
+      // Turn 2: Water (upperRear) swaps back with Fire (frontActive)
       tutorial.playTurn(HandMove.water);
+      expect(tutorial.slotOf(HandMove.water), RoyalGardenMageSlot.frontActive);
+      expect(tutorial.slotOf(HandMove.fire), RoyalGardenMageSlot.upperRear);
+      expect(tutorial.slotOf(HandMove.wood), RoyalGardenMageSlot.lowerRear);
       expect(tutorial.activeAdvancingMage, HandMove.water);
 
+      // Turn 3: Wood (lowerRear) swaps with Water (frontActive)
       tutorial.playTurn(HandMove.wood);
+      expect(tutorial.slotOf(HandMove.wood), RoyalGardenMageSlot.frontActive);
+      expect(tutorial.slotOf(HandMove.water), RoyalGardenMageSlot.lowerRear);
+      expect(tutorial.slotOf(HandMove.fire), RoyalGardenMageSlot.upperRear);
       expect(tutorial.activeAdvancingMage, HandMove.wood);
 
       // Force Fire Mage to 1 HP and make Robot counter with Water to knock Fire out
@@ -344,6 +360,24 @@ void main() {
         'assets/images/enemies/mage_fire_dead.png',
       );
       expect(tutorial.activeAdvancingMage, isNull);
+
+      // Fallen Fire Mage settles into a rear flank and never moves again during subsequent living swaps
+      final deadFireSlot = tutorial.slotOf(HandMove.fire);
+      expect(deadFireSlot, isNot(RoyalGardenMageSlot.frontActive));
+      expect(tutorial.frontMageElement, isNot(HandMove.fire));
+
+      // Swapping between living Water and Wood never moves dead Fire
+      final livingRear = tutorial.frontMageElement == HandMove.water
+          ? HandMove.wood
+          : HandMove.water;
+      final previousFront = tutorial.frontMageElement!;
+      final previousRearSlot = tutorial.slotOf(livingRear);
+      tutorial.playTurn(livingRear);
+      expect(tutorial.slotOf(HandMove.fire), deadFireSlot);
+      if (!tutorial.mageFor(livingRear).isKnockedOut) {
+        expect(tutorial.slotOf(livingRear), RoyalGardenMageSlot.frontActive);
+        expect(tutorial.slotOf(previousFront), previousRearSlot);
+      }
     });
 
     test('Failsafe Overdrive Strike triggers if all surviving mages run out of 100 Mana', () {
@@ -451,7 +485,7 @@ void main() {
         expect(initialWaterCenter.dx, greaterThan(initialFireCenter.dx));
         expect(initialWaterCenter.dx, greaterThan(initialWoodCenter.dx));
 
-        // Act 1 Turn 1: Fire burns Wood! -> Fire Mage steps forward toward center
+        // Act 1 Turn 1: Fire burns Wood! -> TRUE SWAP: Fire moves to frontActive AND Water moves to upperRear
         expect(find.text('Fire burns Wood!'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('tutorial_move_highlight_fire')),
@@ -475,12 +509,20 @@ void main() {
           tester.widget<Text>(find.byKey(const ValueKey('tutorial_mage_mana_fire'))).data,
           '99/100',
         );
-        final fireAdvancedCenter = tester.getCenter(
-          find.byKey(const ValueKey('tutorial_mage_fire')),
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_fire'))).dx,
+          closeTo(initialWaterCenter.dx, 1.0),
         );
-        expect(fireAdvancedCenter.dx, greaterThan(initialFireCenter.dx));
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
+          closeTo(initialFireCenter.dx, 1.0),
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dy,
+          closeTo(initialFireCenter.dy, 1.0),
+        );
 
-        // Act 1 Turn 2: Water extinguishes Fire! -> Fire returns to rear-guard, Water steps forward
+        // Act 1 Turn 2: Water extinguishes Fire! -> TRUE SWAP: Water moves to frontActive AND Fire moves to upperRear
         expect(find.text('Water extinguishes Fire!'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
         await tester.pump();
@@ -490,14 +532,14 @@ void main() {
         );
         expect(
           tester.getCenter(find.byKey(const ValueKey('tutorial_mage_fire'))).dx,
-          closeTo(initialFireCenter.dx, 0.5),
+          closeTo(initialFireCenter.dx, 1.0),
         );
         expect(
           tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
-          greaterThan(initialWaterCenter.dx),
+          closeTo(initialWaterCenter.dx, 1.0),
         );
 
-        // Act 1 Turn 3: Wood absorbs Water! -> Water returns to anchor, Wood steps forward
+        // Act 1 Turn 3: Wood absorbs Water! -> TRUE SWAP: Wood moves to frontActive AND Water moves to lowerRear
         expect(find.text('Wood absorbs Water!'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
         await tester.pump();
@@ -506,12 +548,16 @@ void main() {
           '97 / 100',
         );
         expect(
-          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
-          closeTo(initialWaterCenter.dx, 0.5),
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_wood'))).dx,
+          closeTo(initialWaterCenter.dx, 1.0),
         );
         expect(
-          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_wood'))).dx,
-          greaterThan(initialWoodCenter.dx),
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dx,
+          closeTo(initialWoodCenter.dx, 1.0),
+        );
+        expect(
+          tester.getCenter(find.byKey(const ValueKey('tutorial_mage_water'))).dy,
+          closeTo(initialWoodCenter.dy, 1.0),
         );
 
         // Act 2 Turn 4: Markov Matrix online banner appears
@@ -815,6 +861,105 @@ void main() {
 
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
+      },
+    );
+
+    testWidgets(
+      'Reuses main Cleric battle BattleVfxPainter (launch -> 300ms clash -> 550ms impact), Guardian Robot hit pose, and curved flying orb VFX from center clash',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createHarness(prefs: {'animationsEnabled': true});
+        final controller = harness.controller;
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: MaterialApp(
+              home: RoyalGardenTutorialBattle(
+                gameController: controller,
+                onSkip: () {},
+                onBattleCompleted: ({
+                  required int fireOrbs,
+                  required int waterOrbs,
+                  required int woodOrbs,
+                }) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Tap Fire on Turn 1 (Fire beats Wood -> win)
+        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+        await tester.pump();
+
+        // 150ms (< 300ms): BattleVfxPainter is in launch phase; Robot HP still 100 / 100 pre-impact
+        await tester.pump(const Duration(milliseconds: 150));
+        final launchPaint = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('tutorial_battle_vfx_layer')),
+        );
+        expect(launchPaint.painter, isA<BattleVfxPainter>());
+        expect(
+          (launchPaint.painter! as BattleVfxPainter).phase,
+          BattleVfxPhase.launch,
+        );
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('tutorial_robot_hp'))).data,
+          '100 / 100',
+        );
+        expect(find.byKey(const ValueKey('tutorial_flying_orb_vfx')), findsNothing);
+
+        // 350ms (>= 300ms clash, < 550ms impact): BattleVfxPainter in clash phase AND curved orb flight spawns from mid-arena clash
+        await tester.pump(const Duration(milliseconds: 200));
+        final clashPaint = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('tutorial_battle_vfx_layer')),
+        );
+        expect(
+          (clashPaint.painter! as BattleVfxPainter).phase,
+          BattleVfxPhase.clash,
+        );
+        expect(
+          find.byKey(const ValueKey('tutorial_flying_orb_vfx')),
+          findsOneWidget,
+        );
+
+        // 600ms (>= 550ms impact, < 750ms): BattleVfxPainter in impact phase, Robot swaps to hit sprite, HP commits to 99 / 100
+        await tester.pump(const Duration(milliseconds: 250));
+        final impactPaint = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('tutorial_battle_vfx_layer')),
+        );
+        expect(
+          (impactPaint.painter! as BattleVfxPainter).phase,
+          BattleVfxPhase.impact,
+        );
+        final robotImg = tester.widget<Image>(
+          find.byKey(const ValueKey('tutorial_robot_sprite')),
+        );
+        expect(
+          (robotImg.image as AssetImage).assetName,
+          'assets/images/enemies/guardian_robot_hit.png',
+        );
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('tutorial_robot_hp'))).data,
+          '99 / 100',
+        );
+
+        // Advance past completion so no pending timers remain
+        await tester.pump(const Duration(milliseconds: 900));
+        final idleRobotImg = tester.widget<Image>(
+          find.byKey(const ValueKey('tutorial_robot_sprite')),
+        );
+        expect(
+          (idleRobotImg.image as AssetImage).assetName,
+          'assets/images/enemies/guardian_robot_idle.png',
+        );
       },
     );
   });
