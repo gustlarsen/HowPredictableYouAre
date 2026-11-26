@@ -523,5 +523,139 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('Suggestion pill renders only safe Water icon when PC candidates are [Fire, Water] and maintains height 34.0', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedNextMove': true,
+        'showNextMove': true,
+        'unlockedSuggestion': true,
+        'showSuggestion': true,
+        'unlockedYourPrediction': false,
+        'showYourPrediction': false,
+        'unlockedCrystalBall': false,
+        'showCrystalBall': false,
+        'animationsEnabled': false,
+      });
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: AudioService(),
+      );
+      addTearDown(controller.dispose);
+
+      // Drive Markov tie Fire -> {Fire: 1, Wood: 1} so PC candidates are [Water, Fire]
+      controller.playTurn(HandMove.fire);
+      controller.playTurn(HandMove.fire);
+      controller.playTurn(HandMove.wood);
+      controller.playTurn(HandMove.fire);
+
+      expect(
+        controller.pcNextMoves,
+        unorderedEquals([HandMove.fire, HandMove.water]),
+      );
+      expect(controller.suggestedMoves, [HandMove.water]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: controller,
+              builder: (context, _) {
+                return Center(
+                  child: SizedBox(
+                    width: 320,
+                    child: HintsBar(controller: controller),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+
+      final pcChip = find.ancestor(
+        of: find.text("PC's Choice:"),
+        matching: find.byType(Container),
+      ).first;
+      final suggestionChip = find.ancestor(
+        of: find.text('Suggestion:'),
+        matching: find.byType(Container),
+      ).first;
+
+      // Both pills preserve exact fixed height 34.0 and contain FittedBox(scaleDown)
+      expect(tester.getSize(pcChip).height, equals(34.0));
+      expect(tester.getSize(suggestionChip).height, equals(34.0));
+      expect(
+        find.descendant(
+          of: suggestionChip,
+          matching: find.byWidgetPredicate(
+            (w) => w is FittedBox && w.fit == BoxFit.scaleDown,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // PC's Choice displays both Fire and Water
+      expect(
+        find.descendant(
+          of: pcChip,
+          matching: find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.fire,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: pcChip,
+          matching: find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.water,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // Suggestion displays ONLY safe Water icon (never risky Wood or Fire)
+      expect(
+        find.descendant(
+          of: suggestionChip,
+          matching: find.byWidgetPredicate(
+            (w) => w is ElementalSymbolIcon && w.move == HandMove.water,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: suggestionChip,
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is ElementalSymbolIcon &&
+                (w.move == HandMove.wood || w.move == HandMove.fire),
+          ),
+        ),
+        findsNothing,
+      );
+
+      // Classic Hands mode also renders only Water/Paper emoji cleanly at fixed height 34.0
+      controller.toggleShowNewSkin(true);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(suggestionChip).height, equals(34.0));
+      expect(
+        find.descendant(
+          of: suggestionChip,
+          matching: find.text(HandMove.water.emoji),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }

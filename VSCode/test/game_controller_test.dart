@@ -1381,4 +1381,84 @@ void main() {
     controller.crystalBallMove = HandMove.rock;
     expect(controller.crystalBallPlusMoves, [HandMove.paper, HandMove.spock]);
   });
+
+  test('Suggestion filters out risky moves when PC has two candidate moves [Fire, Water] or [Fire, Wood]', () async {
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+      'animationsEnabled': false,
+      'unlockedNextMove': true,
+      'showNextMove': true,
+      'unlockedSuggestion': true,
+      'showSuggestion': true,
+      'hp_upgrade_level': 100,
+      'mana_upgrade_level': 100,
+    });
+    await createController();
+
+    expect(controller.isElementalMode, isTrue);
+    expect(controller.showNewHands, isFalse);
+
+    // Build Markov tie from Fire -> {Fire: 1, Wood: 1} so PC predicts [Fire, Wood]
+    // and counters with [Water, Fire] (= [Fire, Water]).
+    controller.playTurn(HandMove.fire);
+    controller.playTurn(HandMove.fire); // Fire -> Fire recorded
+    controller.playTurn(HandMove.wood); // Fire -> Wood recorded
+    controller.playTurn(HandMove.fire); // lastUserMove = Fire
+
+    expect(
+      controller.predictedUserMoves,
+      unorderedEquals([HandMove.fire, HandMove.wood]),
+    );
+    expect(
+      controller.pcNextMoves,
+      unorderedEquals([HandMove.fire, HandMove.water]),
+    );
+    // Water beats Fire and draws Water (0 losses); Wood beats Water but loses to Fire (risky!).
+    expect(controller.suggestedMoves, [HandMove.water]);
+    expect(controller.suggestedMove, HandMove.water);
+
+    // If all 3 basic elements tie from Fire -> {Fire: 1, Wood: 1, Water: 1}, falls back cleanly to empty
+    controller.playTurn(HandMove.water); // Fire -> Water recorded
+    controller.playTurn(HandMove.fire); // lastUserMove = Fire (all 3 tied)
+    expect(controller.predictedUserMoves, isEmpty);
+    expect(controller.pcNextMoves, isEmpty);
+    expect(controller.suggestedMoves, isEmpty);
+    expect(controller.suggestedMove, isNull);
+
+    // 5-element mode (Earth & Metal unlocked): tie giving PC candidates [Fire, Wood]
+    // In Stage 1 Guardian Robot (enemy pool [Fire, Water, Wood]), Wood->Fire and Earth->Wood
+    // counters: Wood countered by Fire, Earth countered by Wood => PC candidates [Fire, Wood].
+    SharedPreferences.setMockInitialValues({
+      'musicEnabled': false,
+      'animationsEnabled': false,
+      'unlockedNewHands': true,
+      'showNewHands': true,
+      'unlockedNextMove': true,
+      'showNextMove': true,
+      'unlockedSuggestion': true,
+      'showSuggestion': true,
+      'hp_upgrade_level': 100,
+      'mana_upgrade_level': 100,
+    });
+    await createController();
+
+    controller.playTurn(HandMove.fire);
+    controller.playTurn(HandMove.wood); // Fire -> Wood
+    controller.playTurn(HandMove.fire); // Wood -> Fire
+    controller.playTurn(HandMove.earth); // Fire -> Earth
+    controller.playTurn(HandMove.fire); // lastUserMove = Fire
+
+    expect(
+      controller.predictedUserMoves,
+      unorderedEquals([HandMove.wood, HandMove.earth]),
+    );
+    expect(
+      controller.pcNextMoves,
+      unorderedEquals([HandMove.fire, HandMove.wood]),
+    );
+    // Against [Fire, Wood], only Fire draws Fire & beats Wood (0 losses);
+    // Water, Earth, Metal each lose to one candidate.
+    expect(controller.suggestedMoves, [HandMove.fire]);
+    expect(controller.suggestedMove, HandMove.fire);
+  });
 }

@@ -277,17 +277,28 @@ class MarkovEngine {
     return pool[_random.nextInt(pool.length)];
   }
 
-  /// Suggests the most probable hand(s) from the player's active move deck
-  /// to defeat the computer's expected move(s), ordered corresponding to [anticipatedPcMoves].
-  /// Returns an empty list if PC plays random.
+  /// Suggests the safest winning hand(s) from the player's active move deck
+  /// against the computer's anticipated candidate move(s) [anticipatedPcMoves],
+  /// ordered corresponding to [anticipatedPcMoves].
+  ///
+  /// When [anticipatedPcMoves] has multiple candidate moves `C = [c1, c2, ...]`,
+  /// safe moves that win or draw against *every* candidate in `C` (`!c.beats(p)`
+  /// for all `c` in `C`, i.e., zero losses) are prioritized over risky moves
+  /// that beat one candidate while losing to another. Among safe moves, those
+  /// beating the most candidates are selected. If no active move avoids losing
+  /// to every candidate in `C`, falls back to active moves that beat at least
+  /// one candidate while minimizing losses (breaking ties by most wins), or
+  /// returns an empty list if all active moves tie equally or no move can win.
   List<HandMove> computeSuggestions(List<HandMove> anticipatedPcMoves) {
     if (anticipatedPcMoves.isEmpty) {
       return [];
     }
 
+    final uniquePcMoves = anticipatedPcMoves.toSet().toList(growable: false);
+
     // Build ordered candidate list corresponding to each anticipated PC move
     final List<HandMove> orderedCandidates = [];
-    for (final pcMove in anticipatedPcMoves) {
+    for (final pcMove in uniquePcMoves) {
       final counters = _activeMoves
           .where((m) => m.beats(pcMove, elemental: enableElementalMode))
           .toList();
@@ -304,24 +315,51 @@ class MarkovEngine {
       }
     }
 
-    int maxWins = 0;
     final Map<HandMove, int> winCounts = {};
+    final Map<HandMove, int> lossCounts = {};
     for (final candidate in orderedCandidates) {
-      final wins = anticipatedPcMoves
-          .where((pc) => candidate.beats(pc, elemental: enableElementalMode))
-          .length;
-      winCounts[candidate] = wins;
-      if (wins > maxWins) {
-        maxWins = wins;
+      int wins = 0;
+      int losses = 0;
+      for (final pc in uniquePcMoves) {
+        if (candidate.beats(pc, elemental: enableElementalMode)) {
+          wins++;
+        } else if (pc.beats(candidate, elemental: enableElementalMode)) {
+          losses++;
+        }
       }
+      winCounts[candidate] = wins;
+      lossCounts[candidate] = losses;
     }
 
-    if (maxWins <= 0) {
+    final winningCandidates = orderedCandidates
+        .where((c) => (winCounts[c] ?? 0) > 0)
+        .toList();
+    if (winningCandidates.isEmpty) {
       return [];
     }
 
+    // Prioritize safe moves that win or draw against every PC candidate (0 losses).
+    final safeCandidates = winningCandidates
+        .where((c) => (lossCounts[c] ?? 0) == 0)
+        .toList();
+
+    final List<HandMove> candidatePool;
+    if (safeCandidates.isNotEmpty) {
+      candidatePool = safeCandidates;
+    } else {
+      // Fallback when no active move avoids losing to every PC candidate:
+      // minimize losses among moves that beat at least one candidate.
+      final minLosses = winningCandidates
+          .map((c) => lossCounts[c]!)
+          .reduce(min);
+      candidatePool = winningCandidates
+          .where((c) => lossCounts[c] == minLosses)
+          .toList();
+    }
+
+    final maxWins = candidatePool.map((c) => winCounts[c]!).reduce(max);
     final suggestions =
-        orderedCandidates.where((c) => winCounts[c] == maxWins).toList();
+        candidatePool.where((c) => winCounts[c] == maxWins).toList();
     if (suggestions.length >= _activeMoves.length) {
       return [];
     }

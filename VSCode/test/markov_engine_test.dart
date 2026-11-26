@@ -185,9 +185,10 @@ void main() {
       final pcChoices = engine.computeSmartChoices(HandMove.rock);
       expect(pcChoices, [HandMove.scissors, HandMove.rock]);
 
-      // Most probable hands that beat PC's [Scissors, Rock] -> [Rock, Paper]
+      // Safe hands that win or draw against ALL of PC's [Scissors, Rock] -> only [Rock]
+      // (Paper beats Rock but loses to Scissors, so it is filtered out)
       final suggestions = engine.computeSuggestions(pcChoices);
-      expect(suggestions, [HandMove.rock, HandMove.paper]);
+      expect(suggestions, [HandMove.rock]);
 
       // When all 3 active hands are tied (Rock -> Rock, Paper, Scissors each once), return empty so UI displays '?'
       engine.recordTransition(HandMove.rock, HandMove.rock);
@@ -196,6 +197,58 @@ void main() {
       expect(
         engine.computeSuggestions([HandMove.rock, HandMove.paper, HandMove.scissors]),
         isEmpty,
+      );
+    });
+
+    test('computeSuggestions filters out risky moves that lose to any PC candidate and falls back cleanly', () {
+      // 1. 3-element Elemental mode: PC candidates [Fire, Water] -> only Water is safe (beats Fire, draws Water)
+      // Wood beats Water but loses to Fire (risky) -> must be excluded.
+      final engine3 = MarkovEngine(enableExtendedHands: false, enableElementalMode: true);
+      expect(
+        engine3.computeSuggestions([HandMove.fire, HandMove.water]),
+        [HandMove.water],
+      );
+
+      // 2. 5-element Elemental mode: PC candidates [Fire, Water] -> Earth beats both (2 wins, 0 losses)
+      final engine5 = MarkovEngine(enableExtendedHands: true, enableElementalMode: true);
+      expect(
+        engine5.computeSuggestions([HandMove.fire, HandMove.water]),
+        [HandMove.earth],
+      );
+
+      // 3. 5-element Classic RPSLS mode: PC candidates [Rock, Paper] -> only Paper is safe
+      // (Lizard & Scissors lose to Rock; Spock loses to Paper)
+      final engineClassic5 = MarkovEngine(enableExtendedHands: true, enableElementalMode: false);
+      expect(
+        engineClassic5.computeSuggestions([HandMove.rock, HandMove.paper]),
+        [HandMove.paper],
+      );
+
+      // 4. 5-element Elemental mode with no 2-win common weakness: PC candidates [Fire, Wood]
+      // Fire draws Fire and beats Wood (0 losses) -> only Fire is safe!
+      // Water, Earth, and Metal each beat one but lose to the other (1 loss -> filtered out).
+      expect(
+        engine5.computeSuggestions([HandMove.fire, HandMove.wood]),
+        [HandMove.fire],
+      );
+
+      // 5. 5-element Elemental mode with 3 PC candidates [Fire, Water, Earth] -> Earth (2 wins, 0 losses)
+      expect(
+        engine5.computeSuggestions([HandMove.fire, HandMove.water, HandMove.earth]),
+        [HandMove.earth],
+      );
+
+      // 6. Fallback when no move has 0 losses against all candidates:
+      // [Fire, Water, Wood] in 5-element mode -> Earth minimizes losses (1 loss, 2 wins) vs Metal (2 losses, 1 win)
+      expect(
+        engine5.computeSuggestions([HandMove.fire, HandMove.water, HandMove.wood]),
+        [HandMove.earth],
+      );
+
+      // [Fire, Water, Wood, Earth] in 5-element mode -> Wood & Earth (1 loss, 2 wins) vs Metal (2 losses, 2 wins)
+      expect(
+        engine5.computeSuggestions([HandMove.fire, HandMove.water, HandMove.wood, HandMove.earth]),
+        unorderedEquals([HandMove.wood, HandMove.earth]),
       );
     });
 

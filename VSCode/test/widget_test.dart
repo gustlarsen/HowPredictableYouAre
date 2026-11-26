@@ -544,10 +544,17 @@ void main() {
 
     expect(controller.predictedUserMoves, [HandMove.paper, HandMove.scissors]);
     expect(controller.pcNextMoves, [HandMove.scissors, HandMove.rock]);
-    expect(controller.suggestedMoves, [HandMove.rock, HandMove.paper]);
+    expect(controller.suggestedMoves, [HandMove.rock]);
     expect(find.text('✋ ✌'), findsOneWidget);
     expect(find.text('✌ ✊'), findsOneWidget);
-    expect(find.text('✊ ✋'), findsOneWidget);
+    final suggChip = find.ancestor(
+      of: find.text('Suggestion:'),
+      matching: find.byType(Container),
+    ).first;
+    expect(
+      find.descendant(of: suggChip, matching: find.text('✊')),
+      findsOneWidget,
+    );
 
     // 6th turn: Rock -> Rock recorded; now all 3 hands are tied for Rock (Rock=1, Paper=1, Scissors=1)
     // HintsBar must substitute '?' instead of showing all 3 hands
