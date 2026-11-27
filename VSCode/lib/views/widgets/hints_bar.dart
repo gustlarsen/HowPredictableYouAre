@@ -328,17 +328,19 @@ class _HintChip extends StatelessWidget {
 class HintMiniIcon extends StatelessWidget {
   final HintMiniIconType type;
   final double size;
+  final bool includeDefaultKey;
 
   const HintMiniIcon({
     super.key,
     required this.type,
     this.size = 15.0,
+    this.includeDefaultKey = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      key: ValueKey('hint_mini_icon_${type.name}'),
+      key: includeDefaultKey ? ValueKey('hint_mini_icon_${type.name}') : null,
       size: Size.square(size),
       painter: _HintMiniIconPainter(type: type),
     );

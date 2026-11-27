@@ -1,5 +1,5 @@
 {
-  "summary": "- Processed real princess scream audio with stone dungeon acoustics, fade-in/out, and peak normalization (-1.4 dB) to 20.2 KB mono MP3 (VSCode/assets/audio/princess_scream.mp3).\n- Removed experimental princess_scream*.mid files and updated VSCode/pubspec.yaml.\n- Updated AudioService.playPrincessScream() to play princess_scream.mp3 over active BGM with smooth volume ducking/restoration while respecting Sound Effects mute and app lifecycle.\n- Updated unit and widget tests in bgm_track_routing_test.dart, audio_lifecycle_test.dart, and week0_scream_warning_test.dart (426 tests passing).",
+  "summary": "- Added activeSuggestedMoves and activeCrystalBallPlusMoves getters on GameController so bottom action buttons highlight strictly for Suggestion and Crystal Ball+ (never falsely highlighting standard Crystal Ball).\n- Added glowing gradient borders, soft outer BoxShadow halos, top-left lightbulb / top-right crystal ball corner mini-badges (~16px-18px with dark outlines), subtle scale lift, and synchronized 1.5s dual-match gentle pulse (respecting the Animations setting) on bottom elemental attack buttons across Dark and Light Modes.\n- Added widget tests in VSCode/test/action_button_recommendation_highlights_test.dart and verified flutter analyze + all 430 flutter tests pass.",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T03:38:01Z"
+  "updated_at_utc": "2026-11-27T04:00:58Z"
 }

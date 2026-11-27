@@ -2540,6 +2540,10 @@ class _GameScreenState extends State<GameScreen>
                         child: Builder(
                           builder: (context) {
                             final palette = AppPalette.of(context);
+                            final activeSuggestedMoves =
+                                controller.activeSuggestedMoves;
+                            final activeCrystalBallPlusMoves =
+                                controller.activeCrystalBallPlusMoves;
                             return Container(
                               key: const ValueKey('move_selection_card'),
                               decoration: BoxDecoration(
@@ -2632,6 +2636,11 @@ class _GameScreenState extends State<GameScreen>
                                                 isSelected:
                                                     controller.currentUserMove ==
                                                     move,
+                                                isSuggested: activeSuggestedMoves
+                                                    .contains(move),
+                                                isCrystalBallPlusRecommended:
+                                                    activeCrystalBallPlusMoves
+                                                        .contains(move),
                                                 localization: loc,
                                                 animationsEnabled: controller
                                                     .animationsEnabled,
@@ -3304,11 +3313,22 @@ class _GameScreenState extends State<GameScreen>
   }
 }
 
+/// Visual highlight state for a bottom action-deck button based on active
+/// `Suggestion` and `Crystal Ball+` recommendations.
+enum ActionButtonHighlightKind {
+  none,
+  suggestionOnly,
+  crystalBallPlusOnly,
+  both,
+}
+
 class _HandActionButton extends StatefulWidget {
   final HandMove move;
   final bool compact;
   final bool elementalMode;
   final bool isSelected;
+  final bool isSuggested;
+  final bool isCrystalBallPlusRecommended;
   final LocalizationService localization;
   final bool animationsEnabled;
   final bool isOverchargedHolding;
@@ -3324,6 +3344,8 @@ class _HandActionButton extends StatefulWidget {
     this.compact = false,
     this.elementalMode = false,
     this.isSelected = false,
+    this.isSuggested = false,
+    this.isCrystalBallPlusRecommended = false,
     required this.localization,
     required this.animationsEnabled,
     this.isOverchargedHolding = false,
@@ -3343,6 +3365,23 @@ class _HandActionButtonState extends State<_HandActionButton>
   late AnimationController _pressController;
   late Animation<double> _scaleAnimation;
   late AnimationController _auraController;
+  late AnimationController _dualPulseController;
+
+  bool get _isDualRecommended =>
+      widget.isSuggested && widget.isCrystalBallPlusRecommended;
+
+  ActionButtonHighlightKind get _highlightKind {
+    if (widget.isSuggested && widget.isCrystalBallPlusRecommended) {
+      return ActionButtonHighlightKind.both;
+    }
+    if (widget.isSuggested) {
+      return ActionButtonHighlightKind.suggestionOnly;
+    }
+    if (widget.isCrystalBallPlusRecommended) {
+      return ActionButtonHighlightKind.crystalBallPlusOnly;
+    }
+    return ActionButtonHighlightKind.none;
+  }
 
   @override
   void initState() {
@@ -3359,7 +3398,12 @@ class _HandActionButtonState extends State<_HandActionButton>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
+    _dualPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
     _syncAuraAnimation();
+    _syncDualPulseAnimation();
   }
 
   void _syncAuraAnimation() {
@@ -3375,6 +3419,20 @@ class _HandActionButtonState extends State<_HandActionButton>
     }
   }
 
+  void _syncDualPulseAnimation() {
+    if (_isDualRecommended && widget.animationsEnabled) {
+      if (!_dualPulseController.isAnimating) {
+        _dualPulseController.repeat();
+      }
+    } else {
+      if (_dualPulseController.isAnimating ||
+          _dualPulseController.value != 0.0) {
+        _dualPulseController.stop();
+        _dualPulseController.reset();
+      }
+    }
+  }
+
   @override
   void didUpdateWidget(covariant _HandActionButton oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -3382,12 +3440,19 @@ class _HandActionButtonState extends State<_HandActionButton>
         widget.animationsEnabled != oldWidget.animationsEnabled) {
       _syncAuraAnimation();
     }
+    if (widget.isSuggested != oldWidget.isSuggested ||
+        widget.isCrystalBallPlusRecommended !=
+            oldWidget.isCrystalBallPlusRecommended ||
+        widget.animationsEnabled != oldWidget.animationsEnabled) {
+      _syncDualPulseAnimation();
+    }
   }
 
   @override
   void dispose() {
     _pressController.dispose();
     _auraController.dispose();
+    _dualPulseController.dispose();
     super.dispose();
   }
 
@@ -3413,6 +3478,80 @@ class _HandActionButtonState extends State<_HandActionButton>
     _playPressPulse();
   }
 
+  List<BoxShadow>? _buildRecommendationShadows(
+    AppPalette palette,
+    ActionButtonHighlightKind kind,
+    double pulse,
+  ) {
+    switch (kind) {
+      case ActionButtonHighlightKind.none:
+        return null;
+      case ActionButtonHighlightKind.suggestionOnly:
+        return [
+          BoxShadow(
+            color: palette.suggestionHighlightPrimary.withValues(
+              alpha: palette.isDark ? 0.54 : 0.38,
+            ),
+            blurRadius: palette.isDark ? 10.0 : 8.0,
+            spreadRadius: palette.isDark ? 0.8 : 0.4,
+          ),
+          BoxShadow(
+            color: palette.suggestionHighlightSecondary.withValues(
+              alpha: palette.isDark ? 0.30 : 0.22,
+            ),
+            blurRadius: 4.5,
+            spreadRadius: 0.2,
+          ),
+        ];
+      case ActionButtonHighlightKind.crystalBallPlusOnly:
+        return [
+          BoxShadow(
+            color: palette.crystalBallPlusHighlightPrimary.withValues(
+              alpha: palette.isDark ? 0.54 : 0.36,
+            ),
+            blurRadius: palette.isDark ? 10.0 : 8.0,
+            spreadRadius: palette.isDark ? 0.8 : 0.4,
+            offset: const Offset(-1.0, 0.0),
+          ),
+          BoxShadow(
+            color: palette.crystalBallPlusHighlightSecondary.withValues(
+              alpha: palette.isDark ? 0.48 : 0.32,
+            ),
+            blurRadius: palette.isDark ? 10.0 : 8.0,
+            spreadRadius: palette.isDark ? 0.6 : 0.3,
+            offset: const Offset(1.0, 0.0),
+          ),
+        ];
+      case ActionButtonHighlightKind.both:
+        return [
+          BoxShadow(
+            color: palette.suggestionHighlightPrimary.withValues(
+              alpha: (palette.isDark ? 0.52 : 0.36) + 0.14 * pulse,
+            ),
+            blurRadius: (palette.isDark ? 10.0 : 8.0) + 3.0 * pulse,
+            spreadRadius: 0.6 + 0.45 * pulse,
+            offset: const Offset(-2.0, -1.0),
+          ),
+          BoxShadow(
+            color: palette.crystalBallPlusHighlightPrimary.withValues(
+              alpha: (palette.isDark ? 0.50 : 0.34) + 0.14 * pulse,
+            ),
+            blurRadius: (palette.isDark ? 10.0 : 8.0) + 3.0 * pulse,
+            spreadRadius: 0.5 + 0.40 * pulse,
+            offset: const Offset(2.0, 1.0),
+          ),
+          BoxShadow(
+            color: palette.crystalBallPlusHighlightSecondary.withValues(
+              alpha: (palette.isDark ? 0.44 : 0.30) + 0.12 * pulse,
+            ),
+            blurRadius: (palette.isDark ? 9.0 : 7.0) + 2.5 * pulse,
+            spreadRadius: 0.4 + 0.30 * pulse,
+            offset: const Offset(2.0, -1.0),
+          ),
+        ];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -3421,6 +3560,8 @@ class _HandActionButtonState extends State<_HandActionButton>
     final compact = widget.compact;
     final elemental = widget.elementalMode;
     final isSelected = widget.isSelected;
+    final highlightKind = _highlightKind;
+    final isHighlighted = highlightKind != ActionButtonHighlightKind.none;
     final primaryColor = widget.move.elementalPrimaryColor;
     final secondaryColor = widget.move.elementalSecondaryColor;
     final elementLabelColor = palette.elementalText(widget.move);
@@ -3441,6 +3582,9 @@ class _HandActionButtonState extends State<_HandActionButton>
     final emojiFontSize = compact ? 20.0 : 24.0;
     final elementalSymbolSize = compact ? 25.0 : 30.0;
     final labelFontSize = compact ? 8.8 : 10.0;
+    final badgeSize = compact ? 16.0 : 18.0;
+    final badgeIconSize = compact ? 11.5 : 13.0;
+    final badgeSideOffset = compact ? -0.5 : -3.0;
 
     final String buttonLabel = elemental
         ? widget.move
@@ -3448,270 +3592,568 @@ class _HandActionButtonState extends State<_HandActionButton>
               .toUpperCase()
         : widget.move.label.toUpperCase();
 
-    Widget buttonContent = InkWell(
-      onTapDown: widget.onPressed == null ? null : (_) => _playPressPulse(),
-      onTap: widget.onPressed == null ? null : _handleTap,
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: horizontalPadding,
-          vertical: verticalPadding,
-        ),
-        decoration: BoxDecoration(
-          color: elemental
-              ? (palette.isDark
-                    ? Colors.transparent
-                    : palette.elementalCardBackground(widget.move))
-              : (palette.isDark
-                    ? theme.colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.5,
-                      )
-                    : palette.sandCardSurface),
-          borderRadius: BorderRadius.circular(borderRadius),
-          border: elemental && palette.isDark
-              ? null
-              : Border.all(
-                  color: elemental
-                      ? elementLabelColor.withValues(
-                          alpha: isSelected ? 0.85 : 0.48,
-                        )
-                      : (palette.isDark
-                            ? theme.colorScheme.outline.withValues(alpha: 0.2)
-                            : palette.sandCardBorder),
-                  width: elemental && isSelected ? 1.5 : 1.0,
-                ),
-        ),
-        child: Container(
-          key: ValueKey('hand_orb_${widget.move.name}'),
-          width: circleSize,
-          height: circleSize,
-          decoration: elemental
-              ? null
-              : BoxDecoration(
-                  color: palette.isDark
-                      ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                      : palette.amberBorder.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-          child: Stack(
-            clipBehavior: Clip.none,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_pressController, _dualPulseController]),
+        builder: (context, _) {
+          final pulse = (_isDualRecommended && widget.animationsEnabled)
+              ? (0.5 - 0.5 * math.cos(_dualPulseController.value * 2.0 * math.pi))
+              : 0.0;
+
+          final double highlightScale = switch (highlightKind) {
+            ActionButtonHighlightKind.none => 1.0,
+            ActionButtonHighlightKind.suggestionOnly => 1.045,
+            ActionButtonHighlightKind.crystalBallPlusOnly => 1.045,
+            ActionButtonHighlightKind.both =>
+              widget.animationsEnabled ? (1.04 + 0.025 * pulse) : 1.05,
+          };
+          final pressScale =
+              widget.animationsEnabled ? _scaleAnimation.value : 1.0;
+          final effectiveScale = highlightScale * pressScale;
+
+          return Transform.scale(
+            key: ValueKey('hand_button_scale_${widget.move.name}'),
+            scale: effectiveScale,
             alignment: Alignment.center,
-            children: [
-              // Animated CustomPainter flame aura around the active/selected orb
-              if (elemental && isSelected)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _auraController,
-                      builder: (context, _) {
-                        return CustomPaint(
-                          key: ValueKey(
-                            'active_orb_flame_aura_${widget.move.name}',
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                InkWell(
+                  onTapDown: widget.onPressed == null
+                      ? null
+                      : (_) => _playPressPulse(),
+                  onTap: widget.onPressed == null ? null : _handleTap,
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    decoration: BoxDecoration(
+                      color: elemental
+                          ? (palette.isDark
+                                ? (isHighlighted
+                                      ? const Color(0xFF1A1E28)
+                                          .withValues(alpha: 0.72)
+                                      : Colors.transparent)
+                                : palette.elementalCardBackground(widget.move))
+                          : (palette.isDark
+                                ? theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.5)
+                                : palette.sandCardSurface),
+                      borderRadius: BorderRadius.circular(borderRadius),
+                      border: elemental && palette.isDark
+                          ? null
+                          : Border.all(
+                              color: isHighlighted
+                                  ? Colors.transparent
+                                  : elemental
+                                      ? elementLabelColor.withValues(
+                                          alpha: isSelected ? 0.85 : 0.48,
+                                        )
+                                      : (palette.isDark
+                                            ? theme.colorScheme.outline
+                                                .withValues(alpha: 0.2)
+                                            : palette.sandCardBorder),
+                              width:
+                                  !isHighlighted && elemental && isSelected
+                                      ? 1.5
+                                      : 1.0,
+                            ),
+                      boxShadow: _buildRecommendationShadows(
+                        palette,
+                        highlightKind,
+                        pulse,
+                      ),
+                    ),
+                    child: Container(
+                      key: ValueKey('hand_orb_${widget.move.name}'),
+                      width: circleSize,
+                      height: circleSize,
+                      decoration: elemental
+                          ? null
+                          : BoxDecoration(
+                              color: palette.isDark
+                                  ? theme.colorScheme.primary
+                                      .withValues(alpha: 0.12)
+                                  : palette.amberBorder
+                                      .withValues(alpha: 0.14),
+                              shape: BoxShape.circle,
+                            ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          // Animated CustomPainter flame aura around the active/selected orb
+                          if (elemental && isSelected)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedBuilder(
+                                  animation: _auraController,
+                                  builder: (context, _) {
+                                    return CustomPaint(
+                                      key: ValueKey(
+                                        'active_orb_flame_aura_${widget.move.name}',
+                                      ),
+                                      painter: _ActiveOrbFlameAuraPainter(
+                                        phase: widget.animationsEnabled
+                                            ? _auraController.value
+                                            : 0.35,
+                                        primaryColor: primaryColor,
+                                        secondaryColor: secondaryColor,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                          // Overcharged Staff Charge Ring (fills over 250ms and pulses during rapid-fire)
+                          if (widget.isOverchargedHolding)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedBuilder(
+                                  animation: Listenable.merge([
+                                    if (widget.overchargedChargeAnimation !=
+                                        null)
+                                      widget.overchargedChargeAnimation!,
+                                    if (widget.overchargedPulseAnimation !=
+                                        null)
+                                      widget.overchargedPulseAnimation!,
+                                  ]),
+                                  builder: (context, _) {
+                                    return CustomPaint(
+                                      key: ValueKey(
+                                        'overcharged_charge_ring_${widget.move.name}',
+                                      ),
+                                      painter: _OverchargedChargeRingPainter(
+                                        progress: widget
+                                                .isOverchargedRapidFiring
+                                            ? 1.0
+                                            : (widget.overchargedChargeAnimation
+                                                    ?.value ??
+                                                1.0),
+                                        pulse: widget.isOverchargedRapidFiring
+                                            ? (widget.overchargedPulseAnimation
+                                                    ?.value ??
+                                                0.0)
+                                            : 0.0,
+                                        isRapidFiring:
+                                            widget.isOverchargedRapidFiring,
+                                        primaryColor: primaryColor,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                          // Glossy 3D Shaded Elemental Energy Sphere with Outer Glow, Inner Bevel & Specular Arc
+                          if (elemental)
+                            Container(
+                              width: circleSize,
+                              height: circleSize,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  center: const Alignment(-0.28, -0.32),
+                                  radius: 0.90,
+                                  colors: [orbInnerColor, orbOuterColor],
+                                  stops: const [0.10, 1.0],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: orbInnerColor.withValues(
+                                      alpha: isSelected ? 0.58 : 0.32,
+                                    ),
+                                    blurRadius: isSelected ? 12 : 7,
+                                    spreadRadius: isSelected ? 1.0 : 0.2,
+                                  ),
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.45),
+                                    blurRadius: 5,
+                                    offset: const Offset(0, 2.5),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ElementalEnergySphere(
+                                    size: circleSize,
+                                    primaryColor: orbInnerColor,
+                                    secondaryColor: orbOuterColor,
+                                    isDark: palette.isDark,
+                                  ),
+                                  IgnorePointer(
+                                    child: CustomPaint(
+                                      size: Size.square(circleSize),
+                                      painter: _ActionOrbGlossPainter(
+                                        primaryColor: orbInnerColor,
+                                        secondaryColor: orbOuterColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          // Crisp Elemental Emblem or Classic Hand in Upper-Middle of Sphere
+                          Positioned(
+                            top: circleSize * 0.12,
+                            child: elemental
+                                ? ElementalSymbolIcon(
+                                    move: widget.move,
+                                    size: elementalSymbolSize,
+                                  )
+                                : hasAsset
+                                    ? Image.asset(
+                                        widget.move.leftAsset,
+                                        width: imageSize,
+                                        height: imageSize,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Text(
+                                          widget.move.emoji,
+                                          style: TextStyle(
+                                            fontSize: emojiFontSize,
+                                          ),
+                                        ),
+                                      )
+                                    : Text(
+                                        widget.move.emoji,
+                                        style: TextStyle(
+                                          fontSize: emojiFontSize,
+                                        ),
+                                      ),
                           ),
-                          painter: _ActiveOrbFlameAuraPainter(
-                            phase: widget.animationsEnabled
-                                ? _auraController.value
-                                : 0.35,
-                            primaryColor: primaryColor,
-                            secondaryColor: secondaryColor,
+
+                          // Bold Shadowed White Element Label Inside Lower Third of Sphere
+                          Positioned(
+                            bottom: elemental ? circleSize * 0.11 : 2.0,
+                            left: 4,
+                            right: 4,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                buttonLabel,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: labelFontSize,
+                                  height: 1.0,
+                                  letterSpacing: 0.5,
+                                  color: elemental
+                                      ? Colors.white
+                                      : (palette.isDark
+                                            ? Colors.white
+                                            : palette.primaryText),
+                                  shadows: elemental
+                                      ? const [
+                                          Shadow(
+                                            color: Color(0xFF0A0E14),
+                                            offset: Offset(-0.9, -0.9),
+                                            blurRadius: 0.6,
+                                          ),
+                                          Shadow(
+                                            color: Color(0xFF0A0E14),
+                                            offset: Offset(0.9, -0.9),
+                                            blurRadius: 0.6,
+                                          ),
+                                          Shadow(
+                                            color: Color(0xFF0A0E14),
+                                            offset: Offset(-0.9, 0.9),
+                                            blurRadius: 0.6,
+                                          ),
+                                          Shadow(
+                                            color: Color(0xFF0A0E14),
+                                            offset: Offset(0.9, 0.9),
+                                            blurRadius: 0.6,
+                                          ),
+                                          Shadow(
+                                            color: Colors.black,
+                                            blurRadius: 3.5,
+                                            offset: Offset(0, 1.5),
+                                          ),
+                                        ]
+                                      : palette.isDark
+                                          ? const [
+                                              Shadow(
+                                                color: Colors.black,
+                                                blurRadius: 3.5,
+                                                offset: Offset(0, 1),
+                                              ),
+                                              Shadow(
+                                                color: Colors.black,
+                                                blurRadius: 6.0,
+                                              ),
+                                            ]
+                                          : const [
+                                              Shadow(
+                                                color: Colors.white,
+                                                blurRadius: 3.0,
+                                              ),
+                                            ],
+                                ),
+                              ),
+                            ),
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     ),
                   ),
                 ),
 
-              // Overcharged Staff Charge Ring (fills over 250ms and pulses during rapid-fire)
-              if (widget.isOverchargedHolding)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: Listenable.merge([
-                        if (widget.overchargedChargeAnimation != null)
-                          widget.overchargedChargeAnimation!,
-                        if (widget.overchargedPulseAnimation != null)
-                          widget.overchargedPulseAnimation!,
-                      ]),
-                      builder: (context, _) {
-                        return CustomPaint(
-                          key: ValueKey(
-                            'overcharged_charge_ring_${widget.move.name}',
-                          ),
-                          painter: _OverchargedChargeRingPainter(
-                            progress: widget.isOverchargedRapidFiring
-                                ? 1.0
-                                : (widget.overchargedChargeAnimation?.value ??
-                                    1.0),
-                            pulse: widget.isOverchargedRapidFiring
-                                ? (widget.overchargedPulseAnimation?.value ??
-                                    0.0)
-                                : 0.0,
-                            isRapidFiring: widget.isOverchargedRapidFiring,
-                            primaryColor: primaryColor,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-              // Glossy 3D Shaded Elemental Energy Sphere with Outer Glow, Inner Bevel & Specular Arc
-              if (elemental)
-                Container(
-                  width: circleSize,
-                  height: circleSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.28, -0.32),
-                      radius: 0.90,
-                      colors: [orbInnerColor, orbOuterColor],
-                      stops: const [0.10, 1.0],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: orbInnerColor.withValues(
-                          alpha: isSelected ? 0.58 : 0.32,
+                // Glowing border overlay for Suggestion / Crystal Ball+ / Dual recommendations
+                if (isHighlighted)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        key: ValueKey(
+                          'hand_button_highlight_border_${widget.move.name}',
                         ),
-                        blurRadius: isSelected ? 12 : 7,
-                        spreadRadius: isSelected ? 1.0 : 0.2,
+                        painter: RecommendationHighlightBorderPainter(
+                          kind: highlightKind,
+                          isDark: palette.isDark,
+                          borderRadius: borderRadius,
+                          pulse: pulse,
+                          suggestionPrimary: palette.suggestionHighlightPrimary,
+                          suggestionSecondary:
+                              palette.suggestionHighlightSecondary,
+                          crystalBallPrimary:
+                              palette.crystalBallPlusHighlightPrimary,
+                          crystalBallSecondary:
+                              palette.crystalBallPlusHighlightSecondary,
+                        ),
                       ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2.5),
-                      ),
-                    ],
+                    ),
                   ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ElementalEnergySphere(
-                        size: circleSize,
-                        primaryColor: orbInnerColor,
-                        secondaryColor: orbOuterColor,
+
+                // Top-left lightbulb mini-badge for active Suggestion match
+                if (widget.isSuggested)
+                  Positioned(
+                    top: -4,
+                    left: badgeSideOffset,
+                    child: IgnorePointer(
+                      child: _RecommendationMiniBadge(
+                        key: ValueKey(
+                          'hand_button_suggestion_badge_${widget.move.name}',
+                        ),
+                        iconType: HintMiniIconType.lightbulb,
+                        size: badgeSize,
+                        iconSize: badgeIconSize,
+                        accentColor: palette.suggestionHighlightPrimary,
+                        backgroundInner: const Color(0xFF3E3012),
+                        backgroundOuter: const Color(0xFF1A1408),
                         isDark: palette.isDark,
                       ),
-                      IgnorePointer(
-                        child: CustomPaint(
-                          size: Size.square(circleSize),
-                          painter: _ActionOrbGlossPainter(
-                            primaryColor: orbInnerColor,
-                            secondaryColor: orbOuterColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Crisp Elemental Emblem or Classic Hand in Upper-Middle of Sphere
-              Positioned(
-                top: elemental ? circleSize * 0.12 : circleSize * 0.12,
-                child: elemental
-                    ? ElementalSymbolIcon(
-                        move: widget.move,
-                        size: elementalSymbolSize,
-                      )
-                    : hasAsset
-                    ? Image.asset(
-                        widget.move.leftAsset,
-                        width: imageSize,
-                        height: imageSize,
-                        errorBuilder: (context, error, stackTrace) => Text(
-                          widget.move.emoji,
-                          style: TextStyle(fontSize: emojiFontSize),
-                        ),
-                      )
-                    : Text(
-                        widget.move.emoji,
-                        style: TextStyle(fontSize: emojiFontSize),
-                      ),
-              ),
-
-              // Bold Shadowed White Element Label Inside Lower Third of Sphere
-              Positioned(
-                bottom: elemental ? circleSize * 0.11 : 2.0,
-                left: 4,
-                right: 4,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    buttonLabel,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: labelFontSize,
-                      height: 1.0,
-                      letterSpacing: 0.5,
-                      color: elemental
-                          ? Colors.white
-                          : (palette.isDark
-                                ? Colors.white
-                                : palette.primaryText),
-                      shadows: elemental
-                          ? const [
-                              Shadow(
-                                color: Color(0xFF0A0E14),
-                                offset: Offset(-0.9, -0.9),
-                                blurRadius: 0.6,
-                              ),
-                              Shadow(
-                                color: Color(0xFF0A0E14),
-                                offset: Offset(0.9, -0.9),
-                                blurRadius: 0.6,
-                              ),
-                              Shadow(
-                                color: Color(0xFF0A0E14),
-                                offset: Offset(-0.9, 0.9),
-                                blurRadius: 0.6,
-                              ),
-                              Shadow(
-                                color: Color(0xFF0A0E14),
-                                offset: Offset(0.9, 0.9),
-                                blurRadius: 0.6,
-                              ),
-                              Shadow(
-                                color: Colors.black,
-                                blurRadius: 3.5,
-                                offset: Offset(0, 1.5),
-                              ),
-                            ]
-                          : palette.isDark
-                          ? const [
-                              Shadow(
-                                color: Colors.black,
-                                blurRadius: 3.5,
-                                offset: Offset(0, 1),
-                              ),
-                              Shadow(
-                                color: Colors.black,
-                                blurRadius: 6.0,
-                              ),
-                            ]
-                          : const [
-                              Shadow(
-                                color: Colors.white,
-                                blurRadius: 3.0,
-                              ),
-                            ],
                     ),
                   ),
-                ),
-              ),
-            ],
+
+                // Top-right crystal ball mini-badge for active Crystal Ball+ match
+                if (widget.isCrystalBallPlusRecommended)
+                  Positioned(
+                    top: -4,
+                    right: badgeSideOffset,
+                    child: IgnorePointer(
+                      child: _RecommendationMiniBadge(
+                        key: ValueKey(
+                          'hand_button_crystal_ball_plus_badge_${widget.move.name}',
+                        ),
+                        iconType: HintMiniIconType.crystalBall,
+                        size: badgeSize,
+                        iconSize: badgeIconSize,
+                        accentColor: palette.crystalBallPlusHighlightSecondary,
+                        backgroundInner: const Color(0xFF34164D),
+                        backgroundOuter: const Color(0xFF160B24),
+                        isDark: palette.isDark,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Paints the glowing rounded-rectangle border around recommended elemental
+/// attack buttons (golden for `Suggestion`, purple-cyan for `Crystal Ball+`,
+/// and a split golden + purple-cyan gradient with synchronized gentle pulse
+/// when both match the same element).
+class RecommendationHighlightBorderPainter extends CustomPainter {
+  final ActionButtonHighlightKind kind;
+  final bool isDark;
+  final double borderRadius;
+  final double pulse;
+  final Color suggestionPrimary;
+  final Color suggestionSecondary;
+  final Color crystalBallPrimary;
+  final Color crystalBallSecondary;
+
+  const RecommendationHighlightBorderPainter({
+    required this.kind,
+    required this.isDark,
+    required this.borderRadius,
+    required this.pulse,
+    required this.suggestionPrimary,
+    required this.suggestionSecondary,
+    required this.crystalBallPrimary,
+    required this.crystalBallSecondary,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || kind == ActionButtonHighlightKind.none) return;
+
+    final strokeWidth = kind == ActionButtonHighlightKind.both
+        ? (2.4 + 0.35 * pulse)
+        : 2.2;
+    final rect = Rect.fromLTWH(
+      strokeWidth * 0.5,
+      strokeWidth * 0.5,
+      size.width - strokeWidth,
+      size.height - strokeWidth,
+    );
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(math.max(0.0, borderRadius - strokeWidth * 0.5)),
+    );
+
+    final Shader borderShader;
+    switch (kind) {
+      case ActionButtonHighlightKind.none:
+        return;
+      case ActionButtonHighlightKind.suggestionOnly:
+        borderShader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            suggestionPrimary,
+            suggestionSecondary,
+            suggestionPrimary,
+          ],
+        ).createShader(Offset.zero & size);
+      case ActionButtonHighlightKind.crystalBallPlusOnly:
+        borderShader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            crystalBallPrimary,
+            crystalBallSecondary,
+          ],
+        ).createShader(Offset.zero & size);
+      case ActionButtonHighlightKind.both:
+        borderShader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            suggestionPrimary,
+            suggestionSecondary,
+            crystalBallPrimary,
+            crystalBallSecondary,
+          ],
+          stops: const [0.0, 0.44, 0.56, 1.0],
+        ).createShader(Offset.zero & size);
+    }
+
+    // Soft luminous bloom directly along the border edge
+    final glowPaint = Paint()
+      ..shader = borderShader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + (isDark ? 1.8 : 1.2) + (0.8 * pulse)
+      ..maskFilter = MaskFilter.blur(
+        BlurStyle.normal,
+        (isDark ? 2.6 : 1.8) + 1.0 * pulse,
+      );
+    canvas.drawRRect(rrect, glowPaint);
+
+    // Crisp inner luminous border stroke
+    final strokePaint = Paint()
+      ..shader = borderShader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawRRect(rrect, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant RecommendationHighlightBorderPainter oldDelegate,
+  ) {
+    return oldDelegate.kind != kind ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.borderRadius != borderRadius ||
+        oldDelegate.pulse != pulse ||
+        oldDelegate.suggestionPrimary != suggestionPrimary ||
+        oldDelegate.suggestionSecondary != suggestionSecondary ||
+        oldDelegate.crystalBallPrimary != crystalBallPrimary ||
+        oldDelegate.crystalBallSecondary != crystalBallSecondary;
+  }
+}
+
+/// Small circular corner mini-badge (`16px–18px`) anchored at the top-left
+/// (`Suggestion` lightbulb) or top-right (`Crystal Ball+` orb) of a recommended
+/// action button card.
+class _RecommendationMiniBadge extends StatelessWidget {
+  final HintMiniIconType iconType;
+  final double size;
+  final double iconSize;
+  final Color accentColor;
+  final Color backgroundInner;
+  final Color backgroundOuter;
+  final bool isDark;
+
+  const _RecommendationMiniBadge({
+    super.key,
+    required this.iconType,
+    required this.size,
+    required this.iconSize,
+    required this.accentColor,
+    required this.backgroundInner,
+    required this.backgroundOuter,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            center: const Alignment(-0.25, -0.25),
+            radius: 0.9,
+            colors: [backgroundInner, backgroundOuter],
+          ),
+          border: Border.all(
+            color: const Color(0xFF0A0D12),
+            width: 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withValues(alpha: isDark ? 0.65 : 0.45),
+              blurRadius: 4.0,
+              spreadRadius: 0.3,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 2.5,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Center(
+          child: HintMiniIcon(
+            type: iconType,
+            size: iconSize,
+            includeDefaultKey: false,
           ),
         ),
       ),
-    );
-
-    if (!widget.animationsEnabled) {
-      return buttonContent;
-    }
-
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: buttonContent,
     );
   }
 }

@@ -93,6 +93,19 @@ class AppPalette {
   Color get purpleAccent =>
       isDark ? Colors.purpleAccent : const Color(0xFF6A1B9A);
 
+  // Action Deck Recommendation Highlight Tokens (Suggestion & Crystal Ball+)
+  Color get suggestionHighlightPrimary =>
+      isDark ? const Color(0xFFFFD54F) : const Color(0xFFC88A00);
+
+  Color get suggestionHighlightSecondary =>
+      isDark ? const Color(0xFFF5C22B) : const Color(0xFF8A5A00);
+
+  Color get crystalBallPlusHighlightPrimary =>
+      isDark ? const Color(0xFF9C27B0) : const Color(0xFF8E24AA);
+
+  Color get crystalBallPlusHighlightSecondary =>
+      isDark ? const Color(0xFF00E5FF) : const Color(0xFF00ACC1);
+
   // Elemental Foreground & Card Tint Tokens (crisp contrast on light surfaces)
   Color elementalText(HandMove move) {
     if (isDark) {

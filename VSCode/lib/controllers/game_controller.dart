@@ -545,6 +545,27 @@ class GameController extends ChangeNotifier {
     return List.unmodifiable(counters);
   }
 
+  /// Elements currently recommended by an active `Suggestion` hint.
+  /// Returns an empty list when Suggestion is disabled, has no recommendation,
+  /// or ties equally across the entire active player deck.
+  List<HandMove> get activeSuggestedMoves {
+    if (!showSuggestion || suggestedMoves.isEmpty) return const [];
+    final playerPoolSize = _engine.size;
+    if (playerPoolSize > 1 && suggestedMoves.length >= playerPoolSize) {
+      return const [];
+    }
+    return List.unmodifiable(suggestedMoves);
+  }
+
+  /// Elements currently recommended by an active `Crystal Ball+` upgrade.
+  /// Strictly returns an empty list when only standard `Crystal Ball` is active
+  /// without `Crystal Ball+` so the opponent's predicted move is never falsely
+  /// highlighted as a winning player attack.
+  List<HandMove> get activeCrystalBallPlusMoves {
+    if (!showCrystalBall || !showCrystalBallPlus) return const [];
+    return crystalBallPlusMoves;
+  }
+
   List<HandMove> predictedUserMoves = [];
   List<HandMove> pcNextMoves = [];
   List<HandMove> suggestedMoves = [];
