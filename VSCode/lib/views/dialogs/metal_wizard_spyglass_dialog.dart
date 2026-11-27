@@ -48,9 +48,12 @@ class MetalWizardSpyglassDialog extends StatefulWidget {
 }
 
 class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
+  late final bool _playSnapInOnMount;
+
   @override
   void initState() {
     super.initState();
+    _playSnapInOnMount = widget.controller.consumeMetalWizardForgeSnapIn();
     if (widget.controller.hasUnreadWeek10WatchtowerAlert) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -65,11 +68,16 @@ class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
     final loc = controller.localization;
     final theme = Theme.of(context);
     final palette = AppPalette.of(context);
-    final coolingDown = MetalWizardSpyglassDialog.isForgeCoolingDown(controller);
-    final caption =
-        MetalWizardSpyglassDialog.resolveNarrativeCaption(controller);
 
-    return Dialog(
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final coolingDown =
+            MetalWizardSpyglassDialog.isForgeCoolingDown(controller);
+        final caption =
+            MetalWizardSpyglassDialog.resolveNarrativeCaption(controller);
+
+        return Dialog(
       key: const ValueKey('metal_wizard_spyglass_dialog'),
       backgroundColor: palette.isDark
           ? const Color(0xFF0D1119)
@@ -171,6 +179,8 @@ class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
                                       animationsEnabled:
                                           controller.animationsEnabled,
                                       isCoolingDown: coolingDown,
+                                      currentWeek: controller.currentWeek,
+                                      playSnapInOnMount: _playSnapInOnMount,
                                     ),
                                   ),
                                 ),
@@ -321,6 +331,8 @@ class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

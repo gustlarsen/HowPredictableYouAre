@@ -66,12 +66,16 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
   Offset _doubleTapLocalPosition = Offset.zero;
   Size _viewportSize = Size.zero;
   late final bool _openedFromWatchTower;
+  late final bool _playMetalWizardSnapIn;
 
   @override
   void initState() {
     super.initState();
     _openedFromWatchTower =
         widget.controller.audio.currentTrack == BgmTrack.watchTower;
+    _playMetalWizardSnapIn = widget.target == SpyglassTarget.metalWizard
+        ? widget.controller.consumeMetalWizardForgeSnapIn()
+        : false;
     unawaited(widget.controller.audio.playTrack(BgmTrack.watchTower));
     _zoomAnimController = AnimationController(
       vsync: this,
@@ -171,14 +175,17 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
                       child: AspectRatio(
                         aspectRatio: aspect,
                         child: isMetalWizard
-                            ? WatchtowerForgeView(
-                                isFullScreen: true,
-                                animationsEnabled:
-                                    widget.controller.animationsEnabled,
-                                isCoolingDown:
-                                    MetalWizardSpyglassDialog.isForgeCoolingDown(
-                                      widget.controller,
-                                    ),
+                            ? ListenableBuilder(
+                                listenable: widget.controller,
+                                builder: (context, _) => WatchtowerForgeView(
+                                  isFullScreen: true,
+                                  animationsEnabled:
+                                      widget.controller.animationsEnabled,
+                                  isCoolingDown: MetalWizardSpyglassDialog
+                                      .isForgeCoolingDown(widget.controller),
+                                  currentWeek: widget.controller.currentWeek,
+                                  playSnapInOnMount: _playMetalWizardSnapIn,
+                                ),
                               )
                             : ListenableBuilder(
                                 listenable: widget.controller,

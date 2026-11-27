@@ -424,6 +424,15 @@ class StorageService {
     return _prefs.setInt(savedMetalWizardHpKey, val);
   }
 
+  // Last campaign week inspected in the Metal Wizard Forge spyglass (for 1x snap-in micro-animation)
+  static const String lastSeenMetalWizardForgeWeekKey =
+      'last_seen_metal_wizard_forge_week';
+
+  int get lastSeenMetalWizardForgeWeek =>
+      _prefs.getInt(lastSeenMetalWizardForgeWeekKey) ?? -1;
+  Future<void> setLastSeenMetalWizardForgeWeek(int val) =>
+      _prefs.setInt(lastSeenMetalWizardForgeWeekKey, val);
+
   // Week 40+ Sacred Temple Siege (Last Stand) Persistence Flags (per-campaign)
   static const String isTempleSiegeActiveKey = 'is_temple_siege_active';
   static const String hasShownTempleSiegeIntroKey =
@@ -1536,6 +1545,7 @@ class StorageService {
       setHasShownWeek10ArchmageWarning(false),
       setHasUnreadWeek10WatchtowerAlert(false),
       setSavedMetalWizardHp(null),
+      setLastSeenMetalWizardForgeWeek(-1),
       setIsTempleSiegeActive(false),
       setHasShownTempleSiegeIntro(false),
       setAdConsagrationsThisWeek(0),

@@ -25,10 +25,13 @@ class _Week10ArchmageSlideData {
   });
 }
 
+/// Result action chosen by the player on the Week 10 Archmage awakening alert.
+enum Week10ArchmageWarningAction { close, inspectWatchTower }
+
 /// 2-slide Royal Chronicler-styled warning carousel shown once per campaign at
 /// the start of Week 10+ when the Metal Wizard and Robot Archmage are still
-/// undefeated, alerting the player that the Robot Archmage has appeared inside
-/// the Metal Wizard's Lair and advising them to check the Watch Tower spyglass.
+/// undefeated, alerting the player that the Robot Archmage has awakened inside
+/// the Metal Wizard's Lair and offering a quick action to inspect the Watch Tower.
 class Week10ArchmageWarningDialog extends StatefulWidget {
   final GameController controller;
 
@@ -37,14 +40,14 @@ class Week10ArchmageWarningDialog extends StatefulWidget {
     required this.controller,
   });
 
-  static Future<void> show(
+  static Future<Week10ArchmageWarningAction?> show(
     BuildContext context, {
     required GameController controller,
   }) {
     controller.audio.playStoryChime();
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
 
-    return showGeneralDialog<void>(
+    return showGeneralDialog<Week10ArchmageWarningAction>(
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Watch Tower Alert',
@@ -165,7 +168,7 @@ class _Week10ArchmageWarningDialogState
                   ],
                 ),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -212,7 +215,8 @@ class _Week10ArchmageWarningDialogState
                             key: const ValueKey('week10_archmage_skip_button'),
                             onPressed: () {
                               widget.controller.audio.playTapVibrate();
-                              Navigator.of(context).pop();
+                              Navigator.of(context)
+                                  .pop(Week10ArchmageWarningAction.close);
                             },
                             child: Text(
                               loc.t('story_skip', fallback: 'Skip'),
@@ -224,7 +228,7 @@ class _Week10ArchmageWarningDialogState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
                       // Framed illustration / emblem card
                       ClipRRect(
@@ -281,13 +285,13 @@ class _Week10ArchmageWarningDialogState
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 24,
-                                  horizontal: 16,
+                                  vertical: 15,
+                                  horizontal: 14,
                                 ),
                                 child: Column(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(16),
+                                      padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: isDark
@@ -303,7 +307,7 @@ class _Week10ArchmageWarningDialogState
                                       ),
                                       child: slide.iconWidget,
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 10),
                                     Text(
                                       loc.t(
                                         slide.speakerKey,
@@ -318,7 +322,7 @@ class _Week10ArchmageWarningDialogState
                                             : const Color(0xFF7A4E00),
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 4),
                                     Text(
                                       loc.t(
                                         slide.titleKey,
@@ -326,7 +330,7 @@ class _Week10ArchmageWarningDialogState
                                       ),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 19,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.w900,
                                         color: palette.primaryText,
                                       ),
@@ -338,12 +342,12 @@ class _Week10ArchmageWarningDialogState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
-                      // Bordered narrative text box
+                      // Bordered narrative text box + dramatic forge-awakening quote
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: narrativeBg,
                           borderRadius: BorderRadius.circular(14),
@@ -353,17 +357,54 @@ class _Week10ArchmageWarningDialogState
                             ),
                           ),
                         ),
-                        child: Text(
-                          loc.t(
-                            slide.bodyKey,
-                            fallback: slide.fallbackBody,
-                          ),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.45,
-                            color: palette.primaryText,
-                          ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_index == 0) ...[
+                              Text(
+                                loc.t(
+                                  'week10_archmage_awakening_quote',
+                                  fallback:
+                                      'The hammering in the underground forge has stopped... The Robot Archmage has awakened and awaits in the Lair!',
+                                ),
+                                key: const ValueKey(
+                                  'week10_archmage_awakening_quote',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.4,
+                                  color: isDark
+                                      ? const Color(0xFFFFE082)
+                                      : const Color(0xFF7A3E00),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 20,
+                                ),
+                                child: Divider(
+                                  height: 1,
+                                  color: _warmGold.withValues(alpha: 0.35),
+                                ),
+                              ),
+                            ],
+                            Text(
+                              loc.t(
+                                slide.bodyKey,
+                                fallback: slide.fallbackBody,
+                              ),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.45,
+                                color: palette.primaryText,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -412,7 +453,8 @@ class _Week10ArchmageWarningDialogState
                           onPressed: () {
                             widget.controller.audio.playTapVibrate();
                             if (isLast) {
-                              Navigator.of(context).pop();
+                              Navigator.of(context)
+                                  .pop(Week10ArchmageWarningAction.close);
                             } else {
                               setState(() => _index++);
                             }
@@ -427,6 +469,53 @@ class _Week10ArchmageWarningDialogState
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Quick action button to jump straight to the Watch Tower
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey(
+                            'week10_archmage_inspect_watchtower_button',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: isDark
+                                ? const Color(0xFFFFE082)
+                                : const Color(0xFF7A4E00),
+                            side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.62)
+                                  : _warmGold.withValues(alpha: 0.85),
+                              width: 1.2,
+                            ),
+                            backgroundColor: isDark
+                                ? const Color(0xFF102432).withValues(alpha: 0.72)
+                                : const Color(0xFFFDF7E7),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            widget.controller.audio.playTapVibrate();
+                            Navigator.of(context).pop(
+                              Week10ArchmageWarningAction.inspectWatchTower,
+                            );
+                          },
+                          icon: const WatchTowerIcon(size: 18),
+                          label: Text(
+                            loc.t(
+                              'week10_archmage_inspect_watchtower_btn',
+                              fallback: 'Inspect Watch Tower',
+                            ),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
                             ),
                           ),
                         ),

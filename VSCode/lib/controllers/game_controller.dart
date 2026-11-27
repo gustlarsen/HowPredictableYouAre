@@ -675,6 +675,7 @@ class GameController extends ChangeNotifier {
   bool hasShownWeek10ArchmageWarning = false;
   bool hasUnreadWeek10WatchtowerAlert = false;
   int? savedMetalWizardHp;
+  int lastSeenMetalWizardForgeWeek = -1;
 
   // Week 40+ Sacred Temple Siege (Last Stand) State (per-campaign)
   bool isTempleSiegeActive = false;
@@ -1513,6 +1514,7 @@ class GameController extends ChangeNotifier {
     hasShownWeek10ArchmageWarning = storage.hasShownWeek10ArchmageWarning;
     hasUnreadWeek10WatchtowerAlert = storage.hasUnreadWeek10WatchtowerAlert;
     savedMetalWizardHp = storage.savedMetalWizardHp;
+    lastSeenMetalWizardForgeWeek = storage.lastSeenMetalWizardForgeWeek;
     isTempleSiegeActive = storage.isTempleSiegeActive;
     hasShownTempleSiegeIntro = storage.hasShownTempleSiegeIntro;
     if (storage.userHpRaw != null) {
@@ -3131,6 +3133,7 @@ class GameController extends ChangeNotifier {
       hasShownWeek10ArchmageWarning = false;
       hasUnreadWeek10WatchtowerAlert = false;
       savedMetalWizardHp = null;
+      lastSeenMetalWizardForgeWeek = -1;
       isTempleSiegeActive = false;
       hasShownTempleSiegeIntro = false;
       storage.setEnemyStage(1);
@@ -3146,6 +3149,7 @@ class GameController extends ChangeNotifier {
       storage.setHasShownWeek10ArchmageWarning(false);
       storage.setHasUnreadWeek10WatchtowerAlert(false);
       storage.setSavedMetalWizardHp(null);
+      storage.setLastSeenMetalWizardForgeWeek(-1);
       storage.setIsTempleSiegeActive(false);
       storage.setHasShownTempleSiegeIntro(false);
       _refreshCompletedDecreesAndResetBattleTrackers();
@@ -3510,6 +3514,20 @@ class GameController extends ChangeNotifier {
     storage.setHasUnreadWeek10WatchtowerAlert(false);
     _triggerCloudSave();
     notifyListeners();
+  }
+
+  /// Returns `true` the first time the player inspects the Metal Wizard forge
+  /// spyglass after advancing to a new assembly week (`1..9`), persisting
+  /// [lastSeenMetalWizardForgeWeek] so the snap-in micro-animation plays once
+  /// per week progression.
+  bool consumeMetalWizardForgeSnapIn() {
+    final week = currentWeek;
+    final coolingDown = week >= maxCampaignWeeks || enemyStage >= 4;
+    if (coolingDown || week < 1 || week > 9) return false;
+    if (lastSeenMetalWizardForgeWeek >= week) return false;
+    lastSeenMetalWizardForgeWeek = week;
+    storage.setLastSeenMetalWizardForgeWeek(week);
+    return true;
   }
 
   /// Advances the campaign calendar by +1 Week upon exiting a battle via

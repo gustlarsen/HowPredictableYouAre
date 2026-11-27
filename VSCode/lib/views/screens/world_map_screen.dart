@@ -291,8 +291,16 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         _isWeek10ArchmageDialogOpen = false;
         return;
       }
-      await Week10ArchmageWarningDialog.show(context, controller: controller);
+      final action = await Week10ArchmageWarningDialog.show(
+        context,
+        controller: controller,
+      );
       _isWeek10ArchmageDialogOpen = false;
+      if (action == Week10ArchmageWarningAction.inspectWatchTower &&
+          mounted &&
+          context.mounted) {
+        _openObservatory(context, controller);
+      }
     });
   }
 
