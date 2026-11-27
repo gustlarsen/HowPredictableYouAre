@@ -83,11 +83,12 @@ class AudioService with WidgetsBindingObserver {
   static const Duration rapidFireSfxMinInterval = Duration(milliseconds: 120);
 
   static const double targetBgmVolume = 0.55;
+  static const double duckedBgmVolume = 0.14;
   static const Duration defaultFadeDuration = Duration(milliseconds: 260);
   static const int defaultFadeSteps = 8;
-  static const String princessScreamAssetPath = 'audio/princess_scream.mid';
+  static const String princessScreamAssetPath = 'audio/princess_scream.mp3';
   static const Duration defaultPrincessScreamDuration = Duration(
-    milliseconds: 1700,
+    milliseconds: 2050,
   );
 
   final Duration _fadeDuration;
@@ -103,7 +104,7 @@ class AudioService with WidgetsBindingObserver {
   bool _hasLoadedMusicSource = false;
   bool _wasPlayingBeforeBackground = false;
   bool _isPrincessScreamPlaying = false;
-  bool _resumeBgmAfterScream = false;
+  bool _isBgmDuckedForScream = false;
   int _screamToken = 0;
   Timer? _screamRestoreTimer;
   BgmTrack _currentTrack = BgmTrack.worldMap;
@@ -134,7 +135,7 @@ class AudioService with WidgetsBindingObserver {
   bool get isPrincessScreamPlaying => _isPrincessScreamPlaying;
 
   @visibleForTesting
-  bool get isBgmDuckPausedForScream => _resumeBgmAfterScream;
+  bool get isBgmDuckedForScream => _isBgmDuckedForScream;
 
   /// The logical BGM track currently selected for the active screen or modal.
   BgmTrack get currentTrack => _currentTrack;
@@ -145,6 +146,9 @@ class AudioService with WidgetsBindingObserver {
   @visibleForTesting
   double get currentBgmVolume => _currentBgmVolume;
 
+  double get _effectiveTargetBgmVolume =>
+      _isBgmDuckedForScream ? duckedBgmVolume : targetBgmVolume;
+
   bool _soundEnabled = true;
   bool _musicEnabled = true;
   bool vibrationEnabled = true;
@@ -152,7 +156,7 @@ class AudioService with WidgetsBindingObserver {
   bool get soundEnabled => _soundEnabled;
   set soundEnabled(bool value) {
     _soundEnabled = value;
-    if (!value && (_isPrincessScreamPlaying || _resumeBgmAfterScream)) {
+    if (!value && (_isPrincessScreamPlaying || _isBgmDuckedForScream)) {
       unawaited(finishPrincessScreamAndRestoreBgm());
     }
   }
@@ -162,7 +166,7 @@ class AudioService with WidgetsBindingObserver {
     _musicEnabled = value;
     if (!value) {
       _wasPlayingBeforeBackground = false;
-      _resumeBgmAfterScream = false;
+      _isBgmDuckedForScream = false;
       _transitionToken++;
       _activeTransitionTrack = null;
       _cancelFadeTimer();
@@ -321,10 +325,7 @@ class AudioService with WidgetsBindingObserver {
           debugPrint('Could not stop princess scream on background: $error');
         }
       }
-      if (_resumeBgmAfterScream) {
-        _resumeBgmAfterScream = false;
-        _wasPlayingBeforeBackground = true;
-      }
+      _isBgmDuckedForScream = false;
       if (isCurrentlyPlaying) {
         _wasPlayingBeforeBackground = true;
         _isMusicPlaying = false;
@@ -541,11 +542,11 @@ class AudioService with WidgetsBindingObserver {
     }
   }
 
-  /// Plays the synthetic princess scream `.mid` once when the Week 1 scream warning appears.
+  /// Plays the distant dungeon princess scream `.mp3` once over active BGM.
   ///
-  /// Temporarily pauses active/transitioning BGM so Android's native MIDI synthesizer
-  /// does not drop voices across two simultaneous `.mid` files, then smoothly restores
-  /// [currentTrack] (e.g. `worldMap`) once the scream completes or the dialog is dismissed.
+  /// Briefly ducks active/transitioning BGM volume (e.g. `worldMap`) so the scream
+  /// is clearly audible, then smoothly restores [currentTrack] to [targetBgmVolume]
+  /// once the scream completes or the pop-up is dismissed.
   Future<void> playPrincessScream() async {
     playTapVibrate();
     if (_isDisposed || !soundEnabled || _isAppInBackground) return;
@@ -555,22 +556,33 @@ class AudioService with WidgetsBindingObserver {
     _screamRestoreTimer?.cancel();
     _screamRestoreTimer = null;
 
-    final shouldPauseBgm =
+    final shouldDuckBgm =
         musicEnabled &&
+        _bgmPlayer != null &&
         (_isMusicPlaying ||
             _activeTransitionTrack != null ||
-            _bgmPlayer?.state == PlayerState.playing);
-    _resumeBgmAfterScream = _resumeBgmAfterScream || shouldPauseBgm;
+            _bgmPlayer!.state == PlayerState.playing);
 
-    if (shouldPauseBgm) {
+    if (shouldDuckBgm) {
+      _isBgmDuckedForScream = true;
       _transitionToken++;
       _activeTransitionTrack = null;
       _cancelFadeTimer();
-      _isMusicPlaying = false;
       try {
-        await _bgmPlayer?.pause();
+        if (_loadedTrack == _currentTrack &&
+            _bgmPlayer!.state == PlayerState.playing) {
+          _isMusicPlaying = true;
+          await _setBgmVolume(duckedBgmVolume);
+        } else {
+          await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+          await _setBgmVolume(duckedBgmVolume);
+          _isMusicPlaying = true;
+          await _bgmPlayer!.play(AssetSource(_currentTrack.assetPath));
+          _hasLoadedMusicSource = true;
+          _loadedTrack = _currentTrack;
+        }
       } catch (error) {
-        debugPrint('Could not pause BGM for princess scream: $error');
+        debugPrint('Could not duck BGM for princess scream: $error');
       }
     }
 
@@ -578,12 +590,20 @@ class AudioService with WidgetsBindingObserver {
         !soundEnabled ||
         _isAppInBackground ||
         screamToken != _screamToken) {
-      if (!_isDisposed &&
-          !_isAppInBackground &&
+      if (_isAppInBackground) {
+        _isBgmDuckedForScream = false;
+        if (_isMusicPlaying || _bgmPlayer?.state == PlayerState.playing) {
+          _isMusicPlaying = false;
+          _wasPlayingBeforeBackground = true;
+          try {
+            await _bgmPlayer?.pause();
+          } catch (_) {}
+        }
+      } else if (!_isDisposed &&
           screamToken == _screamToken &&
-          _resumeBgmAfterScream &&
+          _isBgmDuckedForScream &&
           musicEnabled) {
-        _resumeBgmAfterScream = false;
+        _isBgmDuckedForScream = false;
         await _restoreBgmWithSmoothFadeIn();
       }
       return;
@@ -598,11 +618,11 @@ class AudioService with WidgetsBindingObserver {
     } catch (error) {
       _isPrincessScreamPlaying = false;
       debugPrint('Could not play princess scream sound: $error');
-      if (_resumeBgmAfterScream &&
+      if (_isBgmDuckedForScream &&
           !_isDisposed &&
           musicEnabled &&
           !_isAppInBackground) {
-        _resumeBgmAfterScream = false;
+        _isBgmDuckedForScream = false;
         await _restoreBgmWithSmoothFadeIn();
       }
       return;
@@ -616,9 +636,15 @@ class AudioService with WidgetsBindingObserver {
       try {
         await _sfxPlayer?.stop();
       } catch (_) {}
-      if (_isAppInBackground && _resumeBgmAfterScream) {
-        _resumeBgmAfterScream = false;
-        _wasPlayingBeforeBackground = true;
+      if (_isAppInBackground) {
+        _isBgmDuckedForScream = false;
+        if (_isMusicPlaying || _bgmPlayer?.state == PlayerState.playing) {
+          _isMusicPlaying = false;
+          _wasPlayingBeforeBackground = true;
+          try {
+            await _bgmPlayer?.pause();
+          } catch (_) {}
+        }
       }
       return;
     }
@@ -629,9 +655,9 @@ class AudioService with WidgetsBindingObserver {
   }
 
   /// Stops an active princess scream early (e.g. when the player dismisses the
-  /// Week 1 scream warning pop-up or mutes sound) and smoothly resumes BGM if needed.
+  /// Week 1 scream warning pop-up or mutes sound) and smoothly restores BGM volume.
   Future<void> finishPrincessScreamAndRestoreBgm() async {
-    if (!_isPrincessScreamPlaying && !_resumeBgmAfterScream) return;
+    if (!_isPrincessScreamPlaying && !_isBgmDuckedForScream) return;
     final token = ++_screamToken;
     await _finishPrincessScreamAndRestoreBgm(
       token,
@@ -658,8 +684,8 @@ class AudioService with WidgetsBindingObserver {
       }
     }
 
-    final shouldRestore = _resumeBgmAfterScream;
-    _resumeBgmAfterScream = false;
+    final shouldRestore = _isBgmDuckedForScream;
+    _isBgmDuckedForScream = false;
     if (!shouldRestore || _isDisposed || !musicEnabled) {
       return;
     }
@@ -676,9 +702,34 @@ class AudioService with WidgetsBindingObserver {
       _wasPlayingBeforeBackground = true;
       return;
     }
-    if (_isMusicPlaying &&
-        _loadedTrack == _currentTrack &&
+    if (_loadedTrack == _currentTrack &&
+        _isMusicPlaying &&
         _bgmPlayer!.state == PlayerState.playing) {
+      if (_currentBgmVolume >= targetBgmVolume - 0.001) {
+        return;
+      }
+      final token = ++_transitionToken;
+      _cancelFadeTimer();
+      _activeTransitionTrack = _currentTrack;
+      try {
+        if (_fadeDuration > Duration.zero) {
+          await _rampBgmVolume(
+            from: _currentBgmVolume,
+            to: targetBgmVolume,
+            duration: _fadeDuration,
+            token: token,
+          );
+        } else {
+          await _setBgmVolume(targetBgmVolume);
+        }
+      } catch (error) {
+        debugPrint('Could not restore background music volume after scream: $error');
+      } finally {
+        if (token == _transitionToken &&
+            _activeTransitionTrack == _currentTrack) {
+          _activeTransitionTrack = null;
+        }
+      }
       return;
     }
 
@@ -766,10 +817,6 @@ class AudioService with WidgetsBindingObserver {
       _wasPlayingBeforeBackground = true;
       return;
     }
-    if (_isPrincessScreamPlaying) {
-      _resumeBgmAfterScream = true;
-      return;
-    }
     if (_bgmPlayer == null) return;
     if (isAlreadyPlayingSameTrack) return;
 
@@ -784,17 +831,18 @@ class AudioService with WidgetsBindingObserver {
       _isMusicPlaying = true;
       _wasPlayingBeforeBackground = false;
       try {
+        final targetVol = _effectiveTargetBgmVolume;
         if (fade &&
             _fadeDuration > Duration.zero &&
-            _currentBgmVolume < targetBgmVolume) {
+            _currentBgmVolume < targetVol) {
           await _rampBgmVolume(
             from: _currentBgmVolume,
-            to: targetBgmVolume,
+            to: targetVol,
             duration: _fadeDuration,
             token: token,
           );
         } else {
-          await _setBgmVolume(targetBgmVolume);
+          await _setBgmVolume(targetVol);
         }
       } catch (error) {
         debugPrint('Could not restore background music volume: $error');
@@ -834,10 +882,11 @@ class AudioService with WidgetsBindingObserver {
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       if (_shouldAbortTransition(token)) return;
 
+      final targetVol = _effectiveTargetBgmVolume;
       if (shouldFade) {
         await _setBgmVolume(0.0);
       } else {
-        await _setBgmVolume(targetBgmVolume);
+        await _setBgmVolume(targetVol);
       }
       if (_shouldAbortTransition(token)) return;
 
@@ -871,7 +920,7 @@ class AudioService with WidgetsBindingObserver {
       if (shouldFade) {
         await _rampBgmVolume(
           from: 0.0,
-          to: targetBgmVolume,
+          to: _effectiveTargetBgmVolume,
           duration: _fadeDuration,
           token: token,
         );
@@ -903,7 +952,7 @@ class AudioService with WidgetsBindingObserver {
     _cancelFadeTimer();
     _isMusicPlaying = false;
     _wasPlayingBeforeBackground = false;
-    _resumeBgmAfterScream = false;
+    _isBgmDuckedForScream = false;
     _hasLoadedMusicSource = false;
     _loadedTrack = null;
     _currentBgmVolume = targetBgmVolume;
@@ -920,7 +969,7 @@ class AudioService with WidgetsBindingObserver {
     _activeTransitionTrack = null;
     _cancelFadeTimer();
     _isMusicPlaying = false;
-    _resumeBgmAfterScream = false;
+    _isBgmDuckedForScream = false;
     try {
       await _bgmPlayer?.pause();
     } catch (error) {
@@ -932,10 +981,6 @@ class AudioService with WidgetsBindingObserver {
     if (_isDisposed || !musicEnabled) return;
     if (_isAppInBackground) {
       _wasPlayingBeforeBackground = true;
-      return;
-    }
-    if (_isPrincessScreamPlaying) {
-      _resumeBgmAfterScream = true;
       return;
     }
     if (_bgmPlayer == null) return;
@@ -950,7 +995,7 @@ class AudioService with WidgetsBindingObserver {
           (_bgmPlayer!.state == PlayerState.paused || _hasLoadedMusicSource);
       if (canResumeSameTrack) {
         _isMusicPlaying = true;
-        await _setBgmVolume(targetBgmVolume);
+        await _setBgmVolume(_effectiveTargetBgmVolume);
         await _bgmPlayer!.resume();
         if (_isDisposed || !musicEnabled) {
           _isMusicPlaying = false;
@@ -978,7 +1023,7 @@ class AudioService with WidgetsBindingObserver {
     _screamRestoreTimer?.cancel();
     _screamRestoreTimer = null;
     _isPrincessScreamPlaying = false;
-    _resumeBgmAfterScream = false;
+    _isBgmDuckedForScream = false;
     if (_isObserverRegistered) {
       try {
         WidgetsBinding.instance.removeObserver(this);

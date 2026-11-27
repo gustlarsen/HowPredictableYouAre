@@ -176,23 +176,46 @@ void main() {
       }
     });
 
-    test('princess_scream.mid and all 4 alternative scream MIDI assets exist with valid SMF headers', () async {
-      const screamAssets = [
+    test('princess_scream.mp3 asset exists, is lightweight (< 35 KB), has valid MP3 header, and experimental MIDI scream files are removed', () async {
+      expect(
+        AudioService.princessScreamAssetPath,
+        'audio/princess_scream.mp3',
+      );
+      final data = await rootBundle.load(
         'assets/${AudioService.princessScreamAssetPath}',
+      );
+      expect(data.lengthInBytes, greaterThan(4000));
+      expect(data.lengthInBytes, lessThan(35 * 1024));
+
+      final bytes = data.buffer.asUint8List();
+      final hasId3Header =
+          bytes.length >= 3 &&
+          bytes[0] == 0x49 &&
+          bytes[1] == 0x44 &&
+          bytes[2] == 0x33;
+      final hasMpegFrameSync =
+          bytes.length >= 2 &&
+          bytes[0] == 0xFF &&
+          (bytes[1] & 0xE0) == 0xE0;
+      expect(
+        hasId3Header || hasMpegFrameSync,
+        isTrue,
+        reason: 'assets/audio/princess_scream.mp3 must have valid MP3 magic bytes',
+      );
+
+      const removedMidiAssets = [
+        'assets/audio/princess_scream.mid',
         'assets/audio/princess_scream_alt1_spectral_shriek.mid',
         'assets/audio/princess_scream_alt2_dungeon_echo.mid',
         'assets/audio/princess_scream_alt3_16bit_rpg.mid',
         'assets/audio/princess_scream_alt4_trembling_hybrid.mid',
       ];
-      expect(
-        AudioService.princessScreamAssetPath,
-        'audio/princess_scream.mid',
-      );
-      for (final assetPath in screamAssets) {
-        final data = await rootBundle.load(assetPath);
-        expect(data.lengthInBytes, greaterThan(1000), reason: assetPath);
-        final header = String.fromCharCodes(data.buffer.asUint8List(0, 4));
-        expect(header, 'MThd', reason: '$assetPath must be valid SMF');
+      for (final oldAsset in removedMidiAssets) {
+        await expectLater(
+          () => rootBundle.load(oldAsset),
+          throwsA(isA<FlutterError>()),
+          reason: '$oldAsset should be removed from assets and pubspec.yaml',
+        );
       }
     });
 

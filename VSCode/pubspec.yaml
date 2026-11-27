@@ -102,11 +102,7 @@ flutter:
     - assets/audio/sacred_temple.mid
     - assets/audio/royal_castle.mid
     - assets/audio/watch_tower.mid
-    - assets/audio/princess_scream.mid
-    - assets/audio/princess_scream_alt1_spectral_shriek.mid
-    - assets/audio/princess_scream_alt2_dungeon_echo.mid
-    - assets/audio/princess_scream_alt3_16bit_rpg.mid
-    - assets/audio/princess_scream_alt4_trembling_hybrid.mid
+    - assets/audio/princess_scream.mp3
 
   shaders:
     - shaders/watchtower_prisoner.frag
