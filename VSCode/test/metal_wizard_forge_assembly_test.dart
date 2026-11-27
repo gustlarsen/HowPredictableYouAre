@@ -55,16 +55,17 @@ void main() {
 
   group('Robot Archmage Progressive Forge Assembly & Week 10 Awakening Tests', () {
     test(
-      'All 22 generated watchtower bare-metal chassis, stage, part, and workbench pile assets are bundled and loadable',
+      'All 22 generated watchtower assets plus Titanium Robot Egg sprite are bundled and loadable',
       () async {
         final expectedAssets = <String>[
+          WatchtowerForgeView.babyRobotEggAsset,
           WatchtowerForgeView.nakedFrameAsset,
           ...WatchtowerForgeView.stageAssets,
           ...WatchtowerForgeView.partAssets,
           for (int w = 0; w <= 6; w++)
             WatchtowerForgeView.pileAssetForWeek(w)!,
         ];
-        expect(expectedAssets.length, 22);
+        expect(expectedAssets.length, 23);
 
         for (final asset in expectedAssets) {
           final bytes = await rootBundle.load(asset);
@@ -88,7 +89,7 @@ void main() {
     );
 
     testWidgets(
-      'Metal Wizard spyglass renders distinct progressive assembly stages across Week 0, 1, 4, 7, 8 (eye off), 9 (eye on), 10+ (Baby Robot), and 40+ (cooling) in both circular and full-screen views',
+      'Metal Wizard spyglass renders Week 0 Titanium Robot Egg enchantment, Weeks 1-9 progressive Archmage assembly, Weeks 10-39 Overcharged Egg, and Week 40+ cooling in both circular and full-screen views',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(412, 915);
         tester.view.devicePixelRatio = 1.0;
@@ -106,20 +107,21 @@ void main() {
           bool expectBlueprint,
           bool expectDormantMask,
           bool expectPoweredVfx,
-          bool expectBabyRobot,
+          bool expectEgg,
+          bool expectEggOvercharged,
           bool expectCooling,
         })>[
           (
             week: 0,
             enemyStage: 1,
-            expectedPhase: ForgeAssemblyPhase.week0EmptyRig,
-            expectedRigAsset: null,
-            expectedPileAsset:
-                'assets/images/watchtower/archmage_pile_week_0.png',
-            expectBlueprint: true,
+            expectedPhase: ForgeAssemblyPhase.week0EggEnchantment,
+            expectedRigAsset: WatchtowerForgeView.babyRobotEggAsset,
+            expectedPileAsset: null,
+            expectBlueprint: false,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: true,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -133,7 +135,8 @@ void main() {
             expectBlueprint: true,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -147,7 +150,8 @@ void main() {
             expectBlueprint: true,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -161,7 +165,8 @@ void main() {
             expectBlueprint: true,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -174,7 +179,8 @@ void main() {
             expectBlueprint: true,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -186,7 +192,8 @@ void main() {
             expectBlueprint: false,
             expectDormantMask: true,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
@@ -198,19 +205,21 @@ void main() {
             expectBlueprint: false,
             expectDormantMask: false,
             expectPoweredVfx: true,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: false,
           ),
           (
             week: 10,
             enemyStage: 2,
-            expectedPhase: ForgeAssemblyPhase.babyRobotForging,
-            expectedRigAsset: WatchtowerForgeView.babyRobotMageAsset,
+            expectedPhase: ForgeAssemblyPhase.eggOvercharged,
+            expectedRigAsset: WatchtowerForgeView.babyRobotEggAsset,
             expectedPileAsset: null,
             expectBlueprint: false,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: true,
+            expectEgg: true,
+            expectEggOvercharged: true,
             expectCooling: false,
           ),
           (
@@ -222,7 +231,8 @@ void main() {
             expectBlueprint: false,
             expectDormantMask: false,
             expectPoweredVfx: false,
-            expectBabyRobot: false,
+            expectEgg: false,
+            expectEggOvercharged: false,
             expectCooling: true,
           ),
         ];
@@ -255,6 +265,8 @@ void main() {
           expect(view.activePileAsset, c.expectedPileAsset);
           expect(view.isArchmageEyePoweredOff, c.expectDormantMask);
           expect(view.isArchmageEyePoweredOn, c.expectPoweredVfx);
+          expect(view.isEggOnPedestal, c.expectEgg);
+          expect(view.isEggOvercharged, c.expectEggOvercharged);
 
           expect(
             find.byKey(const ValueKey('watchtower_forge_blueprint_hologram')),
@@ -282,9 +294,34 @@ void main() {
             c.expectPoweredVfx ? findsOneWidget : findsNothing,
           );
           expect(
-            find.byKey(const ValueKey('watchtower_forge_baby_robot_image')),
-            c.expectBabyRobot ? findsOneWidget : findsNothing,
+            find.byKey(const ValueKey('watchtower_forge_egg_image')),
+            c.expectEgg ? findsOneWidget : findsNothing,
           );
+          expect(
+            find.byKey(
+              const ValueKey('watchtower_forge_egg_enchantment_painter'),
+            ),
+            c.expectEgg ? findsOneWidget : findsNothing,
+          );
+          if (c.expectEgg) {
+            final eggImg = tester.widget<Image>(
+              find.byKey(const ValueKey('watchtower_forge_egg_image')),
+            );
+            expect(
+              (eggImg.image as AssetImage).assetName,
+              WatchtowerForgeView.babyRobotEggAsset,
+            );
+            final eggPaint = tester.widget<CustomPaint>(
+              find.byKey(
+                const ValueKey('watchtower_forge_egg_enchantment_painter'),
+              ),
+            );
+            expect(eggPaint.painter, isA<EggEnchantmentPainter>());
+            expect(
+              (eggPaint.painter as EggEnchantmentPainter).isOvercharged,
+              c.expectEggOvercharged,
+            );
+          }
           expect(
             find.byKey(const ValueKey('watchtower_forge_metal_wizard_image')),
             c.expectCooling ? findsNothing : findsOneWidget,
@@ -313,6 +350,12 @@ void main() {
           expect(fullView.isFullScreen, isTrue);
           expect(fullView.assemblyPhase, c.expectedPhase);
           expect(fullView.activeRigSpriteAsset, c.expectedRigAsset);
+          expect(
+            find.byKey(
+              const ValueKey('watchtower_forge_egg_enchantment_painter'),
+            ),
+            c.expectEgg ? findsOneWidget : findsNothing,
+          );
           expect(tester.takeException(), isNull);
         }
       },
@@ -563,6 +606,287 @@ void main() {
           expect(currentRect.bottom, closeTo(initialFullRect.bottom, 1e-6));
           expect(currentRect.left, closeTo(initialFullRect.left, 1e-6));
           expect(currentRect.right, closeTo(initialFullRect.right, 1e-6));
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Week 0 renders Titanium Robot Egg enchantment with localized captions (en, pt, es, de) and transitions cleanly to Weeks 1-9 Archmage assembly and Weeks 10-39 overcharged egg',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        const expectedWeek0Captions = {
+          'en':
+              'Deep beneath his lair, the Metal Wizard channels forbidden crimson energy into a mysterious titanium egg—forging a terrifying contingency before he even begins assembling his Archmage...',
+          'pt':
+              'Nas profundezas de seu covil, o Mago de Metal canaliza energia carmesim proibida em um misterioso ovo de titânio — forjando uma contingência aterrorizante antes mesmo de começar a montar seu Arquimago...',
+          'es':
+              'En lo profundo de su guarida, el Mago de Metal canaliza energía carmesí prohibida en un misterioso huevo de titanio, forjando una contingencia aterradora antes siquiera de ensamblar su Archimago...',
+          'de':
+              'Tief in seinem Versteck leitet der Metallmagier verbotene karmesinrote Energie in ein geheimnisvolles Titan-Ei – eine schreckliche Geheimwaffe, noch bevor er mit dem Bau seines Erzmagiers beginnt...',
+        };
+
+        for (final entry in expectedWeek0Captions.entries) {
+          final controller = await _createController(
+            language: entry.key,
+            currentWeek: 0,
+            animationsEnabled: false,
+          );
+          addTearDown(controller.dispose);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: Scaffold(
+                body: MetalWizardSpyglassDialog(controller: controller),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text(entry.value), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('watchtower_forge_egg_image')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(
+              const ValueKey('watchtower_forge_egg_enchantment_painter'),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('watchtower_forge_blueprint_hologram')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('watchtower_forge_parts_pile_image')),
+            findsNothing,
+          );
+        }
+
+        // Dynamic live transition: Week 0 (Egg) -> Week 1..9 (Archmage) -> Week 10 (Overcharged Egg)
+        final liveController = await _createController(
+          language: 'en',
+          currentWeek: 0,
+          animationsEnabled: false,
+        );
+        addTearDown(liveController.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: MetalWizardSpyglassDialog(controller: liveController),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(expectedWeek0Captions['en']!), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_egg_image')),
+          findsOneWidget,
+        );
+
+        // Advance Week 0 -> Week 1: transitions cleanly to Robot Archmage assembly & early caption
+        liveController.currentWeek = 1;
+        liveController.notifyListeners();
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_egg_image')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(
+            const ValueKey('watchtower_forge_egg_enchantment_painter'),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_stage_1_image')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_blueprint_hologram')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_parts_pile_image')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Robot Archmage before Week 10'),
+          findsOneWidget,
+        );
+
+        // Advance to Week 9: powered Archmage on rig
+        liveController.currentWeek = 9;
+        liveController.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_archmage_powered_vfx')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_egg_image')),
+          findsNothing,
+        );
+
+        // Advance to Week 10: Titanium Robot Egg returns in Overcharged / Awakening state
+        liveController.currentWeek = 10;
+        liveController.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_egg_image')),
+          findsOneWidget,
+        );
+        final eggPaint = tester.widget<CustomPaint>(
+          find.byKey(
+            const ValueKey('watchtower_forge_egg_enchantment_painter'),
+          ),
+        );
+        expect(
+          (eggPaint.painter as EggEnchantmentPainter).isOvercharged,
+          isTrue,
+        );
+        expect(
+          find.textContaining('Baby Mage Robot prototype'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Tapping the Titanium Robot Egg triggers Tap-to-Resonate shockwave & visor flare while keeping Metal Wizard stationary and lens tap opening full screen',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          currentWeek: 0,
+          animationsEnabled: true,
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: MetalWizardSpyglassDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final wizardFinder = find.byKey(
+          const ValueKey('watchtower_forge_metal_wizard_image'),
+        );
+        final eggTapFinder = find.byKey(
+          const ValueKey('watchtower_forge_egg_tap_target'),
+        );
+        final eggPainterFinder = find.byKey(
+          const ValueKey('watchtower_forge_egg_enchantment_painter'),
+        );
+
+        expect(wizardFinder, findsOneWidget);
+        expect(eggTapFinder, findsOneWidget);
+        expect(eggPainterFinder, findsOneWidget);
+
+        final initialWizardRect = tester.getRect(wizardFinder);
+
+        EggEnchantmentPainter readPainter() =>
+            tester.widget<CustomPaint>(eggPainterFinder).painter
+                as EggEnchantmentPainter;
+
+        // Idle resonance before tapping
+        expect(readPainter().resonanceProgress, 0.0);
+        expect(readPainter().isOvercharged, isFalse);
+
+        // Tap directly on the Titanium Robot Egg -> triggers ~450ms shockwave & visor flare
+        await tester.tap(eggTapFinder);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        expect(readPainter().resonanceProgress, greaterThan(0.05));
+        expect(readPainter().resonanceProgress, lessThan(0.95));
+        // Still inside modal (did not navigate away when tapping egg directly)
+        expect(find.byType(FullScreenSpyglassView), findsNothing);
+
+        // Metal Wizard stays 100% static throughout animation & resonance burst
+        for (final step in const [
+          Duration(milliseconds: 150),
+          Duration(milliseconds: 250),
+          Duration(milliseconds: 600),
+        ]) {
+          await tester.pump(step);
+          final currentRect = tester.getRect(wizardFinder);
+          expect(currentRect.top, closeTo(initialWizardRect.top, 1e-6));
+          expect(currentRect.bottom, closeTo(initialWizardRect.bottom, 1e-6));
+          expect(currentRect.left, closeTo(initialWizardRect.left, 1e-6));
+          expect(currentRect.right, closeTo(initialWizardRect.right, 1e-6));
+        }
+
+        // Resonance finishes cleanly after 450ms
+        expect(readPainter().resonanceProgress, 0.0);
+
+        // Tapping the circular spyglass lens center opens FullScreenSpyglassView
+        await tester.tap(
+          find.byKey(const ValueKey('metal_wizard_spyglass_lens_tap')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(find.byType(FullScreenSpyglassView), findsOneWidget);
+
+        // Tapping the egg in full-screen view also triggers resonance cleanly
+        // (waits past double-tap disambiguation timeout from outer zoom detector)
+        final fullEggTapFinder = find.byKey(
+          const ValueKey('watchtower_forge_egg_tap_target'),
+        );
+        final fullEggPainterFinder = find.byKey(
+          const ValueKey('watchtower_forge_egg_enchantment_painter'),
+        );
+        expect(fullEggTapFinder, findsOneWidget);
+        await tester.tap(fullEggTapFinder);
+        await tester.pump(const Duration(milliseconds: 320));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 140));
+        final fullPainter = tester
+            .widget<CustomPaint>(fullEggPainterFinder)
+            .painter as EggEnchantmentPainter;
+        expect(fullPainter.resonanceProgress, greaterThan(0.05));
+        expect(fullPainter.resonanceProgress, lessThan(0.95));
+
+        // Switch to Week 10 (Overcharged) -> egg tremors while Metal Wizard stays stationary
+        controller.currentWeek = 10;
+        controller.notifyListeners();
+        await tester.pump();
+        final fullWizardRect = tester.getRect(wizardFinder);
+        for (final step in const [
+          Duration(milliseconds: 180),
+          Duration(milliseconds: 420),
+          Duration(milliseconds: 700),
+        ]) {
+          await tester.pump(step);
+          final r = tester.getRect(wizardFinder);
+          expect(r.top, closeTo(fullWizardRect.top, 1e-6));
+          expect(r.bottom, closeTo(fullWizardRect.bottom, 1e-6));
+          expect(r.left, closeTo(fullWizardRect.left, 1e-6));
+          expect(r.right, closeTo(fullWizardRect.right, 1e-6));
         }
 
         await tester.pumpWidget(const SizedBox.shrink());

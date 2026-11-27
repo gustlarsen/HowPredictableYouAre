@@ -185,6 +185,8 @@ class _FullScreenSpyglassViewState extends State<FullScreenSpyglassView>
                                       .isForgeCoolingDown(widget.controller),
                                   currentWeek: widget.controller.currentWeek,
                                   playSnapInOnMount: _playMetalWizardSnapIn,
+                                  onEggResonate: () =>
+                                      widget.controller.audio.playTapVibrate(),
                                 ),
                               )
                             : ListenableBuilder(

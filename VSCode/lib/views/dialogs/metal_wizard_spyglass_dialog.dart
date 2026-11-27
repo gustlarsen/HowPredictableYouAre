@@ -28,6 +28,13 @@ class MetalWizardSpyglassDialog extends StatefulWidget {
             'The subterranean forge cools with dying embers as the war across the kingdom reaches its climax...',
       );
     }
+    if (controller.currentWeek <= 0) {
+      return loc.t(
+        'observatory_wizard_caption_week0',
+        fallback:
+            'Deep beneath his lair, the Metal Wizard channels forbidden crimson energy into a mysterious titanium egg—forging a terrifying contingency before he even begins assembling his Archmage...',
+      );
+    }
     if (controller.currentWeek >= GameController.phase2StartWeek) {
       return loc.t(
         'observatory_wizard_caption_mid',
@@ -181,6 +188,8 @@ class _MetalWizardSpyglassDialogState extends State<MetalWizardSpyglassDialog> {
                                       isCoolingDown: coolingDown,
                                       currentWeek: controller.currentWeek,
                                       playSnapInOnMount: _playSnapInOnMount,
+                                      onEggResonate: () =>
+                                          controller.audio.playTapVibrate(),
                                     ),
                                   ),
                                 ),

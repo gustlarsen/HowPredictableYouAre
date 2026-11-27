@@ -72,6 +72,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/enemies/
+    - assets/images/enemies/baby_robot_mage_egg.png
     - assets/images/enemies/metal_wizard_idle.png
     - assets/images/enemies/metal_wizard_hit.png
     - assets/images/enemies/temple_master_idle.png
