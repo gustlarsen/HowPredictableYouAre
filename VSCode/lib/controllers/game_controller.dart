@@ -4193,6 +4193,33 @@ class GameController extends ChangeNotifier {
   int get unlockedStoryMemoriesCount =>
       StoryChapter.values.where(isStoryChapterUnlocked).length;
 
+  bool _pendingOpenWatchTower = false;
+  int _attachedWorldMapCount = 0;
+
+  bool get shouldOpenWatchTower => _pendingOpenWatchTower;
+  bool get isWorldMapAttached => _attachedWorldMapCount > 0;
+
+  void attachWorldMap() {
+    _attachedWorldMapCount++;
+  }
+
+  void detachWorldMap() {
+    if (_attachedWorldMapCount > 0) {
+      _attachedWorldMapCount--;
+    }
+  }
+
+  void requestOpenWatchTower() {
+    _pendingOpenWatchTower = true;
+    notifyListeners();
+  }
+
+  bool consumePendingOpenWatchTower() {
+    if (!_pendingOpenWatchTower) return false;
+    _pendingOpenWatchTower = false;
+    return true;
+  }
+
   void completeIntroStory({
     bool grantTutorialOrbs = false,
     int fireOrbsBonus = 1,

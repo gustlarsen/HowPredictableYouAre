@@ -55,6 +55,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _isWeek0ScreamDialogOpen = false;
   bool _isWeek10ArchmageDialogOpen = false;
   bool _isOfflineOffertoryDialogOpen = false;
+  bool _isOpeningPendingWatchTower = false;
   bool _isLaunchingTempleSiege = false;
   bool _metricsRebuildScheduled = false;
 
@@ -73,6 +74,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         _hasCheckedForUpdate = true;
         unawaited(controller.checkForUpdate());
       }
+      _checkPendingOpenWatchTower(context, controller);
       _checkOfflineOffertoryDialog(context, controller);
     });
   }
@@ -82,7 +84,9 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     super.didChangeDependencies();
     final nextController = context.read<GameController>();
     if (_controller != nextController) {
+      _controller?.detachWorldMap();
       _controller = nextController;
+      nextController.attachWorldMap();
       unawaited(nextController.audio.playTrack(BgmTrack.worldMap));
     }
     _syncPulseAnimation(nextController.animationsEnabled);
@@ -104,6 +108,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _controller?.detachWorldMap();
     _controller?.cancelPendingTimers();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -350,18 +355,38 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
+  void _checkPendingOpenWatchTower(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldOpenWatchTower || _isOpeningPendingWatchTower) {
+      return;
+    }
+    _isOpeningPendingWatchTower = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isOpeningPendingWatchTower = false;
+      if (!mounted || !context.mounted) return;
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) return;
+      if (!controller.consumePendingOpenWatchTower()) return;
+      _openObservatory(context, controller);
+    });
+  }
+
   void _checkOfflineOffertoryDialog(
     BuildContext context,
     GameController controller,
   ) {
     if (!controller.shouldShowOfflineOffertoryDialog ||
         _isOfflineOffertoryDialogOpen ||
+        _isOpeningPendingWatchTower ||
         _isLaunchingTempleSiege ||
         _isWeek0ScreamDialogOpen ||
         _isWeek10ArchmageDialogOpen ||
         _isInventoryDialogOpen ||
         controller.isTempleSiegeActive ||
         controller.currentWeek > GameController.maxCampaignWeeks ||
+        controller.shouldOpenWatchTower ||
         controller.shouldShowWeek0ScreamWarning ||
         controller.shouldShowWeek10ArchmageWarning ||
         controller.pendingStoryChapter != null) {
@@ -452,6 +477,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     _checkTempleSiegeAutoLaunch(context, controller);
     _checkQaBonusSnackBar(context, controller);
     _checkUpdateSnackBar(context, controller);
+    _checkPendingOpenWatchTower(context, controller);
     if (!controller.isTempleSiegeActive &&
         controller.currentWeek <= GameController.maxCampaignWeeks) {
       _checkWeek0ScreamWarning(context, controller);

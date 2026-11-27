@@ -167,7 +167,7 @@ void main() {
 
       expect(
         StoryChapter.intro.assetPath,
-        'assets/images/story/robot_mage_cliff.webp',
+        'assets/images/story/intro_3.jpeg',
       );
     });
 

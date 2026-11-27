@@ -829,7 +829,7 @@ void main() {
     expect(controller.unlockedPredictability, isFalse);
   });
 
-  testWidgets('IntroStoryScreen 4-card carousel opens automatically on first launch, advances cards, persists has_seen_story_intro, and transitions to WorldMapScreen', (WidgetTester tester) async {
+  testWidgets('IntroStoryScreen 5-card carousel opens automatically on first launch, triggers tutorial after slide 2, persists has_seen_story_intro, and transitions to WorldMapScreen', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'animationsEnabled': false,
     });
@@ -855,14 +855,21 @@ void main() {
     // IntroStoryScreen should open automatically before WorldMapScreen
     expect(find.byKey(const ValueKey('intro_story_screen')), findsOneWidget);
     expect(find.text('Chapter I'), findsOneWidget);
-    expect(find.text('The Metal Automaton'), findsOneWidget);
-    expect(find.text('1 / 4'), findsOneWidget);
+    expect(find.text('The Royal Garden'), findsOneWidget);
+    expect(find.text('1 / 5'), findsOneWidget);
     expect(storage.hasSeenStoryIntro, isFalse);
 
     final nextBtnFinder = find.byKey(const ValueKey('intro_action_button'));
     expect(nextBtnFinder, findsOneWidget);
 
-    // Tap Next on Card 1 -> enters the playable Royal Garden Tutorial Battle
+    // Tap Next on Card 1 -> advances to Card 2
+    await tester.tap(nextBtnFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 5'), findsOneWidget);
+    expect(find.text('Chapter II'), findsOneWidget);
+    expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
+
+    // Tap Next on Card 2 -> enters the playable Royal Garden Tutorial Battle
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
     expect(
@@ -903,27 +910,28 @@ void main() {
       }
     }
     await tester.pumpAndSettle();
-    expect(find.text('2 / 4'), findsOneWidget);
+    expect(find.text('3 / 5'), findsOneWidget);
 
-    // Swipe left on closing PageView -> moves forward to Card 3
+    // Swipe left on closing PageView -> moves forward to Card 4
     await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(-300, 0));
     await tester.pumpAndSettle();
-    expect(find.text('3 / 4'), findsOneWidget);
+    expect(find.text('4 / 5'), findsOneWidget);
 
-    // Swipe right on closing PageView -> rewinds to Card 2
+    // Swipe right on closing PageView -> rewinds to Card 3
     await tester.drag(find.byKey(const ValueKey('intro_story_page_view')), const Offset(300, 0));
     await tester.pumpAndSettle();
-    expect(find.text('2 / 4'), findsOneWidget);
+    expect(find.text('3 / 5'), findsOneWidget);
 
-    // Tap Next through cards 3, 4
+    // Tap Next through cards 4, 5
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text('3 / 4'), findsOneWidget);
+    expect(find.text('4 / 5'), findsOneWidget);
 
     await tester.tap(nextBtnFinder);
     await tester.pumpAndSettle();
-    expect(find.text('4 / 4'), findsOneWidget);
+    expect(find.text('5 / 5'), findsOneWidget);
     expect(find.text('Begin Quest'), findsOneWidget);
+    expect(find.byKey(const ValueKey('intro_go_to_watchtower_button')), findsOneWidget);
 
     // Final tap on Begin Quest persists hasSeenIntro, grants collected orbs, and enters WorldMapScreen
     await tester.tap(nextBtnFinder);
@@ -1108,7 +1116,7 @@ void main() {
     expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
     expect(find.byKey(const ValueKey('story_gallery_item_intro_1')), findsNothing);
     expect(find.byKey(const ValueKey('story_gallery_badge_intro')), findsOneWidget);
-    expect(find.text('4 Scenes'), findsOneWidget);
+    expect(find.text('5 Scenes'), findsOneWidget);
 
     // Verify Story Memories layout: chapter name is above thumbnail and read button,
     // and thumbnail and read button are in the same horizontal line

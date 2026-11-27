@@ -5,12 +5,15 @@ import '../../controllers/game_controller.dart';
 import '../../controllers/royal_garden_tutorial_controller.dart';
 import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
+import '../dialogs/observatory_dialog.dart';
 import '../widgets/royal_garden_tutorial_battle.dart';
+import '../widgets/watch_tower_icon.dart';
 import 'world_map_screen.dart';
 
-/// Interactive Prologue Intro & Playable Royal Garden Tutorial Battle shown on
-/// first launch (`hasSeenIntro == false`) and replayable anytime in isolated
-/// sandbox mode from Royal Castle Library `#1` or Settings.
+/// Interactive 5-Scene Prologue Story & Playable Royal Garden Tutorial Battle
+/// shown on first launch (`hasSeenIntro == false`) and replayable anytime in
+/// isolated sandbox mode from Royal Castle Library `#1`, Watch Tower Story Log,
+/// or Settings.
 class IntroStoryScreen extends StatefulWidget {
   final bool isReplay;
   final int initialPage;
@@ -51,6 +54,8 @@ class IntroStoryScreen extends StatefulWidget {
 
 class _IntroStoryScreenState extends State<IntroStoryScreen> {
   static const Duration _typewriterCharInterval = Duration(milliseconds: 25);
+  static const int _tutorialTriggerSlideIndex = 1; // Slide 2 (intro_2)
+  static const int _postTutorialResumeSlideIndex = 2; // Slide 3 (intro_3)
 
   late PageController _pageController;
   late int _currentPage;
@@ -60,6 +65,7 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
   bool _hasCompleted = false;
 
   bool _isInTutorialBattle = false;
+  bool _hasPassedTutorialGate = false;
   bool _hasCompletedTutorialBattle = false;
   int _earnedFireOrbs = 0;
   int _earnedWaterOrbs = 0;
@@ -69,13 +75,13 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
   IntroStoryCardData get _activeCard => _cards[_currentPage];
   bool get _isLastCard => _currentPage >= _cards.length - 1;
   bool get _shouldLaunchTutorialAfterCurrentCard =>
-      _currentPage == 0 && !_hasCompletedTutorialBattle;
+      _currentPage == _tutorialTriggerSlideIndex && !_hasPassedTutorialGate;
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage.clamp(0, _cards.length - 1);
-    _hasCompletedTutorialBattle = _currentPage > 0;
+    _hasPassedTutorialGate = _currentPage > _tutorialTriggerSlideIndex;
     _pageController = PageController(initialPage: _currentPage);
   }
 
@@ -157,6 +163,16 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     });
   }
 
+  void _resumeAtPostTutorialSlide() {
+    _pageController.dispose();
+    _pageController = PageController(initialPage: _postTutorialResumeSlideIndex);
+    setState(() {
+      _isInTutorialBattle = false;
+      _currentPage = _postTutorialResumeSlideIndex;
+      _startTypewriterForPage(_postTutorialResumeSlideIndex);
+    });
+  }
+
   void _handleTutorialBattleCompleted({
     required int fireOrbs,
     required int waterOrbs,
@@ -167,21 +183,27 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     _earnedWaterOrbs = waterOrbs;
     _earnedWoodOrbs = woodOrbs;
     _hasCompletedTutorialBattle = true;
+    _hasPassedTutorialGate = true;
+    _resumeAtPostTutorialSlide();
+  }
 
-    const closingStartIndex = 1;
-    _pageController.dispose();
-    _pageController = PageController(initialPage: closingStartIndex);
-    setState(() {
-      _isInTutorialBattle = false;
-      _currentPage = closingStartIndex;
-      _startTypewriterForPage(closingStartIndex);
-    });
+  void _handleTutorialBattleSkipped() {
+    if (!mounted) return;
+    _earnedFireOrbs = 0;
+    _earnedWaterOrbs = 0;
+    _earnedWoodOrbs = 0;
+    _hasCompletedTutorialBattle = false;
+    _hasPassedTutorialGate = true;
+    _resumeAtPostTutorialSlide();
   }
 
   void _goToPage(int nextPage) {
     final controller = _controller;
     if (controller == null) return;
-    final clamped = nextPage.clamp(0, _cards.length - 1);
+    final maxAllowedPage = _hasPassedTutorialGate
+        ? _cards.length - 1
+        : _tutorialTriggerSlideIndex;
+    final clamped = nextPage.clamp(0, maxAllowedPage);
     if (clamped == _currentPage) return;
 
     if (controller.animationsEnabled && _pageController.hasClients) {
@@ -215,6 +237,58 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
       return;
     }
 
+    controller.completeIntroStory(
+      grantTutorialOrbs: _hasCompletedTutorialBattle,
+      fireOrbsBonus: _earnedFireOrbs,
+      waterOrbsBonus: _earnedWaterOrbs,
+      woodOrbsBonus: _earnedWoodOrbs,
+    );
+    if (widget.onFinished != null) {
+      widget.onFinished!();
+      return;
+    }
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const WorldMapScreen()),
+      );
+    }
+  }
+
+  void _handleGoToWatchTowerTap(GameController controller) {
+    if (_hasCompleted) return;
+    _hasCompleted = true;
+    _typewriterTimer?.cancel();
+    controller.audio.playTapVibrate();
+
+    if (widget.isReplay) {
+      if (!controller.hasSeenIntro) {
+        controller.completeIntroStory();
+      }
+      final navigator = Navigator.of(context);
+      if (widget.onFinished != null) {
+        widget.onFinished!();
+      } else if (navigator.canPop()) {
+        navigator.popUntil((route) => route.isFirst);
+      }
+
+      if (controller.isWorldMapAttached) {
+        controller.requestOpenWatchTower();
+      } else {
+        final hostContext = navigator.context;
+        if (hostContext.mounted) {
+          showDialog<void>(
+            context: hostContext,
+            builder: (_) => WatchTowerDialog(controller: controller),
+          );
+        }
+      }
+      return;
+    }
+
+    controller.requestOpenWatchTower();
     controller.completeIntroStory(
       grantTutorialOrbs: _hasCompletedTutorialBattle,
       fireOrbsBonus: _earnedFireOrbs,
@@ -279,7 +353,7 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
         gameController: controller,
         tutorialController: widget.tutorialController,
         isReplay: widget.isReplay,
-        onSkip: _finishIntro,
+        onSkip: _handleTutorialBattleSkipped,
         onBattleCompleted: _handleTutorialBattleCompleted,
       );
     }
@@ -289,6 +363,10 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
     final beginQuestLabel = loc.t(
       'story_begin_quest',
       fallback: 'Begin Quest',
+    );
+    final goToWatchTowerLabel = loc.t(
+      'story_go_to_watchtower_btn',
+      fallback: 'Go to Watch Tower',
     );
 
     final bgColors = isDark
@@ -397,10 +475,9 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
                       child: PageView.builder(
                         key: const ValueKey('intro_story_page_view'),
                         controller: _pageController,
-                        physics: _shouldLaunchTutorialAfterCurrentCard
-                            ? const NeverScrollableScrollPhysics()
-                            : null,
-                        itemCount: _cards.length,
+                        itemCount: _hasPassedTutorialGate
+                            ? _cards.length
+                            : _tutorialTriggerSlideIndex + 1,
                         onPageChanged: (index) {
                           setState(() {
                             _currentPage = index;
@@ -426,9 +503,9 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    // Bottom Row: 4 Animated Page Indicator Dots + Golden RPG Action Button
+                    // Bottom Row: 5 Animated Page Indicator Dots + Golden RPG Action Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -471,43 +548,109 @@ class _IntroStoryScreenState extends State<IntroStoryScreen> {
                             );
                           }),
                         ),
-                        ElevatedButton.icon(
-                          key: const ValueKey('intro_action_button'),
-                          onPressed: () => _handleActionButtonTap(controller),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF5C22B),
-                            foregroundColor: const Color(0xFF1E1B16),
-                            elevation: 4,
-                            shadowColor: Colors.amber.withValues(alpha: 0.45),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: const BorderSide(
-                                color: Color(0xFFC8961E),
-                                width: 1.4,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: ElevatedButton.icon(
+                            key: const ValueKey('intro_action_button'),
+                            onPressed: () => _handleActionButtonTap(controller),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF5C22B),
+                              foregroundColor: const Color(0xFF1E1B16),
+                              elevation: 4,
+                              shadowColor: Colors.amber.withValues(alpha: 0.45),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: const BorderSide(
+                                  color: Color(0xFFC8961E),
+                                  width: 1.4,
+                                ),
                               ),
                             ),
-                          ),
-                          icon: Icon(
-                            _isLastCard
-                                ? Icons.shield_outlined
-                                : Icons.arrow_forward_rounded,
-                            size: 19,
-                          ),
-                          label: Text(
-                            _isLastCard ? beginQuestLabel : nextLabel,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              letterSpacing: 0.2,
+                            icon: Icon(
+                              _isLastCard
+                                  ? Icons.shield_outlined
+                                  : Icons.arrow_forward_rounded,
+                              size: 19,
+                            ),
+                            label: Text(
+                              _isLastCard ? beginQuestLabel : nextLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
+                    if (_isLastCard) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: TextButton(
+                          key: const ValueKey('intro_go_to_watchtower_button'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: isDark
+                                ? const Color(0xFFFFD54F)
+                                : const Color(0xFF7A4E00),
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => _handleGoToWatchTowerTap(controller),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const WatchTowerIcon(size: 16),
+                              const SizedBox(width: 7),
+                              Flexible(
+                                child: Text(
+                                  goToWatchTowerLabel,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? const Color(0xFFFFD54F)
+                                        : const Color(0xFF7A4E00),
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: (isDark
+                                            ? const Color(0xFFFFD54F)
+                                            : const Color(0xFF7A4E00))
+                                        .withValues(alpha: 0.75),
+                                    decorationThickness: 1.3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '→',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? const Color(0xFFFFD54F)
+                                      : const Color(0xFF7A4E00),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -588,14 +731,14 @@ class _IntroStoryCardPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Top Artwork Frame (4:3, rounded RPG frame, golden-amber border, no cropping)
+                  // Top Artwork Frame (1024x571 widescreen, rounded RPG frame, golden-amber border, no cropping)
                   ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxHeight: (constraints.maxHeight * 0.54).clamp(180.0, 420.0),
+                      maxHeight: (constraints.maxHeight * 0.52).clamp(160.0, 420.0),
                     ),
                     child: Center(
                       child: AspectRatio(
-                        aspectRatio: 4.0 / 3.0,
+                        aspectRatio: 1024.0 / 571.0,
                         child: Container(
                           key: ValueKey('intro_artwork_frame_${card.id}'),
                           decoration: BoxDecoration(

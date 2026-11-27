@@ -10,9 +10,12 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
 import 'package:how_predictable/views/dialogs/royal_castle_dialog.dart';
+import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
 import 'package:how_predictable/views/screens/intro_story_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
+import 'package:how_predictable/views/widgets/watch_tower_icon.dart';
 
 class _FakePlayGamesClient implements PlayGamesClient {
   String? savedPayload;
@@ -80,12 +83,54 @@ Future<({
   );
 }
 
+Future<void> _completeRoyalGardenTutorial(WidgetTester tester) async {
+  // Act 1: Guided Turns 1-3 (Fire -> Water -> Wood)
+  await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
+  await tester.pump();
+
+  // Act 2: Play until all 3 mages fall
+  for (int i = 0; i < 60; i++) {
+    if (find.byKey(const ValueKey('royal_garden_tutorial_battle')).evaluate().isEmpty) {
+      break;
+    }
+    if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
+      await tester.pump();
+      break;
+    }
+    for (final key in const [
+      'tutorial_move_btn_fire',
+      'tutorial_move_btn_water',
+      'tutorial_move_btn_wood',
+    ]) {
+      final finder = find.byKey(ValueKey(key));
+      if (finder.evaluate().isEmpty) continue;
+      final inkWell = tester.widget<InkWell>(finder);
+      if (inkWell.onTap != null) {
+        await tester.tap(finder);
+        await tester.pump();
+        break;
+      }
+    }
+  }
+
+  if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
+    await tester.pump();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('IntroStoryScreen Assets & Localization', () {
-    test('All 4 story intro JPEG assets exist on disk and are non-empty', () {
-      for (int i = 1; i <= 4; i++) {
+    test('All 5 story intro JPEG assets exist on disk, are non-empty, legacy intro_comic is removed, and Prologue cover uses intro_3', () {
+      expect(IntroStoryCardData.cards.length, 5);
+      for (int i = 1; i <= 5; i++) {
         final file = File('assets/images/story/intro_$i.jpeg');
         expect(
           file.existsSync(),
@@ -97,38 +142,67 @@ void main() {
           greaterThan(10000),
           reason: 'Asset intro_$i.jpeg should be non-empty',
         );
+        final bytes = file.readAsBytesSync();
+        expect(bytes.sublist(0, 2), [0xFF, 0xD8], reason: 'intro_$i.jpeg must be valid JPEG');
+        expect(IntroStoryCardData.cards[i - 1].assetPath, 'assets/images/story/intro_$i.jpeg');
       }
+
+      expect(
+        File('assets/images/story/intro_comic.jpeg').existsSync(),
+        isFalse,
+        reason: 'Obsolete intro_comic.jpeg should be deleted',
+      );
+
+      expect(StoryChapter.intro.assetPath, 'assets/images/story/intro_3.jpeg');
     });
 
-    test('All 4 cards, titles, and buttons localize cleanly in en, pt, es, and de', () async {
+    test('All 5 cards, titles, Watch Tower link, and badges localize cleanly in en, pt, es, and de', () async {
       final loc = LocalizationService();
       await loc.load();
 
       final expectedCaptions = <String, List<String>>{
         'en': [
-          'A Wizard obsessed with Metal studied human behavior and forged an automaton capable of predicting patterns and conjuring Fire, Water, and Wood.',
-          "In the royal garden, the automaton defeated the three guardian mages and kidnapped the Princess to the Metal Wizard's dark fortress.",
-          'With no other hope, the King turned to the Sacred Temple and summoned the only young Cleric capable of channeling all three elements.',
-          'Armed with your blessed Staff and orb satchel, you march toward the lair—defeat the automaton before time runs out.',
+          "In the peaceful royal garden, the Princess gathered roses under the watchful protection of the realm's three guardian mages.",
+          'Suddenly, a ruthless Robot Mage forged from dark metal ambushed the garden, unleashing arcane lightning against the guardians!',
+          'With the three guardian mages fallen in battle, the Robot Mage seized the helpless Princess and carried her toward the dark fortress.',
+          'Desperate to save his daughter, the King hurried to the Sacred Temple and pleaded for aid, calling upon a young Cleric.',
+          "Armed with your blessed Staff, your adventure begins! Before marching into battle, check the Watch Tower to spy on the Princess's cell and see what the Metal Wizard is planning.",
         ],
         'pt': [
-          'Um Mago obcecado pelo elemento Metal estudou o comportamento humano e forjou um autômato capaz de prever padrões e conjurar Fogo, Água e Madeira.',
-          'No jardim real, o autômato derrotou os três magos guardiões e raptou a Princesa para a fortaleza sombria do Mago de Metal.',
-          'Sem saída, o Rei recorreu ao Templo Sagrado e convocou o único jovem Clérigo capaz de canalizar os três elementos.',
-          'Com seu Cajado abençoado e sua mochila de orbes, você parte rumo ao covil — vença o autômato antes que o tempo acabe.',
+          'No pacífico jardim real, a Princesa colhia rosas sob a proteção vigilante dos três magos guardiões do reino.',
+          'De repente, um impiedoso Robô Mago forjado em metal sombrio emboscou o jardim, lançando raios arcanos contra os guardiões!',
+          'Com os três magos guardiões derrotados em batalha, o Robô Mago capturou a Princesa indefesa e a levou rumo à fortaleza sombria.',
+          'Desesperado para salvar sua filha, o Rei correu ao Templo Sagrado e pediu ajuda, convocando um jovem Clérigo.',
+          'Empunhando seu Cajado abençoado, sua aventura começa! Antes de partir para a batalha, dê uma olhada na Torre de Vigia para ver a cela da Princesa e o que o Mago de Metal está planejando.',
         ],
         'es': [
-          'Un Mago obsesionado con el Metal estudió el comportamiento humano y forjó un autómata capaz de predecir patrones y conjurar Fuego, Agua y Madera.',
-          'En el jardín real, el autómata derrotó a los tres magos guardianes y secuestró a la Princesa hacia la oscura fortaleza del Mago de Metal.',
-          'Sin otra salida, el Rey acudió al Templo Sagrado y convocó al único joven Clérigo capaz de canalizar los tres elementos.',
-          'Con tu Báculo bendito y tu mochila de orbes, marchas hacia la guarida: derrota al autómata antes de que se acabe el tiempo.',
+          'En el pacífico jardín real, la Princesa recogía rosas bajo la vigilante protección de los tres magos guardianes del reino.',
+          'De repente, un despiadado Robot Mago forjado en metal oscuro emboscó el jardín, ¡desatando rayos arcanos contra los guardianes!',
+          'Con los tres magos guardianes caídos en batalla, el Robot Mago capturó a la Princesa indefensa y la llevó hacia la fortaleza oscura.',
+          'Desesperado por salvar a su hija, el Rey acudió al Templo Sagrado y suplicó ayuda, convocando a un joven Clérigo.',
+          'Empuñando tu Báculo bendito, ¡comienza tu aventura! Antes de ir a la batalla, echa un vistazo a la Torre de Vigilancia para ver la celda de la Princesa y lo que planea el Mago de Metal.',
         ],
         'de': [
-          'Ein vom Metall besessener Zauberer studierte das menschliche Verhalten und schmiedete einen Automaten, der Muster vorhersagt und Feuer, Wasser sowie Holz beschwört.',
-          'Im königlichen Garten besiegte der Automat die drei Wächter-Magier und entführte die Prinzessin in die dunkle Festung des Metall-Zauberers.',
-          'Ohne anderen Ausweg wandte sich der König an den Heiligen Tempel und rief den einzigen jungen Kleriker, der alle drei Elemente meistert.',
-          'Mit deinem gesegneten Stab und deinem Orb-Rucksack ziehst du zur Festung – besiege den Automaten, bevor die Zeit abläuft.',
+          'Im friedlichen königlichen Garten pflückte die Prinzessin Rosen unter dem wachsamen Schutz der drei Wächter-Magier.',
+          'Plötzlich überfiel ein gnadenloser Roboter-Magier aus dunklem Metall den Garten und entfesselte arkane Blitze gegen die Wächter!',
+          'Nachdem die drei Wächter-Magier im Kampf gefallen waren, ergriff der Roboter-Magier die wehrlose Prinzessin und verschleppte sie.',
+          'Verzweifelt, seine Tochter zu retten, eilte der König zum Heiligen Tempel, bat um Hilfe und rief einen jungen Kleriker.',
+          'Mit deinem gesegneten Stab beginnt dein Abenteuer! Wirf vorher einen Blick in den Wachturm, um die Zelle der Prinzessin zu sehen und zu erfahren, was der Metall-Zauberer plant.',
         ],
+      };
+
+      final expectedWatchTowerLink = <String, String>{
+        'en': 'Go to Watch Tower',
+        'pt': 'Ir para a Torre de Vigia',
+        'es': 'Ir a la Torre de Vigilancia',
+        'de': 'Zum Wachturm gehen',
+      };
+
+      final expectedPagesBadge = <String, String>{
+        'en': '5 Scenes',
+        'pt': '5 Cenas',
+        'es': '5 Escenas',
+        'de': '5 Szenen',
       };
 
       for (final lang in ['en', 'pt', 'es', 'de']) {
@@ -139,9 +213,10 @@ void main() {
         expect(loc.t('story_replay_intro'), isNot('story_replay_intro'));
         expect(loc.t('story_intro_title'), isNot('story_intro_title'));
         expect(loc.t('story_intro_summary'), isNot('story_intro_summary'));
+        expect(loc.t('story_intro_pages_badge'), expectedPagesBadge[lang]);
         expect(
-          loc.t('story_intro_pages_badge'),
-          isNot('story_intro_pages_badge'),
+          loc.t('story_go_to_watchtower_btn'),
+          expectedWatchTowerLink[lang],
         );
 
         for (int i = 0; i < IntroStoryCardData.cards.length; i++) {
@@ -156,7 +231,7 @@ void main() {
 
   group('IntroStoryScreen Onboarding & Navigation Tests', () {
     testWidgets(
-      'First launch (hasSeenIntro == false) opens IntroStoryScreen, animates typewriter + tap-to-advance across all 4 cards, persists hasSeenIntro, syncs Cloud Save, and enters WorldMapScreen',
+      'First launch opens 5-slide IntroStoryScreen, triggers playable tutorial after Slide 2, resumes at Slides 3-5, shows Watch Tower link only on Slide 5, persists hasSeenIntro, syncs Cloud Save, and enters WorldMapScreen',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -185,17 +260,21 @@ void main() {
         );
         await tester.pump();
 
-        // IntroStoryScreen is open before WorldMapScreen
+        // Slide 1 (intro_1)
         expect(find.byType(IntroStoryScreen), findsOneWidget);
         expect(find.byType(WorldMapScreen), findsNothing);
-        expect(find.text('1 / 4'), findsOneWidget);
+        expect(find.text('1 / 5'), findsOneWidget);
         expect(find.text('Chapter I'), findsOneWidget);
-        expect(find.text('The Metal Automaton'), findsOneWidget);
+        expect(find.text('The Royal Garden'), findsOneWidget);
         expect(find.text('Skip'), findsOneWidget);
         expect(find.text('Next'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+          findsNothing,
+        );
 
-        // Verify 4 page indicator dots are rendered
-        for (int i = 0; i < 4; i++) {
+        // Verify 5 page indicator dots are rendered
+        for (int i = 0; i < 5; i++) {
           expect(find.byKey(ValueKey('intro_page_dot_$i')), findsOneWidget);
         }
 
@@ -216,72 +295,67 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('intro_dialogue_box_0')));
         await tester.pump();
         expect(tester.widget<Text>(caption0Finder).data, fullCard1Text);
-        expect(find.text('1 / 4'), findsOneWidget);
+        expect(find.text('1 / 5'), findsOneWidget);
 
-        // Second tap on dialogue box enters the playable Royal Garden Tutorial Battle
+        // Second tap on dialogue box advances to Slide 2 (intro_2)
         await tester.tap(find.byKey(const ValueKey('intro_dialogue_box_0')));
         await tester.pump();
-        expect(find.byKey(const ValueKey('royal_garden_tutorial_battle')), findsOneWidget);
-
-        // Act 1: Guided Turns 1-3 (Fire -> Water -> Wood)
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
-        await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
-        await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
-        await tester.pump();
-
-        // Act 2: Play until all 3 mages fall (repeating a pattern so Markov Matrix counters reliably)
-        for (int i = 0; i < 60; i++) {
-          if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
-            break;
-          }
-          for (final key in const [
-            'tutorial_move_btn_fire',
-            'tutorial_move_btn_water',
-            'tutorial_move_btn_wood',
-          ]) {
-            final finder = find.byKey(ValueKey(key));
-            if (finder.evaluate().isEmpty) continue;
-            final inkWell = tester.widget<InkWell>(finder);
-            if (inkWell.onTap != null) {
-              await tester.tap(finder);
-              await tester.pump();
-              break;
-            }
-          }
-        }
-
-        // Continue from completed tutorial battle into closing Card 2
-        if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
-          await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
-          await tester.pump();
-        } else {
-          await tester.pump(const Duration(milliseconds: 1600));
-        }
-
-        expect(find.text('2 / 4'), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('2 / 5'), findsOneWidget);
         expect(find.text('Chapter II'), findsOneWidget);
         expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+          findsNothing,
+        );
 
-        // Tap Next button -> advances to Card 3
+        // Advancing past Slide 2 launches the playable Royal Garden Tutorial Battle
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
-        expect(find.text('3 / 4'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('royal_garden_tutorial_battle')),
+          findsOneWidget,
+        );
+
+        await _completeRoyalGardenTutorial(tester);
+        await tester.pump(const Duration(milliseconds: 1600));
+
+        // Resumes seamlessly at Slide 3 (intro_3)
+        expect(find.text('3 / 5'), findsOneWidget);
         expect(find.text('Chapter III'), findsOneWidget);
-        expect(find.text("The King's Summons"), findsOneWidget);
+        expect(find.text('The Princess Captured'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+          findsNothing,
+        );
 
-        // Tap Next button -> advances to Card 4 where action button becomes Begin Quest
+        // Tap Next -> Slide 4 (intro_4)
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
-        expect(find.text('4 / 4'), findsOneWidget);
+        expect(find.text('4 / 5'), findsOneWidget);
         expect(find.text('Chapter IV'), findsOneWidget);
+        expect(find.text("The King's Summons"), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+          findsNothing,
+        );
+
+        // Tap Next -> Slide 5 (intro_5) where Begin Quest + Go to Watch Tower appear
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('5 / 5'), findsOneWidget);
+        expect(find.text('Chapter V'), findsOneWidget);
         expect(find.text('The Quest Begins'), findsOneWidget);
         expect(find.text('Begin Quest'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+          findsOneWidget,
+        );
+        expect(find.text('Go to Watch Tower'), findsOneWidget);
 
-        // Tap Begin Quest -> persists hasSeenIntro = true, grants 3 starting orbs, syncs Cloud Save, enters WorldMapScreen at Week 0
+        // Tap Begin Quest -> persists hasSeenIntro = true, grants orbs, syncs Cloud Save, enters WorldMapScreen at Week 0
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
@@ -298,12 +372,87 @@ void main() {
         expect(storage.woodOrbs, controller.woodOrbs);
         expect(find.byType(IntroStoryScreen), findsNothing);
         expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(find.byType(WatchTowerDialog), findsNothing);
 
         final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
         expect(cloud.hasSeenStoryIntro, isTrue);
         expect(cloud.fireOrbs, controller.fireOrbs);
         expect(cloud.waterOrbs, controller.waterOrbs);
         expect(cloud.woodOrbs, controller.woodOrbs);
+      },
+    );
+
+    testWidgets(
+      'Tapping "Go to Watch Tower" on Slide 5 on first launch persists hasSeenIntro, syncs Cloud Save, navigates to WorldMapScreen, and immediately opens WatchTowerDialog',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createTestHarness(
+          prefs: {'animationsEnabled': false},
+          signInPlayGames: true,
+        );
+        final controller = harness.controller;
+        final storage = harness.storage;
+        final fakeClient = harness.playGamesClient;
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Slide 1 -> Slide 2 -> Tutorial -> Skip tutorial -> Slide 3 -> Slide 4 -> Slide 5
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('royal_garden_tutorial_battle')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('intro_skip_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('3 / 5'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('5 / 5'), findsOneWidget);
+
+        final watchTowerLink = find.byKey(
+          const ValueKey('intro_go_to_watchtower_button'),
+        );
+        expect(watchTowerLink, findsOneWidget);
+        expect(
+          find.descendant(
+            of: watchTowerLink,
+            matching: find.byType(WatchTowerIcon),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.getSize(watchTowerLink).height, greaterThanOrEqualTo(40));
+
+        await tester.tap(watchTowerLink);
+        await tester.pumpAndSettle();
+
+        expect(controller.hasSeenIntro, isTrue);
+        expect(storage.hasSeenIntro, isTrue);
+        expect(find.byType(IntroStoryScreen), findsNothing);
+        expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(find.byType(WatchTowerDialog), findsOneWidget);
+
+        final cloud = CloudSaveData.tryParse(fakeClient.savedPayload)!;
+        expect(cloud.hasSeenStoryIntro, isTrue);
       },
     );
 
@@ -381,7 +530,7 @@ void main() {
 
   group('IntroStoryScreen Dark & Light Theme and Royal Library Integration', () {
     testWidgets(
-      'Dark Mode and Light Mode render IntroStoryScreen cleanly across compact and standard viewports without overflow',
+      'Dark Mode and Light Mode render all 5 IntroStoryScreen slides (including Slide 5 Watch Tower link) cleanly across compact and standard viewports without overflow',
       (WidgetTester tester) async {
         for (final isDark in [true, false]) {
           for (final viewport in [
@@ -399,37 +548,55 @@ void main() {
             );
             final controller = harness.controller;
 
-            await tester.pumpWidget(
-              ChangeNotifierProvider.value(
-                value: controller,
-                child: const HowPredictableApp(),
-              ),
-            );
-            await tester.pumpAndSettle();
+            for (int slideIndex = 0; slideIndex < 5; slideIndex++) {
+              await tester.pumpWidget(
+                ChangeNotifierProvider.value(
+                  value: controller,
+                  child: HowPredictableApp(
+                    home: IntroStoryScreen(
+                      key: ValueKey('theme_${isDark}_${viewport.width}_$slideIndex'),
+                      initialPage: slideIndex,
+                      isReplay: true,
+                    ),
+                  ),
+                ),
+              );
+              await tester.pumpAndSettle();
 
-            expect(tester.takeException(), isNull);
-            expect(find.byType(IntroStoryScreen), findsOneWidget);
+              expect(tester.takeException(), isNull);
+              expect(find.byType(IntroStoryScreen), findsOneWidget);
+              expect(find.text('${slideIndex + 1} / 5'), findsOneWidget);
+              expect(
+                find.byKey(ValueKey('intro_artwork_image_intro_${slideIndex + 1}')),
+                findsOneWidget,
+              );
 
-            // Verify Light Mode parchment story box & dark ink colors
-            final dialogueContainer = tester.widget<Container>(
-              find.descendant(
-                of: find.byKey(const ValueKey('intro_dialogue_box_0')),
-                matching: find.byType(Container),
-              ).first,
-            );
-            final decoration = dialogueContainer.decoration! as BoxDecoration;
-            expect(
-              decoration.color,
-              isDark ? const Color(0xFF161923) : const Color(0xFFF5EFE2),
-            );
+              final dialogueContainer = tester.widget<Container>(
+                find.descendant(
+                  of: find.byKey(ValueKey('intro_dialogue_box_$slideIndex')),
+                  matching: find.byType(Container),
+                ).first,
+              );
+              final decoration = dialogueContainer.decoration! as BoxDecoration;
+              expect(
+                decoration.color,
+                isDark ? const Color(0xFF161923) : const Color(0xFFF5EFE2),
+              );
 
-            final captionText = tester.widget<Text>(
-              find.byKey(const ValueKey('intro_caption_text_0')),
-            );
-            expect(
-              captionText.style?.color,
-              isDark ? Colors.white : const Color(0xFF231F1A),
-            );
+              final captionText = tester.widget<Text>(
+                find.byKey(ValueKey('intro_caption_text_$slideIndex')),
+              );
+              expect(
+                captionText.style?.color,
+                isDark ? Colors.white : const Color(0xFF231F1A),
+              );
+
+              // Go to Watch Tower link button appears ONLY on Slide 5
+              expect(
+                find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+                slideIndex == 4 ? findsOneWidget : findsNothing,
+              );
+            }
 
             controller.dispose();
           }
@@ -441,7 +608,7 @@ void main() {
     );
 
     testWidgets(
-      'Royal Castle Library consolidates intro into single #1 card (1/9..9/9) that opens the 4-slide IntroStoryScreen carousel, and Replay Intro works identically',
+      'Royal Castle Library #1 Prologue card uses intro_3 thumbnail, shows 5 Scenes badge, launches full 5-slide prologue, and Slide 5 Go to Watch Tower opens WatchTowerDialog cleanly',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -488,15 +655,22 @@ void main() {
         expect(replayIntroBtn, findsOneWidget);
         expect(find.text('Replay Intro / Tutorial'), findsOneWidget);
 
-        // Unified #1 card is present; old 4 duplicate intro_1..intro_4 list entries are absent
+        // Unified #1 card uses intro_3.jpeg thumbnail and displays "5 Scenes" badge
         final introSlot = find.byKey(const ValueKey('story_gallery_item_intro'));
         await tester.ensureVisible(introSlot);
         await tester.pumpAndSettle();
         expect(introSlot, findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('story_gallery_thumb_intro')),
-          findsOneWidget,
+
+        final thumbFinder = find.byKey(const ValueKey('story_gallery_thumb_intro'));
+        expect(thumbFinder, findsOneWidget);
+        final thumbImage = tester.widget<Image>(
+          find.descendant(of: thumbFinder, matching: find.byType(Image)),
         );
+        expect(
+          (thumbImage.image as AssetImage).assetName,
+          'assets/images/story/intro_3.jpeg',
+        );
+
         expect(
           find.byKey(const ValueKey('story_gallery_badge_intro')),
           findsOneWidget,
@@ -507,10 +681,10 @@ void main() {
         );
         expect(find.text('#1'), findsOneWidget);
         expect(find.text("Prologue: The Metal Wizard's Plot"), findsOneWidget);
-        expect(find.text('4 Scenes'), findsOneWidget);
+        expect(find.text('5 Scenes'), findsOneWidget);
         expect(find.text('Read Comic'), findsOneWidget);
 
-        for (int i = 1; i <= 4; i++) {
+        for (int i = 1; i <= 5; i++) {
           expect(
             find.byKey(ValueKey('story_gallery_item_intro_$i')),
             findsNothing,
@@ -523,14 +697,14 @@ void main() {
         }
         expect(find.text('#10'), findsNothing);
 
-        // Tapping Replay Intro / Tutorial opens IntroStoryScreen at Card 1, and Skip returns to Library
+        // Tapping Replay Intro / Tutorial opens IntroStoryScreen at Slide 1, and Skip returns to Library
         await tester.ensureVisible(replayIntroBtn);
         await tester.pumpAndSettle();
         await tester.tap(replayIntroBtn);
         await tester.pumpAndSettle();
         expect(find.byType(IntroStoryScreen), findsOneWidget);
-        expect(find.text('1 / 4'), findsOneWidget);
-        expect(find.text('The Metal Automaton'), findsOneWidget);
+        expect(find.text('1 / 5'), findsOneWidget);
+        expect(find.text('The Royal Garden'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_skip_button')));
         await tester.pumpAndSettle();
@@ -538,7 +712,7 @@ void main() {
         expect(find.byType(RoyalCastleDialog), findsOneWidget);
         expect(controller.currentWeek, 3);
 
-        // Tapping the unified #1 Intro card opens Card 1 -> Playable Royal Garden Tutorial Battle -> Cards 2-4
+        // Tapping unified #1 Intro card opens Slides 1 -> 2 -> Playable Tutorial -> Slides 3 -> 4 -> 5
         final readBtn = find.byKey(const ValueKey('story_gallery_read_btn_intro'));
         await tester.ensureVisible(readBtn);
         await tester.pumpAndSettle();
@@ -546,8 +720,13 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(IntroStoryScreen), findsOneWidget);
-        expect(find.text('1 / 4'), findsOneWidget);
-        expect(find.text('The Metal Automaton'), findsOneWidget);
+        expect(find.text('1 / 5'), findsOneWidget);
+        expect(find.text('The Royal Garden'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('2 / 5'), findsOneWidget);
+        expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
@@ -560,54 +739,23 @@ void main() {
           findsOneWidget,
         );
 
-        // Play through Act 1 + Act 2 in sandbox replay mode
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_fire')));
-        await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_water')));
-        await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('tutorial_move_btn_wood')));
-        await tester.pump();
-
-        for (int i = 0; i < 60; i++) {
-          if (find.byKey(const ValueKey('royal_garden_tutorial_battle')).evaluate().isEmpty) {
-            break;
-          }
-          if (find.byKey(const ValueKey('tutorial_finish_continue_button')).evaluate().isNotEmpty) {
-            await tester.tap(find.byKey(const ValueKey('tutorial_finish_continue_button')));
-            await tester.pumpAndSettle();
-            break;
-          }
-          for (final key in const [
-            'tutorial_move_btn_fire',
-            'tutorial_move_btn_water',
-            'tutorial_move_btn_wood',
-          ]) {
-            final finder = find.byKey(ValueKey(key));
-            if (finder.evaluate().isEmpty) continue;
-            final inkWell = tester.widget<InkWell>(finder);
-            if (inkWell.onTap != null) {
-              await tester.tap(finder);
-              await tester.pump();
-              break;
-            }
-          }
-        }
+        await _completeRoyalGardenTutorial(tester);
         await tester.pumpAndSettle();
 
-        expect(find.text('2 / 4'), findsOneWidget);
-        expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
+        expect(find.text('3 / 5'), findsOneWidget);
+        expect(find.text('The Princess Captured'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
-        expect(find.text('3 / 4'), findsOneWidget);
+        expect(find.text('4 / 5'), findsOneWidget);
         expect(find.text("The King's Summons"), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
-        expect(find.text('4 / 4'), findsOneWidget);
+        expect(find.text('5 / 5'), findsOneWidget);
         expect(find.text('The Quest Begins'), findsOneWidget);
 
-        // Begin Quest on slide 4 returns cleanly to Royal Castle Library with ZERO campaign changes
+        // Begin Quest on Slide 5 returns cleanly to Royal Castle Library with ZERO campaign changes
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
         expect(find.byType(IntroStoryScreen), findsNothing);
@@ -617,12 +765,61 @@ void main() {
         expect(controller.waterOrbs, 0);
         expect(controller.woodOrbs, 0);
 
-        // Unlocking all 8 artifact chapters brings Story Memories counter to 9 / 9
-        for (final chapter in controller.artifactStoryChapters) {
-          controller.markStorySeen(chapter);
-        }
+        // Re-open #1 Prologue, advance to Slide 5 (skipping tutorial), and tap "Go to Watch Tower"
+        await tester.ensureVisible(readBtn);
         await tester.pumpAndSettle();
-        expect(find.text('9 / 9'), findsOneWidget);
+        await tester.tap(readBtn);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intro_skip_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('3 / 5'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('5 / 5'), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('intro_go_to_watchtower_button')),
+        );
+        await tester.pumpAndSettle();
+
+        // Closes replay modal stack cleanly and opens WatchTowerDialog on WorldMapScreen
+        expect(find.byType(IntroStoryScreen), findsNothing);
+        expect(find.byType(RoyalCastleDialog), findsNothing);
+        expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(find.byType(WatchTowerDialog), findsOneWidget);
+        expect(controller.currentWeek, 3);
+        expect(controller.fireOrbs, 0);
+        expect(controller.waterOrbs, 0);
+        expect(controller.woodOrbs, 0);
+
+        // Open Story Log inside WatchTowerDialog -> verifies #1 Prologue card uses intro_3 & 5 Scenes
+        final storyLogBtn = find.byKey(const ValueKey('observatory_story_log_button'));
+        if (storyLogBtn.evaluate().isNotEmpty) {
+          await tester.ensureVisible(storyLogBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(storyLogBtn);
+          await tester.pumpAndSettle();
+          expect(find.byType(StoryGalleryDialog), findsOneWidget);
+          expect(find.text('5 Scenes'), findsOneWidget);
+          final galleryThumb = tester.widget<Image>(
+            find.descendant(
+              of: find.byKey(const ValueKey('story_gallery_thumb_intro')),
+              matching: find.byType(Image),
+            ),
+          );
+          expect(
+            (galleryThumb.image as AssetImage).assetName,
+            'assets/images/story/intro_3.jpeg',
+          );
+        }
       },
     );
   });

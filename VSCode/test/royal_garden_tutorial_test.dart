@@ -433,8 +433,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Card 1 -> tap Next -> transitions into Playable Royal Garden Tutorial Battle
-        expect(find.text('1 / 4'), findsOneWidget);
+        // Card 1 -> tap Next -> Card 2 -> tap Next -> transitions into Playable Royal Garden Tutorial Battle
+        expect(find.text('1 / 5'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('2 / 5'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
 
@@ -626,19 +630,19 @@ void main() {
         final expectedWater = deterministicTutorial.collectedWaterOrbs;
         final expectedWood = deterministicTutorial.collectedWoodOrbs;
 
-        // Transitions smoothly into closing Intro slides (Card 2 -> Card 3 -> Card 4)
+        // Transitions smoothly into closing Intro slides (Card 3 -> Card 4 -> Card 5)
         await tester.pumpAndSettle();
         expect(find.byType(RoyalGardenTutorialBattle), findsNothing);
-        expect(find.text('2 / 4'), findsOneWidget);
-        expect(find.text('Ambush in the Royal Garden'), findsOneWidget);
+        expect(find.text('3 / 5'), findsOneWidget);
+        expect(find.text('The Princess Captured'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
-        expect(find.text('3 / 4'), findsOneWidget);
+        expect(find.text('4 / 5'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
-        expect(find.text('4 / 4'), findsOneWidget);
+        expect(find.text('5 / 5'), findsOneWidget);
 
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
@@ -666,7 +670,7 @@ void main() {
     );
 
     testWidgets(
-      'Skipping during the playable tutorial on first launch enters Week 0 with 0 tutorial bonus orbs',
+      'Skipping during the playable tutorial on first launch resumes cleanly at Slide 3 and enters Week 0 with 0 tutorial bonus orbs',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -687,7 +691,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Advance from Card 1 into tutorial battle, play 1 turn, then tap Skip
+        // Advance from Card 1 -> Card 2 -> tutorial battle, play 1 turn, then tap Skip
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('2 / 5'), findsOneWidget);
+
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
         expect(find.byType(RoyalGardenTutorialBattle), findsOneWidget);
@@ -696,6 +704,24 @@ void main() {
         await tester.pump();
 
         await tester.tap(find.byKey(const ValueKey('intro_skip_button')));
+        await tester.pumpAndSettle();
+
+        // Resumes seamlessly at Slide 3 (intro_3)
+        expect(find.byType(RoyalGardenTutorialBattle), findsNothing);
+        expect(find.byType(IntroStoryScreen), findsOneWidget);
+        expect(find.text('3 / 5'), findsOneWidget);
+        expect(find.text('The Princess Captured'), findsOneWidget);
+
+        // Advance through Slides 3 -> 4 -> 5 -> Begin Quest
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('4 / 5'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('5 / 5'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
 
         expect(find.byType(WorldMapScreen), findsOneWidget);
@@ -756,8 +782,12 @@ void main() {
         await tester.tap(replayBtn);
         await tester.pumpAndSettle();
 
-        // Card 1 -> Tutorial Battle -> play until finish -> Cards 2-4 -> Begin Quest
+        // Card 1 -> Card 2 -> Tutorial Battle -> play until finish -> Cards 3-5 -> Begin Quest
         expect(find.byType(IntroStoryScreen), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('intro_action_button')));
+        await tester.pumpAndSettle();
+        expect(find.text('2 / 5'), findsOneWidget);
+
         await tester.tap(find.byKey(const ValueKey('intro_action_button')));
         await tester.pumpAndSettle();
 
@@ -798,7 +828,7 @@ void main() {
         }
         await tester.pumpAndSettle();
 
-        // Advance through closing slides 2 -> 3 -> 4 -> finish
+        // Advance through closing slides 3 -> 4 -> 5 -> finish
         for (int s = 0; s < 3; s++) {
           await tester.tap(find.byKey(const ValueKey('intro_action_button')));
           await tester.pumpAndSettle();

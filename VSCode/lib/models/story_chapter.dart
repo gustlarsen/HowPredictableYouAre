@@ -53,11 +53,11 @@ class IntroStoryCardData {
       chapterKey: 'story_intro_c1_chapter',
       fallbackChapter: 'Chapter I',
       titleKey: 'story_intro_c1_title',
-      fallbackTitle: 'The Metal Automaton',
+      fallbackTitle: 'The Royal Garden',
       captionKey: 'story_intro_c1_caption',
       fallbackCaption:
-          'A Wizard obsessed with Metal studied human behavior and forged an automaton capable of predicting patterns and conjuring Fire, Water, and Wood.',
-      icon: Icons.precision_manufacturing_outlined,
+          "In the peaceful royal garden, the Princess gathered roses under the watchful protection of the realm's three guardian mages.",
+      icon: Icons.local_florist_outlined,
     ),
     IntroStoryCardData(
       index: 1,
@@ -69,8 +69,8 @@ class IntroStoryCardData {
       fallbackTitle: 'Ambush in the Royal Garden',
       captionKey: 'story_intro_c2_caption',
       fallbackCaption:
-          "In the royal garden, the automaton defeated the three guardian mages and kidnapped the Princess to the Metal Wizard's dark fortress.",
-      icon: Icons.park_outlined,
+          'Suddenly, a ruthless Robot Mage forged from dark metal ambushed the garden, unleashing arcane lightning against the guardians!',
+      icon: Icons.bolt_outlined,
     ),
     IntroStoryCardData(
       index: 2,
@@ -79,11 +79,11 @@ class IntroStoryCardData {
       chapterKey: 'story_intro_c3_chapter',
       fallbackChapter: 'Chapter III',
       titleKey: 'story_intro_c3_title',
-      fallbackTitle: "The King's Summons",
+      fallbackTitle: 'The Princess Captured',
       captionKey: 'story_intro_c3_caption',
       fallbackCaption:
-          'With no other hope, the King turned to the Sacred Temple and summoned the only young Cleric capable of channeling all three elements.',
-      icon: Icons.castle_outlined,
+          'With the three guardian mages fallen in battle, the Robot Mage seized the helpless Princess and carried her toward the dark fortress.',
+      icon: Icons.warning_amber_rounded,
     ),
     IntroStoryCardData(
       index: 3,
@@ -92,10 +92,23 @@ class IntroStoryCardData {
       chapterKey: 'story_intro_c4_chapter',
       fallbackChapter: 'Chapter IV',
       titleKey: 'story_intro_c4_title',
-      fallbackTitle: 'The Quest Begins',
+      fallbackTitle: "The King's Summons",
       captionKey: 'story_intro_c4_caption',
       fallbackCaption:
-          'Armed with your blessed Staff and orb satchel, you march toward the lair—defeat the automaton before time runs out.',
+          'Desperate to save his daughter, the King hurried to the Sacred Temple and pleaded for aid, calling upon a young Cleric.',
+      icon: Icons.castle_outlined,
+    ),
+    IntroStoryCardData(
+      index: 4,
+      id: 'intro_5',
+      assetPath: 'assets/images/story/intro_5.jpeg',
+      chapterKey: 'story_intro_c5_chapter',
+      fallbackChapter: 'Chapter V',
+      titleKey: 'story_intro_c5_title',
+      fallbackTitle: 'The Quest Begins',
+      captionKey: 'story_intro_c5_caption',
+      fallbackCaption:
+          "Armed with your blessed Staff, your adventure begins! Before marching into battle, check the Watch Tower to spy on the Princess's cell and see what the Metal Wizard is planning.",
       icon: Icons.explore_outlined,
     ),
   ];
@@ -161,7 +174,7 @@ enum StoryChapter {
   String get assetPath {
     switch (this) {
       case StoryChapter.intro:
-        return 'assets/images/story/robot_mage_cliff.webp';
+        return 'assets/images/story/intro_3.jpeg';
       case StoryChapter.resetButton:
         return 'assets/images/story/reset_button_comic.jpeg';
       case StoryChapter.predictabilityScore:
@@ -184,7 +197,7 @@ enum StoryChapter {
   double get imageAspectRatio {
     switch (this) {
       case StoryChapter.intro:
-        return 571.0 / 1024.0;
+        return 1024.0 / 571.0;
       case StoryChapter.crystalBall:
         return 1792.0 / 2400.0;
       default:
@@ -266,7 +279,7 @@ enum StoryChapter {
   String get fallbackItemName {
     switch (this) {
       case StoryChapter.intro:
-        return "Stand with the three Royal Guardian Mages in the Royal Garden as the automaton ambushes the Princess, before the King summons a young Cleric.";
+        return "Witness the Robot Mage's ambush in the Royal Garden, stand with the three guardian mages, and answer the King's summons at the Sacred Temple.";
       case StoryChapter.resetButton:
         return 'Reset Button';
       case StoryChapter.predictabilityScore:

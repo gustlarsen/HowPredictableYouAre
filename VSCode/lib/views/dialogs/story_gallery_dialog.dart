@@ -185,7 +185,7 @@ class StoryMemoriesSection extends StatelessWidget {
     final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
     final introBadgeLabel = loc.t(
       'story_intro_pages_badge',
-      fallback: '4 Scenes',
+      fallback: '5 Scenes',
     );
 
     return ListView.separated(

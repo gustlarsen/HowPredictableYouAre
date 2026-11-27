@@ -1,5 +1,5 @@
 {
-  "summary": "- Replaced robotic arm icon on Watch Tower Metal Wizard button with shared MetalWizardLairIcon(size: 18) matching Princess's Cell sizing and alignment\n- Added widget test assertions in watchtower_spyglass_test.dart verifying MetalWizardLairIcon usage and matched button height\n- Verified with flutter analyze (0 issues) and flutter test (442 passed)",
+  "summary": "- Replaced prologue illustrations with 5 new widescreen assets (intro_1..intro_5.jpeg) and removed obsolete intro_comic.jpeg\n- Updated IntroStoryScreen to a 5-slide sequence triggering the playable Royal Garden tutorial after Slide 2 and resuming at Slide 3 upon completion or tutorial skip\n- Set intro_3.jpeg as the unified #1 Prologue thumbnail/cover and updated scene badges to 5 Scenes in Royal Castle Library and Watch Tower Story Log\n- Added Slide 5 Watch Tower narrative callout and direct 'Go to Watch Tower ->' link button that persists hasSeenIntro, syncs Cloud Save, and opens WatchTowerDialog cleanly\n- Localized all 5 prologue slides, summary, badge, and Watch Tower link in en, pt, es, de and verified all 443 Flutter tests + flutter analyze pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T11:27:37Z"
+  "updated_at_utc": "2026-11-27T12:35:16Z"
 }
