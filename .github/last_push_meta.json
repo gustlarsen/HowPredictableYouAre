@@ -1,5 +1,5 @@
 {
-  "summary": "- Renamed 'Unlock Earth & Metal' upgrade title and subtitle to 'Learn Earth & Metal' across en, pt, es, and de in stringsHowPredict.json and ShopDialog/RoyalCastle fallbacks\\n- Updated Cleric's Backpack locked orb requirement hint to '(Learn Earth & Metal)' across all 4 languages while preserving 3-line layout and FittedBox scaling\\n- Kept internal storage keys, Cloud Save flags, and Google Play Billing product ID ('unlock_new_hands') unchanged\\n- Updated affected widget and unit tests and verified flutter analyze and all 430 flutter tests pass",
+  "summary": "- Added \"Go to Watch Tower\" link button on final slide of Week0ScreamWarningDialog\n- Wired Go to Watch Tower action in WorldMapScreen to persist dismissal and open ObservatoryDialog (WatchTowerDialog) via _openObservatory\n- Added en/pt/es/de localizations in stringsHowPredict.json\n- Updated week0_scream_warning_test.dart and verified with flutter test (431 passed) and flutter analyze",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T04:15:42Z"
+  "updated_at_utc": "2026-11-27T04:34:21Z"
 }

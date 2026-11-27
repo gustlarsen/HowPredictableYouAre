@@ -262,8 +262,16 @@ class _WorldMapScreenState extends State<WorldMapScreen>
         _isWeek0ScreamDialogOpen = false;
         return;
       }
-      await Week0ScreamWarningDialog.show(context, controller: controller);
+      final action = await Week0ScreamWarningDialog.show(
+        context,
+        controller: controller,
+      );
       _isWeek0ScreamDialogOpen = false;
+      if (action == Week0ScreamWarningAction.goToWatchTower &&
+          mounted &&
+          context.mounted) {
+        _openObservatory(context, controller);
+      }
     });
   }
 

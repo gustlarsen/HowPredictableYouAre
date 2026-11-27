@@ -12,6 +12,7 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
 import 'package:how_predictable/views/dialogs/week0_scream_warning_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
@@ -290,6 +291,11 @@ void main() {
         expect(find.textContaining('loud, piercing scream'), findsOneWidget);
         expect(find.text('Next'), findsOneWidget);
         expect(find.text('Skip'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('week0_scream_go_to_watchtower_button')),
+          findsNothing,
+        );
+        expect(find.text('Go to Watch Tower'), findsNothing);
 
         // Advance to Slide 2
         await tester.tap(
@@ -301,6 +307,12 @@ void main() {
         expect(find.textContaining('Watch Tower'), findsWidgets);
         expect(find.textContaining('spyglass'), findsOneWidget);
         expect(find.text('Got It'), findsOneWidget);
+        final goToWatchTowerBtn = find.byKey(
+          const ValueKey('week0_scream_go_to_watchtower_button'),
+        );
+        expect(goToWatchTowerBtn, findsOneWidget);
+        expect(find.text('Go to Watch Tower'), findsOneWidget);
+        expect(tester.getSize(goToWatchTowerBtn).height, greaterThanOrEqualTo(40));
 
         // Dismiss via "Got It"
         await tester.tap(
@@ -312,6 +324,8 @@ void main() {
           find.byKey(const ValueKey('week0_scream_warning_dialog')),
           findsNothing,
         );
+        expect(find.byType(WatchTowerDialog), findsNothing);
+        expect(find.byType(WorldMapScreen), findsOneWidget);
         expect(controller.hasShownWeek0ScreamWarning, isTrue);
         expect(storage.hasShownWeek0ScreamWarning, isTrue);
 
@@ -482,18 +496,42 @@ void main() {
             'week0_scream_s2_title',
             'week0_scream_s2_body',
             'week0_scream_got_it',
+            'week0_scream_go_to_watchtower_btn',
           ]) {
             final value = loc.t(key, fallback: '__MISSING__');
             expect(value, isNot('__MISSING__'));
             expect(value.trim(), isNotEmpty);
           }
         }
+        loc.setLanguage('en');
+        expect(loc.t('week0_scream_go_to_watchtower_btn'), 'Go to Watch Tower');
         loc.setLanguage('pt');
         expect(
           loc.t('week0_scream_s1_body'),
           contains('um grito muito alto vindo do covil do mago foi ouvido'),
         );
+        expect(
+          loc.t('week0_scream_go_to_watchtower_btn'),
+          'Ir para a Torre de Vigia',
+        );
+        loc.setLanguage('es');
+        expect(
+          loc.t('week0_scream_go_to_watchtower_btn'),
+          'Ir a la Torre de Vigilancia',
+        );
+        loc.setLanguage('de');
+        expect(
+          loc.t('week0_scream_go_to_watchtower_btn'),
+          'Zum Wachturm gehen',
+        );
         loc.setLanguage('en');
+
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
         for (final isDark in [true, false]) {
           controller.darkMode = isDark;
@@ -503,7 +541,10 @@ void main() {
               darkTheme: ThemeData.dark(useMaterial3: true),
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
               home: Scaffold(
-                body: Week0ScreamWarningDialog(controller: controller),
+                body: Week0ScreamWarningDialog(
+                  key: ValueKey('scream_theme_$isDark'),
+                  controller: controller,
+                ),
               ),
             ),
           );
@@ -523,6 +564,22 @@ void main() {
             decoration.color,
             isDark ? const Color(0xFF161A22) : const Color(0xFFF5EFE2),
           );
+
+          // Advance to final slide and verify Go to Watch Tower link renders cleanly on compact screen
+          final nextBtn = find.byKey(
+            const ValueKey('week0_scream_next_button'),
+          );
+          await tester.ensureVisible(nextBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(nextBtn);
+          await tester.pumpAndSettle();
+          final watchTowerBtn = find.byKey(
+            const ValueKey('week0_scream_go_to_watchtower_button'),
+          );
+          expect(watchTowerBtn, findsOneWidget);
+          await tester.ensureVisible(watchTowerBtn);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
         }
       },
     );
@@ -712,6 +769,102 @@ void main() {
         expect(
           audio.currentBgmVolume,
           closeTo(AudioService.targetBgmVolume, 0.001),
+        );
+      },
+    );
+
+    testWidgets(
+      'Tapping "Go to Watch Tower" on the final scream carousel slide persists dismissal, closes the carousel, and opens WatchTowerDialog',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final harness = await _createTestHarness();
+        final controller = harness.controller;
+        final storage = harness.storage;
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Enter Lair on Week 0 and Teleport back -> Week 1 triggers scream carousel
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_portal_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('teleport_confirm_button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsOneWidget,
+        );
+        // Hidden on first slide
+        expect(
+          find.byKey(const ValueKey('week0_scream_go_to_watchtower_button')),
+          findsNothing,
+        );
+
+        // Advance to final slide
+        await tester.tap(
+          find.byKey(const ValueKey('week0_scream_next_button')),
+        );
+        await tester.pumpAndSettle();
+
+        final gotItFinder = find.byKey(
+          const ValueKey('week0_scream_got_it_button'),
+        );
+        final watchTowerLinkFinder = find.byKey(
+          const ValueKey('week0_scream_go_to_watchtower_button'),
+        );
+        expect(gotItFinder, findsOneWidget);
+        expect(watchTowerLinkFinder, findsOneWidget);
+        expect(
+          tester.getTopLeft(watchTowerLinkFinder).dy,
+          greaterThan(tester.getBottomLeft(gotItFinder).dy),
+        );
+        expect(
+          tester.getSize(watchTowerLinkFinder).height,
+          greaterThanOrEqualTo(40),
+        );
+
+        // Tap "Go to Watch Tower" -> closes carousel, persists flag, opens WatchTowerDialog
+        await tester.tap(watchTowerLinkFinder);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsNothing,
+        );
+        expect(find.byType(WatchTowerDialog), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('observatory_dialog')),
+          findsOneWidget,
+        );
+        expect(controller.hasShownWeek0ScreamWarning, isTrue);
+        expect(storage.hasShownWeek0ScreamWarning, isTrue);
+        expect(controller.pendingWeek0ScreamWarning, isFalse);
+        expect(storage.pendingWeek0ScreamWarning, isFalse);
+
+        // Close WatchTowerDialog -> remains on WorldMapScreen, does not re-trigger carousel
+        await tester.tap(find.byKey(const ValueKey('observatory_close_button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(WatchTowerDialog), findsNothing);
+        expect(find.byType(WorldMapScreen), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('week0_scream_warning_dialog')),
+          findsNothing,
         );
       },
     );

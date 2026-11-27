@@ -27,6 +27,9 @@ class _Week0ScreamSlideData {
   });
 }
 
+/// Result action chosen by the player on the Week 0 scream warning alert.
+enum Week0ScreamWarningAction { close, goToWatchTower }
+
 /// 2-slide Royal Chronicler-styled warning carousel shown once per campaign when
 /// the player leaves Week 0 for Week 1 without defeating both the Guardian
 /// Robot and the Metal Wizard.
@@ -38,14 +41,14 @@ class Week0ScreamWarningDialog extends StatefulWidget {
     required this.controller,
   });
 
-  static Future<void> show(
+  static Future<Week0ScreamWarningAction?> show(
     BuildContext context, {
     required GameController controller,
   }) async {
     unawaited(controller.audio.playPrincessScream());
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
 
-    await showGeneralDialog<void>(
+    final action = await showGeneralDialog<Week0ScreamWarningAction>(
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Watch Tower Alert',
@@ -72,6 +75,7 @@ class Week0ScreamWarningDialog extends StatefulWidget {
       },
     );
     unawaited(controller.audio.finishPrincessScreamAndRestoreBgm());
+    return action;
   }
 
   @override
@@ -112,6 +116,12 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
     ),
   ];
 
+  void _dismissDialog(Week0ScreamWarningAction action) {
+    widget.controller.audio.playTapVibrate();
+    widget.controller.markWeek0ScreamWarningDismissed();
+    Navigator.of(context).pop(action);
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = widget.controller.localization;
@@ -124,6 +134,8 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
     final borderColor = _index == 0 ? _primaryOrange : _warmGold;
     final narrativeBg =
         isDark ? const Color(0xFF1E2430) : const Color(0xFFFAF6EE);
+    final watchTowerLinkColor =
+        isDark ? const Color(0xFFFFD54F) : const Color(0xFF7A4E00);
 
     final badgeLabel = loc.t(
       'week0_scream_alert_badge',
@@ -156,7 +168,7 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                   ],
                 ),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -201,10 +213,8 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                           const SizedBox(width: 8),
                           TextButton(
                             key: const ValueKey('week0_scream_skip_button'),
-                            onPressed: () {
-                              widget.controller.audio.playTapVibrate();
-                              Navigator.of(context).pop();
-                            },
+                            onPressed: () =>
+                                _dismissDialog(Week0ScreamWarningAction.close),
                             child: Text(
                               loc.t('story_skip', fallback: 'Skip'),
                               style: TextStyle(
@@ -215,7 +225,7 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
                       // Framed illustration / emblem card
                       ClipRRect(
@@ -272,13 +282,13 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                               ),
                               Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 24,
-                                  horizontal: 16,
+                                  vertical: 18,
+                                  horizontal: 14,
                                 ),
                                 child: Column(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(16),
+                                      padding: const EdgeInsets.all(13),
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: isDark
@@ -294,7 +304,7 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                                       ),
                                       child: slide.iconWidget,
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 11),
                                     Text(
                                       loc.t(
                                         slide.speakerKey,
@@ -401,10 +411,10 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                             ),
                           ),
                           onPressed: () {
-                            widget.controller.audio.playTapVibrate();
                             if (isLast) {
-                              Navigator.of(context).pop();
+                              _dismissDialog(Week0ScreamWarningAction.close);
                             } else {
+                              widget.controller.audio.playTapVibrate();
                               setState(() => _index++);
                             }
                           },
@@ -422,6 +432,64 @@ class _Week0ScreamWarningDialogState extends State<Week0ScreamWarningDialog> {
                           ),
                         ),
                       ),
+                      if (isLast) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          key: const ValueKey(
+                            'week0_scream_go_to_watchtower_button',
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: watchTowerLinkColor,
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => _dismissDialog(
+                            Week0ScreamWarningAction.goToWatchTower,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const WatchTowerIcon(size: 16),
+                              const SizedBox(width: 7),
+                              Flexible(
+                                child: Text(
+                                  loc.t(
+                                    'week0_scream_go_to_watchtower_btn',
+                                    fallback: 'Go to Watch Tower',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: watchTowerLinkColor,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: watchTowerLinkColor
+                                        .withValues(alpha: 0.75),
+                                    decorationThickness: 1.3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '→',
+                                style: TextStyle(
+                                  color: watchTowerLinkColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

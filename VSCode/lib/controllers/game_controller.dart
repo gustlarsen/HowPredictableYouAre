@@ -3498,6 +3498,18 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
+  /// Ensures the post-Week-0 scream warning dismissal is persisted in
+  /// [StorageService] so it does not trigger again during the current run.
+  void markWeek0ScreamWarningDismissed() {
+    if (!pendingWeek0ScreamWarning && hasShownWeek0ScreamWarning) return;
+    pendingWeek0ScreamWarning = false;
+    hasShownWeek0ScreamWarning = true;
+    storage.setPendingWeek0ScreamWarning(false);
+    storage.setHasShownWeek0ScreamWarning(true);
+    _triggerCloudSave();
+    notifyListeners();
+  }
+
   /// Marks the Princess's Cell spyglass as inspected after the Week 0 scream
   /// warning has been shown, clearing the Watch Tower `"!"` alert badge for
   /// the remainder of the current run.
