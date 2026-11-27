@@ -4063,6 +4063,89 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  /// Permanently wipes all local run and account progression (campaign week,
+  /// Elemental Orbs, shop unlocks including orb-unlocked Remove Ads, Royal
+  /// Castle Treasury/Spoils/Relics/Hall of Heroes/Endings/Bestiary/Decrees,
+  /// Story Memories, Sacred Temple Offertory, and lifetime statistics), while
+  /// preserving verified real-money Google Play Billing purchases and UI
+  /// preferences, and cleanly resetting/overwriting Cloud Save (or arming a
+  /// pending wipe marker if offline so stale cloud data is never restored).
+  ///
+  /// Returns `true` if Cloud Save was immediately overwritten, or `false` if
+  /// offline / cloud sync is pending.
+  Future<bool> wipeAccountData() async {
+    _giftTimer?.cancel();
+    _giftTimer = null;
+    _giftCooldownUntil = null;
+    _remainingGiftCooldown = Duration.zero;
+    isGiftAvailable = true;
+
+    final verifiedPaidIds = <String>{
+      ...storage.purchasedIapProductIds,
+      ...billingService.verifiedPurchasedProductIds,
+    };
+
+    await storage.clearGameplayProgress(
+      includeSettings: false,
+      includeCastleMeta: true,
+      preserveStoryFlags: false,
+      preserveRemoveAds: false,
+    );
+    await storage.setTurn0Orbs(
+      fire: 0,
+      water: 0,
+      wood: 0,
+      earth: 0,
+      metal: 0,
+    );
+    await storage.setPurchasedIapProductIds(verifiedPaidIds);
+    await storage.setCurrentWeek(0);
+
+    turnCount = 0;
+    lastCollectedOrbMove = null;
+    lastCollectedOrbMoves = const [];
+    orbCollectionEventId = 0;
+    lastDualSpellResult = null;
+    lastRoundBlockedByAntiMetalShield = false;
+    lastRoundUserDamage = 0;
+    lastRoundComputerDamage = 0;
+    predictedUserMove = null;
+    pcNextMove = null;
+    suggestedMove = null;
+    crystalBallMove = null;
+    predictedUserMoves = [];
+    pcNextMoves = [];
+    suggestedMoves = [];
+    is100RoundsAlertPending = false;
+    isDeathAlertPending = false;
+    isBossVictoryPending = false;
+    pendingBossVictoryPhase = null;
+    pendingBossVictoryWeek = null;
+    pendingQaBonusSnackBar = null;
+    pendingOfflineOffertoryDuration = null;
+    _offlineOffertoryDismissedThisSession = false;
+
+    _loadState(restartAudio: false);
+
+    for (final productId in verifiedPaidIds) {
+      unlockByProductId(
+        productId,
+        recordAsIap: false,
+        triggerStory: false,
+        triggerCloudSave: false,
+      );
+    }
+
+    notifyListeners();
+    final cloudSynced = await playGames.wipeCloudData(
+      wipeTimestampMillis: _nowUtc().millisecondsSinceEpoch,
+    );
+    if (billingService.isAvailable) {
+      unawaited(billingService.restorePurchases(silent: true));
+    }
+    return cloudSynced;
+  }
+
   // Shop Purchases (Elemental Orbs)
   bool canAfford(ElementalCost cost) {
     return fireOrbs >= cost.fire &&

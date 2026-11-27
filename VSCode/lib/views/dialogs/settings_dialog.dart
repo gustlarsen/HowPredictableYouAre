@@ -373,6 +373,116 @@ class _SettingsDialogState extends State<SettingsDialog> {
     }
   }
 
+  Future<void> _confirmWipeAccountData(BuildContext context) async {
+    controller.audio.playTapVibrate();
+    final loc = controller.localization;
+    final shouldWipe = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final palette = AppPalette.of(dialogContext);
+        return AlertDialog(
+          key: const ValueKey('wipe_account_confirm_dialog'),
+          backgroundColor: palette.isDark ? null : palette.dialogSurface,
+          surfaceTintColor: palette.isDark ? null : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.delete_outline_rounded,
+                color: palette.dangerText,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.t(
+                    'wipe_account_title',
+                    fallback: 'Wipe Account Data?',
+                  ),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: palette.primaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              loc.t(
+                'wipe_account_message',
+                fallback:
+                    'This performs a permanent, full reset (unlike Forfeit Run). All local run and account progression—including Elemental Orbs, shop unlocks, Relic Chamber, Spoils of War, Royal Treasury, Hall of Heroes, Story Memories, Offertory, and lifetime statistics—will be permanently erased.\n\n• Real-money purchases (via Google Play Billing / Restore Purchases) are preserved and remain recoverable.\n• Items or upgrades unlocked with in-game orbs/diamonds (such as Remove Ads) are NOT recovered as real-money purchases and will be lost.\n• Cloud Save: If signed in to Google Play Games, your cloud save for the active player will also be reset and overwritten. If offline, local data is wiped cleanly and stale cloud progress will not be restored over this reset when you reconnect.',
+              ),
+              style: TextStyle(
+                color: palette.primaryText,
+                fontSize: 13.5,
+                height: 1.4,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('cancel_wipe_account_button'),
+              style: palette.isDark
+                  ? null
+                  : TextButton.styleFrom(foregroundColor: palette.secondaryText),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                loc.t('reset_all_progress_cancel', fallback: 'Cancel'),
+              ),
+            ),
+            ElevatedButton(
+              key: const ValueKey('confirm_wipe_account_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.dangerText,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                loc.t('wipe_account_confirm', fallback: 'Wipe Everything'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldWipe == true && context.mounted) {
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final gameController = controller;
+      navigator.popUntil((route) => route.isFirst);
+      final cloudSynced = await gameController.wipeAccountData();
+      messenger.hideCurrentSnackBar();
+      final message = cloudSynced
+          ? loc.t(
+              'wipe_account_done_synced',
+              fallback:
+                  'Account wiped! Local data and Cloud Save have been reset.',
+            )
+          : loc.t(
+              'wipe_account_done_local',
+              fallback:
+                  'Local account wiped! Cloud Save will sync this reset when back online.',
+            );
+      messenger.showSnackBar(
+        SnackBar(
+          key: const ValueKey('wipe_account_done_snackbar'),
+          content: Text(message, textAlign: TextAlign.center),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 2600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
+      );
+    }
+  }
+
   Widget _buildDialog(BuildContext context) {
     final loc = controller.localization;
     final theme = Theme.of(context);
@@ -455,9 +565,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         // Player Profile / Cloud Account section
                         _PlayerProfileSection(
                           playGames: controller.playGames,
+                          localization: loc,
                           onSignIn: () => _handleSignIn(context),
                           onManualSync: () => _handleManualSync(context),
                           onCopyPlayerId: () => _handleCopyPlayerId(context),
+                          onWipeAccount: () => _confirmWipeAccountData(context),
                         ),
 
                         Divider(
@@ -1015,15 +1127,19 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
 class _PlayerProfileSection extends StatelessWidget {
   final PlayGamesService playGames;
+  final LocalizationService localization;
   final VoidCallback onSignIn;
   final VoidCallback onManualSync;
   final VoidCallback onCopyPlayerId;
+  final VoidCallback onWipeAccount;
 
   const _PlayerProfileSection({
     required this.playGames,
+    required this.localization,
     required this.onSignIn,
     required this.onManualSync,
     required this.onCopyPlayerId,
+    required this.onWipeAccount,
   });
 
   @override
@@ -1061,7 +1177,7 @@ class _PlayerProfileSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Header + Cloud Sync Status Badge
+          // Section Header + Cloud Sync Status Badge + Discreet Trash Button
           Row(
             children: [
               Expanded(
@@ -1100,47 +1216,90 @@ class _PlayerProfileSection extends StatelessWidget {
                 isAuthenticating: playGames.isAuthenticating,
                 onTap: isBusy ? null : (isConnected ? onManualSync : onSignIn),
               ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: localization.t(
+                  'wipe_account_tooltip',
+                  fallback: 'Wipe Account Data',
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: const ValueKey('settings_wipe_account_button'),
+                    borderRadius: BorderRadius.circular(8),
+                    splashColor: palette.dangerText.withValues(alpha: 0.16),
+                    highlightColor: palette.dangerText.withValues(alpha: 0.08),
+                    onTap: isBusy ? null : onWipeAccount,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 16,
+                        color: isBusy
+                            ? (palette.isDark
+                                  ? Colors.white.withValues(alpha: 0.22)
+                                  : palette.mutedText.withValues(alpha: 0.35))
+                            : (palette.isDark
+                                  ? Colors.white.withValues(alpha: 0.52)
+                                  : palette.mutedText.withValues(alpha: 0.85)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
 
           if (!isConnected) ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                key: const ValueKey('play_games_sign_in_button'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
-                  foregroundColor: const Color(0xFF231F1A),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 9,
-                    horizontal: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                _PlayerAvatarBadge(
+                  size: 36,
+                  isConnected: false,
+                  isLoading: playGames.isAuthenticating,
+                  avatarBytes: null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('play_games_sign_in_button'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: const Color(0xFF231F1A),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 9,
+                        horizontal: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: playGames.isAuthenticating ? null : onSignIn,
+                    icon: playGames.isAuthenticating
+                        ? const SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF231F1A),
+                            ),
+                          )
+                        : const Icon(Icons.sports_esports_rounded, size: 17),
+                    label: Text(
+                      playGames.isAuthenticating
+                          ? 'Connecting...'
+                          : 'Sign in with Google Play',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-                onPressed: playGames.isAuthenticating ? null : onSignIn,
-                icon: playGames.isAuthenticating
-                    ? const SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF231F1A),
-                        ),
-                      )
-                    : const Icon(Icons.sports_esports_rounded, size: 17),
-                label: Text(
-                  playGames.isAuthenticating
-                      ? 'Connecting...'
-                      : 'Sign in with Google Play',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              ],
             ),
           ] else ...[
             // Connected Profile Details
@@ -1160,18 +1319,13 @@ class _PlayerProfileSection extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 15,
-                    backgroundColor: palette.amberBorder.withValues(
-                      alpha: palette.isDark ? 0.2 : 0.18,
-                    ),
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: palette.amberIcon,
-                      size: 17,
-                    ),
+                  _PlayerAvatarBadge(
+                    size: 36,
+                    isConnected: true,
+                    isLoading: playGames.isLoadingAvatar,
+                    avatarBytes: playGames.playerAvatarBytes,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1231,6 +1385,123 @@ class _PlayerProfileSection extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerAvatarBadge extends StatelessWidget {
+  final double size;
+  final bool isConnected;
+  final bool isLoading;
+  final Uint8List? avatarBytes;
+
+  const _PlayerAvatarBadge({
+    required this.size,
+    required this.isConnected,
+    required this.isLoading,
+    required this.avatarBytes,
+  });
+
+  Widget _buildFallbackIcon(AppPalette palette) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            palette.amberBorder.withValues(
+              alpha: isConnected
+                  ? (palette.isDark ? 0.24 : 0.20)
+                  : (palette.isDark ? 0.12 : 0.10),
+            ),
+            palette.isDark
+                ? const Color(0xFF171A21)
+                : palette.sandCardSurface,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.person_rounded,
+          key: const ValueKey('player_profile_avatar_fallback'),
+          color: isConnected
+              ? palette.amberIcon
+              : palette.amberIcon.withValues(
+                  alpha: palette.isDark ? 0.65 : 0.72,
+                ),
+          size: size * 0.56,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final bytes = avatarBytes;
+    final hasImage = isConnected && bytes != null && bytes.isNotEmpty;
+
+    return Container(
+      key: const ValueKey('player_profile_avatar'),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: palette.isDark
+            ? const Color(0xFF171A21)
+            : palette.dialogCardSurface,
+        border: Border.all(
+          color: isConnected
+              ? palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.72 : 0.88,
+                )
+              : (palette.isDark
+                    ? palette.amberBorder.withValues(alpha: 0.30)
+                    : palette.sandCardBorder),
+          width: 1.5,
+        ),
+        boxShadow: isConnected
+            ? [
+                BoxShadow(
+                  color: Colors.amber.withValues(
+                    alpha: palette.isDark ? 0.16 : 0.10,
+                  ),
+                  blurRadius: 6,
+                  spreadRadius: 0.5,
+                ),
+              ]
+            : null,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (hasImage)
+            ClipOval(
+              child: Image.memory(
+                bytes,
+                key: const ValueKey('player_profile_avatar_image'),
+                width: size - 3,
+                height: size - 3,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => _buildFallbackIcon(palette),
+              ),
+            )
+          else
+            _buildFallbackIcon(palette),
+          if (isLoading && !hasImage)
+            SizedBox(
+              key: const ValueKey('player_profile_avatar_loading'),
+              width: size - 4,
+              height: size - 4,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.6,
+                color: palette.amberIcon.withValues(alpha: 0.75),
+              ),
+            ),
         ],
       ),
     );

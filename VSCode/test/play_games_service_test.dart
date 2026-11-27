@@ -2171,6 +2171,167 @@ void main() {
       },
     );
   });
+
+  group('PlayGamesService Avatar & Account Wipe Unit Tests', () {
+    const validPngBase64 =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+    test(
+      'decodeAvatarBytes handles standard base64, multiline base64, data URI prefixes, and safely rejects empty/invalid strings',
+      () {
+        final normal = PlayGamesService.decodeAvatarBytes(validPngBase64);
+        expect(normal, isNotNull);
+        expect(normal!.length, 70);
+
+        final multiline = PlayGamesService.decodeAvatarBytes(
+          '${validPngBase64.substring(0, 20)}\n${validPngBase64.substring(20)}',
+        );
+        expect(multiline, equals(normal));
+
+        final dataUri = PlayGamesService.decodeAvatarBytes(
+          'data:image/png;base64,$validPngBase64',
+        );
+        expect(dataUri, equals(normal));
+
+        expect(PlayGamesService.decodeAvatarBytes(null), isNull);
+        expect(PlayGamesService.decodeAvatarBytes(''), isNull);
+        expect(PlayGamesService.decodeAvatarBytes('   \n  '), isNull);
+        expect(PlayGamesService.decodeAvatarBytes('not_valid_base64!!!'), isNull);
+      },
+    );
+
+    test(
+      'Refreshes avatar on signIn and updates/clears avatar cleanly across OS account switches',
+      () async {
+        SharedPreferences.setMockInitialValues({'musicEnabled': false});
+        final storage = StorageService();
+        await storage.init();
+
+        final client = _AvatarAndWipePlayGamesClient(
+          mockPlayerName: 'PlayerA',
+          mockPlayerId: 'player_a',
+          mockAvatarBase64: validPngBase64,
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: client,
+          profileRetryDelay: Duration.zero,
+          maxAutoRetries: 0,
+        );
+        addTearDown(playGames.dispose);
+
+        final okA = await playGames.signIn(silent: true);
+        await Future<void>.delayed(Duration.zero);
+        expect(okA, isTrue);
+        expect(playGames.playerAvatarBytes, isNotNull);
+        expect(playGames.playerAvatarBytes!.length, 70);
+
+        // Switch to PlayerB who has no avatar
+        client.mockPlayerName = 'PlayerB';
+        client.mockPlayerId = 'player_b';
+        client.mockAvatarBase64 = null;
+
+        final okB = await playGames.handleAppResumed();
+        await Future<void>.delayed(Duration.zero);
+        expect(okB, isTrue);
+        expect(playGames.playerID, 'player_b');
+        expect(playGames.playerAvatarBytes, isNull);
+      },
+    );
+
+    test(
+      'wipeCloudData allows newer cross-device cloud saves strictly after wipe timestamp and does not affect other accounts',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'last_player_id': 'player_wipe_1',
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final client = _AvatarAndWipePlayGamesClient(
+          shouldSucceedSignIn: false,
+          mockPlayerName: 'WipeUser1',
+          mockPlayerId: 'player_wipe_1',
+        );
+        final playGames = PlayGamesService(
+          storage: storage,
+          client: client,
+          profileRetryDelay: Duration.zero,
+          maxAutoRetries: 0,
+        );
+        addTearDown(playGames.dispose);
+
+        // Wipe offline at t = 1000
+        final wipedOnline = await playGames.wipeCloudData(
+          wipeTimestampMillis: 1000,
+        );
+        expect(wipedOnline, isFalse);
+        expect(storage.pendingCloudWipeAtMillis, 1000);
+        expect(storage.pendingCloudWipePlayerId, 'player_wipe_1');
+
+        // Reconnect when another device saved newer progress at t = 2000 (> 1000)
+        client.shouldSucceedSignIn = true;
+        client.setCloudSaveForPlayer(
+          'player_wipe_1',
+          const CloudSaveData(
+            fireOrbs: 333,
+            currentWeek: 5,
+            updatedAtMillis: 2000,
+          ).toJsonString(),
+        );
+        await playGames.signIn(silent: false);
+        expect(storage.pendingCloudWipeAtMillis, isNull);
+        expect(storage.fireOrbs, 333);
+        expect(storage.currentWeek, 5);
+      },
+    );
+  });
+}
+
+class _AvatarAndWipePlayGamesClient
+    implements PlayGamesClient, PlayGamesAvatarClient {
+  bool shouldSucceedSignIn;
+  String? mockPlayerName;
+  String? mockPlayerId;
+  String? mockAvatarBase64;
+  final Map<String, String?> _cloudByPlayer = {};
+
+  _AvatarAndWipePlayGamesClient({
+    this.shouldSucceedSignIn = true,
+    this.mockPlayerName = 'AvatarUser',
+    this.mockPlayerId = 'player_avatar',
+    this.mockAvatarBase64,
+  });
+
+  void setCloudSaveForPlayer(String playerId, String? data) {
+    _cloudByPlayer[playerId] = data;
+  }
+
+  @override
+  Future<String?> signIn() async => shouldSucceedSignIn ? 'success' : null;
+
+  @override
+  Future<String?> getPlayerName() async => mockPlayerName;
+
+  @override
+  Future<String?> getPlayerID() async => mockPlayerId;
+
+  @override
+  Future<String?> getPlayerIconImage() async => mockAvatarBase64;
+
+  @override
+  Future<String?> saveGame({
+    required String data,
+    required String name,
+  }) async {
+    _cloudByPlayer[mockPlayerId ?? ''] = data;
+    return 'success';
+  }
+
+  @override
+  Future<String?> loadGame({required String name}) async =>
+      _cloudByPlayer[mockPlayerId ?? ''];
 }
 
 class _SlowPlayGamesClient implements PlayGamesClient {

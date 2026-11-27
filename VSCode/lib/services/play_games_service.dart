@@ -43,6 +43,12 @@ abstract class PlayGamesClient {
   Future<String?> loadGame({required String name});
 }
 
+/// Optional capability interface for [PlayGamesClient] implementations that
+/// provide the signed-in player's Google Play Games avatar as a base64 image.
+abstract class PlayGamesAvatarClient implements PlayGamesClient {
+  Future<String?> getPlayerIconImage();
+}
+
 /// Default production implementation of [PlayGamesClient] backed by
 /// the `games_services` plugin.
 ///
@@ -51,7 +57,7 @@ abstract class PlayGamesClient {
 /// `games_services.player` EventChannel. Keeping a persistent listener warmed up
 /// before `GamesServices.signIn()` ensures the player event emitted during
 /// native sign-in is captured immediately and never lost.
-class DefaultPlayGamesClient implements PlayGamesClient {
+class DefaultPlayGamesClient implements PlayGamesClient, PlayGamesAvatarClient {
   static const Duration defaultSignInTimeout = Duration(seconds: 15);
   static const Duration defaultProfileTimeout = Duration(seconds: 8);
   static const Duration defaultCloudTimeout = Duration(seconds: 12);
@@ -106,6 +112,7 @@ class DefaultPlayGamesClient implements PlayGamesClient {
   @override
   Future<String?> signIn() async {
     _ensurePlayerStreamSubscribed();
+    _cachedPlayer = null;
     return await GamesServices.signIn().timeout(defaultSignInTimeout);
   }
 
@@ -149,6 +156,36 @@ class DefaultPlayGamesClient implements PlayGamesClient {
     }
     final player = await _waitForPlayerData(const Duration(seconds: 3));
     return player?.playerID;
+  }
+
+  @override
+  Future<String?> getPlayerIconImage() async {
+    _ensurePlayerStreamSubscribed();
+    final cachedIcon = _cachedPlayer?.iconImage;
+    if (cachedIcon != null && cachedIcon.trim().isNotEmpty) {
+      return cachedIcon;
+    }
+    try {
+      final icon = await GamesServices.getPlayerIconImage().timeout(
+        defaultProfileTimeout,
+      );
+      if (icon != null && icon.trim().isNotEmpty) {
+        return icon;
+      }
+    } catch (e) {
+      debugPrint('[PlayGamesService] getPlayerIconImage fallback: $e');
+    }
+    try {
+      final hiRes = await GamesServices.getPlayerHiResImage().timeout(
+        defaultProfileTimeout,
+      );
+      if (hiRes != null && hiRes.trim().isNotEmpty) {
+        return hiRes;
+      }
+    } catch (e) {
+      debugPrint('[PlayGamesService] getPlayerHiResImage fallback: $e');
+    }
+    return _cachedPlayer?.iconImage;
   }
 
   @override
@@ -1937,6 +1974,8 @@ class PlayGamesService extends ChangeNotifier {
   String? _playerName;
   String? _playerID;
   String? _lastPlayerID;
+  Uint8List? _playerAvatarBytes;
+  bool _isLoadingAvatar = false;
   String? _lastErrorCode;
   String? _lastErrorMessage;
   CloudSyncStatus _syncStatus = CloudSyncStatus.offline;
@@ -1969,8 +2008,29 @@ class PlayGamesService extends ChangeNotifier {
   String? get playerID => isValidPlayerId(_playerID) ? _playerID : null;
   String? get lastPlayerID =>
       isValidPlayerId(_lastPlayerID) ? _lastPlayerID : storage.lastPlayerId;
+  Uint8List? get playerAvatarBytes => isSignedIn ? _playerAvatarBytes : null;
+  bool get isLoadingAvatar => isSignedIn && _isLoadingAvatar;
   String? get lastErrorCode => _lastErrorCode;
   String? get lastErrorMessage => _lastErrorMessage;
+
+  /// Decodes a Google Play Games base64 profile image string into raw image bytes,
+  /// returning `null` if [rawBase64] is null, empty, or invalid base64.
+  static Uint8List? decodeAvatarBytes(String? rawBase64) {
+    if (rawBase64 == null) return null;
+    var normalized = rawBase64.replaceAll(RegExp(r'\s+'), '');
+    if (normalized.isEmpty) return null;
+    final commaIdx = normalized.indexOf(',');
+    if (normalized.startsWith('data:image/') && commaIdx != -1) {
+      normalized = normalized.substring(commaIdx + 1);
+    }
+    if (normalized.isEmpty) return null;
+    try {
+      final decoded = base64Decode(normalized);
+      return decoded.isEmpty ? null : decoded;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Human-readable diagnostic message for the most recent sign-in failure.
   /// Distinguishes genuine network/timeout issues from Google Play Games SDK
@@ -2255,11 +2315,18 @@ class PlayGamesService extends ChangeNotifier {
       _playerName = resolvedName;
       _playerID = resolvedId;
       _lastPlayerID = resolvedId;
+      if (playerChanged) {
+        _playerAvatarBytes = null;
+        _isLoadingAvatar = false;
+      }
       await storage.setLastPlayerId(resolvedId);
       _isAuthenticating = false;
       notifyListeners();
 
+      unawaited(_refreshPlayerAvatar(resolvedId));
+
       if (playerChanged) {
+        await storage.clearPendingCloudWipe();
         await storage.clearGameplayProgress(
           includeSettings: true,
           includeCastleMeta: true,
@@ -2279,6 +2346,40 @@ class PlayGamesService extends ChangeNotifier {
       }
       return await finish(false);
     }
+  }
+
+  Future<void> _refreshPlayerAvatar(String expectedPlayerId) async {
+    final client = _client;
+    if (client is PlayGamesAvatarClient) {
+      _isLoadingAvatar = true;
+      notifyListeners();
+      try {
+        final raw = await client.getPlayerIconImage();
+        if (!isSignedIn || _playerID != expectedPlayerId) return;
+        _playerAvatarBytes = decodeAvatarBytes(raw);
+      } catch (error) {
+        debugPrint('[PlayGamesService] getPlayerIconImage error: $error');
+        if (isSignedIn && _playerID == expectedPlayerId) {
+          _playerAvatarBytes = null;
+        }
+      } finally {
+        if (_playerID == expectedPlayerId || !isSignedIn) {
+          _isLoadingAvatar = false;
+          notifyListeners();
+        }
+      }
+      return;
+    }
+    _playerAvatarBytes = null;
+    _isLoadingAvatar = false;
+  }
+
+  bool _hasPendingCloudWipeForActivePlayer() {
+    final pendingTs = storage.pendingCloudWipeAtMillis;
+    if (pendingTs == null) return false;
+    final pendingPid = storage.pendingCloudWipePlayerId;
+    if (pendingPid == null) return true;
+    return pendingPid == _playerID;
   }
 
   /// Loads the saved game from Google Play Saved Games (`GamesServices.loadGame`).
@@ -2308,7 +2409,10 @@ class PlayGamesService extends ChangeNotifier {
             isAccountSwitch = true;
             _playerID = resolvedId;
             _lastPlayerID = resolvedId;
+            _playerAvatarBytes = null;
+            _isLoadingAvatar = false;
             await storage.setLastPlayerId(resolvedId);
+            await storage.clearPendingCloudWipe();
             final fetchedName = await _client.getPlayerName();
             if (fetchedName != null && fetchedName.trim().isNotEmpty) {
               _playerName = fetchedName.trim();
@@ -2319,6 +2423,7 @@ class PlayGamesService extends ChangeNotifier {
               preserveRemoveAds: false,
             );
             onCloudDataRestored?.call();
+            unawaited(_refreshPlayerAvatar(resolvedId));
           }
         }
       }
@@ -2326,6 +2431,31 @@ class PlayGamesService extends ChangeNotifier {
       final rawCloud = await _client.loadGame(name: saveSlotName);
       final cloudData = CloudSaveData.tryParse(rawCloud);
       final localData = CloudSaveData.fromStorage(storage);
+
+      if (!isAccountSwitch && _hasPendingCloudWipeForActivePlayer()) {
+        final pendingWipeTs = storage.pendingCloudWipeAtMillis!;
+        final hasNewerCloudSaveFromAnotherDevice =
+            cloudData != null &&
+            cloudData.updatedAtMillis > pendingWipeTs &&
+            cloudData.hasHigherProgressionOrOrbsThan(localData);
+        if (hasNewerCloudSaveFromAnotherDevice) {
+          await storage.clearPendingCloudWipe();
+        } else {
+          final wipedLocal = CloudSaveData.fromStorage(storage);
+          final saveRes = await _client.saveGame(
+            data: wipedLocal.toJsonString(),
+            name: saveSlotName,
+          );
+          if (isSignedIn && saveRes != null) {
+            await storage.clearPendingCloudWipe();
+            _syncStatus = CloudSyncStatus.synced;
+          } else {
+            _syncStatus = CloudSyncStatus.offline;
+          }
+          notifyListeners();
+          return false;
+        }
+      }
 
       bool restoredFromCloud = false;
       if (isAccountSwitch) {
@@ -2380,7 +2510,11 @@ class PlayGamesService extends ChangeNotifier {
       if (isAccountSwitch) {
         onCloudDataRestored?.call();
       }
-      await checkAndGrantQaBonusIfEligible();
+      final skipQaForPendingWipe =
+          !isAccountSwitch && _hasPendingCloudWipeForActivePlayer();
+      if (!skipQaForPendingWipe) {
+        await checkAndGrantQaBonusIfEligible();
+      }
       // Cloud load failed (e.g., no existing snapshot or temporary network issue);
       // attempt to save current local state or fall back to offline status.
       try {
@@ -2389,13 +2523,69 @@ class PlayGamesService extends ChangeNotifier {
           data: localData.toJsonString(),
           name: saveSlotName,
         );
-        _syncStatus = (isSignedIn && saveRes != null)
-            ? CloudSyncStatus.synced
-            : CloudSyncStatus.offline;
+        if (isSignedIn && saveRes != null) {
+          if (_hasPendingCloudWipeForActivePlayer()) {
+            await storage.clearPendingCloudWipe();
+          }
+          _syncStatus = CloudSyncStatus.synced;
+        } else {
+          _syncStatus = CloudSyncStatus.offline;
+        }
       } catch (saveError) {
         debugPrint('[PlayGamesService] fallback saveGame error: $saveError');
         _syncStatus = CloudSyncStatus.offline;
       }
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Records a full account wipe timestamp for the active/last-known player so
+  /// stale cloud data cannot resurrect wiped progress if offline, and overwrites
+  /// the active player's Google Play Saved Games slot with the fresh wiped state
+  /// when signed in and online.
+  ///
+  /// Returns `true` if Cloud Save was immediately overwritten, or `false` if
+  /// offline/failed (in which case the pending wipe marker remains armed until
+  /// the next successful cloud sync).
+  Future<bool> wipeCloudData({int? wipeTimestampMillis}) async {
+    final wipeTs =
+        wipeTimestampMillis ?? DateTime.now().millisecondsSinceEpoch;
+    final targetPlayerId = playerID ?? lastPlayerID;
+    if (isValidPlayerId(targetPlayerId)) {
+      await storage.setPendingCloudWipe(
+        timestampMillis: wipeTs,
+        playerId: targetPlayerId,
+      );
+    }
+
+    if (!isSignedIn) {
+      _syncStatus = CloudSyncStatus.offline;
+      notifyListeners();
+      return false;
+    }
+
+    _syncStatus = CloudSyncStatus.syncing;
+    notifyListeners();
+
+    try {
+      final wipedSnapshot = CloudSaveData.fromStorage(storage);
+      final result = await _client.saveGame(
+        data: wipedSnapshot.toJsonString(),
+        name: saveSlotName,
+      );
+      if (isSignedIn && result != null) {
+        await storage.clearPendingCloudWipe();
+        _syncStatus = CloudSyncStatus.synced;
+        notifyListeners();
+        return true;
+      }
+      _syncStatus = CloudSyncStatus.offline;
+      notifyListeners();
+      return false;
+    } catch (error) {
+      debugPrint('[PlayGamesService] wipeCloudData error: $error');
+      _syncStatus = CloudSyncStatus.offline;
       notifyListeners();
       return false;
     }
@@ -2471,6 +2661,9 @@ class PlayGamesService extends ChangeNotifier {
         name: saveSlotName,
       );
       if (isSignedIn && result != null) {
+        if (_hasPendingCloudWipeForActivePlayer()) {
+          await storage.clearPendingCloudWipe();
+        }
         _syncStatus = CloudSyncStatus.synced;
         notifyListeners();
         return true;
@@ -2492,6 +2685,8 @@ class PlayGamesService extends ChangeNotifier {
     _isAuthenticating = false;
     _playerName = null;
     _playerID = null;
+    _playerAvatarBytes = null;
+    _isLoadingAvatar = false;
     _syncStatus = CloudSyncStatus.offline;
     notifyListeners();
   }

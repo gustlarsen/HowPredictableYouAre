@@ -1,5 +1,5 @@
 {
-  "summary": "- Upgrade Android build toolchain to Gradle 9.5.0, AGP 9.3.1, KGP 2.4.20, and compileSdk 37\n- Migrate app Kotlin compilerOptions DSL and add kotlin.incremental=false for Windows cross-drive builds\n- Align GitHub Actions build workflow to Flutter 3.50.1 and Temurin Java 21 LTS (resolving AGP 9.3.1 release lint crash on JDK 17)\n- Update cupertino_icons (^2.0.0) and flutter_local_notifications (^23.0.4)",
+  "summary": "- Added discreet Full Account Wipe trash button & confirmation dialog near Player Profile in SettingsDialog (clarifying Forfeit Run difference, real-money IAP preservation vs orb-unlocked items like Remove Ads, and Cloud Save reset/offline handling)\n- Added GameController.wipeAccountData(), StorageService pending cloud wipe markers, and PlayGamesService.wipeCloudData() to wipe local & cloud progress cleanly without stale cloud resurrection\n- Improved Player Profile avatar in SettingsDialog to display decoded Google Play Games profile images via PlayGamesAvatarClient with a cohesive dark/amber fallback icon when unavailable, loading, or offline\n- Added localized strings (en, pt, es, de) and unit/widget tests in settings_account_wipe_and_avatar_test.dart and play_games_service_test.dart",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T09:41:25Z"
+  "updated_at_utc": "2026-11-27T09:50:58Z"
 }

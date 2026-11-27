@@ -190,6 +190,47 @@ class StorageService {
     return _prefs.setString('last_player_id', id!.trim());
   }
 
+  // Pending Full Account Wipe Cloud Sync Marker (prevents stale cloud saves
+  // from restoring wiped progress if wiped offline or cloud overwrite fails)
+  static const String pendingCloudWipeAtMillisKey =
+      'pending_cloud_wipe_at_millis';
+  static const String pendingCloudWipePlayerIdKey =
+      'pending_cloud_wipe_player_id';
+
+  int? get pendingCloudWipeAtMillis {
+    final val = _prefs.getInt(pendingCloudWipeAtMillisKey);
+    return (val != null && val > 0) ? val : null;
+  }
+
+  String? get pendingCloudWipePlayerId {
+    final raw = _prefs.getString(pendingCloudWipePlayerIdKey);
+    if (!isValidPlayerId(raw)) return null;
+    return raw!.trim();
+  }
+
+  Future<void> setPendingCloudWipe({
+    required int timestampMillis,
+    String? playerId,
+  }) {
+    final cleanTs = timestampMillis > 0
+        ? timestampMillis
+        : DateTime.now().millisecondsSinceEpoch;
+    return Future.wait([
+      _prefs.setInt(pendingCloudWipeAtMillisKey, cleanTs),
+      if (isValidPlayerId(playerId))
+        _prefs.setString(pendingCloudWipePlayerIdKey, playerId!.trim())
+      else
+        _prefs.remove(pendingCloudWipePlayerIdKey),
+    ]);
+  }
+
+  Future<void> clearPendingCloudWipe() {
+    return Future.wait([
+      _prefs.remove(pendingCloudWipeAtMillisKey),
+      _prefs.remove(pendingCloudWipePlayerIdKey),
+    ]);
+  }
+
   int get userScore => _prefs.getInt('userScore') ?? 0;
   Future<void> setUserScore(int val) => _prefs.setInt('userScore', val);
 
@@ -1472,6 +1513,7 @@ class StorageService {
       setBabyMageRobotDefeatedCount(0),
       clearBattleDecreeProgress(),
       clearOffertoryData(),
+      setLastFreeDailyPrayerDate(null),
     ]);
   }
 

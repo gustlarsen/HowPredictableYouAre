@@ -3314,8 +3314,33 @@
     "en_tutorial_continue_story_btn": "Continue",
     "pt_tutorial_continue_story_btn": "Continuar",
     "es_tutorial_continue_story_btn": "Continuar",
-    "de_tutorial_continue_story_btn": "Weiter"
+    "de_tutorial_continue_story_btn": "Weiter",
+    "en_wipe_account_tooltip": "Wipe Account Data",
+    "pt_wipe_account_tooltip": "Apagar Dados da Conta",
+    "es_wipe_account_tooltip": "Borrar Datos de la Cuenta",
+    "de_wipe_account_tooltip": "Kontodaten löschen",
+    "en_wipe_account_title": "Wipe Account Data?",
+    "pt_wipe_account_title": "Apagar Dados da Conta?",
+    "es_wipe_account_title": "¿Borrar Datos de la Cuenta?",
+    "de_wipe_account_title": "Kontodaten löschen?",
+    "en_wipe_account_message": "This performs a permanent, full reset (unlike Forfeit Run). All local run and account progression—including Elemental Orbs, shop unlocks, Relic Chamber, Spoils of War, Royal Treasury, Hall of Heroes, Story Memories, Offertory, and lifetime statistics—will be permanently erased.\n\n• Real-money purchases (via Google Play Billing / Restore Purchases) are preserved and remain recoverable.\n• Items or upgrades unlocked with in-game orbs/diamonds (such as Remove Ads) are NOT recovered as real-money purchases and will be lost.\n• Cloud Save: If signed in to Google Play Games, your cloud save for the active player will also be reset and overwritten. If offline, local data is wiped cleanly and stale cloud progress will not be restored over this reset when you reconnect.",
+    "pt_wipe_account_message": "Isto realiza uma redefinição completa e permanente (diferente de Desistir da Jornada). Todo o progresso local da jornada e da conta—incluindo Orbes Elementais, desbloqueios da loja, Câmara de Relíquias, Espólios de Guerra, Tesouro Real, Salão dos Heróis, Memórias da História, Ofertório e estatísticas vitalícias—será apagado permanentemente.\n\n• Compras com dinheiro real (via Google Play Billing / Restaurar Compras) são preservadas e continuam recuperáveis.\n• Itens ou melhorias desbloqueados com orbes/diamantes do jogo (como Remover propagandas) NÃO são recuperados como compras com dinheiro real e serão perdidos.\n• Salvamento na Nuvem: Se estiver conectado ao Google Play Games, seu salvamento na nuvem do jogador ativo também será redefinido e sobrescrito. Se estiver offline, os dados locais serão limpos e o progresso antigo da nuvem não será restaurado sobre esta redefinição ao reconectar.",
+    "es_wipe_account_message": "Esto realiza un restablecimiento completo y permanente (a diferencia de Abandonar Jornada). Todo el progreso local de la partida y de la cuenta—incluidos Orbes Elementales, desbloqueos de la tienda, Cámara de Reliquias, Botín de Guerra, Tesoro Real, Salón de Héroes, Recuerdos de la Historia, Ofertorio y estadísticas de por vida—se borrará de forma permanente.\n\n• Las compras con dinero real (mediante Google Play Billing / Restaurar Compras) se conservan y siguen siendo recuperables.\n• Los objetos o mejoras desbloqueados con orbes/diamantes del juego (como Quitar Anuncios) NO se recuperan como compras con dinero real y se perderán.\n• Guardado en la Nube: Si has iniciado sesión en Google Play Games, tu partida guardada en la nube del jugador activo también se restablecerá y sobrescribirá. Si estás sin conexión, los datos locales se borran por completo y el progreso antiguo de la nube no se restaurará sobre este reinicio al reconectar.",
+    "de_wipe_account_message": "Dies führt einen dauerhaften, vollständigen Reset durch (anders als Durchlauf aufgeben). Der gesamte lokale Spiel- und Kontofortschritt—einschließlich Elementar-Orbs, Shop-Freischaltungen, Reliktkammer, Kriegsbeute, Königliche Schatzkammer, Halle der Helden, Geschichts-Erinnerungen, Offertorium und Lebenszeit-Statistiken—wird dauerhaft gelöscht.\n\n• Echtgeldkäufe (über Google Play Billing / Käufe wiederherstellen) bleiben erhalten und sind weiterhin wiederherstellbar.\n• Gegenstände oder Upgrades, die mit Spiel-Orbs/Diamanten freigeschaltet wurden (wie Anzeigen Entfernen), werden NICHT als Echtgeldkäufe wiederhergestellt und gehen verloren.\n• Cloud-Speicher: Wenn du bei Google Play Games angemeldet bist, wird dein Cloud-Speicherstand für den aktiven Spieler ebenfalls zurückgesetzt und überschrieben. Im Offline-Modus werden lokale Daten sauber gelöscht und veralteter Cloud-Fortschritt wird beim erneuten Verbinden nicht über diesen Reset wiederhergestellt.",
+    "en_wipe_account_confirm": "Wipe Everything",
+    "pt_wipe_account_confirm": "Apagar Tudo",
+    "es_wipe_account_confirm": "Borrar Todo",
+    "de_wipe_account_confirm": "Alles löschen",
+    "en_wipe_account_done_synced": "Account wiped! Local data and Cloud Save have been reset.",
+    "pt_wipe_account_done_synced": "Conta apagada! Os dados locais e o Salvamento na Nuvem foram redefinidos.",
+    "es_wipe_account_done_synced": "¡Cuenta borrada! Los datos locales y el Guardado en la Nube se han restablecido.",
+    "de_wipe_account_done_synced": "Konto gelöscht! Lokale Daten und Cloud-Speicher wurden zurückgesetzt.",
+    "en_wipe_account_done_local": "Local account wiped! Cloud Save will sync this reset when back online.",
+    "pt_wipe_account_done_local": "Conta local apagada! O Salvamento na Nuvem sincronizará esta redefinição quando voltar a ficar online.",
+    "es_wipe_account_done_local": "¡Cuenta local borrada! El Guardado en la Nube sincronizará este reinicio al volver a conectarse.",
+    "de_wipe_account_done_local": "Lokales Konto gelöscht! Der Cloud-Speicher synchronisiert diesen Reset, sobald du wieder online bist."
 }
+
 
 
 
