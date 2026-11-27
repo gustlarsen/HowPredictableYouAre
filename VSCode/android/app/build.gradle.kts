@@ -25,17 +25,13 @@ val hasReleaseSigning = resolvedKeystoreFile != null &&
 
 android {
     namespace = "com.gustlarsen.howpredictable"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = System.getenv("ANDROID_NDK_VERSION")?.takeIf { it.isNotBlank() } ?: flutter.ndkVersion
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -79,6 +75,12 @@ android {
 
     androidResources {
         noCompress += listOf("mid", "midi", "wav", "mp3")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
