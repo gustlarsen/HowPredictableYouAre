@@ -3354,7 +3354,31 @@
     "en_wipe_account_done_local": "Local account wiped! Cloud Save will sync this reset when back online.",
     "pt_wipe_account_done_local": "Conta local apagada! O Salvamento na Nuvem sincronizará esta redefinição quando voltar a ficar online.",
     "es_wipe_account_done_local": "¡Cuenta local borrada! El Guardado en la Nube sincronizará este reinicio al volver a conectarse.",
-    "de_wipe_account_done_local": "Lokales Konto gelöscht! Der Cloud-Speicher synchronisiert diesen Reset, sobald du wieder online bist."
+    "de_wipe_account_done_local": "Lokales Konto gelöscht! Der Cloud-Speicher synchronisiert diesen Reset, sobald du wieder online bist.",
+    "en_altar_sacrifice_title": "Altar of Sacrifice",
+    "pt_altar_sacrifice_title": "Altar do Sacrifício",
+    "es_altar_sacrifice_title": "Altar del Sacrificio",
+    "de_altar_sacrifice_title": "Opferaltar",
+    "en_altar_sacrifice_phase_flame": "Holocaust Flame Consumes Your Offering...",
+    "pt_altar_sacrifice_phase_flame": "A Chama do Holocausto Consome Sua Oferenda...",
+    "es_altar_sacrifice_phase_flame": "La Llama del Holocausto Consume Tu Ofrenda...",
+    "de_altar_sacrifice_phase_flame": "Die Opferflamme verzehrt deine Gabe...",
+    "en_altar_sacrifice_phase_star": "A Divine Star Descends Upon the Sanctuary...",
+    "pt_altar_sacrifice_phase_star": "Uma Estrela Divina Desce Sobre o Santuário...",
+    "es_altar_sacrifice_phase_star": "Una Estrella Divina Desciende Sobre el Santuario...",
+    "de_altar_sacrifice_phase_star": "Ein göttlicher Stern senkt sich auf das Heiligtum...",
+    "en_altar_blessing_granted_badge": "SACRED BLESSING GRANTED",
+    "pt_altar_blessing_granted_badge": "BÊNÇÃO SAGRADA CONCEDIDA",
+    "es_altar_blessing_granted_badge": "BENDICIÓN SAGRADA CONCEDIDA",
+    "de_altar_blessing_granted_badge": "HEILIGER SEGEN GEWÄHRT",
+    "en_altar_sacrificed_orbs_label": "Sacrificed Elemental Orbs",
+    "pt_altar_sacrificed_orbs_label": "Orbes Elementais Sacrificados",
+    "es_altar_sacrificed_orbs_label": "Orbes Elementales Sacrificados",
+    "de_altar_sacrificed_orbs_label": "Geopferte Elementar-Orbs",
+    "en_altar_collect_blessing": "Continue",
+    "pt_altar_collect_blessing": "Continuar",
+    "es_altar_collect_blessing": "Continuar",
+    "de_altar_collect_blessing": "Weiter"
 }
 
 

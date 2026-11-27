@@ -85,6 +85,8 @@ flutter:
     - assets/images/player/
     - assets/images/forge_arena_bg.webp
     - assets/images/temple_arena_bg.webp
+    - assets/images/sacred_altar.webp
+    - assets/images/offerings/
     - assets/images/royal_garden_arena_bg.png
     - assets/images/kingdom_map.jpeg
     - assets/images/world_map_peace.jpeg

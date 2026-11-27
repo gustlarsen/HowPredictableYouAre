@@ -421,6 +421,10 @@ void main() {
           // Purchase Level 1
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
+          await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 1);
           expect(controller.overchargedStaffEnabled, isTrue);
           expect(controller.overchargedStaffSelectedSpeed, 1);
@@ -475,6 +479,10 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
+          await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 2);
           expect(controller.overchargedStaffSelectedSpeed, 2);
           expect(
@@ -498,6 +506,10 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
+          await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 3);
           expect(controller.overchargedStaffSelectedSpeed, 5);
           expect(
@@ -520,6 +532,10 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
+          await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 4);
           expect(controller.overchargedStaffSelectedSpeed, 10);
           expect(
@@ -535,6 +551,10 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
+          await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 5);
           expect(controller.overchargedStaffSelectedSpeed, 20);
           expect(
@@ -549,6 +569,10 @@ void main() {
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_reveal_collect_button')),
+          );
           await tester.pumpAndSettle();
           expect(controller.overchargedStaffLevel, 6);
           expect(controller.overchargedStaffSelectedSpeed, 30);

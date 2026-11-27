@@ -1073,26 +1073,27 @@ void main() {
     await tester.tap(resetUnlockBtn);
     await tester.pumpAndSettle();
 
-    // Reset Button comic cutscene should open immediately
-    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsOneWidget);
+    // Altar of Sacrifice & Blessing reveal modal should open immediately
+    expect(find.byKey(const ValueKey('altar_sacrifice_dialog')), findsOneWidget);
+    expect(find.byKey(const ValueKey('altar_reveal_item_emblem')), findsOneWidget);
     expect(storage.hasSeenStoryReset, isTrue);
 
-    // Skip the cutscene
-    await tester.tap(find.byKey(const ValueKey('story_skip_button')));
+    // Collect/Continue from the blessing modal
+    await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+    expect(find.byKey(const ValueKey('altar_sacrifice_dialog')), findsNothing);
 
-    // Toggling the Reset switch off and on in the shop should NOT re-trigger the comic
+    // Toggling the Reset switch off and on in the shop should NOT re-trigger the ritual
     final resetSwitch = find.byType(Switch).first;
     await tester.ensureVisible(resetSwitch);
     await tester.pumpAndSettle();
     await tester.tap(resetSwitch);
     await tester.pumpAndSettle();
-    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+    expect(find.byKey(const ValueKey('altar_sacrifice_dialog')), findsNothing);
 
     await tester.tap(resetSwitch);
     await tester.pumpAndSettle();
-    expect(find.text('Chapter I: The Hourglass of Oblivion'), findsNothing);
+    expect(find.byKey(const ValueKey('altar_sacrifice_dialog')), findsNothing);
 
     // Close ShopDialog
     await tester.tap(find.text('Close'));
@@ -1467,6 +1468,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.unlockedPredictability, isTrue);
     expect(controller.totalOrbs, 0);
+    await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
+    await tester.pumpAndSettle();
 
     // Verify localized subtitle in Portuguese (pt), Spanish (es), and German (de)
     controller.setLanguage('pt');
@@ -1953,6 +1956,8 @@ void main() {
     final fireBeforePurchase = controller.fireOrbs;
     final earthBeforePurchase = controller.earthOrbs;
     await tester.tap(find.byKey(const ValueKey('diamond_unlock_New Skin')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
     await tester.pumpAndSettle();
 
     expect(controller.unlockedNewSkin, isTrue);
@@ -3678,6 +3683,12 @@ void main() {
 
     // 3. Purchase Gift Box in Shop -> deducts 500 of each element, starts disabled
     await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('altar_reveal_emblem_image_gift_box')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
     await tester.pumpAndSettle();
 
     expect(controller.giftBoxUnlocked, isTrue);
