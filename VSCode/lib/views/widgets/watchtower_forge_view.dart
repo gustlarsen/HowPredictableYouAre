@@ -306,19 +306,20 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
       pileSize,
     );
 
-    // Balanced, imposing Titanium Robot Egg perched on the right-side iron anvil pedestal
-    final eggSize = unit * 0.43;
+    // Scaled-down Titanium Robot Egg (~35% of prior size) matching the Metal Wizard's hooded head height
+    final eggSize = unit * 0.15;
+    final eggCenter = Offset(cx + unit * 0.195, cy + unit * 0.064);
     final eggRect = Rect.fromCenter(
-      center: Offset(cx + unit * 0.20, cy - unit * 0.02),
+      center: eggCenter,
       width: eggSize,
       height: eggSize,
     );
 
-    // Tight interactive tap hitbox matching visible ovoid silhouette (stays strictly right of lens center)
+    // Comfortable interactive tap hitbox centered on the scaled-down egg (stays strictly right of lens center)
     final eggTapRect = Rect.fromCenter(
-      center: Offset(cx + unit * 0.20, cy - unit * 0.015),
-      width: eggSize * 0.68,
-      height: eggSize * 0.89,
+      center: eggCenter,
+      width: math.max(eggSize * 1.25, unit * 0.21),
+      height: math.max(eggSize * 1.35, unit * 0.22),
     );
 
     final eggEyeCenter = Offset(
@@ -326,8 +327,12 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
       eggRect.top + eggRect.height * WatchtowerForgeView.eggEyeNormalized.dy,
     );
 
-    // Top cradle rim & runic circle center directly beneath the egg base
-    final pedestalCenter = Offset(cx + unit * 0.20, cy + unit * 0.178);
+    // Wrought-iron pedestal top cradle collar directly clasping the scaled-down egg's base
+    final pedestalTopCenter = Offset(cx + unit * 0.195, cy + unit * 0.138);
+
+    // Elliptical rotating rune ring center positioned below the egg's lower rim so
+    // back arc (π..2π) passes behind the egg/pedestal and front arc (0..π) wraps in front of pedestal base
+    final pedestalCenter = Offset(cx + unit * 0.195, cy + unit * 0.162);
 
     return _ForgeSceneGeometry(
       size: size,
@@ -340,6 +345,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
       eggRect: eggRect,
       eggTapRect: eggTapRect,
       eggEyeCenter: eggEyeCenter,
+      pedestalTopCenter: pedestalTopCenter,
       pedestalCenter: pedestalCenter,
     );
   }
@@ -396,7 +402,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                 final burstEnv = math.exp(
                   -math.pow((beatPhase - 0.16) / 0.11, 2),
                 );
-                final tremorAmp = (geom.unit * 0.0055).clamp(1.2, 2.4) * burstEnv;
+                final tremorAmp = (geom.unit * 0.0042).clamp(0.9, 1.8) * burstEnv;
                 eggTremorOffset = Offset(
                   math.sin(t * 168.0 * math.pi) * tremorAmp,
                   math.cos(t * 134.0 * math.pi) * tremorAmp * 0.45,
@@ -404,7 +410,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
               }
               if (resonanceT > 0.0 && resonanceT < 0.35) {
                 final resEnv = 1.0 - (resonanceT / 0.35);
-                final resAmp = (geom.unit * 0.004).clamp(0.8, 1.8) * resEnv;
+                final resAmp = (geom.unit * 0.0032).clamp(0.7, 1.5) * resEnv;
                 eggTremorOffset += Offset(
                   math.sin(resonanceT * 42.0 * math.pi) * resAmp,
                   0.0,
@@ -431,8 +437,36 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                     ),
                   ),
 
-                  // 2. Iron Assembly Rig gantry & Workbench (Weeks 1–9 / Cooling)
-                  //    OR Dark Wrought-Iron Arcane Forge Pedestal / Anvil Cradle (Week 0 & Weeks 10–39)
+                  // 2a. Back Layer (Behind Pedestal & Egg): rear/upper half (π..2π) of the
+                  //     concentric rotating rune ring, floor aura, and background embers
+                  if (eggOnPedestal)
+                    IgnorePointer(
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          key: const ValueKey(
+                            'watchtower_forge_egg_enchantment_back_painter',
+                          ),
+                          painter: EggEnchantmentPainter(
+                            staffOrigin: geom.staffOrigin,
+                            eggRect: geom.eggRect.shift(eggTremorOffset),
+                            eggEyeCenter:
+                                geom.eggEyeCenter + eggTremorOffset,
+                            pedestalCenter: geom.pedestalCenter,
+                            unit: geom.unit,
+                            ambientProgress: t,
+                            resonanceProgress: resonanceT,
+                            isOvercharged: eggOvercharged,
+                            animationsEnabled: widget.animationsEnabled,
+                            isFullScreen: widget.isFullScreen,
+                            layer: EggEnchantmentLayer.back,
+                          ),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    ),
+
+                  // 2b. Iron Assembly Rig gantry & Workbench (Weeks 1–9 / Cooling)
+                  //     OR Dark Wrought-Iron Arcane Forge Pedestal / Anvil Cradle (Week 0 & Weeks 10–39)
                   IgnorePointer(
                     child: CustomPaint(
                       key: const ValueKey('watchtower_forge_rig_backdrop'),
@@ -452,7 +486,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                   if (widget.showsBlueprintHologram)
                     _buildBlueprintHologramLayer(geom, t),
 
-                  // 4. Mounted Titanium Robot Egg / Assembly Stage / Cloaked Archmage
+                  // 4. Middle Layer: Scaled-down Titanium Robot Egg / Assembly Stage / Cloaked Archmage
                   ..._buildRigSubjectLayers(
                     geom: geom,
                     phase: phase,
@@ -485,7 +519,8 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                       key: ValueKey('watchtower_forge_cooling_state'),
                     ),
 
-                  // 7. Dedicated 60 FPS Arcane Egg Enchantment VFX (Week 0 & Weeks 10–39)
+                  // 7. Front Layer (In Front of Egg & Pedestal): front/lower rune ring arc (0..π),
+                  //    staff-to-egg lightning conduits, visor heartbeat glow & tap-to-resonate burst
                   if (eggOnPedestal)
                     IgnorePointer(
                       child: RepaintBoundary(
@@ -505,6 +540,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                             isOvercharged: eggOvercharged,
                             animationsEnabled: widget.animationsEnabled,
                             isFullScreen: widget.isFullScreen,
+                            layer: EggEnchantmentLayer.front,
                           ),
                           child: const SizedBox.expand(),
                         ),
@@ -531,7 +567,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
                     ),
                   ),
 
-                  // 9. Interactive Tap-to-Resonate hitbox strictly over the Titanium Robot Egg
+                  // 9. Interactive Tap-to-Resonate hitbox over the scaled-down Titanium Robot Egg
                   if (eggOnPedestal)
                     Positioned.fromRect(
                       rect: geom.eggTapRect,
@@ -771,6 +807,7 @@ class _ForgeSceneGeometry {
   final Rect eggRect;
   final Rect eggTapRect;
   final Offset eggEyeCenter;
+  final Offset pedestalTopCenter;
   final Offset pedestalCenter;
 
   const _ForgeSceneGeometry({
@@ -784,6 +821,7 @@ class _ForgeSceneGeometry {
     required this.eggRect,
     required this.eggTapRect,
     required this.eggEyeCenter,
+    required this.pedestalTopCenter,
     required this.pedestalCenter,
   });
 
@@ -973,12 +1011,13 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
   }
 
   /// Paints the dark wrought-iron Arcane Forge Pedestal / Anvil Cradle
-  /// supporting the Titanium Robot Egg (Week 0 & Weeks 10–39).
+  /// proportioned to naturally seat the scaled-down Titanium Robot Egg
+  /// (Week 0 & Weeks 10–39).
   void _paintArcaneEggPedestal(Canvas canvas) {
     final u = geom.unit;
-    final pc = geom.pedestalCenter;
+    final pt = geom.pedestalTopCenter;
     final isOvercharged = phase == ForgeAssemblyPhase.eggOvercharged;
-    final strokeW = (u * 0.0045).clamp(1.1, 2.5);
+    final strokeW = (u * 0.0042).clamp(1.0, 2.3);
 
     const ironDeep = Color(0xFF16161D);
     const ironMid = Color(0xFF2A2933);
@@ -986,7 +1025,7 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
     final runeAccent = isOvercharged
         ? const Color(0xFFFF1744)
         : const Color(0xFFE040FB);
-    final emberEdge = const Color(0xFFFFB300).withValues(alpha: 0.48);
+    final emberEdge = const Color(0xFFFFB300).withValues(alpha: 0.50);
 
     final outlinePaint = Paint()
       ..color = ironRim
@@ -994,24 +1033,24 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
       ..strokeWidth = strokeW
       ..strokeJoin = StrokeJoin.round;
 
-    final baseBottomY = pc.dy + u * 0.115;
+    final baseBottomY = pt.dy + u * 0.146;
 
     // 1. Grounding floor shadow & warm subterranean rune glow under anvil base
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(pc.dx, baseBottomY + u * 0.006),
-        width: u * 0.36,
-        height: u * 0.068,
+        center: Offset(pt.dx, baseBottomY + u * 0.005),
+        width: u * 0.28,
+        height: u * 0.054,
       ),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.68)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+        ..color = Colors.black.withValues(alpha: 0.70)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(pc.dx, baseBottomY),
-        width: u * 0.34,
-        height: u * 0.058,
+        center: Offset(pt.dx, baseBottomY),
+        width: u * 0.26,
+        height: u * 0.046,
       ),
       Paint()
         ..shader = RadialGradient(
@@ -1023,21 +1062,21 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
           stops: const [0.0, 0.55, 1.0],
         ).createShader(
           Rect.fromCenter(
-            center: Offset(pc.dx, baseBottomY),
-            width: u * 0.34,
-            height: u * 0.08,
+            center: Offset(pt.dx, baseBottomY),
+            width: u * 0.26,
+            height: u * 0.065,
           ),
         ),
     );
 
-    // 2. Stepped heavy wrought-iron anvil plinth (bottom slab)
+    // 2. Stepped heavy wrought-iron anvil plinth (bottom slab resting on forge stone)
     final lowerBase = RRect.fromRectAndRadius(
       Rect.fromCenter(
-        center: Offset(pc.dx, baseBottomY - u * 0.015),
-        width: u * 0.275,
-        height: u * 0.036,
+        center: Offset(pt.dx, baseBottomY - u * 0.015),
+        width: u * 0.215,
+        height: u * 0.032,
       ),
-      Radius.circular(u * 0.009),
+      Radius.circular(u * 0.008),
     );
     canvas.drawRRect(
       lowerBase,
@@ -1051,23 +1090,23 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
     );
     canvas.drawRRect(lowerBase, outlinePaint);
 
-    // 3. Tapered forged anvil waist / pedestal column
-    final waistTopY = pc.dy + u * 0.006;
-    final waistBotY = lowerBase.top + u * 0.004;
+    // 3. Tapered forged iron pedestal column rising from plinth to egg cradle
+    final waistTopY = pt.dy + u * 0.008;
+    final waistBotY = lowerBase.top + u * 0.003;
     final waistPath = Path()
-      ..moveTo(pc.dx - u * 0.095, waistTopY)
-      ..lineTo(pc.dx + u * 0.095, waistTopY)
+      ..moveTo(pt.dx - u * 0.056, waistTopY)
+      ..lineTo(pt.dx + u * 0.056, waistTopY)
       ..quadraticBezierTo(
-        pc.dx + u * 0.070,
-        (waistTopY + waistBotY) * 0.52,
-        pc.dx + u * 0.112,
+        pt.dx + u * 0.044,
+        (waistTopY + waistBotY) * 0.54,
+        pt.dx + u * 0.084,
         waistBotY,
       )
-      ..lineTo(pc.dx - u * 0.112, waistBotY)
+      ..lineTo(pt.dx - u * 0.084, waistBotY)
       ..quadraticBezierTo(
-        pc.dx - u * 0.070,
-        (waistTopY + waistBotY) * 0.52,
-        pc.dx - u * 0.095,
+        pt.dx - u * 0.044,
+        (waistTopY + waistBotY) * 0.54,
+        pt.dx - u * 0.056,
         waistTopY,
       )
       ..close();
@@ -1084,34 +1123,34 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
     canvas.drawPath(waistPath, outlinePaint);
 
     // Central carved arcane rune channel running vertically down the iron pedestal
-    final grooveTop = Offset(pc.dx, waistTopY + u * 0.014);
-    final grooveBot = Offset(pc.dx, waistBotY - u * 0.010);
+    final grooveTop = Offset(pt.dx, waistTopY + u * 0.014);
+    final grooveBot = Offset(pt.dx, waistBotY - u * 0.010);
     canvas.drawLine(
       grooveTop,
       grooveBot,
       Paint()
         ..color = runeAccent.withValues(alpha: 0.45)
-        ..strokeWidth = (u * 0.015).clamp(3.0, 7.0)
+        ..strokeWidth = (u * 0.012).clamp(2.5, 6.0)
         ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
     );
     canvas.drawLine(
       grooveTop,
       grooveBot,
       Paint()
         ..color = const Color(0xFFFF80AB).withValues(alpha: 0.85)
-        ..strokeWidth = (u * 0.005).clamp(1.2, 2.6)
+        ..strokeWidth = (u * 0.0042).clamp(1.1, 2.3)
         ..strokeCap = StrokeCap.round,
     );
 
-    // 4. Forged iron collar lip cradling the base of the egg
+    // 4. Forged iron collar cup cleanly seating the base of the scaled-down egg
     final collarRect = RRect.fromRectAndRadius(
       Rect.fromCenter(
-        center: Offset(pc.dx, pc.dy),
-        width: u * 0.245,
-        height: u * 0.032,
+        center: Offset(pt.dx, pt.dy),
+        width: u * 0.136,
+        height: u * 0.025,
       ),
-      Radius.circular(u * 0.012),
+      Radius.circular(u * 0.009),
     );
     canvas.drawRRect(
       collarRect,
@@ -1124,42 +1163,54 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
     );
     canvas.drawRRect(collarRect, outlinePaint);
 
+    // Recessed dark cradle bed shadow directly beneath the egg's lower tip
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(pt.dx, pt.dy - u * 0.006),
+        width: u * 0.095,
+        height: u * 0.016,
+      ),
+      Paint()..color = const Color(0xFF0C0B10),
+    );
+
     // Warm forge-light rim highlight + bolted iron rivets on collar & plinth
     canvas.drawLine(
-      Offset(collarRect.left + u * 0.015, collarRect.top + strokeW * 0.8),
-      Offset(collarRect.right - u * 0.015, collarRect.top + strokeW * 0.8),
+      Offset(collarRect.left + u * 0.010, collarRect.top + strokeW * 0.8),
+      Offset(collarRect.right - u * 0.010, collarRect.top + strokeW * 0.8),
       Paint()
         ..color = emberEdge
-        ..strokeWidth = (u * 0.004).clamp(1.0, 2.0),
+        ..strokeWidth = (u * 0.0036).clamp(0.9, 1.8),
     );
     final rivetPaint = Paint()..color = const Color(0xFF7B707B);
-    final rivetR = (u * 0.0055).clamp(1.3, 3.0);
-    for (final dx in [-0.088, -0.044, 0.044, 0.088]) {
-      canvas.drawCircle(Offset(pc.dx + u * dx, pc.dy), rivetR, rivetPaint);
+    final rivetR = (u * 0.0046).clamp(1.2, 2.6);
+    for (final dx in [-0.048, -0.020, 0.020, 0.048]) {
+      canvas.drawCircle(Offset(pt.dx + u * dx, pt.dy), rivetR, rivetPaint);
+    }
+    for (final dx in [-0.075, -0.036, 0.036, 0.075]) {
       canvas.drawCircle(
-        Offset(pc.dx + u * dx * 1.12, lowerBase.center.dy),
+        Offset(pt.dx + u * dx, lowerBase.center.dy),
         rivetR,
         rivetPaint,
       );
     }
 
-    // 5. Curved wrought-iron Anvil Cradle Prongs clasping the lower contour of the egg
-    final prongW = (u * 0.022).clamp(4.0, 11.0);
+    // 5. Curved wrought-iron Anvil Cradle Prongs clasping the lower contour of the scaled-down egg
+    final prongW = (u * 0.014).clamp(3.0, 8.0);
     for (final side in [-1.0, 1.0]) {
       final prongPath = Path()
-        ..moveTo(pc.dx + side * u * 0.095, pc.dy - u * 0.004)
+        ..moveTo(pt.dx + side * u * 0.052, pt.dy - u * 0.003)
         ..quadraticBezierTo(
-          pc.dx + side * u * 0.145,
-          pc.dy - u * 0.032,
-          pc.dx + side * u * 0.128,
-          pc.dy - u * 0.098,
+          pt.dx + side * u * 0.078,
+          pt.dy - u * 0.018,
+          pt.dx + side * u * 0.064,
+          pt.dy - u * 0.052,
         )
-        ..lineTo(pc.dx + side * u * 0.106, pc.dy - u * 0.084)
+        ..lineTo(pt.dx + side * u * 0.050, pt.dy - u * 0.043)
         ..quadraticBezierTo(
-          pc.dx + side * u * 0.118,
-          pc.dy - u * 0.032,
-          pc.dx + side * u * 0.070,
-          pc.dy - u * 0.006,
+          pt.dx + side * u * 0.060,
+          pt.dy - u * 0.018,
+          pt.dx + side * u * 0.034,
+          pt.dy - u * 0.004,
         )
         ..close();
 
@@ -1176,11 +1227,11 @@ class _ForgeWorkshopBackdropPainter extends CustomPainter {
 
       // Subtle glowing rune tip at each iron prong
       canvas.drawCircle(
-        Offset(pc.dx + side * u * 0.120, pc.dy - u * 0.086),
-        prongW * 0.26,
+        Offset(pt.dx + side * u * 0.058, pt.dy - u * 0.045),
+        prongW * 0.28,
         Paint()
           ..color = const Color(0xFFFFB300).withValues(alpha: 0.72)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0),
       );
     }
   }
@@ -1917,6 +1968,22 @@ class _ForgeSpyglassVfxPainter extends CustomPainter {
   }
 }
 
+/// Render pass selector for [EggEnchantmentPainter] so the rear/upper half of
+/// the elliptical runic ring (`π` to `2π`) and background aura/embers render
+/// behind the wrought-iron pedestal & Titanium Robot Egg while the front/lower
+/// arc (`0` to `π`), staff lightning conduits, optical visor pulse, and
+/// Tap-to-Resonate shockwave render cleanly in front.
+enum EggEnchantmentLayer {
+  /// Back pass painted underneath the iron pedestal and Titanium Robot Egg.
+  back,
+
+  /// Front pass painted in front of the Titanium Robot Egg and pedestal base.
+  front,
+
+  /// Combined single-pass render (back then front).
+  both,
+}
+
 /// Dedicated 60 FPS arcane enchantment overlay rendered whenever the Titanium
 /// Robot Egg rests on the wrought-iron forge pedestal (Week 0 ritual &
 /// Weeks 10–39 Overcharged / Awakening state).
@@ -1924,11 +1991,14 @@ class _ForgeSpyglassVfxPainter extends CustomPainter {
 /// Renders:
 /// 1. Glowing crimson-violet (`#E040FB` / `#FF1744`) and molten-amber
 ///    (`#FFB300`) energy conduits & crackling lightning tendrils streaming
-///    from the Metal Wizard's clockwork staff into the egg & red optical eye.
+///    from the Metal Wizard's clockwork staff into the scaled-down egg's red
+///    optical eye.
 /// 2. Slowly rotating concentric golden-and-crimson magic rune ring around
-///    the iron pedestal, rising incandescent embers/mana motes, and a smooth
-///    rhythmic heartbeat glow (`~2.2s` Week 0 / `~1.1s` Overcharged) illuminating
-///    the egg's crimson runes and red visor.
+///    the iron pedestal (Z-ordered so `π..2π` passes behind the egg/pedestal
+///    and `0..π` wraps cleanly in front of the pedestal base), rising
+///    incandescent embers/mana motes, and a smooth rhythmic heartbeat glow
+///    (`~2.2s` Week 0 / `~1.1s` Overcharged) illuminating the egg's crimson
+///    runes and red visor.
 /// 3. Interactive Tap-to-Resonate defensive crimson-violet shockwave ring and
 ///    optical visor flare (`~450ms`).
 class EggEnchantmentPainter extends CustomPainter {
@@ -1942,6 +2012,7 @@ class EggEnchantmentPainter extends CustomPainter {
   final bool isOvercharged;
   final bool animationsEnabled;
   final bool isFullScreen;
+  final EggEnchantmentLayer layer;
 
   const EggEnchantmentPainter({
     required this.staffOrigin,
@@ -1954,6 +2025,7 @@ class EggEnchantmentPainter extends CustomPainter {
     required this.isOvercharged,
     required this.animationsEnabled,
     required this.isFullScreen,
+    this.layer = EggEnchantmentLayer.both,
   });
 
   static const Color _violetArcane = Color(0xFFE040FB);
@@ -1964,18 +2036,18 @@ class EggEnchantmentPainter extends CustomPainter {
   static const List<
     ({double angleOffset, double radiusFactor, double speed, double phase, double size, int colorIdx})
   > _manaMoteSpecs = [
-    (angleOffset: 0.15, radiusFactor: 0.85, speed: 1.0, phase: 0.04, size: 1.9, colorIdx: 0),
-    (angleOffset: 0.82, radiusFactor: 1.05, speed: 1.3, phase: 0.21, size: 1.5, colorIdx: 1),
-    (angleOffset: 1.54, radiusFactor: 0.72, speed: 1.1, phase: 0.39, size: 2.1, colorIdx: 2),
-    (angleOffset: 2.28, radiusFactor: 0.96, speed: 1.4, phase: 0.56, size: 1.6, colorIdx: 0),
-    (angleOffset: 2.95, radiusFactor: 0.80, speed: 0.95, phase: 0.73, size: 1.8, colorIdx: 1),
-    (angleOffset: 3.68, radiusFactor: 1.08, speed: 1.25, phase: 0.88, size: 1.5, colorIdx: 2),
-    (angleOffset: 4.35, radiusFactor: 0.76, speed: 1.15, phase: 0.14, size: 2.0, colorIdx: 0),
-    (angleOffset: 5.08, radiusFactor: 0.92, speed: 1.35, phase: 0.47, size: 1.7, colorIdx: 1),
-    (angleOffset: 5.74, radiusFactor: 0.68, speed: 1.05, phase: 0.65, size: 1.4, colorIdx: 2),
-    (angleOffset: 0.52, radiusFactor: 0.62, speed: 1.50, phase: 0.31, size: 1.8, colorIdx: 1),
-    (angleOffset: 2.62, radiusFactor: 1.12, speed: 1.20, phase: 0.79, size: 1.6, colorIdx: 0),
-    (angleOffset: 4.72, radiusFactor: 0.88, speed: 1.45, phase: 0.92, size: 2.1, colorIdx: 2),
+    (angleOffset: 0.15, radiusFactor: 0.85, speed: 1.0, phase: 0.04, size: 1.7, colorIdx: 0),
+    (angleOffset: 0.82, radiusFactor: 1.05, speed: 1.3, phase: 0.21, size: 1.4, colorIdx: 1),
+    (angleOffset: 1.54, radiusFactor: 0.72, speed: 1.1, phase: 0.39, size: 1.9, colorIdx: 2),
+    (angleOffset: 2.28, radiusFactor: 0.96, speed: 1.4, phase: 0.56, size: 1.5, colorIdx: 0),
+    (angleOffset: 2.95, radiusFactor: 0.80, speed: 0.95, phase: 0.73, size: 1.6, colorIdx: 1),
+    (angleOffset: 3.68, radiusFactor: 1.08, speed: 1.25, phase: 0.88, size: 1.4, colorIdx: 2),
+    (angleOffset: 4.35, radiusFactor: 0.76, speed: 1.15, phase: 0.14, size: 1.8, colorIdx: 0),
+    (angleOffset: 5.08, radiusFactor: 0.92, speed: 1.35, phase: 0.47, size: 1.5, colorIdx: 1),
+    (angleOffset: 5.74, radiusFactor: 0.68, speed: 1.05, phase: 0.65, size: 1.3, colorIdx: 2),
+    (angleOffset: 0.52, radiusFactor: 0.62, speed: 1.50, phase: 0.31, size: 1.6, colorIdx: 1),
+    (angleOffset: 2.62, radiusFactor: 1.12, speed: 1.20, phase: 0.79, size: 1.4, colorIdx: 0),
+    (angleOffset: 4.72, radiusFactor: 0.88, speed: 1.45, phase: 0.92, size: 1.8, colorIdx: 2),
   ];
 
   /// Computes a smooth cardiac double-pulse (`lub-dub`) heartbeat value in `[0, 1]`.
@@ -1995,6 +2067,12 @@ class EggEnchantmentPainter extends CustomPainter {
         eggRect.top + eggRect.height * v,
       );
 
+  static double _normalizeAngle(double a) {
+    const twoPi = 2.0 * math.pi;
+    final r = a % twoPi;
+    return r < 0 ? r + twoPi : r;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
@@ -2007,62 +2085,114 @@ class EggEnchantmentPainter extends CustomPainter {
     final resSurge =
         resActive ? math.sin(resonanceProgress * math.pi).clamp(0.0, 1.0) : 0.0;
 
-    // 1. Slowly rotating concentric golden & crimson magic rune ring on pedestal
-    _paintRotatingRunicPedestalRing(canvas, t, heartbeat, scale, intensity);
+    final drawBack = layer == EggEnchantmentLayer.back ||
+        layer == EggEnchantmentLayer.both;
+    final drawFront = layer == EggEnchantmentLayer.front ||
+        layer == EggEnchantmentLayer.both;
 
-    // 2. Heartbeat aura & crimson-violet rune/visor glow over the Titanium Robot Egg
-    _paintEggHeartbeatAndVisorGlow(
-      canvas,
-      heartbeat,
-      scale,
-      intensity,
-      resSurge,
-    );
+    if (drawBack) {
+      // Back Layer (Behind Pedestal & Egg):
+      // 1. Rear/upper half (π to 2π) of the concentric rotating golden & crimson rune ring + floor aura
+      _paintRotatingRunicPedestalHalf(
+        canvas,
+        t: t,
+        heartbeat: heartbeat,
+        scale: scale,
+        intensity: intensity,
+        isBackHalf: true,
+      );
 
-    // 3. Arcane energy conduit & crackling lightning tendrils (Staff -> Egg & Eye)
-    _paintStaffToEggConduits(canvas, t, heartbeat, scale, intensity, resSurge);
+      // 2. Soft ambient heartbeat crimson-violet halo behind the Titanium Robot Egg
+      _paintEggBackgroundAura(canvas, heartbeat, resSurge);
 
-    // 4. Rising incandescent embers & crimson-violet/amber mana motes
-    _paintRisingManaMotes(canvas, t, scale, intensity);
+      // 3. Background rising incandescent embers/mana motes orbiting behind the egg
+      _paintRisingManaMotes(
+        canvas,
+        t: t,
+        scale: scale,
+        intensity: intensity,
+        isBackHalf: true,
+      );
+    }
 
-    // 5. Interactive Tap-to-Resonate shockwave ring & optical visor flare (~450ms)
-    if (resActive) {
-      _paintTapResonanceBurst(canvas, scale);
+    if (drawFront) {
+      // Front Layer (In Front of Egg & Pedestal Base):
+      // 1. Front/lower half (0 to π) of the concentric rotating golden & crimson rune ring
+      _paintRotatingRunicPedestalHalf(
+        canvas,
+        t: t,
+        heartbeat: heartbeat,
+        scale: scale,
+        intensity: intensity,
+        isBackHalf: false,
+      );
+
+      // 2. Heartbeat crimson-violet rune & red optical visor glow over the scaled-down egg
+      _paintEggFrontHeartbeatAndVisorGlow(
+        canvas,
+        heartbeat,
+        scale,
+        intensity,
+        resSurge,
+      );
+
+      // 3. Arcane energy conduit & crackling lightning tendrils (Staff -> Egg & Eye)
+      _paintStaffToEggConduits(canvas, t, heartbeat, scale, intensity, resSurge);
+
+      // 4. Foreground rising incandescent embers & mana motes
+      _paintRisingManaMotes(
+        canvas,
+        t: t,
+        scale: scale,
+        intensity: intensity,
+        isBackHalf: false,
+      );
+
+      // 5. Interactive Tap-to-Resonate shockwave ring & optical visor flare (~450ms)
+      if (resActive) {
+        _paintTapResonanceBurst(canvas, scale);
+      }
     }
   }
 
-  void _paintRotatingRunicPedestalRing(
-    Canvas canvas,
-    double t,
-    double heartbeat,
-    double scale,
-    double intensity,
-  ) {
-    final outerRx = unit * 0.215;
-    final outerRy = unit * 0.056;
-    final innerRx = outerRx * 0.74;
-    final innerRy = outerRy * 0.74;
+  /// Paints either the rear/upper half (`π` to `2π`, behind pedestal & egg) or
+  /// the front/lower half (`0` to `π`, wrapping cleanly in front of the
+  /// pedestal base below the egg) of the rotating concentric rune ring.
+  void _paintRotatingRunicPedestalHalf(
+    Canvas canvas, {
+    required double t,
+    required double heartbeat,
+    required double scale,
+    required double intensity,
+    required bool isBackHalf,
+  }) {
+    final outerRx = unit * 0.158;
+    final outerRy = unit * 0.041;
+    final innerRx = outerRx * 0.73;
+    final innerRy = outerRy * 0.73;
 
-    // Soft glowing floor aura beneath the rotating runic circle
-    final glowRect = Rect.fromCenter(
-      center: pedestalCenter,
-      width: outerRx * 2.35,
-      height: outerRy * 2.8,
-    );
-    canvas.drawOval(
-      glowRect,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            _crimsonCore.withValues(
-              alpha: (0.20 + 0.16 * heartbeat) * intensity.clamp(1.0, 1.25),
-            ),
-            _violetArcane.withValues(alpha: 0.10 + 0.08 * heartbeat),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(glowRect),
-    );
+    // Soft glowing floor aura painted once in the back layer behind pedestal & egg
+    if (isBackHalf) {
+      final glowRect = Rect.fromCenter(
+        center: pedestalCenter,
+        width: outerRx * 2.35,
+        height: outerRy * 2.8,
+      );
+      canvas.drawOval(
+        glowRect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              _crimsonCore.withValues(
+                alpha: (0.20 + 0.16 * heartbeat) * intensity.clamp(1.0, 1.25),
+              ),
+              _violetArcane.withValues(alpha: 0.10 + 0.08 * heartbeat),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ).createShader(glowRect),
+      );
+    }
 
     final outerOval = Rect.fromCenter(
       center: pedestalCenter,
@@ -2075,63 +2205,87 @@ class EggEnchantmentPainter extends CustomPainter {
       height: innerRy * 2.0,
     );
 
-    // Outer golden magic circle halo + crisp ring
-    final goldAlpha = (0.48 + 0.34 * heartbeat).clamp(0.0, 0.95);
-    canvas.drawOval(
+    // Back/upper arc covers [π, 2π] (sin <= 0); Front/lower arc covers [0, π] (sin >= 0)
+    final startAngle = isBackHalf ? math.pi : 0.0;
+    const sweepAngle = math.pi;
+    final depthFade = isBackHalf ? 0.76 : 1.0;
+
+    // Outer golden magic circle arc halo + crisp ring
+    final goldAlpha =
+        ((0.48 + 0.34 * heartbeat) * depthFade).clamp(0.0, 0.95);
+    canvas.drawArc(
       outerOval,
+      startAngle,
+      sweepAngle,
+      false,
       Paint()
         ..color = _moltenAmber.withValues(alpha: goldAlpha * 0.45)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.2 * scale
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+        ..strokeWidth = 3.8 * scale
+        ..strokeCap = StrokeCap.butt
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.8),
     );
-    canvas.drawOval(
+    canvas.drawArc(
       outerOval,
+      startAngle,
+      sweepAngle,
+      false,
       Paint()
         ..color = _moltenAmber.withValues(alpha: goldAlpha)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.35 * scale,
+        ..strokeWidth = 1.25 * scale
+        ..strokeCap = StrokeCap.butt,
     );
 
-    // Inner counter-rotating crimson-violet ring
-    final crimsonAlpha = (0.52 + 0.36 * heartbeat).clamp(0.0, 0.96);
-    canvas.drawOval(
+    // Inner counter-rotating crimson-violet ring arc
+    final crimsonAlpha =
+        ((0.52 + 0.36 * heartbeat) * depthFade).clamp(0.0, 0.96);
+    canvas.drawArc(
       innerOval,
+      startAngle,
+      sweepAngle,
+      false,
       Paint()
         ..color = _crimsonCore.withValues(alpha: crimsonAlpha * 0.50)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.6 * scale
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+        ..strokeWidth = 3.2 * scale
+        ..strokeCap = StrokeCap.butt
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
     );
-    canvas.drawOval(
+    canvas.drawArc(
       innerOval,
+      startAngle,
+      sweepAngle,
+      false,
       Paint()
         ..color = _violetArcane.withValues(alpha: crimsonAlpha * 0.88)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.15 * scale,
+        ..strokeWidth = 1.05 * scale
+        ..strokeCap = StrokeCap.butt,
     );
 
-    // Slowly rotating outer golden arcane rune ticks & diamond glyphs
+    // Slowly rotating outer golden arcane rune ticks & glyphs filtered strictly to this half
     final rotOuter = t * 2.0 * math.pi * (isOvercharged ? 2.0 : 1.0);
     final tickPaint = Paint()
-      ..color = const Color(0xFFFFE082).withValues(alpha: goldAlpha)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.25 * scale
+      ..strokeWidth = 1.15 * scale
       ..strokeCap = StrokeCap.round;
     const outerRunes = 12;
     for (int i = 0; i < outerRunes; i++) {
-      final a = rotOuter + (i / outerRunes) * 2.0 * math.pi;
+      final a = _normalizeAngle(rotOuter + (i / outerRunes) * 2.0 * math.pi);
+      final inBack = a >= math.pi;
+      if (inBack != isBackHalf) continue;
+
       final ca = math.cos(a);
       final sa = math.sin(a);
-      // Perspective depth dimming for back half of ellipse
       final depth = 0.65 + 0.35 * ((sa + 1.0) * 0.5);
       final pOuter = Offset(
         pedestalCenter.dx + ca * outerRx,
         pedestalCenter.dy + sa * outerRy,
       );
       final pInner = Offset(
-        pedestalCenter.dx + ca * (outerRx * 0.87),
-        pedestalCenter.dy + sa * (outerRy * 0.87),
+        pedestalCenter.dx + ca * (outerRx * 0.86),
+        pedestalCenter.dy + sa * (outerRy * 0.86),
       );
       canvas.drawLine(
         pInner,
@@ -2147,49 +2301,49 @@ class EggEnchantmentPainter extends CustomPainter {
         );
         canvas.drawCircle(
           glyphCenter,
-          1.7 * scale,
+          1.45 * scale,
           Paint()
             ..color = _moltenAmber.withValues(alpha: goldAlpha * depth),
         );
       }
     }
 
-    // Counter-rotating inner crimson rune nodes
+    // Counter-rotating inner crimson rune nodes filtered strictly to this half
     final rotInner = -t * 4.0 * math.pi * (isOvercharged ? 1.5 : 1.0);
     const innerRunes = 6;
     for (int i = 0; i < innerRunes; i++) {
-      final a = rotInner + (i / innerRunes) * 2.0 * math.pi;
+      final a = _normalizeAngle(rotInner + (i / innerRunes) * 2.0 * math.pi);
+      final inBack = a >= math.pi;
+      if (inBack != isBackHalf) continue;
+
       final node = Offset(
         pedestalCenter.dx + math.cos(a) * innerRx,
         pedestalCenter.dy + math.sin(a) * innerRy,
       );
       canvas.drawCircle(
         node,
-        3.6 * scale,
+        3.1 * scale,
         Paint()
           ..color = _crimsonCore.withValues(alpha: 0.42 * crimsonAlpha)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
       );
       canvas.drawCircle(
         node,
-        1.45 * scale,
+        1.25 * scale,
         Paint()..color = const Color(0xFFFF8A80).withValues(alpha: crimsonAlpha),
       );
     }
   }
 
-  void _paintEggHeartbeatAndVisorGlow(
+  /// Soft rhythmic crimson-violet aura halo painted behind the Titanium Robot Egg.
+  void _paintEggBackgroundAura(
     Canvas canvas,
     double heartbeat,
-    double scale,
-    double intensity,
     double resSurge,
   ) {
     final boost = (heartbeat + resSurge * 0.75).clamp(0.0, 1.45);
     final eggCenter = eggRect.center;
-
-    // 1. Subtle rhythmic crimson-violet halo embracing the Titanium Robot Egg
-    final auraR = eggRect.width * (0.48 + 0.06 * heartbeat);
+    final auraR = eggRect.width * (0.76 + 0.12 * heartbeat);
     canvas.drawCircle(
       eggCenter,
       auraR,
@@ -2197,34 +2351,44 @@ class EggEnchantmentPainter extends CustomPainter {
         ..shader = RadialGradient(
           colors: [
             _crimsonCore.withValues(
-              alpha: (0.14 + 0.16 * boost).clamp(0.0, 0.42),
+              alpha: (0.20 + 0.20 * boost).clamp(0.0, 0.50),
             ),
             _violetArcane.withValues(
-              alpha: (0.07 + 0.11 * boost).clamp(0.0, 0.28),
+              alpha: (0.10 + 0.14 * boost).clamp(0.0, 0.34),
             ),
             Colors.transparent,
           ],
-          stops: const [0.22, 0.65, 1.0],
+          stops: const [0.22, 0.62, 1.0],
         ).createShader(Rect.fromCircle(center: eggCenter, radius: auraR)),
     );
+  }
 
-    // 2. Pulsing highlights along the egg's crimson-violet & amber rune fissures
+  /// Foreground heartbeat glow pulse illuminating the scaled-down egg's
+  /// crimson runes and central red optical visor.
+  void _paintEggFrontHeartbeatAndVisorGlow(
+    Canvas canvas,
+    double heartbeat,
+    double scale,
+    double intensity,
+    double resSurge,
+  ) {
+    final boost = (heartbeat + resSurge * 0.75).clamp(0.0, 1.45);
+
+    // 1. Crisp pulsing highlights along the egg's crimson-violet & amber rune fissures
     const runePoints = [
       (u: 0.33, v: 0.23, isAmber: true),
       (u: 0.67, v: 0.22, isAmber: true),
-      (u: 0.23, v: 0.50, isAmber: false),
-      (u: 0.77, v: 0.50, isAmber: false),
-      (u: 0.28, v: 0.65, isAmber: true),
-      (u: 0.70, v: 0.64, isAmber: true),
-      (u: 0.31, v: 0.81, isAmber: false),
-      (u: 0.68, v: 0.81, isAmber: false),
+      (u: 0.24, v: 0.50, isAmber: false),
+      (u: 0.76, v: 0.50, isAmber: false),
+      (u: 0.29, v: 0.68, isAmber: true),
+      (u: 0.70, v: 0.68, isAmber: true),
     ];
-    final runeBaseR = eggRect.width * (0.048 + 0.018 * heartbeat);
+    final runeBaseR = eggRect.width * (0.075 + 0.025 * heartbeat);
     for (final rp in runePoints) {
       final pt = _eggPoint(rp.u, rp.v);
       final c = rp.isAmber ? _moltenAmber : _violetArcane;
-      final a = ((0.18 + 0.34 * boost) * (isOvercharged ? 1.2 : 1.0))
-          .clamp(0.0, 0.75);
+      final a = ((0.16 + 0.30 * boost) * (isOvercharged ? 1.2 : 1.0))
+          .clamp(0.0, 0.68);
       canvas.drawCircle(
         pt,
         runeBaseR,
@@ -2232,7 +2396,7 @@ class EggEnchantmentPainter extends CustomPainter {
           ..shader = RadialGradient(
             colors: [
               c.withValues(alpha: a),
-              _crimsonCore.withValues(alpha: a * 0.45),
+              _crimsonCore.withValues(alpha: a * 0.42),
               Colors.transparent,
             ],
             stops: const [0.0, 0.5, 1.0],
@@ -2240,8 +2404,8 @@ class EggEnchantmentPainter extends CustomPainter {
       );
     }
 
-    // 3. Rhythmic heartbeat glow illuminating the central red optical visor
-    final visorR = eggRect.width * (0.145 + 0.045 * boost);
+    // 2. Rhythmic heartbeat glow illuminating the central red optical visor
+    final visorR = eggRect.width * (0.21 + 0.065 * boost);
     canvas.drawCircle(
       eggEyeCenter,
       visorR,
@@ -2249,10 +2413,10 @@ class EggEnchantmentPainter extends CustomPainter {
         ..shader = RadialGradient(
           colors: [
             const Color(0xFFFF8A80).withValues(
-              alpha: (0.42 + 0.38 * boost).clamp(0.0, 0.92),
+              alpha: (0.44 + 0.38 * boost).clamp(0.0, 0.94),
             ),
             _crimsonCore.withValues(
-              alpha: (0.24 + 0.30 * boost).clamp(0.0, 0.78),
+              alpha: (0.26 + 0.32 * boost).clamp(0.0, 0.80),
             ),
             _violetArcane.withValues(
               alpha: (0.08 + 0.14 * boost).clamp(0.0, 0.38),
@@ -2265,7 +2429,7 @@ class EggEnchantmentPainter extends CustomPainter {
 
     // Crisp horizontal crimson optical lens streak pulsing with heartbeat
     final flareHalfW =
-        eggRect.width * (0.16 + 0.09 * heartbeat * intensity);
+        eggRect.width * (0.24 + 0.14 * heartbeat * intensity);
     canvas.drawLine(
       eggEyeCenter - Offset(flareHalfW, 0),
       eggEyeCenter + Offset(flareHalfW, 0),
@@ -2283,10 +2447,10 @@ class EggEnchantmentPainter extends CustomPainter {
           Rect.fromCenter(
             center: eggEyeCenter,
             width: flareHalfW * 2.0,
-            height: 4.0 * scale,
+            height: 3.4 * scale,
           ),
         )
-        ..strokeWidth = (1.6 + 1.0 * heartbeat) * scale
+        ..strokeWidth = (1.35 + 0.85 * heartbeat) * scale
         ..strokeCap = StrokeCap.round,
     );
   }
@@ -2302,7 +2466,8 @@ class EggEnchantmentPainter extends CustomPainter {
     final surge = 1.0 + 0.45 * resSurge;
 
     // 1. Glowing clockwork-core energy flare at the Metal Wizard's staff origin
-    final staffFlareR = unit * (0.058 + 0.016 * heartbeat) * (isOvercharged ? 1.18 : 1.0);
+    final staffFlareR =
+        unit * (0.056 + 0.015 * heartbeat) * (isOvercharged ? 1.18 : 1.0);
     canvas.drawCircle(
       staffOrigin,
       staffFlareR,
@@ -2318,11 +2483,11 @@ class EggEnchantmentPainter extends CustomPainter {
         ).createShader(Rect.fromCircle(center: staffOrigin, radius: staffFlareR)),
     );
 
-    // 2. Smooth glowing curved arcane energy conduit stream (Staff -> Red Optical Eye)
+    // 2. Smooth glowing curved arcane energy conduit stream (Staff -> Scaled-Down Egg Red Visor)
     final midCtrl = Offset(
-      (staffOrigin.dx + eggEyeCenter.dx) * 0.5,
-      math.min(staffOrigin.dy, eggEyeCenter.dy) -
-          unit * (0.045 + 0.014 * math.sin(t * 12.0 * math.pi)),
+      (staffOrigin.dx + eggEyeCenter.dx) * 0.52,
+      (staffOrigin.dy + eggEyeCenter.dy) * 0.5 -
+          unit * (0.042 + 0.012 * math.sin(t * 12.0 * math.pi)),
     );
     final conduitPath = Path()
       ..moveTo(staffOrigin.dx, staffOrigin.dy)
@@ -2346,9 +2511,9 @@ class EggEnchantmentPainter extends CustomPainter {
           ],
         ).createShader(Rect.fromPoints(staffOrigin, eggEyeCenter).inflate(24))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 6.2 * scale * surge
+        ..strokeWidth = 5.2 * scale * surge
         ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
     );
     canvas.drawPath(
       conduitPath,
@@ -2361,11 +2526,11 @@ class EggEnchantmentPainter extends CustomPainter {
           ],
         ).createShader(Rect.fromPoints(staffOrigin, eggEyeCenter).inflate(12))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.65 * scale * surge
+        ..strokeWidth = 1.45 * scale * surge
         ..strokeCap = StrokeCap.round,
     );
 
-    // Traveling luminous mana pulses flowing along the Bezier conduit into the eye
+    // Traveling luminous mana pulses flowing along the Bezier conduit into the visor
     final pulseCount = isOvercharged ? 5 : 3;
     for (int i = 0; i < pulseCount; i++) {
       final p = ((t * (isOvercharged ? 7.0 : 4.0)) + i / pulseCount) % 1.0;
@@ -2381,78 +2546,78 @@ class EggEnchantmentPainter extends CustomPainter {
       final fade = math.sin(p * math.pi).clamp(0.0, 1.0);
       canvas.drawCircle(
         pos,
-        4.2 * scale,
+        3.6 * scale,
         Paint()
           ..color = (i.isEven ? _violetArcane : _moltenAmber)
               .withValues(alpha: 0.55 * fade)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
       );
       canvas.drawCircle(
         pos,
-        1.8 * scale,
+        1.55 * scale,
         Paint()..color = _hotFilament.withValues(alpha: 0.95 * fade),
       );
     }
 
-    // 3. Crackling crimson-violet & molten-amber lightning tendrils
-    final jitterScale = (isOvercharged ? 1.38 : 1.0) * surge;
-    // Main crimson-violet lightning arc directly into the egg's red optical visor
+    // 3. Crackling crimson-violet & molten-amber lightning tendrils converging on the egg
+    final jitterScale = (isOvercharged ? 1.32 : 1.0) * surge;
+    // Main crimson-violet lightning arc directly onto the scaled-down egg's red optical visor
     _paintLightningTendril(
       canvas,
       staffOrigin,
       eggEyeCenter,
       t: t,
-      scale: scale,
+      scale: scale * 0.92,
       primaryColor: _violetArcane,
       coreColor: _crimsonCore,
-      jitterAmp: 9.5 * jitterScale,
+      jitterAmp: 8.5 * jitterScale,
       seed: 1.4,
       speedMult: isOvercharged ? 44.0 : 30.0,
     );
 
     // Molten-amber arcane lightning stream arching into the egg's upper titanium rune seam
-    final upperRuneTarget = _eggPoint(0.32, 0.24);
+    final upperRuneTarget = _eggPoint(0.36, 0.25);
     _paintLightningTendril(
       canvas,
       staffOrigin,
       upperRuneTarget,
       t: t,
-      scale: scale * 0.88,
+      scale: scale * 0.78,
       primaryColor: _moltenAmber,
       coreColor: _hotFilament,
-      jitterAmp: 8.0 * jitterScale,
+      jitterAmp: 7.2 * jitterScale,
       seed: 3.7,
       speedMult: isOvercharged ? 38.0 : 26.0,
     );
 
-    // Lower crimson-violet tendril channeling down into the egg's lower rune fissure
-    final lowerRuneTarget = _eggPoint(0.28, 0.70);
+    // Lower crimson-violet tendril channeling into the egg's lower rune fissure
+    final lowerRuneTarget = _eggPoint(0.32, 0.68);
     _paintLightningTendril(
       canvas,
       staffOrigin,
       lowerRuneTarget,
       t: t,
-      scale: scale * 0.82,
+      scale: scale * 0.74,
       primaryColor: _crimsonCore,
       coreColor: _violetArcane,
-      jitterAmp: 8.5 * jitterScale,
+      jitterAmp: 7.5 * jitterScale,
       seed: 6.2,
       speedMult: isOvercharged ? 40.0 : 28.0,
     );
 
-    // 4. Weeks 10–39 Overcharged extra lightning arcs crackling across the egg shell
+    // 4. Weeks 10–39 Overcharged extra lightning arcs crackling tightly across the egg shell
     if (isOvercharged) {
       final rightUpper = _eggPoint(0.74, 0.30);
-      final rightLower = _eggPoint(0.71, 0.74);
+      final rightLower = _eggPoint(0.70, 0.72);
       _paintLightningTendril(
         canvas,
         eggEyeCenter,
         rightUpper,
         t: t,
-        scale: scale * 0.82,
+        scale: scale * 0.68,
         primaryColor: _crimsonCore,
         coreColor: _moltenAmber,
-        jitterAmp: 7.5,
+        jitterAmp: 4.5,
         seed: 9.1,
         speedMult: 48.0,
       );
@@ -2461,10 +2626,10 @@ class EggEnchantmentPainter extends CustomPainter {
         upperRuneTarget,
         rightLower,
         t: t,
-        scale: scale * 0.75,
+        scale: scale * 0.62,
         primaryColor: _violetArcane,
         coreColor: _hotFilament,
-        jitterAmp: 8.5,
+        jitterAmp: 5.0,
         seed: 11.8,
         speedMult: 52.0,
       );
@@ -2510,34 +2675,38 @@ class EggEnchantmentPainter extends CustomPainter {
       Paint()
         ..color = primaryColor.withValues(alpha: 0.62 * flicker)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.6 * scale
+        ..strokeWidth = 4.2 * scale
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.6),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2),
     );
     canvas.drawPath(
       path,
       Paint()
         ..color = coreColor.withValues(alpha: 0.94 * flicker)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.55 * scale
+        ..strokeWidth = 1.45 * scale
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
   }
 
   void _paintRisingManaMotes(
-    Canvas canvas,
-    double t,
-    double scale,
-    double intensity,
-  ) {
-    final riseHeight = eggRect.height * 1.18;
-    final orbitRx = unit * 0.19;
+    Canvas canvas, {
+    required double t,
+    required double scale,
+    required double intensity,
+    required bool isBackHalf,
+  }) {
+    final riseHeight = unit * 0.28;
+    final orbitRx = unit * 0.145;
 
     for (final m in _manaMoteSpecs) {
       final cycle = (t * m.speed * (isOvercharged ? 1.5 : 1.0) + m.phase) % 1.0;
-      final angle = m.angleOffset + cycle * 1.6 * math.pi;
+      final angle = _normalizeAngle(m.angleOffset + cycle * 1.6 * math.pi);
+      final inBack = angle >= math.pi;
+      if (inBack != isBackHalf) continue;
+
       final x = pedestalCenter.dx +
           math.cos(angle) * orbitRx * m.radiusFactor * (1.0 - 0.25 * cycle);
       final y = pedestalCenter.dy - cycle * riseHeight;
@@ -2555,10 +2724,10 @@ class EggEnchantmentPainter extends CustomPainter {
 
       canvas.drawCircle(
         pos,
-        r * 2.5,
+        r * 2.4,
         Paint()
           ..color = color.withValues(alpha: alpha * 0.48)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
       );
       canvas.drawCircle(
         pos,
@@ -2575,15 +2744,15 @@ class EggEnchantmentPainter extends CustomPainter {
     final center = eggRect.center;
 
     // 1. Primary expanding crimson-violet defensive shockwave ring
-    final ringR = unit * (0.075 + 0.30 * u);
+    final ringR = unit * (0.045 + 0.22 * u);
     canvas.drawCircle(
       center,
       ringR,
       Paint()
         ..color = _violetArcane.withValues(alpha: 0.68 * fade)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = (8.5 * (1.0 - 0.55 * u)) * scale
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0),
+        ..strokeWidth = (7.2 * (1.0 - 0.55 * u)) * scale
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5),
     );
     canvas.drawCircle(
       center,
@@ -2591,7 +2760,7 @@ class EggEnchantmentPainter extends CustomPainter {
       Paint()
         ..color = _crimsonCore.withValues(alpha: 0.95 * fade)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = (2.8 * (1.0 - 0.45 * u)) * scale,
+        ..strokeWidth = (2.4 * (1.0 - 0.45 * u)) * scale,
     );
     canvas.drawCircle(
       center,
@@ -2599,7 +2768,7 @@ class EggEnchantmentPainter extends CustomPainter {
       Paint()
         ..color = _hotFilament.withValues(alpha: 0.72 * fade)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1 * scale,
+        ..strokeWidth = 1.0 * scale,
     );
 
     // 2. Secondary harmonic molten-amber ripple ring
@@ -2608,20 +2777,20 @@ class EggEnchantmentPainter extends CustomPainter {
         ((resonanceProgress - 0.14) / 0.86).clamp(0.0, 1.0),
       );
       final fade2 = (1.0 - u2).clamp(0.0, 1.0);
-      final ringR2 = unit * (0.055 + 0.24 * u2);
+      final ringR2 = unit * (0.032 + 0.175 * u2);
       canvas.drawCircle(
         center,
         ringR2,
         Paint()
           ..color = _moltenAmber.withValues(alpha: 0.62 * fade2)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0 * scale,
+          ..strokeWidth = 1.8 * scale,
       );
     }
 
     // 3. Blazing optical visor flare at the Titanium Robot Egg's red eye
     final flareEnv = math.sin(resonanceProgress * math.pi).clamp(0.0, 1.0);
-    final burstR = eggRect.width * (0.18 + 0.24 * flareEnv);
+    final burstR = eggRect.width * (0.28 + 0.36 * flareEnv);
     canvas.drawCircle(
       eggEyeCenter,
       burstR,
@@ -2638,7 +2807,7 @@ class EggEnchantmentPainter extends CustomPainter {
     );
 
     // Wide anamorphic crimson optical visor streak
-    final streakHalfW = eggRect.width * (0.28 + 0.46 * flareEnv);
+    final streakHalfW = eggRect.width * (0.42 + 0.68 * flareEnv);
     canvas.drawLine(
       eggEyeCenter - Offset(streakHalfW, 0),
       eggEyeCenter + Offset(streakHalfW, 0),
@@ -2656,10 +2825,10 @@ class EggEnchantmentPainter extends CustomPainter {
           Rect.fromCenter(
             center: eggEyeCenter,
             width: streakHalfW * 2.0,
-            height: 6.0 * scale,
+            height: 5.0 * scale,
           ),
         )
-        ..strokeWidth = (3.4 * flareEnv + 1.0) * scale
+        ..strokeWidth = (2.8 * flareEnv + 0.9) * scale
         ..strokeCap = StrokeCap.round,
     );
   }
@@ -2671,6 +2840,7 @@ class EggEnchantmentPainter extends CustomPainter {
         oldDelegate.isOvercharged != isOvercharged ||
         oldDelegate.animationsEnabled != animationsEnabled ||
         oldDelegate.isFullScreen != isFullScreen ||
+        oldDelegate.layer != layer ||
         oldDelegate.staffOrigin != staffOrigin ||
         oldDelegate.eggRect != eggRect ||
         oldDelegate.eggEyeCenter != eggEyeCenter ||

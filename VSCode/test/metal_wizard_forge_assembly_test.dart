@@ -894,5 +894,110 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets(
+      'Titanium Robot Egg is scaled down to match Metal Wizard head height and uses Back (π..2π) -> Pedestal -> Egg -> Front (0..π) Z-order layering in both circular and full-screen views',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        for (final week in [0, 10]) {
+          final controller = await _createController(
+            currentWeek: week,
+            enemyStage: week >= 10 ? 2 : 1,
+            animationsEnabled: false,
+          );
+          addTearDown(controller.dispose);
+
+          for (final isFullScreen in [false, true]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: ThemeData.dark(),
+                home: isFullScreen
+                    ? FullScreenSpyglassView(
+                        controller: controller,
+                        target: SpyglassTarget.metalWizard,
+                      )
+                    : Scaffold(
+                        body: MetalWizardSpyglassDialog(controller: controller),
+                      ),
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            final wizardRect = tester.getRect(
+              find.byKey(const ValueKey('watchtower_forge_metal_wizard_image')),
+            );
+            final eggRect = tester.getRect(
+              find.byKey(const ValueKey('watchtower_forge_egg_image')),
+            );
+
+            // Egg box height is ~27.8% of wizard box height -> visible egg height (~88.9% of box)
+            // is ~24% of wizard height, matching the Metal Wizard's hooded head height
+            final heightRatio = eggRect.height / wizardRect.height;
+            expect(heightRatio, inInclusiveRange(0.24, 0.30));
+
+            // Verify both Back (π..2π) and Front (0..π) EggEnchantmentPainter layers exist
+            final backPaint = tester.widget<CustomPaint>(
+              find.byKey(
+                const ValueKey('watchtower_forge_egg_enchantment_back_painter'),
+              ),
+            );
+            final frontPaint = tester.widget<CustomPaint>(
+              find.byKey(
+                const ValueKey('watchtower_forge_egg_enchantment_painter'),
+              ),
+            );
+            final backPainter = backPaint.painter as EggEnchantmentPainter;
+            final frontPainter = frontPaint.painter as EggEnchantmentPainter;
+            expect(backPainter.layer, EggEnchantmentLayer.back);
+            expect(frontPainter.layer, EggEnchantmentLayer.front);
+
+            // Rotating elliptical rune ring center sits strictly below the egg's lower rim
+            // so the front (0..π) arc wraps in front of the pedestal base without crossing the egg
+            expect(
+              frontPainter.pedestalCenter.dy,
+              greaterThan(frontPainter.eggRect.bottom),
+            );
+
+            // Verify exact Stack child Z-order: Back Layer < Pedestal < Egg Sprite < Front Layer
+            final stack = tester.widget<Stack>(
+              find.byKey(const ValueKey('watchtower_forge_view_stack')),
+            );
+            int indexOfKey(String keyName) {
+              return stack.children.indexWhere((child) {
+                bool matches(Widget w) {
+                  if (w.key == ValueKey(keyName)) return true;
+                  if (w is SingleChildRenderObjectWidget && w.child != null) {
+                    return matches(w.child!);
+                  }
+                  if (w is ProxyWidget) return matches(w.child);
+                  return false;
+                }
+
+                return matches(child);
+              });
+            }
+
+            final backIdx =
+                indexOfKey('watchtower_forge_egg_enchantment_back_painter');
+            final pedestalIdx = indexOfKey('watchtower_forge_rig_backdrop');
+            final eggIdx = indexOfKey('watchtower_forge_egg_image');
+            final frontIdx =
+                indexOfKey('watchtower_forge_egg_enchantment_painter');
+
+            expect(backIdx, greaterThan(0));
+            expect(pedestalIdx, greaterThan(backIdx));
+            expect(eggIdx, greaterThan(pedestalIdx));
+            expect(frontIdx, greaterThan(eggIdx));
+            expect(tester.takeException(), isNull);
+          }
+        }
+      },
+    );
   });
 }
