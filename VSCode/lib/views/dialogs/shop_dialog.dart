@@ -11,6 +11,7 @@ import '../../services/billing_service.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/elemental_energy_sphere.dart';
+import '../widgets/shop_item_icons.dart';
 import '../widgets/temple_wing_icons.dart';
 import 'altar_sacrifice_dialog.dart';
 import 'royal_castle_dialog.dart';
@@ -504,7 +505,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     final desc = loc.t(
       'new_hands_desc',
       fallback:
-          'Learn Earth & Metal for your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
+          'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
     );
     final ok = controller.unlockNewHands();
     _handleOfferingPurchase(
@@ -1017,7 +1018,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       (
         wing: TempleWing.offertory,
         key: const ValueKey('temple_tab_offertory'),
-        iconBuilder: (_) => const OffertoryVaultIcon(
+        iconBuilder: (_) => const TitheVaultIcon(
           size: 28,
           isOnGoldBackground: false,
         ),
@@ -2406,6 +2407,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const PredictabilityScoreIcon(size: 32),
           title: loc.t('string38', fallback: 'Predictability Score'),
           subtitle: loc.t(
             'predictability_score_desc',
@@ -2444,6 +2446,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const ResetButtonIcon(size: 32),
           title: loc.t('string37', fallback: 'Reset Button'),
           subtitle: loc.t(
             'reset_button_desc',
@@ -2482,11 +2485,12 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const NewHandsIcon(size: 32),
           title: loc.t('string56', fallback: 'Learn Earth & Metal'),
           subtitle: loc.t(
             'new_hands_desc',
             fallback:
-                'Learn Earth & Metal for your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
+                'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
           ),
           cost: GameController.costNewHands,
           productId: BillingService.productNewHands,
@@ -2499,6 +2503,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const RandomButtonIcon(size: 32),
           title: loc.t('string39', fallback: 'Random Move Button'),
           subtitle: loc.t(
             'random_button_desc',
@@ -2537,6 +2542,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _OverchargedStaffShopTile(
           key: const ValueKey('shop_overcharged_staff_card'),
+          iconWidget: const OverchargedStaffIcon(size: 32),
           title: loc.t('overcharged_staff_title', fallback: 'Overcharged Staff'),
           subtitle: loc.t(
             'overcharged_staff_desc',
@@ -2608,6 +2614,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const MarkovMatrixIcon(size: 32),
           title: loc.t('string40', fallback: 'Show Markov Algorithm'),
           subtitle: loc.t(
             'show_algorithm_desc',
@@ -2646,6 +2653,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const YourPredictionIcon(size: 32),
           title: loc.t('string41', fallback: 'Your Prediction Hint'),
           subtitle: loc.t(
             'your_prediction_desc',
@@ -2683,6 +2691,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const EnemyNextMoveIcon(size: 32),
           title: loc.t('string42', fallback: 'PC Next Move Reveal'),
           subtitle: loc.t(
             'pc_next_move_desc',
@@ -2721,6 +2730,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const GiftBoxIcon(size: 32),
           title: loc.t('gift_box', fallback: 'Gift Box'),
           subtitle: controller.giftBoxDescription,
           cost: GameController.costGiftBox,
@@ -2751,6 +2761,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const StrategySuggestionIcon(size: 32),
           title: loc.t('string43', fallback: 'Optimal Suggestion'),
           subtitle: loc.t(
             'suggestion_desc',
@@ -2789,6 +2800,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const NewSkinIcon(size: 32),
           title: loc.t('new_skin', fallback: 'New Skin'),
           subtitle: loc.t(
             'new_skin_desc',
@@ -2825,6 +2837,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
+          iconWidget: const CrystalBallIcon(size: 32),
           title: loc.t('string80', fallback: 'Crystal Ball'),
           subtitle: loc.t(
             'crystal_ball_desc',
@@ -2864,6 +2877,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         if (controller.unlockedCrystalBall)
           _buildShopItem(
             context: context,
+            iconWidget: const CrystalBallPlusIcon(size: 32),
             title: loc.t('string82', fallback: 'Crystal Ball+'),
             subtitle: loc.t(
               'crystal_ball_plus_desc',
@@ -2916,6 +2930,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         if (controller.isMarkovRecalibratorVisibleInShop)
           _buildShopItem(
             context: context,
+            iconWidget: const MarkovRecalibratorIcon(size: 32),
             title: loc.t(
               'markov_recalibrator_title',
               fallback: 'Markov Recalibrator',
@@ -2981,7 +2996,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  VowOfSilenceIcon(
+                  RemoveAdsIcon(
                     size: 20,
                     isActive: controller.isRemoveAdsActive,
                   ),
@@ -3964,7 +3979,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                 : palette.amberBorder.withValues(alpha: 0.35),
                           ),
                         ),
-                        child: VowOfSilenceIcon(
+                        child: RemoveAdsIcon(
                           size: 28,
                           isActive: isSilenceOn,
                         ),
@@ -4092,7 +4107,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                 ),
                               ),
                             ),
-                            child: const VowOfSilenceIcon(
+                            child: const RemoveAdsIcon(
                               size: 28,
                               isActive: false,
                             ),
@@ -4261,6 +4276,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
 
   Widget _buildShopItem({
     required BuildContext context,
+    Widget? iconWidget,
     required String title,
     String? subtitle,
     required ElementalCost cost,
@@ -4281,6 +4297,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     final isLoadingStore = productId != null && billing.isLoadingProducts;
 
     return _ShopItemTile(
+      iconWidget: iconWidget,
       title: title,
       subtitle: subtitle,
       cost: cost,
@@ -6402,6 +6419,7 @@ class _TempleCompactVerticalTabPill extends StatelessWidget {
 }
 
 class _ShopItemTile extends StatelessWidget {
+  final Widget? iconWidget;
   final String title;
   final String? subtitle;
   final ElementalCost cost;
@@ -6419,6 +6437,7 @@ class _ShopItemTile extends StatelessWidget {
   final ValueChanged<bool> onToggle;
 
   const _ShopItemTile({
+    this.iconWidget,
     required this.title,
     this.subtitle,
     required this.cost,
@@ -6435,6 +6454,25 @@ class _ShopItemTile extends StatelessWidget {
     this.onRealMoneyUnlock,
     required this.onToggle,
   });
+
+  Widget _buildIconBadge(AppPalette palette, {bool highlightActive = false}) {
+    final accentColor = highlightActive ? palette.successIcon : palette.amberBorder;
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(
+          alpha: palette.isDark ? 0.14 : 0.16,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: accentColor.withValues(
+            alpha: highlightActive ? 0.48 : 0.38,
+          ),
+        ),
+      ),
+      child: iconWidget,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -6489,66 +6527,76 @@ class _ShopItemTile extends StatelessWidget {
     final activeColor = palette.successIcon;
     final inactiveColor = palette.isDark ? Colors.grey : palette.mutedText;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: palette.primaryText,
-                ),
-              ),
-              if (subtitle != null && subtitle!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: palette.amberSubtitle,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (iconWidget != null) ...[
+              _buildIconBadge(palette, highlightActive: isActive),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    isActive ? Icons.check_circle : Icons.cancel_outlined,
-                    size: 13,
-                    color: isActive ? activeColor : inactiveColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      isActive ? enabledLabel : disabledLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isActive ? activeColor : inactiveColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.primaryText,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isActive ? Icons.check_circle : Icons.cancel_outlined,
+                        size: 13,
+                        color: isActive ? activeColor : inactiveColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isActive ? enabledLabel : disabledLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isActive ? activeColor : inactiveColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: isActive,
+              onChanged: isToggleEnabled ? onToggle : null,
+              activeTrackColor: activeColor,
+            ),
+          ],
+        ),
+        if (subtitle != null && subtitle!.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text(
+            subtitle!,
+            softWrap: true,
+            style: TextStyle(
+              fontSize: 11,
+              color: palette.amberSubtitle,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Switch(
-          value: isActive,
-          onChanged: isToggleEnabled ? onToggle : null,
-          activeTrackColor: activeColor,
-        ),
+        ],
       ],
     );
   }
@@ -6559,27 +6607,43 @@ class _ShopItemTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: palette.primaryText,
-          ),
-        ),
-        if (subtitle != null && subtitle!.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(
-            subtitle!,
-            softWrap: true,
-            style: TextStyle(
-              fontSize: 11,
-              color: palette.amberSubtitle,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (iconWidget != null) ...[
+              _buildIconBadge(palette),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      softWrap: true,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: palette.amberSubtitle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 6,
@@ -6682,6 +6746,7 @@ class _ShopItemTile extends StatelessWidget {
 }
 
 class _OverchargedStaffShopTile extends StatelessWidget {
+  final Widget iconWidget;
   final String title;
   final String subtitle;
   final int level;
@@ -6700,6 +6765,7 @@ class _OverchargedStaffShopTile extends StatelessWidget {
 
   const _OverchargedStaffShopTile({
     super.key,
+    this.iconWidget = const OverchargedStaffIcon(size: 32),
     required this.title,
     required this.subtitle,
     required this.level,
@@ -6716,6 +6782,25 @@ class _OverchargedStaffShopTile extends StatelessWidget {
     required this.onToggle,
     required this.onSelectSpeed,
   });
+
+  Widget _buildIconBadge(AppPalette palette, {bool highlightActive = false}) {
+    final accentColor = highlightActive ? palette.successIcon : palette.amberBorder;
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(
+          alpha: palette.isDark ? 0.14 : 0.16,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: accentColor.withValues(
+            alpha: highlightActive ? 0.48 : 0.38,
+          ),
+        ),
+      ),
+      child: iconWidget,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -6775,35 +6860,37 @@ class _OverchargedStaffShopTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.bolt_rounded,
-              size: 18,
-              color: palette.amberIcon,
-            ),
-            const SizedBox(width: 6),
+            _buildIconBadge(palette),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: palette.primaryText,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: palette.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    softWrap: true,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: palette.amberSubtitle,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          softWrap: true,
-          style: TextStyle(
-            fontSize: 11,
-            color: palette.amberSubtitle,
-          ),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -6866,111 +6953,111 @@ class _OverchargedStaffShopTile extends StatelessWidget {
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () => onToggle(!isActive),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildIconBadge(palette, highlightActive: isActive),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.bolt_rounded,
-                            size: 17,
-                            color: isActive
-                                ? _ShopDialogState._goldFill
-                                : palette.amberIcon,
-                          ),
-                          const SizedBox(width: 5),
-                          Flexible(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: palette.primaryText,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            key: const ValueKey('overcharged_staff_level_pill'),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isMaxLevel
-                                  ? _ShopDialogState._goldFill
-                                  : palette.rewardedAdCardSurface,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isMaxLevel
-                                    ? const Color(0xFFFFB300)
-                                    : palette.amberBorder.withValues(alpha: 0.5),
+                              const SizedBox(width: 6),
+                              Container(
+                                key: const ValueKey('overcharged_staff_level_pill'),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isMaxLevel
+                                      ? _ShopDialogState._goldFill
+                                      : palette.rewardedAdCardSurface,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isMaxLevel
+                                        ? const Color(0xFFFFB300)
+                                        : palette.amberBorder.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Text(
+                                  isMaxLevel
+                                      ? maxBadgeLabel
+                                      : '$levelPrefix $level/${GameController.overchargedStaffMaxLevel}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: isMaxLevel
+                                        ? _ShopDialogState._goldDarkInk
+                                        : palette.amberText,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              isMaxLevel
-                                  ? maxBadgeLabel
-                                  : '$levelPrefix $level/${GameController.overchargedStaffMaxLevel}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: isMaxLevel
-                                    ? _ShopDialogState._goldDarkInk
-                                    : palette.amberText,
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        softWrap: true,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: palette.amberSubtitle,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isActive
-                                ? Icons.check_circle
-                                : Icons.cancel_outlined,
-                            size: 13,
-                            color: isActive ? activeColor : inactiveColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              isActive ? enabledLabel : disabledLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
+                          const SizedBox(height: 3),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isActive
+                                    ? Icons.check_circle
+                                    : Icons.cancel_outlined,
+                                size: 13,
                                 color: isActive ? activeColor : inactiveColor,
-                                fontWeight: FontWeight.bold,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  isActive ? enabledLabel : disabledLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isActive ? activeColor : inactiveColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      key: const ValueKey('overcharged_staff_switch'),
+                      value: isActive,
+                      onChanged: onToggle,
+                      activeTrackColor: activeColor,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Switch(
-                  key: const ValueKey('overcharged_staff_switch'),
-                  value: isActive,
-                  onChanged: onToggle,
-                  activeTrackColor: activeColor,
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: palette.amberSubtitle,
+                  ),
                 ),
               ],
             ),
@@ -7625,13 +7712,19 @@ class _ConsumableBundleTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      icon,
-                      size: 17,
-                      color: singleMove != null
-                          ? palette.elementalText(singleMove!)
-                          : palette.amberIcon,
-                    ),
+                    if (singleMove != null)
+                      ElementalEnergySphere(
+                        size: 17,
+                        primaryColor: singleMove!.elementalPrimaryColor,
+                        secondaryColor: singleMove!.elementalSecondaryColor,
+                        isDark: palette.isDark,
+                      )
+                    else
+                      Icon(
+                        icon,
+                        size: 17,
+                        color: palette.amberIcon,
+                      ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(

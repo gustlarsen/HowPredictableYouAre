@@ -7,6 +7,10 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
+import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
+import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
+import 'package:how_predictable/views/widgets/shop_item_icons.dart';
+import 'package:how_predictable/views/widgets/temple_wing_icons.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +21,7 @@ void main() {
     'reset_button_desc':
         'Adds a Reset button to clear the current match and Markov matrix anytime',
     'new_hands_desc':
-        'Learn Earth & Metal for your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
+        'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
     'random_button_desc':
         'Adds a Random button to play unpredictable moves and outsmart the AI',
     'show_algorithm_desc':
@@ -207,4 +211,208 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'ShopDialog renders all bespoke CustomPainter RPG shop icons, Tab 4-6 icons, and 3D ElementalEnergySphere orbs with zero flat ElementalSymbolIcon widgets in Dark & Light modes',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      SharedPreferences.setMockInitialValues({
+        'has_seen_story_intro': true,
+        'unlockedCrystalBall': true,
+        'showCrystalBall': true,
+        'enemy_stage': 2,
+        'animationsEnabled': false,
+        'musicEnabled': false,
+      });
+
+      final storage = StorageService();
+      await storage.init();
+      final localization = LocalizationService();
+      await tester.runAsync(() => localization.load());
+      final audio = AudioService();
+
+      final controller = GameController(
+        storage: storage,
+        localization: localization,
+        audio: audio,
+      );
+      addTearDown(controller.dispose);
+
+      for (final isDark in [true, false]) {
+        controller.darkMode = isDark;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.light(useMaterial3: true),
+            darkTheme: ThemeData.dark(useMaterial3: true),
+            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+            home: Scaffold(
+              body: ShopDialog(
+                key: ValueKey('shop_icons_theme_$isDark'),
+                controller: controller,
+                initialWing: TempleWing.offerings,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        // Verify Tab 4, Tab 5, and Tab 6 custom vector icons are wired into ShopDialog
+        expect(find.byType(AdorationHarpIcon), findsOneWidget);
+        expect(find.byType(PrayerHandsIcon), findsOneWidget);
+        expect(find.byType(TitheVaultIcon), findsOneWidget);
+
+        // Verify 5 top elemental balance counters use 3D ElementalEnergySphere (no flat symbols)
+        final summaryBar = find.byKey(const ValueKey('shop_orb_summary_bar'));
+        expect(
+          find.descendant(
+            of: summaryBar,
+            matching: find.byType(ElementalEnergySphere),
+          ),
+          findsNWidgets(5),
+        );
+        expect(find.byType(ElementalSymbolIcon), findsNothing);
+
+        // Scroll through Offerings and verify every bespoke shop item icon + 3D cost orbs render
+        final scrollable = find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
+        );
+        const offeringsIconTypes = <Type>[
+          PredictabilityScoreIcon,
+          ResetButtonIcon,
+          NewHandsIcon,
+          RandomButtonIcon,
+          OverchargedStaffIcon,
+          MarkovMatrixIcon,
+          YourPredictionIcon,
+          EnemyNextMoveIcon,
+          GiftBoxIcon,
+          StrategySuggestionIcon,
+          NewSkinIcon,
+          CrystalBallIcon,
+          CrystalBallPlusIcon,
+          MarkovRecalibratorIcon,
+          RemoveAdsIcon,
+        ];
+
+        for (final iconType in offeringsIconTypes) {
+          final iconFinder = find.byType(iconType);
+          await tester.scrollUntilVisible(
+            iconFinder,
+            180,
+            scrollable: scrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            iconFinder,
+            findsOneWidget,
+            reason: 'Expected $iconType in Offerings wing (isDark=$isDark)',
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        // Verify Prayer wing displays RemoveAdsIcon & 3D orbs on the Free Elemental Orbs card
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
+        expect(find.byType(RemoveAdsIcon), findsOneWidget);
+        final adCard = find.byKey(const ValueKey('shop_rewarded_ad_card'));
+        expect(adCard, findsOneWidget);
+        expect(
+          find.descendant(
+            of: adCard,
+            matching: find.byType(ElementalEnergySphere),
+          ),
+          findsWidgets,
+        );
+        expect(find.byType(ElementalSymbolIcon), findsNothing);
+
+        // Verify Consagration wing (+1 Max HP / +1 Max Mana Pool) cost pills use 3D orbs
+        await tester.tap(find.byKey(const ValueKey('temple_tab_consagration')));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('shop_upgrade_max_hp_card')),
+            matching: find.byType(ElementalEnergySphere),
+          ),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('shop_upgrade_max_mana_card')),
+            matching: find.byType(ElementalEnergySphere),
+          ),
+          findsWidgets,
+        );
+        expect(find.byType(ElementalSymbolIcon), findsNothing);
+      }
+    },
+  );
+
+  testWidgets(
+    'All bespoke shop_item_icons render cleanly across standard and isOnGoldBackground contrast palettes',
+    (WidgetTester tester) async {
+      for (final onGold in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              backgroundColor:
+                  onGold ? const Color(0xFFF5C22B) : const Color(0xFF1A1D26),
+              body: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  PredictabilityScoreIcon(size: 32, isOnGoldBackground: onGold),
+                  ResetButtonIcon(size: 32, isOnGoldBackground: onGold),
+                  NewHandsIcon(size: 32, isOnGoldBackground: onGold),
+                  RandomButtonIcon(size: 32, isOnGoldBackground: onGold),
+                  MarkovMatrixIcon(size: 32, isOnGoldBackground: onGold),
+                  YourPredictionIcon(size: 32, isOnGoldBackground: onGold),
+                  EnemyNextMoveIcon(size: 32, isOnGoldBackground: onGold),
+                  GiftBoxIcon(size: 32, isOnGoldBackground: onGold),
+                  StrategySuggestionIcon(size: 32, isOnGoldBackground: onGold),
+                  RemoveAdsIcon(size: 32, isOnGoldBackground: onGold),
+                  NewSkinIcon(size: 32, isOnGoldBackground: onGold),
+                  CrystalBallIcon(size: 32, isOnGoldBackground: onGold),
+                  CrystalBallPlusIcon(size: 32, isOnGoldBackground: onGold),
+                  OverchargedStaffIcon(size: 32, isOnGoldBackground: onGold),
+                  MarkovRecalibratorIcon(size: 32, isOnGoldBackground: onGold),
+                  AdorationHarpIcon(size: 28, isOnGoldBackground: onGold),
+                  PrayerHandsIcon(size: 28, isOnGoldBackground: onGold),
+                  TitheVaultIcon(size: 28, isOnGoldBackground: onGold),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byType(PredictabilityScoreIcon), findsOneWidget);
+        expect(find.byType(ResetButtonIcon), findsOneWidget);
+        expect(find.byType(NewHandsIcon), findsOneWidget);
+        expect(find.byType(RandomButtonIcon), findsOneWidget);
+        expect(find.byType(MarkovMatrixIcon), findsOneWidget);
+        expect(find.byType(YourPredictionIcon), findsOneWidget);
+        expect(find.byType(EnemyNextMoveIcon), findsOneWidget);
+        expect(find.byType(GiftBoxIcon), findsOneWidget);
+        expect(find.byType(StrategySuggestionIcon), findsOneWidget);
+        expect(find.byType(RemoveAdsIcon), findsOneWidget);
+        expect(find.byType(NewSkinIcon), findsOneWidget);
+        expect(find.byType(CrystalBallIcon), findsOneWidget);
+        expect(find.byType(CrystalBallPlusIcon), findsOneWidget);
+        expect(find.byType(OverchargedStaffIcon), findsOneWidget);
+        expect(find.byType(MarkovRecalibratorIcon), findsOneWidget);
+        expect(find.byType(AdorationHarpIcon), findsOneWidget);
+        expect(find.byType(PrayerHandsIcon), findsOneWidget);
+        expect(find.byType(TitheVaultIcon), findsOneWidget);
+      }
+    },
+  );
 }
+
