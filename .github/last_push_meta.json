@@ -1,5 +1,5 @@
 {
-  "summary": "- Added discreet Full Account Wipe trash button & confirmation dialog near Player Profile in SettingsDialog (clarifying Forfeit Run difference, real-money IAP preservation vs orb-unlocked items like Remove Ads, and Cloud Save reset/offline handling)\n- Added GameController.wipeAccountData(), StorageService pending cloud wipe markers, and PlayGamesService.wipeCloudData() to wipe local & cloud progress cleanly without stale cloud resurrection\n- Improved Player Profile avatar in SettingsDialog to display decoded Google Play Games profile images via PlayGamesAvatarClient with a cohesive dark/amber fallback icon when unavailable, loading, or offline\n- Added localized strings (en, pt, es, de) and unit/widget tests in settings_account_wipe_and_avatar_test.dart and play_games_service_test.dart",
+  "summary": "- Removed vertical bobbing, staff tilt rotation, and circular lens pan/scale drift affecting the Metal Wizard sprite in WatchtowerForgeView so he stays completely anchored and stationary\n- Scoped first-visit weekly snap-in micro-shake exclusively to the assembly rig layers while preserving embers, welding sparks, lens framing, zoom/pan controls, and narrative captions\n- Added widget test verifying pixel-exact stationary Metal Wizard rect across animated frames in both MetalWizardSpyglassDialog and FullScreenSpyglassView",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T09:50:58Z"
+  "updated_at_utc": "2026-11-27T10:22:05Z"
 }

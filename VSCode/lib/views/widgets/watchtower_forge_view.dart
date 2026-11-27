@@ -317,124 +317,110 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
               final snapT =
                   widget.animationsEnabled ? _snapInController.value : 1.0;
 
-              // Subtle 2px micro-shake when newly added part snaps into place (snapT in 0.60..0.88)
-              Offset shakeOffset = Offset.zero;
+              // Subtle 2px micro-shake on the assembly rig when newly added part snaps into place
+              Offset rigShakeOffset = Offset.zero;
               if (snapT < 0.99 && snapT >= 0.58) {
                 final u = ((snapT - 0.58) / 0.32).clamp(0.0, 1.0);
                 final decay = (1.0 - u) * (1.0 - u);
                 final amp = 2.2 * decay;
-                shakeOffset = Offset(
+                rigShakeOffset = Offset(
                   math.sin(u * 26.0) * amp,
                   math.cos(u * 31.0) * amp * 0.7,
                 );
               }
 
-              // Subtle breathing/pan inside circular preview lens
-              final angle = t * 2.0 * math.pi;
-              final lensScale = (!widget.isFullScreen && widget.animationsEnabled)
-                  ? 1.03 + 0.015 * math.sin(angle)
-                  : 1.0;
-              final lensPan = (!widget.isFullScreen && widget.animationsEnabled)
-                  ? Offset(2.5 * math.sin(angle), 1.6 * math.cos(angle * 0.5))
-                  : Offset.zero;
+              return Stack(
+                key: const ValueKey('watchtower_forge_view_stack'),
+                fit: StackFit.expand,
+                children: [
+                  // 1. Dark underground stone forge backdrop
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      cooling
+                          ? const Color(0xFF0A101C).withValues(alpha: 0.62)
+                          : const Color(0xFF140A08).withValues(alpha: 0.34),
+                      BlendMode.srcATop,
+                    ),
+                    child: Image.asset(
+                      WatchtowerForgeView.forgeBackdropAsset,
+                      key: const ValueKey('watchtower_forge_image'),
+                      fit: BoxFit.cover,
+                      alignment: const Alignment(0.0, 0.15),
+                    ),
+                  ),
 
-              return Transform.translate(
-                offset: lensPan + shakeOffset,
-                child: Transform.scale(
-                  scale: lensScale,
-                  child: Stack(
-                    key: const ValueKey('watchtower_forge_view_stack'),
-                    fit: StackFit.expand,
-                    children: [
-                      // 1. Dark underground stone forge backdrop
-                      ColorFiltered(
-                        colorFilter: ColorFilter.mode(
-                          cooling
-                              ? const Color(0xFF0A101C).withValues(alpha: 0.62)
-                              : const Color(0xFF140A08).withValues(alpha: 0.34),
-                          BlendMode.srcATop,
-                        ),
-                        child: Image.asset(
-                          WatchtowerForgeView.forgeBackdropAsset,
-                          key: const ValueKey('watchtower_forge_image'),
-                          fit: BoxFit.cover,
-                          alignment: const Alignment(0.0, 0.15),
-                        ),
-                      ),
-
-                      // 2. Iron Assembly Rig gantry, overhead chains & Forge Workbench
-                      IgnorePointer(
-                        child: CustomPaint(
-                          key: const ValueKey('watchtower_forge_rig_backdrop'),
-                          painter: _ForgeWorkshopBackdropPainter(
-                            geom: geom,
-                            phase: phase,
-                            currentWeek: week,
-                            ambientProgress: t,
-                            snapInProgress: snapT,
-                            isCoolingDown: cooling,
-                          ),
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-
-                      // 3. Faint cyan-amber blueprint hologram silhouette (Weeks 0–7)
-                      if (widget.showsBlueprintHologram)
-                        _buildBlueprintHologramLayer(geom, t),
-
-                      // 4. Mounted Assembly Stage / Cloaked Archmage / Baby Mage Robot
-                      ..._buildRigSubjectLayers(
+                  // 2. Iron Assembly Rig gantry, overhead chains & Forge Workbench
+                  IgnorePointer(
+                    child: CustomPaint(
+                      key: const ValueKey('watchtower_forge_rig_backdrop'),
+                      painter: _ForgeWorkshopBackdropPainter(
                         geom: geom,
                         phase: phase,
-                        week: week,
-                        ambientT: t,
-                        snapT: snapT,
+                        currentWeek: week,
+                        ambientProgress: t,
+                        snapInProgress: snapT,
+                        isCoolingDown: cooling,
                       ),
-
-                      // 5. Workbench Parts Pile (Weeks 0–6; vanishes piece-by-piece until Week 7)
-                      if (widget.activePileAsset != null)
-                        Positioned.fromRect(
-                          rect: geom.pileRect,
-                          child: Image.asset(
-                            widget.activePileAsset!,
-                            key: const ValueKey(
-                              'watchtower_forge_parts_pile_image',
-                            ),
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                        ),
-
-                      // 6. Metal Wizard working on the left side of the forge (absent when cooling down)
-                      if (!cooling)
-                        _buildMetalWizardLayer(geom, t, phase)
-                      else
-                        const SizedBox.shrink(
-                          key: ValueKey('watchtower_forge_cooling_state'),
-                        ),
-
-                      // 7. 60 FPS Forge Embers, Targeted Welding Beam & Sparks, Arcane Ignition & Vignette
-                      IgnorePointer(
-                        child: RepaintBoundary(
-                          child: CustomPaint(
-                            key: const ValueKey('watchtower_forge_vfx_paint'),
-                            painter: _ForgeSpyglassVfxPainter(
-                              geom: geom,
-                              phase: phase,
-                              currentWeek: week,
-                              ambientProgress: t,
-                              snapInProgress: snapT,
-                              animationsEnabled: widget.animationsEnabled,
-                              isFullScreen: widget.isFullScreen,
-                              isCoolingDown: cooling,
-                            ),
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
-                      ),
-                    ],
+                      child: const SizedBox.expand(),
+                    ),
                   ),
-                ),
+
+                  // 3. Faint cyan-amber blueprint hologram silhouette (Weeks 0–7)
+                  if (widget.showsBlueprintHologram)
+                    _buildBlueprintHologramLayer(geom, t),
+
+                  // 4. Mounted Assembly Stage / Cloaked Archmage / Baby Mage Robot
+                  ..._buildRigSubjectLayers(
+                    geom: geom,
+                    phase: phase,
+                    week: week,
+                    ambientT: t,
+                    snapT: snapT,
+                    rigShakeOffset: rigShakeOffset,
+                  ),
+
+                  // 5. Workbench Parts Pile (Weeks 0–6; vanishes piece-by-piece until Week 7)
+                  if (widget.activePileAsset != null)
+                    Positioned.fromRect(
+                      rect: geom.pileRect,
+                      child: Image.asset(
+                        widget.activePileAsset!,
+                        key: const ValueKey(
+                          'watchtower_forge_parts_pile_image',
+                        ),
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+
+                  // 6. Stationary Metal Wizard anchored on the left side of the forge (absent when cooling down)
+                  if (!cooling)
+                    _buildMetalWizardLayer(geom)
+                  else
+                    const SizedBox.shrink(
+                      key: ValueKey('watchtower_forge_cooling_state'),
+                    ),
+
+                  // 7. 60 FPS Forge Embers, Targeted Welding Beam & Sparks, Arcane Ignition & Vignette
+                  IgnorePointer(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        key: const ValueKey('watchtower_forge_vfx_paint'),
+                        painter: _ForgeSpyglassVfxPainter(
+                          geom: geom,
+                          phase: phase,
+                          currentWeek: week,
+                          ambientProgress: t,
+                          snapInProgress: snapT,
+                          animationsEnabled: widget.animationsEnabled,
+                          isFullScreen: widget.isFullScreen,
+                          isCoolingDown: cooling,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           );
@@ -485,7 +471,10 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
     required int week,
     required double ambientT,
     required double snapT,
+    required Offset rigShakeOffset,
   }) {
+    final activeRigRect = geom.rigRect.shift(rigShakeOffset);
+
     switch (phase) {
       case ForgeAssemblyPhase.week0EmptyRig:
       case ForgeAssemblyPhase.coolingDown:
@@ -507,7 +496,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
           return [
             if (prevStage != null)
               Positioned.fromRect(
-                rect: geom.rigRect,
+                rect: activeRigRect,
                 child: Image.asset(
                   prevStage,
                   fit: BoxFit.contain,
@@ -516,7 +505,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
               ),
             if (newPart != null)
               Positioned.fromRect(
-                rect: geom.rigRect.shift(Offset(0, dropDy)),
+                rect: activeRigRect.shift(Offset(0, dropDy)),
                 child: Image.asset(
                   newPart,
                   key: const ValueKey('watchtower_forge_snap_in_part_image'),
@@ -529,7 +518,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
 
         return [
           Positioned.fromRect(
-            rect: geom.rigRect,
+            rect: activeRigRect,
             child: Image.asset(
               stageAsset,
               key: ValueKey('watchtower_forge_stage_${week}_image'),
@@ -551,7 +540,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
         return [
           if (isSnapping)
             Positioned.fromRect(
-              rect: geom.rigRect,
+              rect: activeRigRect,
               child: Image.asset(
                 WatchtowerForgeView.stageAssetForWeek(7)!,
                 fit: BoxFit.contain,
@@ -559,7 +548,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
               ),
             ),
           Positioned.fromRect(
-            rect: geom.rigRect.shift(Offset(0, dropDy)),
+            rect: activeRigRect.shift(Offset(0, dropDy)),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -592,7 +581,7 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
             : 0.75;
         return [
           Positioned.fromRect(
-            rect: geom.rigRect,
+            rect: activeRigRect,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -635,34 +624,16 @@ class _WatchtowerForgeViewState extends State<WatchtowerForgeView>
     }
   }
 
-  Widget _buildMetalWizardLayer(
-    _ForgeSceneGeometry geom,
-    double t,
-    ForgeAssemblyPhase phase,
-  ) {
-    final bobDy = widget.animationsEnabled
-        ? math.sin(t * 6.0 * math.pi) * (geom.unit * 0.008)
-        : 0.0;
-    final staffTilt = widget.animationsEnabled
-        ? (phase == ForgeAssemblyPhase.archmagePowered ||
-                phase == ForgeAssemblyPhase.babyRobotForging)
-            ? math.sin(t * 10.0 * math.pi) * 0.025
-            : math.sin(t * 6.0 * math.pi) * 0.015
-        : 0.0;
-
+  Widget _buildMetalWizardLayer(_ForgeSceneGeometry geom) {
     return Positioned.fromRect(
-      rect: geom.wizardRect.shift(Offset(0, bobDy)),
-      child: Transform.rotate(
-        angle: staffTilt,
-        alignment: Alignment.bottomCenter,
-        child: Transform.flip(
-          flipX: true,
-          child: Image.asset(
-            WatchtowerForgeView.metalWizardAsset,
-            key: const ValueKey('watchtower_forge_metal_wizard_image'),
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
+      rect: geom.wizardRect,
+      child: Transform.flip(
+        flipX: true,
+        child: Image.asset(
+          WatchtowerForgeView.metalWizardAsset,
+          key: const ValueKey('watchtower_forge_metal_wizard_image'),
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
         ),
       ),
     );

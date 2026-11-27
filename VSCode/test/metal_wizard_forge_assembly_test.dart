@@ -478,5 +478,97 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets(
+      'Metal Wizard sprite remains completely stationary across animated frames in both circular spyglass modal and full-screen view',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _createController(
+          currentWeek: 6,
+          animationsEnabled: true,
+          lastSeenMetalWizardForgeWeek: 5,
+        );
+        addTearDown(controller.dispose);
+
+        final wizardFinder = find.byKey(
+          const ValueKey('watchtower_forge_metal_wizard_image'),
+        );
+
+        // 1. Circular MetalWizardSpyglassDialog with animationsEnabled: true (including snap-in window)
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: MetalWizardSpyglassDialog(controller: controller),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(wizardFinder, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_vfx_paint')),
+          findsOneWidget,
+        );
+
+        final initialModalRect = tester.getRect(wizardFinder);
+        for (final step in const [
+          Duration(milliseconds: 250),
+          Duration(milliseconds: 500),
+          Duration(milliseconds: 700),
+          Duration(milliseconds: 1200),
+          Duration(milliseconds: 1500),
+          Duration(milliseconds: 2000),
+        ]) {
+          await tester.pump(step);
+          final currentRect = tester.getRect(wizardFinder);
+          expect(currentRect.top, closeTo(initialModalRect.top, 1e-6));
+          expect(currentRect.bottom, closeTo(initialModalRect.bottom, 1e-6));
+          expect(currentRect.left, closeTo(initialModalRect.left, 1e-6));
+          expect(currentRect.right, closeTo(initialModalRect.right, 1e-6));
+        }
+
+        // 2. FullScreenSpyglassView with animationsEnabled: true
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: FullScreenSpyglassView(
+              controller: controller,
+              target: SpyglassTarget.metalWizard,
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(wizardFinder, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('watchtower_forge_vfx_paint')),
+          findsOneWidget,
+        );
+
+        final initialFullRect = tester.getRect(wizardFinder);
+        for (final step in const [
+          Duration(milliseconds: 300),
+          Duration(milliseconds: 800),
+          Duration(milliseconds: 1600),
+          Duration(milliseconds: 2500),
+        ]) {
+          await tester.pump(step);
+          final currentRect = tester.getRect(wizardFinder);
+          expect(currentRect.top, closeTo(initialFullRect.top, 1e-6));
+          expect(currentRect.bottom, closeTo(initialFullRect.bottom, 1e-6));
+          expect(currentRect.left, closeTo(initialFullRect.left, 1e-6));
+          expect(currentRect.right, closeTo(initialFullRect.right, 1e-6));
+        }
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
