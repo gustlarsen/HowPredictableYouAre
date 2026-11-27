@@ -10,6 +10,7 @@ import 'package:how_predictable/views/dialogs/full_screen_spyglass_view.dart';
 import 'package:how_predictable/views/dialogs/metal_wizard_spyglass_dialog.dart';
 import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
 import 'package:how_predictable/views/dialogs/watchtower_spyglass_dialog.dart';
+import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
 import 'package:how_predictable/views/widgets/watch_tower_icon.dart';
 import 'package:how_predictable/views/widgets/watchtower_cell_shader_view.dart';
 import 'package:how_predictable/views/widgets/watchtower_forge_view.dart';
@@ -139,13 +140,31 @@ void main() {
         expect(find.text('Metal Wizard'), findsOneWidget);
         expect(find.text('Spy on Dungeon'), findsNothing);
 
-        // Leading WatchTowerIcon inside Princess's Cell button
+        // Leading WatchTowerIcon inside Princess's Cell button and
+        // MetalWizardLairIcon inside Metal Wizard button
         expect(
           find.descendant(
             of: princessBtn,
             matching: find.byType(WatchTowerIcon),
           ),
           findsOneWidget,
+        );
+        final wizardLairIconFinder = find.descendant(
+          of: wizardBtn,
+          matching: find.byType(MetalWizardLairIcon),
+        );
+        expect(wizardLairIconFinder, findsOneWidget);
+        final wizardLairIcon = tester.widget<MetalWizardLairIcon>(
+          wizardLairIconFinder,
+        );
+        expect(wizardLairIcon.size, 18.0);
+        expect(wizardLairIcon.isOnGoldBackground, isFalse);
+        expect(
+          find.descendant(
+            of: wizardBtn,
+            matching: find.byIcon(Icons.precision_manufacturing_rounded),
+          ),
+          findsNothing,
         );
 
         // Side-by-side equal-width Row positioned above Open Story Log
@@ -155,6 +174,10 @@ void main() {
         expect(princessRect.right, lessThan(wizardRect.left));
         expect(
           (princessRect.top - wizardRect.top).abs(),
+          lessThanOrEqualTo(1.0),
+        );
+        expect(
+          (princessRect.height - wizardRect.height).abs(),
           lessThanOrEqualTo(1.0),
         );
         expect(

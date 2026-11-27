@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/audio_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/watch_tower_icon.dart';
 import 'help_dialog.dart';
 import 'metal_wizard_spyglass_dialog.dart';
@@ -415,12 +416,7 @@ class _ObservatoryDialogState extends State<ObservatoryDialog> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
-                                            Icons
-                                                .precision_manufacturing_rounded,
-                                            size: 18,
-                                            color: Color(0xFFFFB300),
-                                          ),
+                                          const MetalWizardLairIcon(size: 18),
                                           const SizedBox(width: 6),
                                           Text(
                                             loc.t(

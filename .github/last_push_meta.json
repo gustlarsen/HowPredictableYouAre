@@ -1,5 +1,5 @@
 {
-  "summary": "- Fix Android release startup crash in WorkManagerInitializer / WorkDatabase_Impl under AGP 9.3.1 R8 full mode\n- Add explicit ProGuard/R8 keep rules for RoomDatabase, WorkDatabase/WorkDatabase_Impl, and WorkManager InputMerger constructors",
+  "summary": "- Replaced robotic arm icon on Watch Tower Metal Wizard button with shared MetalWizardLairIcon(size: 18) matching Princess's Cell sizing and alignment\n- Added widget test assertions in watchtower_spyglass_test.dart verifying MetalWizardLairIcon usage and matched button height\n- Verified with flutter analyze (0 issues) and flutter test (442 passed)",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T10:59:12Z"
+  "updated_at_utc": "2026-11-27T11:27:37Z"
 }
