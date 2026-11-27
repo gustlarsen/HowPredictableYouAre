@@ -17,7 +17,7 @@ void main() {
     'reset_button_desc':
         'Adds a Reset button to clear the current match and Markov matrix anytime',
     'new_hands_desc':
-        'Unlocks Earth & Metal in your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
+        'Learn Earth & Metal for your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
     'random_button_desc':
         'Adds a Random button to play unpredictable moves and outsmart the AI',
     'show_algorithm_desc':

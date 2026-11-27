@@ -537,7 +537,7 @@ void main() {
 
         expect(controller.unlockedNewHands, isTrue);
         expect(
-          find.text('Unlock Earth & Metal: Restored!'),
+          find.text('Learn Earth & Metal: Restored!'),
           findsOneWidget,
         );
       },

@@ -22,7 +22,7 @@ import 'package:how_predictable/views/widgets/hints_bar.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('Phase 2 & Unlock Earth & Metal Mechanics', () {
+  group('Phase 2 & Learn Earth & Metal Mechanics', () {
     test('HandMove.resolvesAgainst allows 3 main elements to defeat all 5 elements', () {
       // Wood (scissors) defeats Earth (lizard) & Water (paper)
       expect(HandMove.scissors.resolvesAgainst(HandMove.lizard), RoundWinner.user);
@@ -172,12 +172,12 @@ void main() {
       expect(earthDefeats, greaterThan(0), reason: 'Player main elements should defeat Earth');
       expect(metalDefeats, greaterThan(0), reason: 'Player main elements should defeat Metal');
 
-      // Unlock Earth & Metal (requires 50 Earth + 50 Metal)
+      // Learn Earth & Metal (requires 50 Earth + 50 Metal)
       expect(GameController.costNewHands, const ElementalCost(earth: 50, metal: 50));
       expect(controller.unlockNewHands(), isFalse);
     });
 
-    test('Unlocking "Unlock Earth & Metal" deducts 50 Earth + 50 Metal, preserves IAP/Cloud Save, and maintains uniform 1 HP damage', () async {
+    test('Unlocking "Learn Earth & Metal" deducts 50 Earth + 50 Metal, preserves IAP/Cloud Save, and maintains uniform 1 HP damage', () async {
       SharedPreferences.setMockInitialValues({
         'musicEnabled': false,
         'animationsEnabled': false,
@@ -200,7 +200,7 @@ void main() {
       );
 
       // Cannot unlock if either Earth or Metal < 50
-      expect(BillingService.productIdForShopItem('Unlock Earth & Metal'), BillingService.productNewHands);
+      expect(BillingService.productIdForShopItem('Learn Earth & Metal'), BillingService.productNewHands);
       expect(BillingService.productIdForShopItem('New Hands'), BillingService.productNewHands);
 
       final success = controller.unlockNewHands();
@@ -328,12 +328,12 @@ void main() {
 
       // Phase 2 boss yellow shield badge is no longer rendered in GameScreen/VersusArena
       expect(find.byKey(const ValueKey('phase2_boss_shield_badge')), findsNothing);
-      // Player still only sees 3 elemental buttons while Unlock Earth & Metal is OFF
+      // Player still only sees 3 elemental buttons while Learn Earth & Metal is OFF
       expect(find.text('Earth'), findsNothing);
       expect(find.text('Metal'), findsNothing);
     });
 
-    testWidgets('ShopDialog purchases Unlock Earth & Metal for 50 Earth + 50 Metal and enables -4 boss damage when toggled ON', (WidgetTester tester) async {
+    testWidgets('ShopDialog purchases Learn Earth & Metal for 50 Earth + 50 Metal and enables -4 boss damage when toggled ON', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -388,7 +388,7 @@ void main() {
         matching: find.byType(Scrollable),
       );
       final scrollState = tester.state<ScrollableState>(dialogScrollable.first);
-      final titleFinder = find.text('Unlock Earth & Metal');
+      final titleFinder = find.text('Learn Earth & Metal');
       final unlockBtn = find.byKey(
         const ValueKey('diamond_unlock_${BillingService.productNewHands}'),
       );

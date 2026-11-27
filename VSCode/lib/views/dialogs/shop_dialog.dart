@@ -263,7 +263,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       case BillingService.productShowAlgorithm:
         return loc.t('string40', fallback: 'Show Markov Algorithm');
       case BillingService.productNewHands:
-        return loc.t('string56', fallback: 'Unlock Earth & Metal');
+        return loc.t('string56', fallback: 'Learn Earth & Metal');
       case BillingService.productYourPrediction:
         return loc.t('string41', fallback: 'Your Prediction Hint');
       case BillingService.productPcNextMove:
@@ -469,7 +469,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   void _handleNewHandsUnlock(BuildContext context) {
     final title = controller.localization.t(
       'string56',
-      fallback: 'Unlock Earth & Metal',
+      fallback: 'Learn Earth & Metal',
     );
     final ok = controller.unlockNewHands();
     _handleUnlock(context, title, ok);
@@ -478,7 +478,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   Future<void> _handleNewHandsToggle(BuildContext context, bool val) async {
     final title = controller.localization.t(
       'string56',
-      fallback: 'Unlock Earth & Metal',
+      fallback: 'Learn Earth & Metal',
     );
     if (controller.hasGameStarted) {
       final confirmed = await _confirmResetForNewHands(context);
@@ -2426,11 +2426,11 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         ),
         _buildShopItem(
           context: context,
-          title: loc.t('string56', fallback: 'Unlock Earth & Metal'),
+          title: loc.t('string56', fallback: 'Learn Earth & Metal'),
           subtitle: loc.t(
             'new_hands_desc',
             fallback:
-                'Unlocks Earth & Metal in your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
+                'Learn Earth & Metal for your move deck for 5-element combat. Earn Earth & Metal orbs by defeating them in battle.',
           ),
           cost: GameController.costNewHands,
           productId: BillingService.productNewHands,

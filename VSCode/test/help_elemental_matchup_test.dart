@@ -140,7 +140,7 @@ void main() {
     );
 
     testWidgets(
-      'HelpDialog defaults to 5 Elements when Unlock Earth & Metal is enabled and supports tapping Earth/Metal and switching back to 3 Elements',
+      'HelpDialog defaults to 5 Elements when Learn Earth & Metal is enabled and supports tapping Earth/Metal and switching back to 3 Elements',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(360, 740);
         tester.view.devicePixelRatio = 1.0;

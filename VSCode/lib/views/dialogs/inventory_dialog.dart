@@ -225,7 +225,7 @@ class _InventoryDialogState extends State<InventoryDialog>
                                       ),
                                       lockedRequirementText: loc.t(
                                         'inventory_locked_requirement',
-                                        fallback: '(Unlock Earth & Metal)',
+                                        fallback: '(Learn Earth & Metal)',
                                       ),
                                       activeStatusText: loc.t(
                                         'inventory_active_combat',

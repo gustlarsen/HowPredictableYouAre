@@ -1,5 +1,5 @@
 {
-  "summary": "- Added activeSuggestedMoves and activeCrystalBallPlusMoves getters on GameController so bottom action buttons highlight strictly for Suggestion and Crystal Ball+ (never falsely highlighting standard Crystal Ball).\n- Added glowing gradient borders, soft outer BoxShadow halos, top-left lightbulb / top-right crystal ball corner mini-badges (~16px-18px with dark outlines), subtle scale lift, and synchronized 1.5s dual-match gentle pulse (respecting the Animations setting) on bottom elemental attack buttons across Dark and Light Modes.\n- Added widget tests in VSCode/test/action_button_recommendation_highlights_test.dart and verified flutter analyze + all 430 flutter tests pass.",
+  "summary": "- Renamed 'Unlock Earth & Metal' upgrade title and subtitle to 'Learn Earth & Metal' across en, pt, es, and de in stringsHowPredict.json and ShopDialog/RoyalCastle fallbacks\\n- Updated Cleric's Backpack locked orb requirement hint to '(Learn Earth & Metal)' across all 4 languages while preserving 3-line layout and FittedBox scaling\\n- Kept internal storage keys, Cloud Save flags, and Google Play Billing product ID ('unlock_new_hands') unchanged\\n- Updated affected widget and unit tests and verified flutter analyze and all 430 flutter tests pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T04:00:58Z"
+  "updated_at_utc": "2026-11-27T04:15:42Z"
 }

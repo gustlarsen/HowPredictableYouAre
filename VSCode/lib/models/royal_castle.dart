@@ -18,7 +18,7 @@ enum ShopUpgradeArtifact {
   newHands(
     id: 'new_hands',
     titleKey: 'string56',
-    fallbackTitle: 'Unlock Earth & Metal',
+    fallbackTitle: 'Learn Earth & Metal',
     icon: Icons.pan_tool_outlined,
   ),
   random(

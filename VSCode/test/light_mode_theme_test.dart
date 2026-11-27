@@ -203,7 +203,7 @@ void main() {
         expect(lockedStatus.style?.color, lightPalette.amberText);
 
         final lockedRequirement = tester.widget<Text>(
-          find.text('(Unlock Earth & Metal)').first,
+          find.text('(Learn Earth & Metal)').first,
         );
         expect(
           lockedRequirement.style?.color,
