@@ -1,5 +1,5 @@
 {
-  "summary": "- Added \"Go to Watch Tower\" link button on final slide of Week0ScreamWarningDialog\n- Wired Go to Watch Tower action in WorldMapScreen to persist dismissal and open ObservatoryDialog (WatchTowerDialog) via _openObservatory\n- Added en/pt/es/de localizations in stringsHowPredict.json\n- Updated week0_scream_warning_test.dart and verified with flutter test (431 passed) and flutter analyze",
+  "summary": "- Updated Player Cleric idle sprite (VSCode/assets/images/player/cleric_idle.png) and added new Cleric hit/recoil sprite (VSCode/assets/images/player/cleric_hit.png) as clean 512x512 RGBA PNGs with anti-aliased transparent cutouts.\n- Wired synchronized idle-to-hit sprite swapping in VersusArena (_PlayerArenaSprite), precached both Cleric sprites in VersusArena and GameScreen with gaplessPlayback: true, and locked Alignment.bottomCenter floor grounding above the HP/Mana bars.\n- Added asset integrity and VersusArena widget tests in VSCode/test/robot_mage_assets_and_arena_test.dart and verified flutter analyze & all 432 flutter test cases pass.",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T04:34:21Z"
+  "updated_at_utc": "2026-11-27T05:08:06Z"
 }

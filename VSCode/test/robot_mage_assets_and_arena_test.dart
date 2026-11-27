@@ -119,6 +119,7 @@ void main() {
 
       const expectedSprites = [
         'assets/images/player/cleric_idle.png',
+        'assets/images/player/cleric_hit.png',
         'assets/images/enemies/guardian_robot_idle.png',
         'assets/images/enemies/guardian_robot_hit.png',
         'assets/images/enemies/robot_archmage_idle.png',
@@ -260,7 +261,7 @@ void main() {
       expect(find.byKey(const ValueKey('user_mana_bar')), findsOneWidget);
       expect(find.text('GUARDIAN ROBOT'), findsOneWidget);
 
-      // PC wins round 1 -> guardian_robot_idle.png stays active (no attack sprite swap)
+      // PC wins round 1 -> guardian_robot_idle.png stays active; Cleric stays on idle until 550ms impact, then swaps to cleric_hit.png for ~450ms
       await pumpArena(
         roundId: 1,
         winner: RoundWinner.computer,
@@ -273,15 +274,33 @@ void main() {
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
+        findsOneWidget,
+      );
 
-      await tester.pump(const Duration(milliseconds: 350)); // 470ms total (>450ms)
+      await tester.pump(const Duration(milliseconds: 350)); // 470ms total (<550ms impact)
       expect(
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
+        findsOneWidget,
+      );
 
-      // Finish remaining VFX duration
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 90)); // 560ms total -> impact fired!
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_hit.png')),
+        findsOneWidget,
+      );
+
+      // Finish remaining hit animation (>450ms after impact) -> reverts back to cleric_idle.png
+      await tester.pump(const Duration(milliseconds: 460));
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
+        findsOneWidget,
+      );
 
       // Player deals damage round 2 -> idle during launch/clash, swaps to guardian_robot_hit.png at 550ms impact for ~450ms
       await pumpArena(
@@ -296,10 +315,18 @@ void main() {
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_idle.png')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
+        findsOneWidget,
+      );
 
       await tester.pump(const Duration(milliseconds: 360)); // 560ms total -> impact fired!
       expect(
         find.byKey(const ValueKey('assets/images/enemies/guardian_robot_hit.png')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('assets/images/player/cleric_idle.png')),
         findsOneWidget,
       );
 
@@ -310,6 +337,150 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'Player Cleric renders cleric_idle.png by default with gaplessPlayback & bottomCenter grounding, swaps to cleric_hit.png synchronized with HP drop & damage indicator, and reverts cleanly',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        await localization.load();
+
+        Future<void> pumpClericArena({
+          required int roundId,
+          RoundWinner? winner,
+          HandMove? userMove,
+          HandMove? computerMove,
+          int userHp = 50,
+          bool elementalMode = true,
+          bool compactHeight = false,
+          DualSpellMatchupResult? dualSpellResult,
+        }) {
+          return tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: Scaffold(
+                body: SizedBox(
+                  width: 390,
+                  child: VersusArena(
+                    userMove: userMove,
+                    computerMove: computerMove,
+                    dualSpellResult: dualSpellResult,
+                    winner: winner,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: roundId,
+                    userHp: userHp,
+                    playerMaxHp: 50,
+                    userDamageAmount: 1,
+                    elementalMode: elementalMode,
+                    compactHeight: compactHeight,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        final idleFinder = find.byKey(
+          const ValueKey('assets/images/player/cleric_idle.png'),
+        );
+        final hitFinder = find.byKey(
+          const ValueKey('assets/images/player/cleric_hit.png'),
+        );
+        final spriteBoxFinder = find.byKey(
+          const ValueKey('versus_player_sprite'),
+        );
+        final userHpBarFinder = find.byKey(const ValueKey('user_hp_bar'));
+
+        // 1. Default idle state & floor grounding check (standard + compactHeight)
+        for (final compact in [false, true]) {
+          await pumpClericArena(roundId: 0, compactHeight: compact);
+          await tester.pump();
+
+          expect(idleFinder, findsOneWidget);
+          expect(hitFinder, findsNothing);
+
+          final idleImage = tester.widget<Image>(idleFinder);
+          expect(idleImage.gaplessPlayback, isTrue);
+          expect(idleImage.alignment, Alignment.bottomCenter);
+
+          final spriteRect = tester.getRect(spriteBoxFinder);
+          final hpRect = tester.getRect(userHpBarFinder);
+          expect(
+            spriteRect.bottom,
+            lessThanOrEqualTo(hpRect.top + 0.5),
+            reason: 'Cleric sprite should stay grounded above HP bar (compact=$compact)',
+          );
+        }
+
+        // 2. Elemental mode impact: HP deduction, damage indicator, and cleric_hit.png fire together at 550ms
+        await pumpClericArena(roundId: 0);
+        await tester.pump();
+        final initialSpriteRect = tester.getRect(spriteBoxFinder);
+
+        await pumpClericArena(
+          roundId: 1,
+          winner: RoundWinner.computer,
+          userMove: HandMove.fire,
+          computerMove: HandMove.water,
+          userHp: 49,
+        );
+        await tester.pump();
+
+        // Before Phase 3 impact (300ms clash): still idle, HP bar still at 50 / 50
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(idleFinder, findsOneWidget);
+        expect(hitFinder, findsNothing);
+        expect(
+          find.descendant(of: userHpBarFinder, matching: find.text('50 / 50')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsNothing);
+
+        // At 560ms (Phase 3 impact): cleric_hit.png active, HP bar drops to 49 / 50, damage indicator shown
+        await tester.pump(const Duration(milliseconds: 260));
+        expect(idleFinder, findsNothing);
+        expect(hitFinder, findsOneWidget);
+        final hitImage = tester.widget<Image>(hitFinder);
+        expect(hitImage.gaplessPlayback, isTrue);
+        expect(hitImage.alignment, Alignment.bottomCenter);
+        expect(
+          find.descendant(of: userHpBarFinder, matching: find.text('49 / 50')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('user_damage_indicator')), findsOneWidget);
+
+        // Bounds remain identical (zero vertical jumping during swap)
+        expect(tester.getRect(spriteBoxFinder), equals(initialSpriteRect));
+
+        // After 460ms (hit animation completes): reverts smoothly to cleric_idle.png
+        await tester.pump(const Duration(milliseconds: 460));
+        expect(idleFinder, findsOneWidget);
+        expect(hitFinder, findsNothing);
+
+        // 3. Classic mode impact: swaps to cleric_hit.png at 500ms impact and returns to cleric_idle.png
+        await pumpClericArena(
+          roundId: 2,
+          winner: RoundWinner.computer,
+          userMove: HandMove.rock,
+          computerMove: HandMove.paper,
+          userHp: 48,
+          elementalMode: false,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(idleFinder, findsOneWidget);
+        expect(hitFinder, findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 110)); // 510ms -> classic impact!
+        expect(hitFinder, findsOneWidget);
+        expect(idleFinder, findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 460));
+        expect(idleFinder, findsOneWidget);
+        expect(hitFinder, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('Stages 2, 3, and 4 render Robot Archmage, Metal Wizard, and Baby Mage Robot sprites cleanly with attack/hit motions', (WidgetTester tester) async {
       final localization = LocalizationService();

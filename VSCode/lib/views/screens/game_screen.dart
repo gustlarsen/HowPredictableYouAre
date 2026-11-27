@@ -80,6 +80,7 @@ class _GameScreenState extends State<GameScreen>
   bool _isTempleSiegeInvasionDialogOpen = false;
   bool _isBossVictoryDialogOpen = false;
   bool _metricsRebuildScheduled = false;
+  bool _didPrecachePlayerSprites = false;
   Timer? _deathDialogTimer;
   GameController? _controller;
 
@@ -167,9 +168,24 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  void _precachePlayerSprites() {
+    for (final assetPath in const [
+      'assets/images/player/cleric_idle.png',
+      'assets/images/player/cleric_hit.png',
+    ]) {
+      unawaited(
+        precacheImage(AssetImage(assetPath), context).catchError((_) {}),
+      );
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_didPrecachePlayerSprites) {
+      _didPrecachePlayerSprites = true;
+      _precachePlayerSprites();
+    }
     final nextController = context.read<GameController>();
     if (_controller != nextController) {
       _controller = nextController;

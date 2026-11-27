@@ -124,6 +124,12 @@ class _VersusArenaState extends State<VersusArena>
   bool _activeUserDamage = false;
   bool _activePcDamage = false;
   int? _precachedBossStage;
+  bool _precachedPlayerSprites = false;
+
+  static const List<String> _playerActionSprites = [
+    'assets/images/player/cleric_idle.png',
+    'assets/images/player/cleric_hit.png',
+  ];
 
   static List<String> _actionSpritesForStage(int enemyStage) {
     switch (enemyStage) {
@@ -155,6 +161,14 @@ class _VersusArenaState extends State<VersusArena>
     }
   }
 
+  void _precachePlayerSprites() {
+    for (final assetPath in _playerActionSprites) {
+      unawaited(
+        precacheImage(AssetImage(assetPath), context).catchError((_) {}),
+      );
+    }
+  }
+
   void _precacheBossSprites(int stage) {
     for (final assetPath in _actionSpritesForStage(stage)) {
       unawaited(
@@ -166,6 +180,10 @@ class _VersusArenaState extends State<VersusArena>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_precachedPlayerSprites) {
+      _precachedPlayerSprites = true;
+      _precachePlayerSprites();
+    }
     if (_precachedBossStage != widget.enemyStage) {
       _precachedBossStage = widget.enemyStage;
       _precacheBossSprites(widget.enemyStage);
@@ -825,7 +843,7 @@ class _VersusArenaState extends State<VersusArena>
               const vsWidth = 48.0;
               const totalItemsWidth = cardWidth * 2 + vsWidth;
               const spriteWidth = 112.0;
-              const spriteHeight = 112.0;
+              final spriteHeight = widget.compactHeight ? 102.0 : 108.0;
               final arenaStackHeight = widget.compactHeight ? 132.0 : 140.0;
               final rowWidth = constraints.maxWidth;
               final maxCardLeft = math.max(0.0, rowWidth - cardWidth);
@@ -845,7 +863,7 @@ class _VersusArenaState extends State<VersusArena>
               final centerX = rowWidth / 2.0;
               final orbCenterY = arenaStackHeight - 81.0;
               final floorRunesCenterY = widget.compactHeight ? 90.0 : 96.0;
-              final spriteTop = widget.compactHeight ? -4.0 : 0.0;
+              final spriteTop = widget.compactHeight ? -6.0 : -4.0;
 
               final playerLeft = (leftCenterX - spriteWidth / 2.0)
                   .clamp(0.0, math.max(0.0, rowWidth - spriteWidth))
@@ -1457,8 +1475,9 @@ class SanctuaryRunesFloorPainter extends CustomPainter {
   }
 }
 
-/// Full-body Player Cleric sprite (`assets/images/player/cleric_idle.png`) with
-/// subtle breathing bob, forward cast lunge/glow pulse, and hit shake/flash.
+/// Full-body Player Cleric sprite (`assets/images/player/cleric_idle.png` and
+/// `assets/images/player/cleric_hit.png`) with subtle breathing bob, forward
+/// cast lunge/glow pulse, bottom-center floor grounding, and hit recoil/shake.
 class _PlayerArenaSprite extends StatelessWidget {
   final _BossActionType actionType;
   final double idleProgress;
@@ -1475,7 +1494,9 @@ class _PlayerArenaSprite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const assetPath = 'assets/images/player/cleric_idle.png';
+    final assetPath = actionType == _BossActionType.hit
+        ? 'assets/images/player/cleric_hit.png'
+        : 'assets/images/player/cleric_idle.png';
     final floatDy =
         animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.2 : 0.0;
     double scale = animationsEnabled ? (1.0 + 0.022 * idleProgress) : 1.0;
@@ -1521,11 +1542,13 @@ class _PlayerArenaSprite extends StatelessWidget {
           offset: Offset(dx, dy),
           child: Transform.scale(
             scale: scale,
+            alignment: Alignment.bottomCenter,
             child: Image.asset(
               assetPath,
-              key: const ValueKey<String>(assetPath),
+              key: ValueKey<String>(assetPath),
               gaplessPlayback: true,
               fit: BoxFit.contain,
+              alignment: Alignment.bottomCenter,
               filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.person_rounded,
