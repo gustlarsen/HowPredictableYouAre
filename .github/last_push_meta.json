@@ -1,5 +1,5 @@
 {
-  "summary": "- Removed vertical bobbing, staff tilt rotation, and circular lens pan/scale drift affecting the Metal Wizard sprite in WatchtowerForgeView so he stays completely anchored and stationary\n- Scoped first-visit weekly snap-in micro-shake exclusively to the assembly rig layers while preserving embers, welding sparks, lens framing, zoom/pan controls, and narrative captions\n- Added widget test verifying pixel-exact stationary Metal Wizard rect across animated frames in both MetalWizardSpyglassDialog and FullScreenSpyglassView",
+  "summary": "- Fix Android release startup crash in WorkManagerInitializer / WorkDatabase_Impl under AGP 9.3.1 R8 full mode\n- Add explicit ProGuard/R8 keep rules for RoomDatabase, WorkDatabase/WorkDatabase_Impl, and WorkManager InputMerger constructors",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T10:22:05Z"
+  "updated_at_utc": "2026-11-27T10:59:12Z"
 }

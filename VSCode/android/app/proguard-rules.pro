@@ -23,4 +23,16 @@
 -dontwarn com.google.android.gms.ads.**
 -dontwarn com.google.errorprone.annotations.**
 
+# Room & WorkManager (transitively pulled by Google Mobile Ads via work-runtime 2.7.0 / room-runtime 2.2.5)
+# AGP 9 / R8 full mode strips <init>() when consumer rules omit member blocks,
+# causing WorkDatabase_Impl instantiation to fail during InitializationProvider startup.
+-keep class * extends androidx.room.RoomDatabase {
+    <init>();
+}
+-keep class androidx.work.impl.WorkDatabase { *; }
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+-keep class * extends androidx.work.InputMerger {
+    <init>();
+}
+
 
