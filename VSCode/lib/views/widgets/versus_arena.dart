@@ -105,7 +105,6 @@ class _VersusArenaState extends State<VersusArena>
   late AnimationController _animController;
   late AnimationController _vfxController;
   late AnimationController _damageIndicatorController;
-  late AnimationController _bossIdleController;
   late AnimationController _bossActionController;
   late AnimationController _playerActionController;
   late Animation<double> _punchAnim;
@@ -227,10 +226,6 @@ class _VersusArenaState extends State<VersusArena>
           });
         }
       });
-    _bossIdleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    );
     _bossActionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: VersusArena.bossActionDurationMs),
@@ -251,7 +246,6 @@ class _VersusArenaState extends State<VersusArena>
           });
         }
       });
-    _syncBossIdleAnimation();
 
     // Winning hand takes 500ms (0.0 -> 0.5) to move over to the losing hand,
     // and 500ms (0.5 -> 1.0) to move back to its starting position.
@@ -307,19 +301,6 @@ class _VersusArenaState extends State<VersusArena>
         );
       }
       _startRoundAnimations();
-    }
-  }
-
-  void _syncBossIdleAnimation() {
-    if (widget.animationsEnabled) {
-      if (!_bossIdleController.isAnimating) {
-        _bossIdleController.repeat(reverse: true);
-      }
-    } else {
-      if (_bossIdleController.isAnimating || _bossIdleController.value != 0.0) {
-        _bossIdleController.stop();
-        _bossIdleController.reset();
-      }
     }
   }
 
@@ -471,9 +452,6 @@ class _VersusArenaState extends State<VersusArena>
   void didUpdateWidget(covariant VersusArena oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.animationsEnabled != oldWidget.animationsEnabled) {
-      _syncBossIdleAnimation();
-    }
     if (widget.enemyStage != oldWidget.enemyStage) {
       _resetBossAction();
       _precachedBossStage = widget.enemyStage;
@@ -541,7 +519,6 @@ class _VersusArenaState extends State<VersusArena>
   void dispose() {
     _animController.removeListener(_handleClassicTick);
     _vfxController.removeListener(_handleVfxTick);
-    _bossIdleController.dispose();
     _bossActionController.dispose();
     _playerActionController.dispose();
     _damageIndicatorController.dispose();
@@ -875,23 +852,17 @@ class _VersusArenaState extends State<VersusArena>
               final sanctuaryRunesLayer = Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([
-                      _bossIdleController,
-                      _vfxController,
-                    ]),
+                    animation: _vfxController,
                     builder: (context, _) {
                       final clashPulse = _vfxController.isAnimating
                           ? math.sin(_vfxController.value * math.pi)
                           : 0.0;
-                      final idlePulse = widget.animationsEnabled
-                          ? _bossIdleController.value
-                          : 0.35;
                       return CustomPaint(
                         key: const ValueKey('sanctuary_runes_floor_paint'),
                         painter: SanctuaryRunesFloorPainter(
                           centerX: centerX,
                           centerY: floorRunesCenterY,
-                          idlePulse: idlePulse,
+                          idlePulse: 0.35,
                           clashPulse: clashPulse,
                           isDark: palette.isDark,
                           suppressRunesGeometry:
@@ -914,17 +885,11 @@ class _VersusArenaState extends State<VersusArena>
                 height: spriteHeight,
                 child: IgnorePointer(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([
-                      _bossIdleController,
-                      _playerActionController,
-                    ]),
+                    animation: _playerActionController,
                     builder: (context, _) {
                       return _PlayerArenaSprite(
                         key: const ValueKey('versus_player_sprite'),
                         actionType: _playerActionType,
-                        idleProgress: widget.animationsEnabled
-                            ? _bossIdleController.value
-                            : 0.0,
                         actionProgress: widget.animationsEnabled
                             ? _playerActionController.value
                             : 0.0,
@@ -942,10 +907,7 @@ class _VersusArenaState extends State<VersusArena>
                 height: spriteHeight,
                 child: IgnorePointer(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([
-                      _bossIdleController,
-                      _bossActionController,
-                    ]),
+                    animation: _bossActionController,
                     builder: (context, _) {
                       return _BossArenaSprite(
                         key: ValueKey(
@@ -953,9 +915,6 @@ class _VersusArenaState extends State<VersusArena>
                         ),
                         enemyStage: widget.enemyStage,
                         actionType: _bossActionType,
-                        idleProgress: widget.animationsEnabled
-                            ? _bossIdleController.value
-                            : 0.0,
                         actionProgress: widget.animationsEnabled
                             ? _bossActionController.value
                             : 0.0,
@@ -1476,18 +1435,16 @@ class SanctuaryRunesFloorPainter extends CustomPainter {
 }
 
 /// Full-body Player Cleric sprite (`assets/images/player/cleric_idle.png` and
-/// `assets/images/player/cleric_hit.png`) with subtle breathing bob, forward
+/// `assets/images/player/cleric_hit.png`) with stationary idle stance, forward
 /// cast lunge/glow pulse, bottom-center floor grounding, and hit recoil/shake.
 class _PlayerArenaSprite extends StatelessWidget {
   final _BossActionType actionType;
-  final double idleProgress;
   final double actionProgress;
   final bool animationsEnabled;
 
   const _PlayerArenaSprite({
     super.key,
     required this.actionType,
-    required this.idleProgress,
     required this.actionProgress,
     required this.animationsEnabled,
   });
@@ -1497,12 +1454,9 @@ class _PlayerArenaSprite extends StatelessWidget {
     final assetPath = actionType == _BossActionType.hit
         ? 'assets/images/player/cleric_hit.png'
         : 'assets/images/player/cleric_idle.png';
-    final floatDy =
-        animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.2 : 0.0;
-    double scale = animationsEnabled ? (1.0 + 0.022 * idleProgress) : 1.0;
+    double scale = 1.0;
     double dx = 0.0;
-    double dy = floatDy;
-    double glowAlpha = 0.22 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
+    double glowAlpha = 0.22;
     Color glowColor = const Color(0xFF00E5FF);
 
     if (animationsEnabled && actionType != _BossActionType.none) {
@@ -1539,7 +1493,7 @@ class _PlayerArenaSprite extends StatelessWidget {
           ),
         ),
         Transform.translate(
-          offset: Offset(dx, dy),
+          offset: Offset(dx, 0.0),
           child: Transform.scale(
             scale: scale,
             alignment: Alignment.bottomCenter,
@@ -1566,7 +1520,6 @@ class _PlayerArenaSprite extends StatelessWidget {
 class _BossArenaSprite extends StatelessWidget {
   final int enemyStage;
   final _BossActionType actionType;
-  final double idleProgress;
   final double actionProgress;
   final bool animationsEnabled;
 
@@ -1574,7 +1527,6 @@ class _BossArenaSprite extends StatelessWidget {
     super.key,
     required this.enemyStage,
     required this.actionType,
-    required this.idleProgress,
     required this.actionProgress,
     required this.animationsEnabled,
   });
@@ -1624,14 +1576,12 @@ class _BossArenaSprite extends StatelessWidget {
     final assetPath = _resolveSpriteAsset();
     final auraBase = _stageAuraColor();
 
-    // Gentle idle breathing & floating motion
-    final floatDy =
-        animationsEnabled ? -math.sin(idleProgress * math.pi) * 2.5 : 0.0;
-    double scale = animationsEnabled ? (1.0 + 0.024 * idleProgress) : 1.0;
+    // Stationary idle stance (no vertical bobbing or idle breathing scale)
+    double scale = 1.0;
     double dx = 0.0;
-    double dy = floatDy;
+    double dy = 0.0;
     double tiltAngle = 0.0;
-    double glowAlpha = 0.22 + (animationsEnabled ? 0.10 * idleProgress : 0.0);
+    double glowAlpha = 0.22;
     Color glowColor = auraBase;
 
     if (animationsEnabled && actionType != _BossActionType.none) {

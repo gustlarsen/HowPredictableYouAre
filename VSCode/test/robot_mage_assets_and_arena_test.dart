@@ -729,6 +729,158 @@ void main() {
     });
 
     testWidgets(
+      'Player Cleric and all 5 enemy/boss sprites remain completely stationary in idle state with animationsEnabled=true (no vertical bobbing)',
+      (WidgetTester tester) async {
+        final localization = LocalizationService();
+        await localization.load();
+
+        final stageAssets = <int, String>{
+          1: 'assets/images/enemies/guardian_robot_idle.png',
+          2: 'assets/images/enemies/robot_archmage_idle.png',
+          3: 'assets/images/enemies/metal_wizard_idle.png',
+          4: 'assets/images/enemies/baby_robot_mage_idle.png',
+          5: 'assets/images/enemies/temple_master_idle.png',
+        };
+
+        for (final entry in stageAssets.entries) {
+          final stage = entry.key;
+          final bossAsset = entry.value;
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.dark(),
+              home: Scaffold(
+                body: SizedBox(
+                  width: 400,
+                  child: VersusArena(
+                    userMove: null,
+                    computerMove: null,
+                    winner: null,
+                    localization: localization,
+                    animationsEnabled: true,
+                    roundId: 0,
+                    elementalMode: true,
+                    enemyStage: stage,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          final clericFinder = find.byKey(
+            const ValueKey('assets/images/player/cleric_idle.png'),
+          );
+          final bossFinder = find.byKey(ValueKey(bossAsset));
+          final playerContainerFinder = find.byKey(
+            const ValueKey('versus_player_sprite'),
+          );
+          final bossContainerFinder = find.byKey(
+            ValueKey('versus_boss_sprite_stage_$stage'),
+          );
+
+          expect(clericFinder, findsOneWidget);
+          expect(bossFinder, findsOneWidget);
+
+          final initialClericRect = tester.getRect(clericFinder);
+          final initialBossRect = tester.getRect(bossFinder);
+          final initialPlayerBoxRect = tester.getRect(playerContainerFinder);
+          final initialBossBoxRect = tester.getRect(bossContainerFinder);
+
+          for (final stepMs in [275, 275, 550, 550, 550]) {
+            await tester.pump(Duration(milliseconds: stepMs));
+            expect(
+              tester.getRect(clericFinder),
+              equals(initialClericRect),
+              reason: 'Cleric sprite should stay stationary in idle (stage=$stage)',
+            );
+            expect(
+              tester.getRect(bossFinder),
+              equals(initialBossRect),
+              reason: 'Boss sprite $bossAsset should stay stationary in idle',
+            );
+            expect(
+              tester.getRect(playerContainerFinder),
+              equals(initialPlayerBoxRect),
+            );
+            expect(
+              tester.getRect(bossContainerFinder),
+              equals(initialBossBoxRect),
+            );
+          }
+
+          // Verify all Transform ancestors inside player/boss sprites have identity matrices
+          for (final containerFinder in [
+            playerContainerFinder,
+            bossContainerFinder,
+          ]) {
+            final transforms = tester.widgetList<Transform>(
+              find.descendant(
+                of: containerFinder,
+                matching: find.byType(Transform),
+              ),
+            );
+            for (final transform in transforms) {
+              expect(
+                transform.transform,
+                equals(Matrix4.identity()),
+                reason: 'Idle sprite transform must be identity (stage=$stage)',
+              );
+            }
+          }
+          expect(tester.takeException(), isNull);
+        }
+
+        // Also verify sprites remain completely stationary while waiting between turns after a round finishes
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                child: VersusArena(
+                  userMove: HandMove.fire,
+                  computerMove: HandMove.wood,
+                  winner: RoundWinner.user,
+                  localization: localization,
+                  animationsEnabled: true,
+                  roundId: 1,
+                  elementalMode: true,
+                  enemyStage: 1,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 560));
+        await tester.pump(const Duration(milliseconds: 460));
+
+        final postRoundClericFinder = find.byKey(
+          const ValueKey('assets/images/player/cleric_idle.png'),
+        );
+        final postRoundBossFinder = find.byKey(
+          const ValueKey('assets/images/enemies/guardian_robot_idle.png'),
+        );
+        final settledClericRect = tester.getRect(postRoundClericFinder);
+        final settledBossRect = tester.getRect(postRoundBossFinder);
+
+        for (final stepMs in [275, 275, 550, 550, 550]) {
+          await tester.pump(Duration(milliseconds: stepMs));
+          expect(
+            tester.getRect(postRoundClericFinder),
+            equals(settledClericRect),
+          );
+          expect(
+            tester.getRect(postRoundBossFinder),
+            equals(settledBossRect),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'Baby Mage Robot dual elemental badges stack vertically near staff without overlapping face or HP bar',
       (WidgetTester tester) async {
         final localization = LocalizationService();

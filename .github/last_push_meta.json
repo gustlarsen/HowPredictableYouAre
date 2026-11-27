@@ -1,5 +1,5 @@
 {
-  "summary": "- Updated Player Cleric idle sprite (VSCode/assets/images/player/cleric_idle.png) and added new Cleric hit/recoil sprite (VSCode/assets/images/player/cleric_hit.png) as clean 512x512 RGBA PNGs with anti-aliased transparent cutouts.\n- Wired synchronized idle-to-hit sprite swapping in VersusArena (_PlayerArenaSprite), precached both Cleric sprites in VersusArena and GameScreen with gaplessPlayback: true, and locked Alignment.bottomCenter floor grounding above the HP/Mana bars.\n- Added asset integrity and VersusArena widget tests in VSCode/test/robot_mage_assets_and_arena_test.dart and verified flutter analyze & all 432 flutter test cases pass.",
+  "summary": "- Remove continuous idle vertical bobbing and idle scaling from VersusArena Player Cleric and enemy/boss sprites\\n- Add widget tests verifying stationary idle rendering across all 5 boss stages and post-round idle state",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-27T05:08:06Z"
+  "updated_at_utc": "2026-11-27T09:21:16Z"
 }
