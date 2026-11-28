@@ -62,8 +62,15 @@ class GameController extends ChangeNotifier {
   static const int singleElementBulkPackBonus = 1500;
   static const double offertoryBaseHourlyRatePerLevel = 12.0;
   static const double offertoryMilestoneBonusPer10Levels = 0.25;
-  static const Duration offertoryMaxCapDuration = Duration(hours: 8);
-  static const int offertoryMaxCapSeconds = 8 * 3600;
+  static const int offertoryBaseCapHours = 8;
+  static const int offertoryCapHoursPerLevel = 1;
+  static const int offertoryCapMaxLevel = StorageService.maxOffertoryCapLevel;
+  static const int offertoryMaxPossibleCapHours =
+      offertoryBaseCapHours + offertoryCapMaxLevel * offertoryCapHoursPerLevel;
+  static const int offertoryMaxPossibleCapSeconds =
+      offertoryMaxPossibleCapHours * 3600;
+  static const int offertoryCapBaseCost = 50;
+  static const double offertoryCapCostGrowth = 1.35;
   static const Duration offertoryTitheBoostDuration = Duration(hours: 4);
   static const Duration offertoryTitheBoostMaxDuration = Duration(hours: 8);
   static const int offertoryTitheMinBalance = 50;
@@ -931,7 +938,8 @@ class GameController extends ChangeNotifier {
 
   // Sacred Temple Offertory Permanent Idle Orb Generator State
   final DateTime Function() _clock;
-  int offertoryLevel = 0;
+  int offertoryRateLevel = 0;
+  int offertoryCapLevel = 0;
   int? offertoryLastCollectedAt;
   double offertoryPendingFraction = 0.0;
   int offertoryBankedOrbs = 0;
@@ -943,6 +951,10 @@ class GameController extends ChangeNotifier {
   bool _offlineOffertoryDismissedThisSession = false;
   bool _hasEvaluatedInitialOfflineReturn = false;
   bool _isAppBackgrounded = false;
+
+  /// Legacy alias for [offertoryRateLevel] kept for backward compatibility.
+  int get offertoryLevel => offertoryRateLevel;
+  set offertoryLevel(int value) => offertoryRateLevel = value;
 
   GameController({
     required this.storage,
@@ -1511,15 +1523,19 @@ class GameController extends ChangeNotifier {
               : vitalityBlessingBonusHp)
         : 0;
     lastFreeDailyPrayerDate = storage.lastFreeDailyPrayerDate;
-    offertoryLevel = storage.offertoryLevel;
+    offertoryRateLevel = storage.offertoryRateLevel;
+    offertoryCapLevel = storage.offertoryCapLevel;
     offertoryLastCollectedAt = storage.offertoryLastCollectedAt;
     offertoryPendingFraction = storage.offertoryPendingFraction;
     offertoryBankedOrbs = storage.offertoryBankedOrbs;
-    offertoryBankedSeconds = storage.offertoryBankedSeconds;
+    offertoryBankedSeconds = storage.offertoryBankedSeconds.clamp(
+      0.0,
+      offertoryMaxCapSeconds.toDouble(),
+    );
     offertoryBoostExpiresAt = storage.offertoryBoostExpiresAt;
     offertoryFreeDoubleReadyAt = storage.offertoryFreeDoubleReadyAt;
     lastAppPausedAt = storage.lastAppPausedAt;
-    if (offertoryLevel > 0 && offertoryLastCollectedAt == null) {
+    if (offertoryRateLevel > 0 && offertoryLastCollectedAt == null) {
       offertoryLastCollectedAt = _nowUtc().millisecondsSinceEpoch;
       storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
     }
@@ -4773,6 +4789,87 @@ class GameController extends ChangeNotifier {
     return (levels: bought, totalCost: cost);
   }
 
+  /// Max offline cap in hours for a given [capLevel] (`8h` at Lv. 0, `+1h` per
+  /// level up to `24h` at Lv. 16).
+  static int offertoryCapHoursForLevel(int capLevel) {
+    final safe = capLevel.clamp(0, offertoryCapMaxLevel);
+    return offertoryBaseCapHours + safe * offertoryCapHoursPerLevel;
+  }
+
+  /// Player's current Max Offline Time Cap in hours.
+  int get offertoryMaxCapHours => offertoryCapHoursForLevel(offertoryCapLevel);
+
+  /// Player's current Max Offline Time Cap as a [Duration].
+  Duration get offertoryMaxCapDuration => Duration(hours: offertoryMaxCapHours);
+
+  /// Player's current Max Offline Time Cap in seconds.
+  int get offertoryMaxCapSeconds => offertoryMaxCapHours * 3600;
+
+  /// True when the player has reached the maximum Offline Time Cap level (`24h`).
+  bool get isOffertoryCapMaxed => offertoryCapLevel >= offertoryCapMaxLevel;
+
+  /// Next cap duration in hours after 1 upgrade (clamped to max cap).
+  int get offertoryNextCapHours =>
+      offertoryCapHoursForLevel(offertoryCapLevel + 1);
+
+  /// Per-element orb cost to upgrade Offline Cap to 1-indexed [targetCapLevel]:
+  /// `floor(50 * 1.35^(targetCapLevel - 1))` (Lv. 1 = 50 -> Lv. 16 = 4,507).
+  static int offertoryCapUnitCostForTargetLevel(int targetCapLevel) {
+    if (targetCapLevel <= 0 || targetCapLevel > offertoryCapMaxLevel) return 0;
+    if (targetCapLevel == 1) return offertoryCapBaseCost;
+    final raw =
+        offertoryCapBaseCost * math.pow(offertoryCapCostGrowth, targetCapLevel - 1);
+    if (raw.isNaN || raw.isInfinite || raw >= 9e15) {
+      return 1 << 52;
+    }
+    return raw.floor();
+  }
+
+  /// Exact progressive level-by-level sum per active element for upgrading
+  /// Offline Cap by [levels] times starting from [fromLevel].
+  int offertoryCapUnitCostForLevels(int levels, {int? fromLevel}) {
+    if (levels <= 0) return 0;
+    final start = (fromLevel ?? offertoryCapLevel).clamp(0, offertoryCapMaxLevel);
+    final cappedLevels = math.min(levels, offertoryCapMaxLevel - start);
+    if (cappedLevels <= 0) return 0;
+    int sum = 0;
+    for (int k = 1; k <= cappedLevels; k++) {
+      final stepCost = offertoryCapUnitCostForTargetLevel(start + k);
+      if (sum > (1 << 52) - stepCost) {
+        return 1 << 52;
+      }
+      sum += stepCost;
+    }
+    return sum;
+  }
+
+  /// Full [ElementalCost] across currently active elements for upgrading
+  /// Offline Cap by [levels] times starting from [fromLevel].
+  ElementalCost offertoryCapCostForLevels(int levels, {int? fromLevel}) {
+    final unit = offertoryCapUnitCostForLevels(levels, fromLevel: fromLevel);
+    if (unit <= 0) return const ElementalCost();
+    if (includesEarthAndMetalInBonuses) {
+      return ElementalCost(
+        fire: unit,
+        water: unit,
+        wood: unit,
+        earth: unit,
+        metal: unit,
+      );
+    }
+    return ElementalCost(fire: unit, water: unit, wood: unit);
+  }
+
+  ElementalCost get nextOffertoryCapUpgradeCost =>
+      isOffertoryCapMaxed ? const ElementalCost() : offertoryCapCostForLevels(1);
+
+  bool canAffordOffertoryCapUpgrade({int levels = 1}) {
+    if (levels <= 0 || offertoryCapLevel + levels > offertoryCapMaxLevel) {
+      return false;
+    }
+    return canAfford(offertoryCapCostForLevels(levels));
+  }
+
   /// Cumulative milestone multiplier: `+25%` (`+0.25x`) every 10 levels.
   static double offertoryMilestoneMultiplierForLevel(int level) {
     if (level <= 0) return 1.0;
@@ -4780,9 +4877,9 @@ class GameController extends ChangeNotifier {
   }
 
   double get offertoryMilestoneMultiplier =>
-      offertoryMilestoneMultiplierForLevel(offertoryLevel);
+      offertoryMilestoneMultiplierForLevel(offertoryRateLevel);
 
-  int get offertoryMilestoneBonusPercent => (offertoryLevel ~/ 10) * 25;
+  int get offertoryMilestoneBonusPercent => (offertoryRateLevel ~/ 10) * 25;
 
   bool isOffertoryBoostActive([DateTime? now]) {
     final expMs = offertoryBoostExpiresAt;
@@ -4807,7 +4904,7 @@ class GameController extends ChangeNotifier {
 
   /// Effective hourly generation rate per active element.
   double offertoryHourlyRate({int? level, DateTime? now, bool? boosted}) {
-    final lv = level ?? offertoryLevel;
+    final lv = level ?? offertoryRateLevel;
     if (lv <= 0) return 0.0;
     final milestone = offertoryMilestoneMultiplierForLevel(lv);
     final boost = (boosted ?? isOffertoryBoostActive(now)) ? 2.0 : 1.0;
@@ -4818,7 +4915,7 @@ class GameController extends ChangeNotifier {
       offertoryHourlyRate(level: level, now: now, boosted: boosted) / 60.0;
 
   double _rawUnbankedOffertorySeconds([DateTime? now]) {
-    if (offertoryLevel <= 0) return 0.0;
+    if (offertoryRateLevel <= 0) return 0.0;
     final startMs = offertoryLastCollectedAt;
     if (startMs == null || startMs <= 0) return 0.0;
     final nowMs = _nowUtc(now).millisecondsSinceEpoch;
@@ -4828,9 +4925,9 @@ class GameController extends ChangeNotifier {
     return math.min(rawElapsedSec, remainingCap);
   }
 
-  /// Total seconds accumulated toward the 8-hour storage cap (`[0, 28800]`).
+  /// Total seconds accumulated toward the player's current Max Offline Time Cap.
   double offertoryElapsedSeconds([DateTime? now]) {
-    if (offertoryLevel <= 0) return 0.0;
+    if (offertoryRateLevel <= 0) return 0.0;
     return (offertoryBankedSeconds + _rawUnbankedOffertorySeconds(now)).clamp(
       0.0,
       offertoryMaxCapSeconds.toDouble(),
@@ -4844,26 +4941,27 @@ class GameController extends ChangeNotifier {
       (offertoryElapsedSeconds(now) / offertoryMaxCapSeconds).clamp(0.0, 1.0);
 
   Duration offertoryTimeUntilFull([DateTime? now]) {
-    if (offertoryLevel <= 0) return offertoryMaxCapDuration;
+    if (offertoryRateLevel <= 0) return offertoryMaxCapDuration;
     final remainingSec =
         math.max(0.0, offertoryMaxCapSeconds - offertoryElapsedSeconds(now));
     return Duration(seconds: remainingSec.ceil());
   }
 
   bool isOffertoryFullAt([DateTime? now]) =>
-      offertoryLevel > 0 && offertoryElapsedSeconds(now) >= offertoryMaxCapSeconds;
+      offertoryRateLevel > 0 &&
+      offertoryElapsedSeconds(now) >= offertoryMaxCapSeconds;
 
   bool get isOffertoryFull => isOffertoryFullAt();
 
   /// Drives the pulsing golden notification badge on the Sacred Temple landmark
-  /// on [WorldMapScreen] whenever the Offertory reaches its 8-hour cap.
+  /// on [WorldMapScreen] whenever the Offertory reaches its Max Offline Time Cap.
   bool get hasSacredTempleNotification => isOffertoryFull;
 
   /// Exact piecewise integration of unbanked orbs since [offertoryLastCollectedAt],
   /// accounting for a 2x Tithe Boost expiring mid-offline interval and clamped
-  /// to the remaining 8-hour storage cap.
+  /// to the remaining Max Offline Time Cap.
   double _computeUnbankedOffertoryFloat([DateTime? now]) {
-    if (offertoryLevel <= 0) return 0.0;
+    if (offertoryRateLevel <= 0) return 0.0;
     final startMs = offertoryLastCollectedAt;
     if (startMs == null || startMs <= 0) return 0.0;
     final cappedElapsedSec = _rawUnbankedOffertorySeconds(now);
@@ -4971,7 +5069,8 @@ class GameController extends ChangeNotifier {
   }
 
   void _persistOffertoryState() {
-    storage.setOffertoryLevel(offertoryLevel);
+    storage.setOffertoryRateLevel(offertoryRateLevel);
+    storage.setOffertoryCapLevel(offertoryCapLevel);
     storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
     storage.setOffertoryPendingFraction(offertoryPendingFraction);
     storage.setOffertoryBankedOrbs(offertoryBankedOrbs);
@@ -4997,8 +5096,14 @@ class GameController extends ChangeNotifier {
     );
   }
 
+  /// Consecrates Elemental Orbs to upgrade the permanent Offertory hourly
+  /// generation rate by [levels] levels using exact progressive level-by-level
+  /// summation.
+  bool upgradeOffertoryRateBatch(int levels, {DateTime? now}) =>
+      upgradeOffertoryBatch(levels, now: now);
+
   /// Consecrates Elemental Orbs to upgrade the permanent Offertory generator
-  /// by [levels] levels using exact progressive level-by-level summation.
+  /// rate by [levels] levels using exact progressive level-by-level summation.
   bool upgradeOffertoryBatch(int levels, {DateTime? now}) {
     if (levels <= 0) return false;
     final totalCost = offertoryCostForLevels(levels);
@@ -5008,7 +5113,7 @@ class GameController extends ChangeNotifier {
     }
 
     final nowUtc = _nowUtc(now);
-    final wasUnbuilt = offertoryLevel == 0;
+    final wasUnbuilt = offertoryRateLevel == 0;
     // Settle earned orbs up to this exact moment before raising the rate
     _settleOffertoryUpTo(nowUtc);
 
@@ -5023,7 +5128,7 @@ class GameController extends ChangeNotifier {
     turn0EarthOrbs = math.max(0, turn0EarthOrbs - totalCost.earth);
     turn0MetalOrbs = math.max(0, turn0MetalOrbs - totalCost.metal);
 
-    offertoryLevel += levels;
+    offertoryRateLevel += levels;
     _persistAllOrbsAndTurn0();
     _persistOffertoryState();
     if (wasUnbuilt && offertoryNotificationsEnabled) {
@@ -5031,6 +5136,50 @@ class GameController extends ChangeNotifier {
     } else {
       unawaited(syncOffertoryFullNotification(now: nowUtc));
     }
+    audio.playWinVibrate();
+    _triggerCloudSave();
+    notifyListeners();
+    return true;
+  }
+
+  /// Consecrates Elemental Orbs to expand the permanent Offertory Max Offline
+  /// Time Cap by [levels] levels (`+1h` per level, up to `24h`).
+  /// Settles accumulated orbs up to [now] before expanding the cap so dead time
+  /// beyond the previous cap is never retroactively credited, then reschedules
+  /// the 100%-full local notification to match the new cap.
+  bool upgradeOffertoryCap({int levels = 1, DateTime? now}) {
+    if (levels <= 0 || offertoryCapLevel + levels > offertoryCapMaxLevel) {
+      audio.playVibrate();
+      return false;
+    }
+    final totalCost = offertoryCapCostForLevels(levels);
+    if (!canAfford(totalCost)) {
+      audio.playVibrate();
+      return false;
+    }
+
+    final nowUtc = _nowUtc(now);
+    // Bank earned orbs & elapsed seconds under the previous cap before expanding
+    _settleOffertoryUpTo(nowUtc);
+
+    fireOrbs -= totalCost.fire;
+    waterOrbs -= totalCost.water;
+    woodOrbs -= totalCost.wood;
+    earthOrbs -= totalCost.earth;
+    metalOrbs -= totalCost.metal;
+    turn0FireOrbs = math.max(0, turn0FireOrbs - totalCost.fire);
+    turn0WaterOrbs = math.max(0, turn0WaterOrbs - totalCost.water);
+    turn0WoodOrbs = math.max(0, turn0WoodOrbs - totalCost.wood);
+    turn0EarthOrbs = math.max(0, turn0EarthOrbs - totalCost.earth);
+    turn0MetalOrbs = math.max(0, turn0MetalOrbs - totalCost.metal);
+
+    offertoryCapLevel = (offertoryCapLevel + levels).clamp(
+      0,
+      offertoryCapMaxLevel,
+    );
+    _persistAllOrbsAndTurn0();
+    _persistOffertoryState();
+    unawaited(syncOffertoryFullNotification(now: nowUtc));
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();

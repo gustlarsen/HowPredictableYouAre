@@ -554,7 +554,11 @@ class StorageService {
   }
 
   // Sacred Temple Offertory Permanent Idle Orb Generator (survives run resets; cleared only on account switch)
+  static const int maxOffertoryCapLevel = 16; // 8h base + 16h = 24h max cap
+  static const double maxOffertoryBankedSeconds = (8 + maxOffertoryCapLevel) * 3600.0;
   static const String offertoryLevelKey = 'offertory_level';
+  static const String offertoryRateLevelKey = 'offertory_rate_level';
+  static const String offertoryCapLevelKey = 'offertory_cap_level';
   static const String offertoryLastCollectedAtKey =
       'offertory_last_collected_at';
   static const String offertoryPendingFractionKey =
@@ -566,13 +570,41 @@ class StorageService {
       'offertory_free_double_ready_at';
   static const String lastAppPausedAtKey = 'last_app_paused_at';
 
-  int get offertoryLevel {
-    final val = _prefs.getInt(offertoryLevelKey) ?? 0;
+  int get offertoryRateLevel {
+    final val =
+        _prefs.getInt(offertoryRateLevelKey) ??
+        _prefs.getInt(offertoryLevelKey) ??
+        0;
     return val < 0 ? 0 : val;
   }
 
-  Future<void> setOffertoryLevel(int val) =>
-      _prefs.setInt(offertoryLevelKey, val < 0 ? 0 : val);
+  Future<void> setOffertoryRateLevel(int val) {
+    final safe = val < 0 ? 0 : val;
+    return Future.wait([
+      _prefs.setInt(offertoryRateLevelKey, safe),
+      _prefs.setInt(offertoryLevelKey, safe),
+    ]);
+  }
+
+  int get offertoryCapLevel {
+    final val = _prefs.getInt(offertoryCapLevelKey) ?? 0;
+    if (val < 0) return 0;
+    if (val > maxOffertoryCapLevel) return maxOffertoryCapLevel;
+    return val;
+  }
+
+  Future<void> setOffertoryCapLevel(int val) {
+    final safe = val < 0
+        ? 0
+        : (val > maxOffertoryCapLevel ? maxOffertoryCapLevel : val);
+    return _prefs.setInt(offertoryCapLevelKey, safe);
+  }
+
+  /// Legacy alias for [offertoryRateLevel] kept for backward compatibility.
+  int get offertoryLevel => offertoryRateLevel;
+
+  /// Legacy alias for [setOffertoryRateLevel] kept for backward compatibility.
+  Future<void> setOffertoryLevel(int val) => setOffertoryRateLevel(val);
 
   int? get offertoryLastCollectedAt {
     final val = _prefs.getInt(offertoryLastCollectedAtKey);
@@ -611,14 +643,14 @@ class StorageService {
   double get offertoryBankedSeconds {
     final val = _prefs.getDouble(offertoryBankedSecondsKey) ?? 0.0;
     if (val.isNaN || val.isInfinite || val < 0.0) return 0.0;
-    if (val > 28800.0) return 28800.0;
+    if (val > maxOffertoryBankedSeconds) return maxOffertoryBankedSeconds;
     return val;
   }
 
   Future<void> setOffertoryBankedSeconds(double val) {
     final safe = (val.isNaN || val.isInfinite || val < 0.0)
         ? 0.0
-        : (val > 28800.0 ? 28800.0 : val);
+        : (val > maxOffertoryBankedSeconds ? maxOffertoryBankedSeconds : val);
     return _prefs.setDouble(offertoryBankedSecondsKey, safe);
   }
 
@@ -660,7 +692,8 @@ class StorageService {
 
   Future<void> clearOffertoryData() {
     return Future.wait([
-      setOffertoryLevel(0),
+      setOffertoryRateLevel(0),
+      setOffertoryCapLevel(0),
       setOffertoryLastCollectedAt(null),
       setOffertoryPendingFraction(0.0),
       setOffertoryBankedOrbs(0),

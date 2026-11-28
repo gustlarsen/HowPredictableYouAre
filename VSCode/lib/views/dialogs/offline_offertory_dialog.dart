@@ -108,7 +108,7 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog>
   bool get _isAtStorageCap =>
       controller.isOffertoryFull ||
       widget.offlineDuration + Duration(seconds: _elapsedOpenSeconds) >=
-          GameController.offertoryMaxCapDuration;
+          controller.offertoryMaxCapDuration;
 
   void _syncLiveTickTimer() {
     if (_isAtStorageCap) {
@@ -256,14 +256,14 @@ class _OfflineOffertoryDialogState extends State<OfflineOffertoryDialog>
     final showDoubleButton = !isRemoveAds || isFreeDoubleReady;
     final doubleEnabled = isRemoveAds ? canRemoveAds2x : canWatchAd2x;
 
+    final capDuration = controller.offertoryMaxCapDuration;
     final liveOfflineDuration =
         widget.offlineDuration + Duration(seconds: _elapsedOpenSeconds);
     final reachedCap =
-        liveOfflineDuration >= GameController.offertoryMaxCapDuration ||
-        controller.isOffertoryFull;
-    final displayDuration = reachedCap &&
-            liveOfflineDuration >= GameController.offertoryMaxCapDuration
-        ? GameController.offertoryMaxCapDuration
+        liveOfflineDuration >= capDuration || controller.isOffertoryFull;
+    final displayDuration =
+        reachedCap && liveOfflineDuration >= capDuration
+        ? capDuration
         : liveOfflineDuration;
     final formattedDuration = OfflineOffertoryDialog.formatOfflineDuration(
       displayDuration,

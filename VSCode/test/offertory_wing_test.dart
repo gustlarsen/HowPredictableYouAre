@@ -805,5 +805,285 @@ void main() {
         expect(c.isOffertoryFreeDoubleReady(), isFalse);
       },
     );
+
+    test(
+      'Independent Rate & Offline Cap upgrades: cost scaling, Phase 1 vs Phase 2+ costs, dynamic cap accumulation, pre-upgrade settling when FULL, 24h max cap, run-reset survival, and Cloud Save independent merge + legacy migration',
+      () async {
+        DateTime fakeNow = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        final pgClient = _OffertoryPlayGamesClient(playerId: 'acct_split_a');
+        final h = await _createHarness(
+          prefs: {
+            'orbs_fire': 100000,
+            'orbs_water': 100000,
+            'orbs_wood': 100000,
+            'orbs_earth': 0,
+            'orbs_metal': 0,
+            'current_week': 0,
+            'enemy_stage': 1,
+            'unlockedNewHands': false,
+          },
+          clock: () => fakeNow,
+          pgClient: pgClient,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+
+        // 1. Initial defaults: Rate Lv. 0, Cap Lv. 0 (8h -> 9h next)
+        expect(c.offertoryRateLevel, equals(0));
+        expect(c.offertoryCapLevel, equals(0));
+        expect(c.offertoryMaxCapHours, equals(8));
+        expect(c.offertoryNextCapHours, equals(9));
+        expect(c.isOffertoryCapMaxed, isFalse);
+
+        // 2. Cap cost formula: floor(50 * 1.35^(Nv - 1))
+        for (final nv in [1, 2, 4, 8, 16]) {
+          final expected = (50.0 * math.pow(1.35, nv - 1)).floor();
+          expect(
+            GameController.offertoryCapUnitCostForTargetLevel(nv),
+            equals(expected),
+            reason: 'Cap cost mismatch at Nv=$nv',
+          );
+        }
+        expect(GameController.offertoryCapUnitCostForTargetLevel(0), equals(0));
+        expect(GameController.offertoryCapUnitCostForTargetLevel(17), equals(0));
+
+        // 3. Independently upgrade Cap BEFORE building Rate (Phase 1 charges only 3 elements)
+        expect(c.upgradeOffertoryCap(), isTrue);
+        expect(c.offertoryRateLevel, equals(0));
+        expect(c.offertoryCapLevel, equals(1));
+        expect(c.offertoryMaxCapHours, equals(9));
+        expect(c.fireOrbs, equals(100000 - 50));
+        expect(c.earthOrbs, equals(0));
+        expect(h.storage.offertoryCapLevel, equals(1));
+
+        // Upgrade 3 more cap levels -> Lv. 4 (12h Cap)
+        expect(c.upgradeOffertoryCap(levels: 3), isTrue);
+        expect(c.offertoryCapLevel, equals(4));
+        expect(c.offertoryMaxCapHours, equals(12));
+        expect(c.offertoryMaxCapDuration, equals(const Duration(hours: 12)));
+
+        // 4. Now build Consecration Rate Lv. 1 (12/h) -> accumulates up to 12h Cap (144 orbs!)
+        expect(c.upgradeOffertoryRateBatch(1), isTrue);
+        expect(c.offertoryRateLevel, equals(1));
+        expect(c.offertoryCapLevel, equals(4));
+
+        // Advance 6h -> 50% of 12h cap (72 orbs), not full
+        fakeNow = fakeNow.add(const Duration(hours: 6));
+        expect(c.offertoryStoredOrbs(), equals(72));
+        expect(c.offertoryFillProgress(), closeTo(0.5, 1e-6));
+        expect(c.isOffertoryFull, isFalse);
+        expect(c.offertoryTimeUntilFull(), equals(const Duration(hours: 6)));
+
+        // Advance 4 more hours (10h total) -> still NOT full (10/12 = 83.3%, 120 orbs)
+        fakeNow = fakeNow.add(const Duration(hours: 4));
+        expect(c.offertoryStoredOrbs(), equals(120));
+        expect(c.isOffertoryFull, isFalse);
+        expect(c.offertoryTimeUntilFull(), equals(const Duration(hours: 2)));
+
+        // Advance 4 more hours (14h total > 12h cap) -> clamped to 12h (144 orbs, FULL)
+        fakeNow = fakeNow.add(const Duration(hours: 4));
+        expect(c.offertoryStoredOrbs(), equals(144));
+        expect(c.isOffertoryFull, isTrue);
+        expect(c.offertoryFillProgress(), closeTo(1.0, 1e-9));
+
+        // 5. Expand Cap while FULL (12h -> 13h): settles 12h, does NOT credit dead time (12h..14h)
+        expect(c.upgradeOffertoryCap(), isTrue);
+        expect(c.offertoryCapLevel, equals(5));
+        expect(c.offertoryMaxCapHours, equals(13));
+        expect(c.offertoryStoredOrbs(), equals(144));
+        expect(c.isOffertoryFull, isFalse);
+        expect(c.offertoryTimeUntilFull(), equals(const Duration(hours: 1)));
+
+        // Advance 1 more hour -> reaches new 13h cap with 156 orbs!
+        fakeNow = fakeNow.add(const Duration(hours: 1));
+        expect(c.offertoryStoredOrbs(), equals(156));
+        expect(c.isOffertoryFull, isTrue);
+        expect(c.collectOffertoryOrbs(), equals(156));
+
+        // 6. Phase 2 requires all 5 elements for Cap upgrade too
+        c.currentWeek = GameController.phase2StartWeek;
+        expect(c.includesEarthAndMetalInBonuses, isTrue);
+        expect(c.upgradeOffertoryCap(), isFalse); // Earth/Metal == 0
+        c.earthOrbs = 100000;
+        c.metalOrbs = 100000;
+        final capLv6Cost = GameController.offertoryCapUnitCostForTargetLevel(6);
+        expect(c.upgradeOffertoryCap(), isTrue);
+        expect(c.offertoryCapLevel, equals(6));
+        expect(c.earthOrbs, equals(100000 - capLv6Cost));
+        expect(c.metalOrbs, equals(100000 - capLv6Cost));
+
+        // 7. Upgrade all the way to Lv. 16 (24h MAX cap) -> further upgrades rejected
+        expect(c.upgradeOffertoryCap(levels: 10), isTrue);
+        expect(c.offertoryCapLevel, equals(16));
+        expect(c.offertoryMaxCapHours, equals(24));
+        expect(c.isOffertoryCapMaxed, isTrue);
+        expect(c.canAffordOffertoryCapUpgrade(), isFalse);
+        expect(c.upgradeOffertoryCap(), isFalse);
+
+        // Verify 24h accumulation works (banked seconds not truncated at 8h!)
+        fakeNow = fakeNow.add(const Duration(hours: 20));
+        expect(c.offertoryStoredOrbs(), equals(240));
+        expect(c.isOffertoryFull, isFalse);
+        // Settle mid-interval by upgrading rate -> bankedSeconds = 20h (> 8h!) persists cleanly
+        expect(c.upgradeOffertoryRateBatch(1), isTrue);
+        expect(h.storage.offertoryBankedSeconds, closeTo(20 * 3600.0, 1.0));
+        expect(c.offertoryStoredOrbs(), equals(240));
+
+        // 8. Both levels survive Hero Death, Week 40 defeat, and Forfeit Run
+        c.userHp = 0;
+        await c.applyPermadeathReset(cause: PermadeathCause.battleDefeat);
+        expect(c.offertoryRateLevel, equals(2));
+        expect(c.offertoryCapLevel, equals(16));
+        expect(h.storage.offertoryRateLevel, equals(2));
+        expect(h.storage.offertoryCapLevel, equals(16));
+
+        await c.resetAllProgress();
+        expect(c.offertoryRateLevel, equals(2));
+        expect(c.offertoryCapLevel, equals(16));
+
+        // 9. Cloud Save serialization, legacy JSON migration, independent max merge, and account isolation
+        final snap = CloudSaveData.fromStorage(h.storage);
+        final parsed = CloudSaveData.tryParse(snap.toJsonString());
+        expect(parsed, isNotNull);
+        expect(parsed!.offertoryRateLevel, equals(2));
+        expect(parsed.offertoryCapLevel, equals(16));
+
+        // Legacy cloud payload with only offertoryLevel (no offertoryRateLevel/offertoryCapLevel)
+        final legacyParsed = CloudSaveData.tryParse('{"offertoryLevel": 7}');
+        expect(legacyParsed, isNotNull);
+        expect(legacyParsed!.offertoryRateLevel, equals(7));
+        expect(legacyParsed.offertoryCapLevel, equals(0));
+
+        // Cloud has higher Rate (9) but lower Cap (3) -> merges independently to Rate 9 & Cap 16!
+        final cloudMixed = CloudSaveData(
+          offertoryRateLevel: 9,
+          offertoryCapLevel: 3,
+          offertoryLastCollectedAt: fakeNow.millisecondsSinceEpoch,
+        );
+        pgClient.saves['acct_split_a'] = cloudMixed.toJsonString();
+        expect(await h.playGames.signIn(silent: true), isTrue);
+        expect(c.offertoryRateLevel, equals(9));
+        expect(c.offertoryCapLevel, equals(16));
+
+        // Switch account -> both reset cleanly to 0
+        pgClient.playerId = 'acct_split_b';
+        expect(await h.playGames.handleAppResumed(), isTrue);
+        expect(c.offertoryRateLevel, equals(0));
+        expect(c.offertoryCapLevel, equals(0));
+        expect(c.offertoryMaxCapHours, equals(8));
+      },
+    );
+
+    testWidgets(
+      'Offertory tab renders both Consecration Rate and Offline Cap cards in Dark/Light mode across all 4 languages, upgrades cap cleanly, and updates WorldMap badge threshold',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        DateTime fakeNow = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        final h = await _createHarness(
+          prefs: {
+            'orbs_fire': 50000,
+            'orbs_water': 50000,
+            'orbs_wood': 50000,
+          },
+          clock: () => fakeNow,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+        expect(c.upgradeOffertoryRateBatch(1), isTrue);
+
+        for (final isDark in [true, false]) {
+          c.darkMode = isDark;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: ValueKey('split_offertory_theme_$isDark'),
+                  controller: c,
+                  fromTemple: true,
+                  initialWing: TempleWing.offertory,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          expect(
+            find.byKey(const ValueKey('offertory_upgrade_card')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('offertory_cap_upgrade_card')),
+            findsOneWidget,
+          );
+          expect(find.text('Consecration Rate'), findsOneWidget);
+          expect(find.text('Offline Cap'), findsOneWidget);
+          expect(find.text('8h Cap → 9h Cap'), findsOneWidget);
+          expect(find.text('Lv. 0 / 16'), findsOneWidget);
+        }
+
+        // Verify all 4 languages have both upgrade titles and labels
+        const expectedTitles = {
+          'en': ('Consecration Rate', 'Offline Cap'),
+          'pt': ('Ritmo de Consagração', 'Tempo Máximo Offline'),
+          'es': ('Ritmo de Consagración', 'Tiempo Máximo Offline'),
+          'de': ('Weiherate', 'Offline-Zeitlimit'),
+        };
+        for (final entry in expectedTitles.entries) {
+          c.setLanguage(entry.key);
+          await tester.pumpAndSettle();
+          expect(find.text(entry.value.$1), findsOneWidget);
+          expect(find.text(entry.value.$2), findsOneWidget);
+        }
+        c.setLanguage('en');
+        await tester.pumpAndSettle();
+
+        // Tap Offline Cap upgrade button -> 8h Cap -> 9h Cap
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('offertory_cap_upgrade_button')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('offertory_cap_upgrade_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(c.offertoryCapLevel, equals(1));
+        expect(c.offertoryMaxCapHours, equals(9));
+        expect(find.text('9h Cap → 10h Cap'), findsOneWidget);
+        expect(find.text('Lv. 1 / 16'), findsOneWidget);
+
+        // Advance 8h -> NOT full yet under 9h cap!
+        fakeNow = fakeNow.add(const Duration(hours: 8));
+        c.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('offertory_full_badge')), findsNothing);
+        expect(find.text('88% • 9h Cap'), findsOneWidget);
+
+        // Advance 1 more hour (9h total) -> FULL (9h Cap) badge appears!
+        fakeNow = fakeNow.add(const Duration(hours: 1));
+        c.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('offertory_full_badge')), findsOneWidget);
+        expect(find.text('FULL (9h Cap)'), findsOneWidget);
+
+        // Upgrade to max 24h Cap -> displays MAX badge & disabled button
+        expect(c.upgradeOffertoryCap(levels: 15), isTrue);
+        await tester.pumpAndSettle();
+        expect(c.isOffertoryCapMaxed, isTrue);
+        expect(find.text('Max 24h Cap Reached'), findsOneWidget);
+        final capBtn = tester.widget<ElevatedButton>(
+          find.byKey(const ValueKey('offertory_cap_upgrade_button')),
+        );
+        expect(capBtn.onPressed, isNull);
+      },
+    );
   });
 }

@@ -915,5 +915,146 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'OfflineOffertoryDialog honors upgraded Max Offline Time Cap (e.g. 12h Cap) for orbs, fill %, clamping, and post-collect notification rescheduling',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // Rate Lv. 1 (12/h) + Cap Lv. 4 (12h Cap); away for 10h -> 120 orbs, 83% Full (NOT capped at 8h!)
+        final pausedAt = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        DateTime fakeNow = pausedAt.add(const Duration(hours: 10));
+        final h = await _createHarness(
+          prefs: {
+            'offertory_rate_level': 1,
+            'offertory_cap_level': 4,
+            'offertory_last_collected_at': pausedAt.millisecondsSinceEpoch,
+            'last_app_paused_at': pausedAt.millisecondsSinceEpoch,
+            'orbs_fire': 100,
+            'orbs_water': 100,
+            'orbs_wood': 100,
+          },
+          clock: () => fakeNow,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: c,
+            child: const MaterialApp(home: WorldMapScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('offline_offertory_dialog')),
+          findsOneWidget,
+        );
+        // 10h / 12h = 83.33% -> 83% Full, 120 orbs per element
+        expect(find.text('Offline for 10h 00m • 83% Full'), findsOneWidget);
+        expect(find.text('+120'), findsNWidgets(3));
+        expect(find.text('Collect (+120 each)'), findsOneWidget);
+
+        // Collect 1x -> grants 120 orbs & reschedules notification for 12h ahead
+        await tester.tap(
+          find.byKey(const ValueKey('offline_offertory_collect_1x_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(c.fireOrbs, equals(220));
+        final scheduled = h.notifClient.activeScheduled[
+          NotificationService.offertoryFullNotificationId
+        ];
+        expect(scheduled, isNotNull);
+        expect(
+          scheduled!.scheduledAtUtc.difference(fakeNow),
+          equals(const Duration(hours: 12)),
+        );
+
+        // Now go offline 15h (> 12h Cap) -> clamped to 12h 00m • 100% FULL (Paused) & +144 orbs
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(hours: 15));
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Offline for 12h 00m • 100% FULL (Paused)'),
+          findsOneWidget,
+        );
+        expect(find.text('+144'), findsNWidgets(3));
+      },
+    );
+
+    test(
+      'Reschedules local notification accurately when Offline Cap or Consecration Rate is upgraded (including mid-interval and while FULL)',
+      () async {
+        DateTime fakeNow = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        final h = await _createHarness(
+          prefs: {
+            'orbs_fire': 5000,
+            'orbs_water': 5000,
+            'orbs_wood': 5000,
+          },
+          clock: () => fakeNow,
+          exactAlarmsAllowed: true,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+
+        // 1. Build Rate Lv. 1 at Cap Lv. 0 (8h Cap) -> schedules at t + 8h
+        expect(c.upgradeOffertoryRateBatch(1), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.notifClient
+              .activeScheduled[NotificationService.offertoryFullNotificationId]
+              ?.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(hours: 8))),
+        );
+
+        // 2. Advance 3h, upgrade Offline Cap Lv. 0 -> Lv. 1 (9h Cap) -> reschedules for now + 6h
+        fakeNow = fakeNow.add(const Duration(hours: 3));
+        expect(c.upgradeOffertoryCap(), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.notifClient
+              .activeScheduled[NotificationService.offertoryFullNotificationId]
+              ?.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(hours: 6))),
+        );
+
+        // 3. Advance 1h, upgrade Consecration Rate Lv. 1 -> Lv. 2 -> reschedules for now + 5h
+        fakeNow = fakeNow.add(const Duration(hours: 1));
+        expect(c.upgradeOffertoryRateBatch(1), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.notifClient
+              .activeScheduled[NotificationService.offertoryFullNotificationId]
+              ?.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(hours: 5))),
+        );
+
+        // 4. Advance 6h (past 9h cap -> FULL -> notification cancelled)
+        fakeNow = fakeNow.add(const Duration(hours: 6));
+        await c.syncOffertoryFullNotification();
+        expect(h.notifClient.activeScheduled, isEmpty);
+
+        // 5. Expand Cap while FULL (9h -> 10h) -> immediately schedules notification for now + 1h!
+        expect(c.upgradeOffertoryCap(), isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.notifClient
+              .activeScheduled[NotificationService.offertoryFullNotificationId]
+              ?.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(hours: 1))),
+        );
+      },
+    );
   });
 }

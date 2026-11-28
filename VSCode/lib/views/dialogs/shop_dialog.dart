@@ -4921,9 +4921,53 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       final msg = loc
           .t(
             'offertory_upgraded_msg',
-            fallback: 'Offertory upgraded to Lv. {level}!',
+            fallback: 'Consecration Rate upgraded to Lv. {level}!',
           )
-          .replaceAll('{level}', _formatGroupedInt(controller.offertoryLevel, loc));
+          .replaceAll(
+            '{level}',
+            _formatGroupedInt(controller.offertoryRateLevel, loc),
+          );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  void _handleOffertoryCapUpgradeTap() {
+    final loc = controller.localization;
+    if (controller.isOffertoryCapMaxed) return;
+    if (!controller.canAffordOffertoryCapUpgrade()) {
+      controller.audio.playVibrate();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+
+    final ok = controller.upgradeOffertoryCap();
+    if (ok && mounted) {
+      setState(() {
+        _stepDownOffertoryBatchIfNeeded();
+      });
+      final msg = loc
+          .t(
+            'offertory_cap_upgraded_msg',
+            fallback: 'Offline Cap expanded to {hours}h!',
+          )
+          .replaceAll('{hours}', '${controller.offertoryMaxCapHours}');
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -5134,7 +5178,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     AppPalette palette,
     LocalizationService loc,
   ) {
-    final lv = controller.offertoryLevel;
+    final lv = controller.offertoryRateLevel;
+    final capLv = controller.offertoryCapLevel;
+    final maxCapHours = controller.offertoryMaxCapHours;
+    final nextCapHours = controller.offertoryNextCapHours;
+    final isCapMaxed = controller.isOffertoryCapMaxed;
+    final nextCapCost = controller.nextOffertoryCapUpgradeCost;
+    final canAffordCap = controller.canAffordOffertoryCapUpgrade();
     final activeMoves = controller.offertoryActiveElements;
     final isPhase2Elements = controller.includesEarthAndMetalInBonuses;
     final isBoostActive = controller.isOffertoryBoostActive();
@@ -5171,6 +5221,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     final cardBg = palette.isDark
         ? const Color(0xFF1E222B)
         : palette.dialogCardSurface;
+
+    final currentCapLabel = loc
+        .t('offertory_cap_label', fallback: '{hours}h Cap')
+        .replaceAll('{hours}', '$maxCapHours');
+    final nextCapLabel = loc
+        .t('offertory_cap_label', fallback: '{hours}h Cap')
+        .replaceAll('{hours}', '$nextCapHours');
 
     final vaultHeaderTitle = lv == 0
         ? loc.t('offertory_unbuilt_title', fallback: 'Unbuilt — Lv. 0')
@@ -5406,6 +5463,43 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                     ),
                                   ),
                                 ),
+                              Container(
+                                key: const ValueKey(
+                                  'offertory_vault_cap_badge',
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: palette.rewardedAdCardSurface,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: palette.amberBorder.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.schedule_rounded,
+                                      size: 10.5,
+                                      color: palette.amberIcon,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      currentCapLabel,
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: palette.amberText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 3),
@@ -5473,11 +5567,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     children: [
                       if (lv == 0)
                         Text(
-                          loc.t(
-                            'offertory_unbuilt_hint',
-                            fallback:
-                                'Consecrate Elemental Orbs below to awaken permanent idle orb generation (up to 8h offline).',
-                          ),
+                          loc
+                              .t(
+                                'offertory_unbuilt_hint',
+                                fallback:
+                                    'Consecrate Elemental Orbs below to awaken permanent idle orb generation (up to {hours}h offline).',
+                              )
+                              .replaceAll('{hours}', '$maxCapHours'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 11,
@@ -5554,10 +5650,15 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                           ],
                                         ),
                                         child: Text(
-                                          loc.t(
-                                            'offertory_full_badge',
-                                            fallback: 'FULL (8h Cap)',
-                                          ),
+                                          loc
+                                              .t(
+                                                'offertory_full_badge',
+                                                fallback: 'FULL ({hours}h Cap)',
+                                              )
+                                              .replaceAll(
+                                                '{hours}',
+                                                '$maxCapHours',
+                                              ),
                                           maxLines: 1,
                                           style: const TextStyle(
                                             fontSize: 10,
@@ -5594,7 +5695,10 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerRight,
                                 child: Text(
-                                  '${(fillProgress * 100).floor()}% • ${loc.t('offertory_cap_label', fallback: '8h Cap')}',
+                                  '${(fillProgress * 100).floor()}% • $currentCapLabel',
+                                  key: const ValueKey(
+                                    'offertory_cap_progress_text',
+                                  ),
                                   maxLines: 1,
                                   style: TextStyle(
                                     fontSize: 10,
@@ -5772,7 +5876,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           ),
 
           // ===================================================================
-          // CARD 2 — CONSECRATE & UPGRADE OFFERTORY (1x | 10x | MAX)
+          // CARD 2A — CONSECRATION RATE UPGRADE (HOURLY RATE • 1x | 10x | MAX)
           // ===================================================================
           Container(
             key: const ValueKey('offertory_upgrade_card'),
@@ -5792,12 +5896,31 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               children: [
                 Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(4.5),
+                      decoration: BoxDecoration(
+                        color: _goldFill.withValues(
+                          alpha: palette.isDark ? 0.14 : 0.22,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.bolt_rounded,
+                        size: 16,
+                        color: palette.amberIcon,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
                     Expanded(
                       child: Text(
                         loc.t(
-                          'offertory_upgrade_card_title',
-                          fallback: 'Consecrate & Upgrade',
+                          'offertory_rate_upgrade_title',
+                          fallback: 'Consecration Rate',
                         ),
+                        key: const ValueKey('offertory_rate_upgrade_title'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -5814,6 +5937,19 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       canAfford10x: canAfford10x,
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  loc.t(
+                    'offertory_rate_upgrade_desc',
+                    fallback:
+                        'Increases idle orbs generated per hour (+12/h per level, +25% every 10 levels).',
+                  ),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.25,
+                    color: palette.secondaryText,
+                  ),
                 ),
                 const SizedBox(height: 7),
                 Row(
@@ -6003,6 +6139,274 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                           '{count}',
                           _formatGroupedInt(upgradePreview.levels, loc),
                         ),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===================================================================
+          // CARD 2B — MAX OFFLINE TIME CAP UPGRADE (+1h PER LEVEL UP TO 24h)
+          // ===================================================================
+          Container(
+            key: const ValueKey('offertory_cap_upgrade_card'),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isCapMaxed
+                    ? (palette.isDark
+                          ? const Color(0xFFFFD54F).withValues(alpha: 0.70)
+                          : const Color(0xFFC88A00).withValues(alpha: 0.75))
+                    : palette.amberBorder.withValues(
+                        alpha: palette.isDark ? 0.36 : 0.50,
+                      ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4.5),
+                      decoration: BoxDecoration(
+                        color: _goldFill.withValues(
+                          alpha: palette.isDark ? 0.14 : 0.22,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: palette.amberBorder.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.hourglass_top_rounded,
+                        size: 16,
+                        color: palette.amberIcon,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        loc.t(
+                          'offertory_cap_upgrade_title',
+                          fallback: 'Offline Cap',
+                        ),
+                        key: const ValueKey('offertory_cap_upgrade_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: palette.primaryText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      key: const ValueKey('offertory_cap_level_badge'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCapMaxed
+                            ? _goldFill
+                            : palette.rewardedAdCardSurface,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: isCapMaxed
+                              ? _goldFill
+                              : palette.amberBorder.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: Text(
+                        isCapMaxed
+                            ? loc.t('offertory_cap_max_badge', fallback: 'MAX')
+                            : 'Lv. $capLv / ${GameController.offertoryCapMaxLevel}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isCapMaxed ? _goldDarkInk : palette.amberText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  loc
+                      .t(
+                        'offertory_cap_upgrade_desc',
+                        fallback:
+                            'Extends maximum offline orb storage (+1h per level, up to {maxHours}h).',
+                      )
+                      .replaceAll(
+                        '{maxHours}',
+                        '${GameController.offertoryMaxPossibleCapHours}',
+                      ),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.25,
+                    color: palette.secondaryText,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          isCapMaxed
+                              ? 'Lv. $capLv (${loc.t('offertory_cap_max_badge', fallback: 'MAX')})'
+                              : 'Lv. $capLv → Lv. ${capLv + 1}',
+                          key: const ValueKey(
+                            'offertory_cap_level_jump_preview',
+                          ),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: palette.amberText,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          isCapMaxed
+                              ? '$currentCapLabel (${loc.t('offertory_cap_max_badge', fallback: 'MAX')})'
+                              : loc
+                                    .t(
+                                      'offertory_cap_preview',
+                                      fallback: '{current} → {next}',
+                                    )
+                                    .replaceAll('{current}', currentCapLabel)
+                                    .replaceAll('{next}', nextCapLabel),
+                          key: const ValueKey('offertory_cap_jump_preview'),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: palette.successText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isCapMaxed) ...[
+                  const SizedBox(height: 7),
+                  Container(
+                    key: const ValueKey('offertory_cap_cost_box'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.summaryBarSurface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: palette.amberBorder.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceEvenly,
+                      spacing: 10,
+                      runSpacing: 5,
+                      children: [
+                        for (final move in activeMoves)
+                          Builder(
+                            builder: (_) {
+                              final req = costForMove(nextCapCost, move);
+                              final hasEnough = controller.orbsFor(move) >= req;
+                              return Row(
+                                key: ValueKey(
+                                  'offertory_cap_cost_${move.orbKey}',
+                                ),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ElementalEnergySphere(
+                                    size: 17,
+                                    primaryColor: move.elementalPrimaryColor,
+                                    secondaryColor:
+                                        move.elementalSecondaryColor,
+                                    isDark: palette.isDark,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatGroupedInt(req, loc),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: hasEnough
+                                          ? palette.elementalText(move)
+                                          : palette.dangerText,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  key: const ValueKey('offertory_cap_upgrade_button'),
+                  onPressed: (!isCapMaxed && canAffordCap)
+                      ? _handleOffertoryCapUpgradeTap
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _goldFill,
+                    foregroundColor: _goldDarkInk,
+                    disabledBackgroundColor: palette.isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : palette.sandCardSurface,
+                    disabledForegroundColor: palette.mutedText,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: Icon(
+                    isCapMaxed
+                        ? Icons.verified_rounded
+                        : Icons.more_time_rounded,
+                    size: 17,
+                  ),
+                  label: Text(
+                    isCapMaxed
+                        ? loc
+                              .t(
+                                'offertory_cap_maxed_btn',
+                                fallback: 'Max {hours}h Cap Reached',
+                              )
+                              .replaceAll(
+                                '{hours}',
+                                '${GameController.offertoryMaxPossibleCapHours}',
+                              )
+                        : loc.t(
+                            'offertory_cap_upgrade_btn',
+                            fallback: 'Expand Cap (+1h)',
+                          ),
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,

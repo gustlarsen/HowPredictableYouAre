@@ -360,13 +360,17 @@ class CloudSaveData {
   final String? lastFreeDailyPrayerDate;
 
   // Sacred Temple Offertory Permanent Idle Orb Generator
-  final int offertoryLevel;
+  final int offertoryRateLevel;
+  final int offertoryCapLevel;
   final int? offertoryLastCollectedAt;
   final double offertoryPendingFraction;
   final int offertoryBankedOrbs;
   final double offertoryBankedSeconds;
   final int? offertoryBoostExpiresAt;
   final int? offertoryFreeDoubleReadyAt;
+
+  /// Legacy alias for [offertoryRateLevel].
+  int get offertoryLevel => offertoryRateLevel;
 
   final int updatedAtMillis;
 
@@ -501,7 +505,9 @@ class CloudSaveData {
     this.activeBattleBlessing,
     this.battleBonusTempHp = 0,
     this.lastFreeDailyPrayerDate,
-    this.offertoryLevel = 0,
+    int? offertoryRateLevel,
+    int? offertoryLevel,
+    int offertoryCapLevel = 0,
     this.offertoryLastCollectedAt,
     this.offertoryPendingFraction = 0.0,
     this.offertoryBankedOrbs = 0,
@@ -512,7 +518,15 @@ class CloudSaveData {
   }) : enemyStage = enemyStage ?? enemyPhase,
        removeAdsEnabled = removeAdsEnabled ?? unlockedAds,
        hasExplicitRemoveAdsEnabled =
-           hasExplicitRemoveAdsEnabled ?? (removeAdsEnabled != null);
+           hasExplicitRemoveAdsEnabled ?? (removeAdsEnabled != null),
+       offertoryRateLevel = (offertoryRateLevel ?? offertoryLevel ?? 0) < 0
+           ? 0
+           : (offertoryRateLevel ?? offertoryLevel ?? 0),
+       offertoryCapLevel = offertoryCapLevel < 0
+           ? 0
+           : (offertoryCapLevel > StorageService.maxOffertoryCapLevel
+                 ? StorageService.maxOffertoryCapLevel
+                 : offertoryCapLevel);
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -617,7 +631,8 @@ class CloudSaveData {
     if (totalOrbs > local.totalOrbs) return true;
     if (unlockedCount > local.unlockedCount) return true;
     if (unlockedShopValue > local.unlockedShopValue) return true;
-    if (offertoryLevel > local.offertoryLevel) return true;
+    if (offertoryRateLevel > local.offertoryRateLevel) return true;
+    if (offertoryCapLevel > local.offertoryCapLevel) return true;
     if (unlockedCount == local.unlockedCount &&
         totalOrbs == local.totalOrbs &&
         (currentWeek > local.currentWeek ||
@@ -700,8 +715,18 @@ class CloudSaveData {
       mergedHasExplicitRemoveAdsEnabled = false;
     }
 
-    final bool useLocalOffertory = local.offertoryLevel > offertoryLevel;
-    final mergedOffertoryLevel = _maxInt(offertoryLevel, local.offertoryLevel);
+    final bool useLocalOffertory =
+        local.offertoryRateLevel > offertoryRateLevel ||
+        (local.offertoryRateLevel == offertoryRateLevel &&
+            local.offertoryCapLevel > offertoryCapLevel);
+    final mergedOffertoryRateLevel = _maxInt(
+      offertoryRateLevel,
+      local.offertoryRateLevel,
+    );
+    final mergedOffertoryCapLevel = _maxInt(
+      offertoryCapLevel,
+      local.offertoryCapLevel,
+    );
     final mergedOffertoryLastCollectedAt = useLocalOffertory
         ? local.offertoryLastCollectedAt
         : (offertoryLastCollectedAt ?? local.offertoryLastCollectedAt);
@@ -909,7 +934,8 @@ class CloudSaveData {
       battleBonusTempHp: battleBonusTempHp,
       lastFreeDailyPrayerDate:
           lastFreeDailyPrayerDate ?? local.lastFreeDailyPrayerDate,
-      offertoryLevel: mergedOffertoryLevel,
+      offertoryRateLevel: mergedOffertoryRateLevel,
+      offertoryCapLevel: mergedOffertoryCapLevel,
       offertoryLastCollectedAt: mergedOffertoryLastCollectedAt,
       offertoryPendingFraction: mergedOffertoryPendingFraction,
       offertoryBankedOrbs: mergedOffertoryBankedOrbs,
@@ -1058,7 +1084,8 @@ class CloudSaveData {
       activeBattleBlessing: storage.activeBattleBlessing,
       battleBonusTempHp: storage.battleBonusTempHp,
       lastFreeDailyPrayerDate: storage.lastFreeDailyPrayerDate,
-      offertoryLevel: storage.offertoryLevel,
+      offertoryRateLevel: storage.offertoryRateLevel,
+      offertoryCapLevel: storage.offertoryCapLevel,
       offertoryLastCollectedAt: storage.offertoryLastCollectedAt,
       offertoryPendingFraction: storage.offertoryPendingFraction,
       offertoryBankedOrbs: storage.offertoryBankedOrbs,
@@ -1113,7 +1140,8 @@ class CloudSaveData {
     await storage.setActiveBattleBlessing(activeBattleBlessing);
     await storage.setBattleBonusTempHp(battleBonusTempHp);
     await storage.setLastFreeDailyPrayerDate(lastFreeDailyPrayerDate);
-    await storage.setOffertoryLevel(offertoryLevel);
+    await storage.setOffertoryRateLevel(offertoryRateLevel);
+    await storage.setOffertoryCapLevel(offertoryCapLevel);
     await storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
     await storage.setOffertoryPendingFraction(offertoryPendingFraction);
     await storage.setOffertoryBankedOrbs(offertoryBankedOrbs);
@@ -1355,7 +1383,9 @@ class CloudSaveData {
       'battleBonusTempHp': battleBonusTempHp,
       if (lastFreeDailyPrayerDate != null)
         'lastFreeDailyPrayerDate': lastFreeDailyPrayerDate,
-      'offertoryLevel': offertoryLevel,
+      'offertoryLevel': offertoryRateLevel,
+      'offertoryRateLevel': offertoryRateLevel,
+      'offertoryCapLevel': offertoryCapLevel,
       if (offertoryLastCollectedAt != null)
         'offertoryLastCollectedAt': offertoryLastCollectedAt,
       'offertoryPendingFraction': offertoryPendingFraction,
@@ -1529,14 +1559,17 @@ class CloudSaveData {
         !storage.treasuryEarthMetalBonusGranted) {
       await storage.setTreasuryEarthMetalBonusGranted(true);
     }
-    if (offertoryLevel > storage.offertoryLevel) {
-      await storage.setOffertoryLevel(offertoryLevel);
+    if (offertoryRateLevel > storage.offertoryRateLevel) {
+      await storage.setOffertoryRateLevel(offertoryRateLevel);
       if (offertoryLastCollectedAt != null) {
         await storage.setOffertoryLastCollectedAt(offertoryLastCollectedAt);
       }
       await storage.setOffertoryPendingFraction(offertoryPendingFraction);
       await storage.setOffertoryBankedOrbs(offertoryBankedOrbs);
       await storage.setOffertoryBankedSeconds(offertoryBankedSeconds);
+    }
+    if (offertoryCapLevel > storage.offertoryCapLevel) {
+      await storage.setOffertoryCapLevel(offertoryCapLevel);
     }
     final mergedBoostExp = _maxNullablePositiveInt(
       storage.offertoryBoostExpiresAt,
@@ -1728,7 +1761,12 @@ class CloudSaveData {
               : ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0),
       lastFreeDailyPrayerDate:
           (map['lastFreeDailyPrayerDate'] as String?)?.trim(),
-      offertoryLevel: _parseNonNegativeInt(map['offertoryLevel']),
+      offertoryRateLevel: _parseNonNegativeInt(
+        map['offertoryRateLevel'] ?? map['offertoryLevel'],
+      ),
+      offertoryCapLevel: _parseNonNegativeInt(
+        map['offertoryCapLevel'],
+      ).clamp(0, StorageService.maxOffertoryCapLevel),
       offertoryLastCollectedAt: (() {
         final raw = (map['offertoryLastCollectedAt'] as num?)?.toInt();
         return (raw != null && raw > 0) ? raw : null;
@@ -1743,7 +1781,9 @@ class CloudSaveData {
       offertoryBankedSeconds: (() {
         final raw = (map['offertoryBankedSeconds'] as num?)?.toDouble() ?? 0.0;
         if (raw.isNaN || raw.isInfinite || raw < 0.0) return 0.0;
-        if (raw > 28800.0) return 28800.0;
+        if (raw > StorageService.maxOffertoryBankedSeconds) {
+          return StorageService.maxOffertoryBankedSeconds;
+        }
         return raw;
       })(),
       offertoryBoostExpiresAt: (() {

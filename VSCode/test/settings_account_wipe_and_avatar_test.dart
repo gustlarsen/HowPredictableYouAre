@@ -462,6 +462,7 @@ void main() {
           'total_cycles_count': 3,
           'standard_victory_count': 2,
           'offertory_level': 4,
+          'offertory_cap_level': 3,
           'last_free_daily_prayer_date': '2026-11-26',
         });
         final storage = StorageService();
@@ -549,7 +550,8 @@ void main() {
         expect(controller.encounteredBestiary, isEmpty);
         expect(controller.totalCyclesCount, 0);
         expect(controller.standardVictoryCount, 0);
-        expect(controller.offertoryLevel, 0);
+        expect(controller.offertoryRateLevel, 0);
+        expect(controller.offertoryCapLevel, 0);
         expect(controller.lastFreeDailyPrayerDate, isNull);
 
         // 2. Orb-unlocked Remove Ads is NOT recovered -> ads re-enabled
@@ -570,7 +572,8 @@ void main() {
         expect(cloudAfterWipe.spoilsFireOrbs, 0);
         expect(cloudAfterWipe.relicChamberUpgrades, isEmpty);
         expect(cloudAfterWipe.totalCyclesCount, 0);
-        expect(cloudAfterWipe.offertoryLevel, 0);
+        expect(cloudAfterWipe.offertoryRateLevel, 0);
+        expect(cloudAfterWipe.offertoryCapLevel, 0);
         expect(storage.pendingCloudWipeAtMillis, isNull);
 
         expect(

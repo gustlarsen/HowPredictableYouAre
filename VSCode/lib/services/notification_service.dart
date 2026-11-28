@@ -31,7 +31,7 @@ class DefaultLocalNotificationsClient implements LocalNotificationsClient {
   static const String offertoryChannelId = 'offertory_full_channel';
   static const String offertoryChannelName = 'Sacred Offertory';
   static const String offertoryChannelDescription =
-      'Alerts when the Sacred Temple Offertory reaches 100% capacity (8-hour cap).';
+      'Alerts when the Sacred Temple Offertory reaches 100% capacity.';
 
   static bool _timeZonesInitialized = false;
 
