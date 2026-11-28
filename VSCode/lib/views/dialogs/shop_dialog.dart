@@ -6060,64 +6060,77 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(4.5),
+                      key: const ValueKey('offertory_rate_icon_badge'),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: _goldFill.withValues(
-                          alpha: palette.isDark ? 0.14 : 0.22,
+                          alpha: palette.isDark ? 0.16 : 0.22,
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: palette.amberBorder.withValues(alpha: 0.45),
+                          color: palette.amberBorder.withValues(alpha: 0.50),
                         ),
                       ),
-                      child: Icon(
-                        Icons.bolt_rounded,
-                        size: 16,
-                        color: palette.amberIcon,
-                      ),
+                      child: const ConsecrationCenserIcon(size: 32),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(width: 9),
                     Expanded(
-                      child: Text(
-                        loc.t(
-                          'offertory_rate_upgrade_title',
-                          fallback: 'Consecration Rate',
-                        ),
-                        key: const ValueKey('offertory_rate_upgrade_title'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: palette.primaryText,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  loc.t(
+                                    'offertory_rate_upgrade_title',
+                                    fallback: 'Consecration Rate',
+                                  ),
+                                  key: const ValueKey(
+                                    'offertory_rate_upgrade_title',
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              _buildOffertoryBatchSelector(
+                                palette: palette,
+                                loc: loc,
+                                canAfford10x: canAfford10x,
+                                selectedOption: _selectedOffertoryBatch,
+                                onSelected: (option) => setState(
+                                  () => _selectedOffertoryBatch = option,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            loc.t(
+                              'offertory_rate_upgrade_desc',
+                              fallback:
+                                  'Increases idle orbs generated per hour (+12/h per level, +25% every 10 levels).',
+                            ),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              height: 1.25,
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    _buildOffertoryBatchSelector(
-                      palette: palette,
-                      loc: loc,
-                      canAfford10x: canAfford10x,
-                      selectedOption: _selectedOffertoryBatch,
-                      onSelected: (option) =>
-                          setState(() => _selectedOffertoryBatch = option),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  loc.t(
-                    'offertory_rate_upgrade_desc',
-                    fallback:
-                        'Increases idle orbs generated per hour (+12/h per level, +25% every 10 levels).',
-                  ),
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    height: 1.25,
-                    color: palette.secondaryText,
-                  ),
                 ),
                 const SizedBox(height: 7),
                 Row(
@@ -6337,65 +6350,78 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(4.5),
+                      key: const ValueKey('offertory_cap_icon_badge'),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: _goldFill.withValues(
-                          alpha: palette.isDark ? 0.14 : 0.22,
+                          alpha: palette.isDark ? 0.16 : 0.22,
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: palette.amberBorder.withValues(alpha: 0.45),
+                          color: palette.amberBorder.withValues(alpha: 0.50),
                         ),
                       ),
-                      child: Icon(
-                        Icons.hourglass_top_rounded,
-                        size: 16,
-                        color: palette.amberIcon,
-                      ),
+                      child: const SanctuaryHourglassIcon(size: 32),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(width: 9),
                     Expanded(
-                      child: Text(
-                        loc.t(
-                          'offertory_cap_upgrade_title',
-                          fallback: 'Offline Cap',
-                        ),
-                        key: const ValueKey('offertory_cap_upgrade_title'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: palette.primaryText,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  loc.t(
+                                    'offertory_cap_upgrade_title',
+                                    fallback: 'Offline Cap',
+                                  ),
+                                  key: const ValueKey(
+                                    'offertory_cap_upgrade_title',
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                    color: palette.primaryText,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              _buildOffertoryBatchSelector(
+                                palette: palette,
+                                loc: loc,
+                                canAfford10x: canAffordCap10x,
+                                selectedOption: _selectedOffertoryCapBatch,
+                                onSelected: (option) => setState(
+                                  () => _selectedOffertoryCapBatch = option,
+                                ),
+                                keyPrefix: 'offertory_cap_batch',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            loc.t(
+                              'offertory_cap_upgrade_desc',
+                              fallback:
+                                  'Extends maximum offline orb storage (+30m per level, no level cap).',
+                            ),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              height: 1.25,
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    _buildOffertoryBatchSelector(
-                      palette: palette,
-                      loc: loc,
-                      canAfford10x: canAffordCap10x,
-                      selectedOption: _selectedOffertoryCapBatch,
-                      onSelected: (option) =>
-                          setState(() => _selectedOffertoryCapBatch = option),
-                      keyPrefix: 'offertory_cap_batch',
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  loc.t(
-                    'offertory_cap_upgrade_desc',
-                    fallback:
-                        'Extends maximum offline orb storage (+30m per level, no level cap).',
-                  ),
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    height: 1.25,
-                    color: palette.secondaryText,
-                  ),
                 ),
                 const SizedBox(height: 7),
                 Row(

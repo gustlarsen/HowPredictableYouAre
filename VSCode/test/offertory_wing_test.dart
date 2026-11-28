@@ -568,13 +568,52 @@ void main() {
             expect(tester.getTopLeft(find.byKey(k)).dy, closeTo(firstTop, 1.0));
           }
 
-          // Bespoke CustomPainter icons & 3D orbs rendered
+          // Bespoke CustomPainter icons & 3D orbs rendered across all 4 Offertory cards
           expect(find.byType(OffertoryVaultIcon), findsWidgets);
+          expect(find.byType(ConsecrationCenserIcon), findsOneWidget);
+          expect(find.byType(SanctuaryHourglassIcon), findsOneWidget);
           expect(find.byType(TitheBlessingIcon), findsOneWidget);
           expect(find.byType(ElementalEnergySphere), findsWidgets);
           expect(find.byKey(const ValueKey('offertory_vault_card')), findsOneWidget);
           expect(find.byKey(const ValueKey('offertory_upgrade_card')), findsOneWidget);
+          expect(find.byKey(const ValueKey('offertory_cap_upgrade_card')), findsOneWidget);
           expect(find.byKey(const ValueKey('offertory_tithe_card')), findsOneWidget);
+
+          // Verify matching ~44px rounded badges & no flat Material icons in middle cards
+          final rateBadgeFinder = find.byKey(
+            const ValueKey('offertory_rate_icon_badge'),
+          );
+          final capBadgeFinder = find.byKey(
+            const ValueKey('offertory_cap_icon_badge'),
+          );
+          expect(rateBadgeFinder, findsOneWidget);
+          expect(capBadgeFinder, findsOneWidget);
+          expect(
+            find.descendant(
+              of: rateBadgeFinder,
+              matching: find.byIcon(Icons.bolt_rounded),
+            ),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: capBadgeFinder,
+              matching: find.byIcon(Icons.hourglass_top_rounded),
+            ),
+            findsNothing,
+          );
+          expect(tester.getSize(rateBadgeFinder).width, closeTo(44.0, 2.0));
+          expect(tester.getSize(rateBadgeFinder).height, closeTo(44.0, 2.0));
+          expect(tester.getSize(capBadgeFinder).width, closeTo(44.0, 2.0));
+          expect(tester.getSize(capBadgeFinder).height, closeTo(44.0, 2.0));
+          expect(
+            tester.getSize(find.byType(ConsecrationCenserIcon)),
+            equals(const Size(32.0, 32.0)),
+          );
+          expect(
+            tester.getSize(find.byType(SanctuaryHourglassIcon)),
+            equals(const Size(32.0, 32.0)),
+          );
         }
 
         // Verify all 4 localized tab names

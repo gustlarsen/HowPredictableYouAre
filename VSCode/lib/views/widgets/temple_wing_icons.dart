@@ -3054,6 +3054,861 @@ class _TitheBlessingPainter extends CustomPainter {
       oldDelegate.isOnGoldBackground != isOnGoldBackground;
 }
 
+/// Sacred Offertory Card 2 — Consecration Rate: Ornate Golden Sacred Thurible /
+/// Incense Censer suspended by fine bronze chains, featuring a hammered-gold
+/// body (`#FFD54F` / `#FFB300`), glowing amber-ruby embers (`#FF6D00`) peeking
+/// through gothic dome vents, curling golden-cyan sacred incense wisps, and
+/// crisp dark graphite outlines (`#1A2226`).
+class ConsecrationCenserIcon extends StatelessWidget {
+  final double size;
+  final bool isOnGoldBackground;
+
+  const ConsecrationCenserIcon({
+    super.key,
+    this.size = 28.0,
+    this.isOnGoldBackground = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: _ConsecrationCenserPainter(
+        isOnGoldBackground: isOnGoldBackground,
+      ),
+    );
+  }
+}
+
+class _ConsecrationCenserPainter extends CustomPainter {
+  final bool isOnGoldBackground;
+
+  const _ConsecrationCenserPainter({required this.isOnGoldBackground});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+
+    final outline = _outlinePaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      baseWidth: 1.08,
+    );
+    final fineOutline = _outlinePaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      baseWidth: 0.88,
+    );
+    final detail = _detailPaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      alpha: 0.72,
+      baseWidth: 0.72,
+    );
+    final ink = _outlineColor(isOnGoldBackground);
+
+    final goldHighlight =
+        isOnGoldBackground ? const Color(0xFF546E7A) : const Color(0xFFFFF3B0);
+    final goldLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFD54F);
+    final goldMid =
+        isOnGoldBackground ? const Color(0xFF2E3B42) : const Color(0xFFFFB300);
+    final goldDark =
+        isOnGoldBackground ? const Color(0xFF1B2429) : const Color(0xFFB87400);
+    final bronzeLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFD54F);
+    final bronzeDark =
+        isOnGoldBackground ? const Color(0xFF1B2429) : const Color(0xFF8C5600);
+
+    const emberCore = Color(0xFFFFF59D);
+    const emberBright = Color(0xFFFF6D00);
+    const emberRuby = Color(0xFFD50000);
+
+    const wispGold = Color(0xFFFFE082);
+    const wispCyan = Color(0xFF00E5FF);
+    const wispTip = Color(0xFFB2EBF2);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Soft sacred amber-cyan ambient glow behind the censer & rising wisps
+    final auraCenter = Offset(s * 0.50, s * 0.48);
+    canvas.drawCircle(
+      auraCenter,
+      s * 0.42,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFF6D00).withValues(alpha: 0.24),
+            const Color(0xFF00E5FF).withValues(alpha: 0.14),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.56, 1.0],
+        ).createShader(Rect.fromCircle(center: auraCenter, radius: s * 0.42)),
+    );
+
+    // 2. Curling golden-cyan wisps of sacred incense rising from the upper vents
+    final leftWisp = Path()
+      ..moveTo(s * 0.35, s * 0.43)
+      ..cubicTo(s * 0.21, s * 0.37, s * 0.13, s * 0.25, s * 0.22, s * 0.135)
+      ..cubicTo(s * 0.255, s * 0.10, s * 0.305, s * 0.092, s * 0.325, s * 0.112)
+      ..cubicTo(s * 0.265, s * 0.145, s * 0.235, s * 0.21, s * 0.27, s * 0.275)
+      ..cubicTo(s * 0.30, s * 0.33, s * 0.36, s * 0.36, s * 0.39, s * 0.41)
+      ..close();
+
+    final rightWisp = Path()
+      ..moveTo(s * 0.65, s * 0.43)
+      ..cubicTo(s * 0.79, s * 0.37, s * 0.87, s * 0.25, s * 0.78, s * 0.135)
+      ..cubicTo(s * 0.745, s * 0.10, s * 0.695, s * 0.092, s * 0.675, s * 0.112)
+      ..cubicTo(s * 0.735, s * 0.145, s * 0.765, s * 0.21, s * 0.73, s * 0.275)
+      ..cubicTo(s * 0.70, s * 0.33, s * 0.64, s * 0.36, s * 0.61, s * 0.41)
+      ..close();
+
+    final wispOutline = Paint()
+      ..color = ink.withValues(alpha: 0.70)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.60, 0.75 * scale)
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    for (final wisp in [leftWisp, rightWisp]) {
+      canvas.drawPath(
+        wisp,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [wispGold, wispCyan, wispTip],
+            stops: [0.0, 0.56, 1.0],
+          ).createShader(Rect.fromLTRB(s * 0.13, s * 0.09, s * 0.87, s * 0.43)),
+      );
+      canvas.drawPath(wisp, wispOutline);
+    }
+
+    // 3. Fine bronze-gold suspension chains & top ring (y: 0.055..0.51)
+    final chainCasing = Paint()
+      ..color = ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.45, 1.75 * scale)
+      ..strokeCap = StrokeCap.round;
+    final chainCore = Paint()
+      ..color = bronzeLight
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.80, 1.0 * scale)
+      ..strokeCap = StrokeCap.round;
+
+    void drawArticulatedChain(Offset a, Offset b, int beads) {
+      canvas.drawLine(a, b, chainCasing);
+      canvas.drawLine(a, b, chainCore);
+      for (int i = 1; i <= beads; i++) {
+        final t = i / (beads + 1);
+        final pt = Offset.lerp(a, b, t)!;
+        canvas.drawCircle(pt, s * 0.019, Paint()..color = goldHighlight);
+        canvas.drawCircle(
+          pt,
+          s * 0.019,
+          Paint()
+            ..color = ink.withValues(alpha: 0.78)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(0.45, 0.55 * scale),
+        );
+      }
+    }
+
+    // Side & center suspension chains
+    drawArticulatedChain(Offset(s * 0.46, s * 0.17), Offset(s * 0.22, s * 0.505), 3);
+    drawArticulatedChain(Offset(s * 0.54, s * 0.17), Offset(s * 0.78, s * 0.505), 3);
+    drawArticulatedChain(Offset(s * 0.50, s * 0.18), Offset(s * 0.50, s * 0.285), 1);
+
+    // Top golden-bronze suspension ring (thick luminous gold band)
+    final ringCenter = Offset(s * 0.50, s * 0.12);
+    final ringOuterR = s * 0.068;
+    final ringInnerR = s * 0.026;
+    final ringPath = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addOval(Rect.fromCircle(center: ringCenter, radius: ringOuterR))
+      ..addOval(Rect.fromCircle(center: ringCenter, radius: ringInnerR));
+    canvas.drawPath(
+      ringPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, bronzeDark],
+        ).createShader(Rect.fromCircle(center: ringCenter, radius: ringOuterR)),
+    );
+    canvas.drawCircle(ringCenter, ringOuterR, fineOutline);
+    canvas.drawCircle(ringCenter, ringInnerR, detail);
+
+    // 4. Sculpted tiered pedestal foot & hanging drop finial (y: 0.78..0.94)
+    final dropTip = Path()
+      ..moveTo(s * 0.45, s * 0.875)
+      ..lineTo(s * 0.55, s * 0.875)
+      ..quadraticBezierTo(s * 0.53, s * 0.918, s * 0.50, s * 0.942)
+      ..quadraticBezierTo(s * 0.47, s * 0.918, s * 0.45, s * 0.875)
+      ..close();
+    canvas.drawPath(
+      dropTip,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [goldHighlight, goldMid, goldDark],
+        ).createShader(Rect.fromLTRB(s * 0.45, s * 0.87, s * 0.55, s * 0.942)),
+    );
+    canvas.drawPath(dropTip, fineOutline);
+
+    final footPlinth = Path()
+      ..moveTo(s * 0.40, s * 0.795)
+      ..lineTo(s * 0.60, s * 0.795)
+      ..lineTo(s * 0.665, s * 0.88)
+      ..lineTo(s * 0.335, s * 0.88)
+      ..close();
+    canvas.drawPath(
+      footPlinth,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.30, 0.70, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.335, s * 0.795, s * 0.665, s * 0.88)),
+    );
+    canvas.drawPath(footPlinth, outline);
+
+    // 5. Hammered-gold lower fire-bowl / brazier belly (y: 0.545..0.805)
+    final bowlPath = Path()
+      ..moveTo(s * 0.22, s * 0.55)
+      ..lineTo(s * 0.78, s * 0.55)
+      ..cubicTo(s * 0.77, s * 0.72, s * 0.66, s * 0.805, s * 0.50, s * 0.805)
+      ..cubicTo(s * 0.34, s * 0.805, s * 0.23, s * 0.72, s * 0.22, s * 0.55)
+      ..close();
+    canvas.drawPath(
+      bowlPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.28, 0.66, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.22, s * 0.55, s * 0.78, s * 0.805)),
+    );
+
+    // Left-side curved specular glint on lower bowl
+    final bowlGlint = Path()
+      ..moveTo(s * 0.275, s * 0.585)
+      ..cubicTo(s * 0.285, s * 0.675, s * 0.34, s * 0.735, s * 0.40, s * 0.76)
+      ..cubicTo(s * 0.365, s * 0.715, s * 0.325, s * 0.66, s * 0.32, s * 0.585)
+      ..close();
+    canvas.drawPath(
+      bowlGlint,
+      Paint()..color = Colors.white.withValues(alpha: isOnGoldBackground ? 0.25 : 0.64),
+    );
+
+    // Hammered gadroon fluted ribs on the bowl
+    for (final rx in [0.36, 0.64]) {
+      final rib = Path()
+        ..moveTo(s * rx, s * 0.565)
+        ..quadraticBezierTo(
+          s * (rx < 0.5 ? 0.38 : 0.62),
+          s * 0.685,
+          s * (rx < 0.5 ? 0.435 : 0.565),
+          s * 0.785,
+        );
+      canvas.drawPath(rib, detail);
+    }
+    canvas.drawPath(bowlPath, outline);
+
+    // Central glowing amber-ruby medallion inset on the fire-bowl
+    final medalCenter = Offset(s * 0.50, s * 0.675);
+    final medalR = s * 0.070;
+    final medal = Path()
+      ..moveTo(medalCenter.dx, medalCenter.dy - medalR)
+      ..lineTo(medalCenter.dx + medalR * 0.82, medalCenter.dy)
+      ..lineTo(medalCenter.dx, medalCenter.dy + medalR)
+      ..lineTo(medalCenter.dx - medalR * 0.82, medalCenter.dy)
+      ..close();
+    canvas.drawPath(
+      medal,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.25, -0.25),
+          colors: [emberCore, emberBright, emberRuby],
+          stops: [0.0, 0.48, 1.0],
+        ).createShader(Rect.fromCircle(center: medalCenter, radius: medalR)),
+    );
+    canvas.drawPath(medal, detail);
+
+    // 6. Ornate Perforated Golden Dome Lid (y: 0.275..0.51)
+    final domePath = Path()
+      ..moveTo(s * 0.215, s * 0.505)
+      ..cubicTo(s * 0.23, s * 0.36, s * 0.37, s * 0.295, s * 0.50, s * 0.285)
+      ..cubicTo(s * 0.63, s * 0.295, s * 0.77, s * 0.36, s * 0.785, s * 0.505)
+      ..close();
+    canvas.drawPath(
+      domePath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.28, 0.66, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.215, s * 0.285, s * 0.785, s * 0.505)),
+    );
+    canvas.drawPath(domePath, outline);
+
+    // Spire finial bead crowning the dome
+    final spireRect = Rect.fromCenter(
+      center: Offset(s * 0.50, s * 0.272),
+      width: s * 0.10,
+      height: s * 0.072,
+    );
+    canvas.drawOval(
+      spireRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldDark],
+        ).createShader(spireRect),
+    );
+    canvas.drawOval(spireRect, fineOutline);
+
+    // 3 Arched Gothic Ember Vents pierced in the dome revealing glowing embers
+    void drawEmberVent(double cx, double cy, double halfW, double h) {
+      final vent = Path()
+        ..moveTo(cx - halfW, cy + h * 0.5)
+        ..lineTo(cx - halfW, cy - h * 0.05)
+        ..quadraticBezierTo(cx, cy - h * 0.72, cx + halfW, cy - h * 0.05)
+        ..lineTo(cx + halfW, cy + h * 0.5)
+        ..close();
+      canvas.drawPath(
+        vent,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(0.0, 0.25),
+            radius: 0.95,
+            colors: [emberCore, emberBright, emberRuby],
+            stops: [0.0, 0.48, 1.0],
+          ).createShader(
+            Rect.fromCenter(center: Offset(cx, cy), width: halfW * 2.2, height: h * 1.4),
+          ),
+      );
+      canvas.drawPath(vent, detail);
+    }
+
+    drawEmberVent(s * 0.50, s * 0.415, s * 0.066, s * 0.132);
+    drawEmberVent(s * 0.34, s * 0.435, s * 0.050, s * 0.106);
+    drawEmberVent(s * 0.66, s * 0.435, s * 0.050, s * 0.106);
+
+    // 7. Sculpted Mid-Waist Flanged Rim, glowing ember seam & side chain lugs
+    for (final lx in [s * 0.20, s * 0.80]) {
+      final lugCenter = Offset(lx, s * 0.52);
+      canvas.drawCircle(
+        lugCenter,
+        s * 0.044,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [goldHighlight, goldLight, bronzeDark],
+          ).createShader(Rect.fromCircle(center: lugCenter, radius: s * 0.044)),
+      );
+      canvas.drawCircle(lugCenter, s * 0.044, fineOutline);
+    }
+
+    final seamRect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.18, s * 0.492, s * 0.82, s * 0.568),
+      Radius.circular(s * 0.036),
+    );
+    canvas.drawRRect(
+      seamRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [goldHighlight, goldLight, goldMid, goldDark],
+          stops: const [0.0, 0.28, 0.68, 1.0],
+        ).createShader(seamRect.outerRect),
+    );
+    canvas.drawRRect(seamRect, outline);
+
+    // Incandescent ember light strip gleaming along the censer waist seam
+    final glowStrip = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.255, s * 0.517, s * 0.745, s * 0.545),
+      Radius.circular(s * 0.014),
+    );
+    canvas.drawRRect(
+      glowStrip,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [emberRuby, emberBright, emberCore, emberBright, emberRuby],
+          stops: [0.0, 0.22, 0.50, 0.78, 1.0],
+        ).createShader(glowStrip.outerRect),
+    );
+
+    // Twin subtle golden-cyan incense sparkle motes
+    void drawSparkMote(Offset c, double r, Color color) {
+      final star = Path()
+        ..moveTo(c.dx, c.dy - r)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy - r * 0.18, c.dx + r, c.dy)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy + r * 0.18, c.dx, c.dy + r)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy + r * 0.18, c.dx - r, c.dy)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy - r * 0.18, c.dx, c.dy - r)
+        ..close();
+      canvas.drawPath(star, Paint()..color = color);
+      canvas.drawPath(star, detail);
+    }
+
+    drawSparkMote(Offset(s * 0.155, s * 0.155), s * 0.048, wispGold);
+    drawSparkMote(Offset(s * 0.845, s * 0.145), s * 0.045, wispCyan);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_ConsecrationCenserPainter oldDelegate) =>
+      oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+
+/// Sacred Offertory Card 3 — Offline Cap: Ornate Royal Arcane Hourglass with
+/// sculpted golden-bronze top and bottom caps (`#FFD54F` / `#C88A00`), slender
+/// side pillars, translucent glass bulbs with curved specular highlights,
+/// glowing golden-cyan cosmic sand (`#FFE082` / `#00E5FF`) flowing from the
+/// upper chamber into a lower mound, and crisp `#1A2226` outlines.
+class SanctuaryHourglassIcon extends StatelessWidget {
+  final double size;
+  final bool isOnGoldBackground;
+
+  const SanctuaryHourglassIcon({
+    super.key,
+    this.size = 28.0,
+    this.isOnGoldBackground = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: _SanctuaryHourglassPainter(
+        isOnGoldBackground: isOnGoldBackground,
+      ),
+    );
+  }
+}
+
+class _SanctuaryHourglassPainter extends CustomPainter {
+  final bool isOnGoldBackground;
+
+  const _SanctuaryHourglassPainter({required this.isOnGoldBackground});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+
+    final outline = _outlinePaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      baseWidth: 1.08,
+    );
+    final pillarOutline = _outlinePaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      baseWidth: 0.90,
+    );
+    final detail = _detailPaint(
+      scale,
+      isOnGoldBackground: isOnGoldBackground,
+      alpha: 0.72,
+      baseWidth: 0.70,
+    );
+
+    final goldHighlight =
+        isOnGoldBackground ? const Color(0xFF546E7A) : const Color(0xFFFFF5C0);
+    final goldLight =
+        isOnGoldBackground ? const Color(0xFF455A64) : const Color(0xFFFFD54F);
+    final goldMid =
+        isOnGoldBackground ? const Color(0xFF2E3B42) : const Color(0xFFFFB300);
+    final bronzeMid =
+        isOnGoldBackground ? const Color(0xFF263238) : const Color(0xFFC88A00);
+    final bronzeDark =
+        isOnGoldBackground ? const Color(0xFF1B2429) : const Color(0xFF915C00);
+
+    const glassDark = Color(0xFF1A313D);
+    const glassMid = Color(0xFF2B5263);
+    const glassRim = Color(0xFF80DEEA);
+
+    const sandCream = Color(0xFFFFF8D6);
+    const sandGold = Color(0xFFFFE082);
+    const sandDeepGold = Color(0xFFE09900);
+    const sandCyan = Color(0xFF00E5FF);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Subtle arcane golden-cyan aura behind the hourglass waist
+    final center = Offset(s * 0.50, s * 0.50);
+    canvas.drawCircle(
+      center,
+      s * 0.39,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            sandCyan.withValues(alpha: 0.22),
+            sandGold.withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.56, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: s * 0.39)),
+    );
+
+    // 2. Slender gleaming golden-bronze side pillars (x: 0.215 & 0.785)
+    for (final px in [s * 0.215, s * 0.785]) {
+      final pillarRect = RRect.fromRectAndRadius(
+        Rect.fromLTRB(px - s * 0.042, s * 0.21, px + s * 0.042, s * 0.79),
+        Radius.circular(s * 0.015),
+      );
+      canvas.drawRRect(
+        pillarRect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [goldHighlight, goldLight, goldMid, bronzeMid],
+            stops: const [0.0, 0.32, 0.70, 1.0],
+          ).createShader(pillarRect.outerRect),
+      );
+      canvas.drawRRect(pillarRect, pillarOutline);
+
+      // Decorative sculpted golden ring collar at mid-pillar
+      final ring = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(px, s * 0.50),
+          width: s * 0.115,
+          height: s * 0.068,
+        ),
+        Radius.circular(s * 0.032),
+      );
+      canvas.drawRRect(
+        ring,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [goldHighlight, goldLight, bronzeMid],
+          ).createShader(ring.outerRect),
+      );
+      canvas.drawRRect(ring, pillarOutline);
+    }
+
+    // 3. Translucent Arcane Glass Bulbs (y: 0.22..0.78)
+    final glassPath = Path()
+      ..moveTo(s * 0.305, s * 0.22)
+      ..lineTo(s * 0.695, s * 0.22)
+      // Right upper bulb curve into pinched waist
+      ..cubicTo(s * 0.71, s * 0.37, s * 0.585, s * 0.455, s * 0.534, s * 0.50)
+      // Right lower bulb curve flaring to base
+      ..cubicTo(s * 0.585, s * 0.545, s * 0.71, s * 0.63, s * 0.695, s * 0.78)
+      ..lineTo(s * 0.305, s * 0.78)
+      // Left lower bulb curve into pinched waist
+      ..cubicTo(s * 0.29, s * 0.63, s * 0.415, s * 0.545, s * 0.466, s * 0.50)
+      // Left upper bulb curve back to top
+      ..cubicTo(s * 0.415, s * 0.455, s * 0.29, s * 0.37, s * 0.305, s * 0.22)
+      ..close();
+
+    // Tinted translucent arcane glass backdrop (high contrast in Dark & Light modes)
+    canvas.drawPath(
+      glassPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            glassRim.withValues(alpha: 0.48),
+            glassMid.withValues(alpha: 0.84),
+            glassDark.withValues(alpha: 0.92),
+          ],
+          stops: const [0.0, 0.48, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.29, s * 0.22, s * 0.71, s * 0.78)),
+    );
+
+    // 4. Glowing Golden-Cyan Cosmic Sand clipped cleanly inside the glass bulbs
+    canvas.save();
+    canvas.clipPath(glassPath);
+
+    // 4a. Upper chamber funneling cosmic sand (y: 0.31..0.498)
+    final upperSand = Path()
+      ..moveTo(s * 0.295, s * 0.315)
+      ..quadraticBezierTo(s * 0.50, s * 0.362, s * 0.705, s * 0.315)
+      ..cubicTo(s * 0.66, s * 0.415, s * 0.555, s * 0.47, s * 0.514, s * 0.498)
+      ..lineTo(s * 0.486, s * 0.498)
+      ..cubicTo(s * 0.445, s * 0.47, s * 0.34, s * 0.415, s * 0.295, s * 0.315)
+      ..close();
+    canvas.drawPath(
+      upperSand,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [sandCream, sandGold, sandCyan],
+          stops: [0.0, 0.55, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.295, s * 0.31, s * 0.705, s * 0.50)),
+    );
+
+    // Bright crest glint along top edge of upper sand
+    final upperCrest = Path()
+      ..moveTo(s * 0.33, s * 0.326)
+      ..quadraticBezierTo(s * 0.50, s * 0.366, s * 0.67, s * 0.326);
+    canvas.drawPath(
+      upperCrest,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.88)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.75, 0.95 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // 4b. Glowing vertical cosmic sand stream pouring through the central waist
+    final streamGlow = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [sandCyan, sandGold, sandCyan],
+      ).createShader(Rect.fromLTRB(s * 0.46, s * 0.49, s * 0.54, s * 0.65))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.8, 2.25 * scale)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(s * 0.50, s * 0.49), Offset(s * 0.50, s * 0.64), streamGlow);
+
+    final streamCore = Paint()
+      ..color = Colors.white.withValues(alpha: 0.92)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.75, 0.95 * scale)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(s * 0.50, s * 0.495), Offset(s * 0.50, s * 0.63), streamCore);
+
+    // Sparkling falling cosmic grains flanking the stream
+    canvas.drawCircle(
+      Offset(s * 0.468, s * 0.562),
+      s * 0.014,
+      Paint()..color = sandGold,
+    );
+    canvas.drawCircle(
+      Offset(s * 0.534, s * 0.584),
+      s * 0.013,
+      Paint()..color = sandCyan,
+    );
+
+    // 4c. Lower chamber radiant conical cosmic sand mound (y: 0.605..0.78)
+    final lowerMound = Path()
+      ..moveTo(s * 0.29, s * 0.782)
+      ..cubicTo(s * 0.34, s * 0.688, s * 0.435, s * 0.614, s * 0.50, s * 0.604)
+      ..cubicTo(s * 0.565, s * 0.614, s * 0.66, s * 0.688, s * 0.71, s * 0.782)
+      ..close();
+    canvas.drawPath(
+      lowerMound,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(0.0, -0.52),
+          radius: 1.05,
+          colors: [sandCream, sandCyan, sandGold, sandDeepGold],
+          stops: [0.0, 0.32, 0.68, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.29, s * 0.60, s * 0.71, s * 0.782)),
+    );
+
+    // Luminous cyan-white impact shimmer at apex of lower sand mound
+    canvas.drawCircle(
+      Offset(s * 0.50, s * 0.625),
+      s * 0.050,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.88),
+            sandCyan.withValues(alpha: 0.45),
+            Colors.transparent,
+          ],
+        ).createShader(
+          Rect.fromCircle(center: Offset(s * 0.50, s * 0.625), radius: s * 0.050),
+        ),
+    );
+
+    // Curved white glass specular reflection highlights inside upper & lower bulbs
+    final glassGlintPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.0, 1.35 * scale)
+      ..strokeCap = StrokeCap.round;
+
+    final upperGlint = Path()
+      ..moveTo(s * 0.345, s * 0.265)
+      ..cubicTo(s * 0.345, s * 0.335, s * 0.375, s * 0.385, s * 0.415, s * 0.425);
+    canvas.drawPath(upperGlint, glassGlintPaint);
+
+    final lowerGlint = Path()
+      ..moveTo(s * 0.415, s * 0.575)
+      ..cubicTo(s * 0.375, s * 0.615, s * 0.345, s * 0.665, s * 0.345, s * 0.735);
+    canvas.drawPath(lowerGlint, glassGlintPaint);
+
+    // Subtle right-edge aqua glass rim bounce light
+    final rightRimGlint = Path()
+      ..moveTo(s * 0.655, s * 0.275)
+      ..cubicTo(s * 0.655, s * 0.335, s * 0.63, s * 0.375, s * 0.60, s * 0.41);
+    canvas.drawPath(
+      rightRimGlint,
+      Paint()
+        ..color = glassRim.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.75, 0.95 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+
+    canvas.restore(); // end glass clip
+
+    // Crisp outer glass bulb silhouette outline
+    canvas.drawPath(glassPath, outline);
+
+    // Ornate miniature golden waist collar clasping the central glass pinch
+    final waistRing = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(s * 0.50, s * 0.50),
+        width: s * 0.145,
+        height: s * 0.062,
+      ),
+      Radius.circular(s * 0.030),
+    );
+    canvas.drawRRect(
+      waistRing,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [goldHighlight, goldLight, goldMid, bronzeMid],
+        ).createShader(waistRing.outerRect),
+    );
+    canvas.drawRRect(waistRing, pillarOutline);
+
+    // 5. Sculpted Golden-Bronze Top Royal Cap & Crown Crest (y: 0.065..0.228)
+    // Crown crest arch rising from the top cap
+    final crownCrest = Path()
+      ..moveTo(s * 0.33, s * 0.125)
+      ..quadraticBezierTo(s * 0.50, s * 0.045, s * 0.67, s * 0.125)
+      ..close();
+    canvas.drawPath(
+      crownCrest,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [goldHighlight, goldLight, bronzeMid],
+        ).createShader(Rect.fromLTRB(s * 0.33, s * 0.05, s * 0.67, s * 0.125)),
+    );
+    canvas.drawPath(crownCrest, outline);
+
+    // Sculpted single stepped beveled royal top cornice (generous gold surface)
+    final topCapPath = Path()
+      ..moveTo(s * 0.13, s * 0.12)
+      ..lineTo(s * 0.87, s * 0.12)
+      ..lineTo(s * 0.87, s * 0.18)
+      ..lineTo(s * 0.82, s * 0.228)
+      ..lineTo(s * 0.18, s * 0.228)
+      ..lineTo(s * 0.13, s * 0.18)
+      ..close();
+    canvas.drawPath(
+      topCapPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, bronzeMid, bronzeDark],
+          stops: const [0.0, 0.28, 0.56, 0.82, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.12, s * 0.87, s * 0.228)),
+    );
+    // Top specular bevel highlight along upper edge
+    canvas.drawLine(
+      Offset(s * 0.175, s * 0.145),
+      Offset(s * 0.55, s * 0.145),
+      Paint()
+        ..color = Colors.white.withValues(alpha: isOnGoldBackground ? 0.25 : 0.68)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.85, 1.05 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawPath(topCapPath, outline);
+
+    // Glowing cyan arcane finial jewel inset on the top cap center
+    final finialGem = Offset(s * 0.50, s * 0.168);
+    canvas.drawCircle(
+      finialGem,
+      s * 0.028,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Colors.white, sandCyan],
+        ).createShader(Rect.fromCircle(center: finialGem, radius: s * 0.028)),
+    );
+    canvas.drawCircle(finialGem, s * 0.028, detail);
+
+    // 6. Sculpted Golden-Bronze Bottom Royal Cap & Base Plinth (y: 0.772..0.925)
+    final bottomCapPath = Path()
+      ..moveTo(s * 0.18, s * 0.772)
+      ..lineTo(s * 0.82, s * 0.772)
+      ..lineTo(s * 0.87, s * 0.822)
+      ..lineTo(s * 0.87, s * 0.892)
+      ..lineTo(s * 0.13, s * 0.892)
+      ..lineTo(s * 0.13, s * 0.822)
+      ..close();
+    canvas.drawPath(
+      bottomCapPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [goldHighlight, goldLight, goldMid, bronzeMid, bronzeDark],
+          stops: const [0.0, 0.28, 0.56, 0.82, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.772, s * 0.87, s * 0.892)),
+    );
+    // Subtle golden highlight glint along lower plinth shoulder
+    canvas.drawLine(
+      Offset(s * 0.18, s * 0.825),
+      Offset(s * 0.54, s * 0.825),
+      Paint()
+        ..color = Colors.white.withValues(alpha: isOnGoldBackground ? 0.25 : 0.62)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.85, 1.05 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawPath(bottomCapPath, outline);
+
+    // Subtle carved royal plinth line across bottom base
+    canvas.drawLine(
+      Offset(s * 0.22, s * 0.892),
+      Offset(s * 0.78, s * 0.892),
+      outline,
+    );
+
+    // 7. Delicate arcane sparkle accents flanking the hourglass waist
+    void drawSparkle(Offset c, double r, Color color) {
+      final star = Path()
+        ..moveTo(c.dx, c.dy - r)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy - r * 0.18, c.dx + r, c.dy)
+        ..quadraticBezierTo(c.dx + r * 0.18, c.dy + r * 0.18, c.dx, c.dy + r)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy + r * 0.18, c.dx - r, c.dy)
+        ..quadraticBezierTo(c.dx - r * 0.18, c.dy - r * 0.18, c.dx, c.dy - r)
+        ..close();
+      canvas.drawPath(star, Paint()..color = color);
+      canvas.drawPath(star, detail);
+    }
+
+    drawSparkle(Offset(s * 0.105, s * 0.36), s * 0.045, sandCyan);
+    drawSparkle(Offset(s * 0.895, s * 0.64), s * 0.048, sandGold);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SanctuaryHourglassPainter oldDelegate) =>
+      oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+
 /// Dispatcher rendering the bespoke custom RPG [CustomPainter] icon for each
 /// [SacredBlessing] in the Sacred Temple Prayer tab and Battle HUD pills.
 class SacredBlessingBadgeIcon extends StatelessWidget {
