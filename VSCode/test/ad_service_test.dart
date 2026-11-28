@@ -10,6 +10,7 @@ import 'package:how_predictable/services/audio_service.dart';
 import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
+import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/game_screen.dart';
 
 class FakeAdMobClient implements AdMobClient {
@@ -410,10 +411,11 @@ void main() {
           findsNothing,
         );
 
-        // Open ShopDialog via Backpack -> rewarded ad card is also hidden when Remove Ads is active
-        await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+        // Open ShopDialog directly from GameScreen context -> rewarded ad card is also hidden when Remove Ads is active
+        showDialog<void>(
+          context: tester.element(find.byType(GameScreen)),
+          builder: (_) => ShopDialog(controller: controller),
+        );
         await tester.pumpAndSettle();
 
         expect(

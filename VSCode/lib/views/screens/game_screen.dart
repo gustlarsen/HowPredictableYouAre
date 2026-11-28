@@ -422,7 +422,10 @@ class _GameScreenState extends State<GameScreen>
       _isInventoryDialogOpen = true;
       showDialog(
         context: context,
-        builder: (_) => InventoryDialog(controller: controller),
+        builder: (_) => InventoryDialog(
+          controller: controller,
+          isInBattle: true,
+        ),
       ).whenComplete(() {
         _isInventoryDialogOpen = false;
       });

@@ -815,5 +815,115 @@ void main() {
         }
       },
     );
+
+    testWidgets(
+      'InventoryDialog shows Open Shop / Altar + Ok on WorldMapScreen, and hides Open Shop / Altar with full-width Ok in GameScreen battle',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        SharedPreferences.setMockInitialValues({
+          'has_seen_story_intro': true,
+          'animationsEnabled': false,
+          'musicEnabled': false,
+        });
+        final storage = StorageService();
+        await storage.init();
+
+        final localization = LocalizationService();
+        await tester.runAsync(() => localization.load());
+
+        final controller = GameController(
+          storage: storage,
+          localization: localization,
+          audio: AudioService(),
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: controller,
+            child: const HowPredictableApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. WorldMapScreen: Backpack shows both "Open Shop / Altar" and "Ok"
+        expect(find.byType(WorldMapScreen), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(InventoryDialog), findsOneWidget);
+        final worldShopBtn = find.byKey(
+          const ValueKey('inventory_open_shop_button'),
+        );
+        final worldOkBtn = find.byKey(
+          const ValueKey('inventory_close_button'),
+        );
+        expect(worldShopBtn, findsOneWidget);
+        expect(worldOkBtn, findsOneWidget);
+        expect(find.text('Open Shop / Altar'), findsOneWidget);
+        expect(
+          find.descendant(of: worldOkBtn, matching: find.text('Ok')),
+          findsOneWidget,
+        );
+
+        // Tapping "Open Shop / Altar" navigates to ShopDialog on World Map
+        await tester.tap(worldShopBtn);
+        await tester.pumpAndSettle();
+        expect(find.byType(InventoryDialog), findsNothing);
+        expect(find.byType(ShopDialog), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('shop_close_button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(ShopDialog), findsNothing);
+
+        // 2. Enter Battle (GameScreen): Backpack hides "Open Shop / Altar" and expands "Ok" full-width
+        await tester.tap(
+          find.byKey(const ValueKey('landmark_metal_wizard_lair')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(GameScreen), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(InventoryDialog), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('inventory_open_shop_button')),
+          findsNothing,
+        );
+        expect(find.text('Open Shop / Altar'), findsNothing);
+
+        final battleOkBtn = find.byKey(
+          const ValueKey('inventory_close_button'),
+        );
+        expect(battleOkBtn, findsOneWidget);
+        expect(
+          find.descendant(of: battleOkBtn, matching: find.text('Ok')),
+          findsOneWidget,
+        );
+
+        final okRect = tester.getRect(battleOkBtn);
+        final orbRowRect = tester.getRect(
+          find.byKey(const ValueKey('inventory_orb_row_fire')),
+        );
+        final cardRect = tester.getRect(
+          find.byKey(const ValueKey('inventory_dialog_card')),
+        );
+        expect(okRect.left, closeTo(orbRowRect.left, 0.5));
+        expect(okRect.right, closeTo(orbRowRect.right, 0.5));
+        expect(okRect.width, closeTo(cardRect.width - 36.0, 4.0));
+
+        await tester.tap(battleOkBtn);
+        await tester.pumpAndSettle();
+        expect(find.byType(InventoryDialog), findsNothing);
+        expect(find.byType(GameScreen), findsOneWidget);
+      },
+    );
   });
 }

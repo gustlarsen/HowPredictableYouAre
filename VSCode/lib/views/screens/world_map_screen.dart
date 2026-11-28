@@ -236,7 +236,10 @@ class _WorldMapScreenState extends State<WorldMapScreen>
       _isInventoryDialogOpen = true;
       showDialog(
         context: context,
-        builder: (_) => InventoryDialog(controller: controller),
+        builder: (_) => InventoryDialog(
+          controller: controller,
+          isInBattle: false,
+        ),
       ).whenComplete(() {
         _isInventoryDialogOpen = false;
       });

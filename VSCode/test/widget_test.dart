@@ -644,11 +644,12 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(home: GameScreen()),
+        child: const HowPredictableApp(),
       ),
     );
+    await tester.pumpAndSettle();
 
-    // Open Shop dialog
+    // Open Shop dialog from World Map Backpack
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
@@ -710,8 +711,10 @@ void main() {
     expect(controller.showCrystalBallPlus, isTrue);
     await tester.pumpAndSettle();
 
-    // Close Shop dialog and verify main screen shows ONLY ONE crystal ball (Crystal Ball+ result)
+    // Close Shop dialog, enter battle arena, and verify main screen shows ONLY ONE crystal ball (Crystal Ball+ result)
     await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('landmark_metal_wizard_lair')));
     await tester.pumpAndSettle();
 
     expect(find.text('Crystal Ball:'), findsNothing);
@@ -796,11 +799,12 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(home: GameScreen()),
+        child: const HowPredictableApp(),
       ),
     );
+    await tester.pumpAndSettle();
 
-    // Open Shop dialog
+    // Open Shop dialog from World Map Backpack
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
@@ -1047,11 +1051,12 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(home: GameScreen()),
+        child: const HowPredictableApp(),
       ),
     );
+    await tester.pumpAndSettle();
 
-    // Open ShopDialog and unlock Reset Button
+    // Open ShopDialog from World Map Backpack and unlock Reset Button
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
@@ -1104,9 +1109,11 @@ void main() {
     // Close ShopDialog
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
 
-    // Open SettingsDialog and open Story Memories gallery
-    await tester.tap(find.byKey(const ValueKey('battle_settings_button')));
+    // Open SettingsDialog from World Map and open Story Memories gallery
+    await tester.tap(find.byKey(const ValueKey('world_map_settings_button')));
     await tester.pumpAndSettle();
 
     final storyMemoriesBtn = find.byKey(
@@ -1390,12 +1397,12 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: controller,
-        child: const HowPredictableApp(home: GameScreen()),
+        child: const HowPredictableApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    // Open ShopDialog
+    // Open ShopDialog from World Map Backpack
     await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
@@ -1629,9 +1636,10 @@ void main() {
     // 1. At the beginning of the game (no hand chosen yet):
     // Toggling Learn Earth & Metal in ShopDialog does NOT ask to reset the game
     expect(controller.hasGameStarted, isFalse);
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -1666,9 +1674,10 @@ void main() {
     expect(controller.hasGameStarted, isTrue);
 
     // 2. Open ShopDialog and press Learn Earth & Metal to enable it while game is in progress
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -1940,10 +1949,11 @@ void main() {
     expect(ongoingTurnCount, 2);
     expect(controller.hasGameStarted, isTrue);
 
-    // Open ShopDialog and scroll to New Skin
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    // Open ShopDialog directly from GameScreen context and scroll to New Skin
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
 
     final shopScrollable = find.descendant(
@@ -2014,9 +2024,10 @@ void main() {
     );
 
     // Reopen ShopDialog and toggle New Skin OFF -> reverts to Elemental Theme without resetting match
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('New Skin'),
@@ -2367,7 +2378,7 @@ void main() {
     expect(find.text(PlayGamesService.qaBonusSnackBarMessage), findsOneWidget);
   });
 
-  testWidgets('Top-left Backpack button opens InventoryDialog showing all 5 orb counts, locked/active combat states, Open Shop / Altar navigation, and Flying Orb VFX on round win', (WidgetTester tester) async {
+  testWidgets('Top-left Backpack button opens InventoryDialog in battle showing all 5 orb counts, locked/active combat states, hidden Open Shop / Altar with full-width Ok button, and Flying Orb VFX on round win', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'orbs_fire': 12,
@@ -2540,14 +2551,34 @@ void main() {
       );
     }
 
-    // 3. Tap "Open Shop / Altar" button in InventoryDialog -> jumps straight to ShopDialog
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    // 3. In battle (GameScreen), "Open Shop / Altar" is hidden and "Ok" spans the full modal width
+    expect(find.byKey(const ValueKey('inventory_open_shop_button')), findsNothing);
+    expect(find.text('Open Shop / Altar'), findsNothing);
+
+    final okButtonFinder = find.byKey(const ValueKey('inventory_close_button'));
+    expect(okButtonFinder, findsOneWidget);
+    expect(
+      find.descendant(of: okButtonFinder, matching: find.text('Ok')),
+      findsOneWidget,
+    );
+
+    final okRect = tester.getRect(okButtonFinder);
+    final orbRowRect = tester.getRect(
+      find.byKey(const ValueKey('inventory_orb_row_fire')),
+    );
+    final cardRect = tester.getRect(
+      find.byKey(const ValueKey('inventory_dialog_card')),
+    );
+    expect(okRect.left, closeTo(orbRowRect.left, 0.5));
+    expect(okRect.right, closeTo(orbRowRect.right, 0.5));
+    expect(okRect.width, closeTo(cardRect.width - 36.0, 4.0));
+
+    await tester.tap(okButtonFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.byType(InventoryDialog), findsNothing);
-    expect(find.byType(ShopDialog), findsOneWidget);
-    expect(find.byKey(const ValueKey('shop_orb_summary_bar')), findsOneWidget);
+    expect(find.byType(ShopDialog), findsNothing);
   });
 
   testWidgets('SettingsDialog displays dynamic release version, copyable Player ID with SnackBar, toggle spacing/contrast, and outlined Ok button', (WidgetTester tester) async {
@@ -3659,10 +3690,11 @@ void main() {
     expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
     expect(find.byType(RpgGiftIcon), findsNothing);
 
-    // 2. Open Shop and scroll to Gift Box
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    // 2. Open Shop directly from GameScreen context and scroll to Gift Box
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -3736,9 +3768,10 @@ void main() {
     expect(find.byKey(const ValueKey('gift_box_button')), findsNothing);
 
     // 6. Toggle Gift Box OFF in Shop -> stops background timer cleanly
-    await tester.tap(find.byKey(const ValueKey('backpack_inventory_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('inventory_open_shop_button')));
+    showDialog<void>(
+      context: tester.element(find.byType(GameScreen)),
+      builder: (_) => ShopDialog(controller: controller),
+    );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Gift Box'),

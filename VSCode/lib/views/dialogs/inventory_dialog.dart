@@ -9,8 +9,13 @@ import 'shop_dialog.dart';
 
 class InventoryDialog extends StatefulWidget {
   final GameController controller;
+  final bool isInBattle;
 
-  const InventoryDialog({super.key, required this.controller});
+  const InventoryDialog({
+    super.key,
+    required this.controller,
+    this.isInBattle = false,
+  });
 
   @override
   State<InventoryDialog> createState() => _InventoryDialogState();
@@ -104,10 +109,37 @@ class _InventoryDialogState extends State<InventoryDialog>
         final theme = Theme.of(context);
         final palette = AppPalette.of(context);
         final isNewHandsActive = controller.showNewHands;
+        final isBattleContext =
+            widget.isInBattle || controller.isTempleSiegeActive;
         final ownedOrbs = {
           for (final move in HandMove.values)
             if (controller.orbsFor(move) > 0) move,
         };
+        final okButton = OutlinedButton(
+          key: const ValueKey('inventory_close_button'),
+          onPressed: () => Navigator.of(context).pop(),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: palette.amberText,
+            side: BorderSide(
+              color: palette.amberBorder.withValues(
+                alpha: palette.isDark ? 0.55 : 0.70,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(
+            loc.t('string36', fallback: 'Ok'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
 
         return Dialog(
           key: const ValueKey('inventory_dialog'),
@@ -238,79 +270,58 @@ class _InventoryDialogState extends State<InventoryDialog>
                           ),
 
                           const SizedBox(height: 12),
-                          // Footer Actions: Open Shop / Altar & Close
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  key: const ValueKey(
-                                    'inventory_open_shop_button',
-                                  ),
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) =>
-                                          ShopDialog(controller: controller),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.amber,
-                                    foregroundColor: const Color(0xFF231F1A),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
+                          // Footer Actions: Open Shop / Altar (World Map only) & Ok
+                          if (isBattleContext)
+                            SizedBox(width: double.infinity, child: okButton)
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    key: const ValueKey(
+                                      'inventory_open_shop_button',
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) =>
+                                            ShopDialog(controller: controller),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber,
+                                      foregroundColor: const Color(0xFF231F1A),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
                                     ),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 17,
-                                  ),
-                                  label: Text(
-                                    loc.t(
-                                      'inventory_open_shop',
-                                      fallback: 'Open Shop / Altar',
+                                    icon: const Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 17,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12.5,
+                                    label: Text(
+                                      loc.t(
+                                        'inventory_open_shop',
+                                        fallback: 'Open Shop / Altar',
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12.5,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              OutlinedButton(
-                                key: const ValueKey('inventory_close_button'),
-                                onPressed: () => Navigator.of(context).pop(),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: palette.amberText,
-                                  side: BorderSide(
-                                    color: palette.amberBorder.withValues(
-                                      alpha: palette.isDark ? 0.55 : 0.70,
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: Text(
-                                  loc.t('string36', fallback: 'Close'),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(width: 10),
+                                okButton,
+                              ],
+                            ),
                         ],
                       ),
                     ),
