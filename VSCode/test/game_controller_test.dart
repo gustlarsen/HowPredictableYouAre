@@ -499,7 +499,7 @@ void main() {
     expect(controller.pendingStoryChapter, isNull);
   });
 
-  test('resetAllProgress preserves seen story flags, archives orbs to Spoils of War, and resets campaign to Week 0', () async {
+  test('resetAllProgress preserves Prologue story flag, prunes legacy story keys, archives orbs to Spoils of War, and resets campaign to Week 0', () async {
     SharedPreferences.setMockInitialValues({
       'musicEnabled': false,
       'has_seen_story_intro': true,
@@ -512,14 +512,15 @@ void main() {
 
     expect(storage.hasSeenStoryIntro, isTrue);
     expect(controller.hasSeenStoryIntro, isTrue);
-    expect(controller.hasSeenStoryReset, isTrue);
+    expect(storage.hasSeenStory('has_seen_story_reset'), isFalse);
+    expect(controller.totalStoryMemoriesCount, 1);
+    expect(controller.unlockedStoryMemoriesCount, 1);
     expect(controller.pendingStoryChapter, isNull);
 
     await controller.resetAllProgress();
 
     expect(storage.hasSeenStoryIntro, isTrue);
     expect(controller.hasSeenStoryIntro, isTrue);
-    expect(controller.hasSeenStoryReset, isTrue);
     expect(controller.pendingStoryChapter, isNull);
     expect(controller.currentWeek, 0);
     expect(storage.currentWeek, 0);
@@ -527,7 +528,7 @@ void main() {
     expect(controller.spoilsFireOrbs, 500);
   });
 
-  test('All 8 shop story chapters trigger on first unlock, persist flags, and do not re-trigger on toggle', () async {
+  test('Unlocking all 8 shop artifacts succeeds cleanly without queuing removed legacy comic chapters', () async {
     SharedPreferences.setMockInitialValues({
       'orbs_fire': 100000,
       'orbs_water': 100000,
@@ -540,80 +541,67 @@ void main() {
     await createController();
 
     expect(controller.pendingStoryChapter, isNull);
+    expect(controller.totalStoryMemoriesCount, 1);
+    expect(controller.unlockedStoryMemoriesCount, 1);
 
     // 1. Reset Button
-    expect(storage.hasSeenStoryReset, isFalse);
-    expect(controller.isStoryChapterUnlocked(StoryChapter.resetButton), isFalse);
     expect(controller.unlockReset(), isTrue);
-    expect(storage.hasSeenStoryReset, isTrue);
-    expect(controller.isStoryChapterUnlocked(StoryChapter.resetButton), isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.resetButton);
+    expect(controller.unlockedReset, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowReset(false);
     controller.toggleShowReset(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 2. Predictability Score
-    expect(storage.hasSeenStoryPredictability, isFalse);
     expect(controller.unlockPredictability(), isTrue);
-    expect(storage.hasSeenStoryPredictability, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.predictabilityScore);
+    expect(controller.unlockedPredictability, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowPredictability(false);
     controller.toggleShowPredictability(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 3. Random Button
-    expect(storage.hasSeenStoryRandom, isFalse);
     expect(controller.unlockRandom(), isTrue);
-    expect(storage.hasSeenStoryRandom, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.randomButton);
+    expect(controller.unlockedRandom, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowRandom(false);
     controller.toggleShowRandom(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 4. Show Algorithm
-    expect(storage.hasSeenStoryAlgorithm, isFalse);
     expect(controller.unlockAlgorithm(), isTrue);
-    expect(storage.hasSeenStoryAlgorithm, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.showAlgorithm);
+    expect(controller.unlockedAlgorithm, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowAlgorithm(false);
     controller.toggleShowAlgorithm(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 5. Your Prediction
-    expect(storage.hasSeenStoryYourPrediction, isFalse);
     expect(controller.unlockYourPrediction(), isTrue);
-    expect(storage.hasSeenStoryYourPrediction, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.yourPrediction);
+    expect(controller.unlockedYourPrediction, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowYourPrediction(false);
     controller.toggleShowYourPrediction(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 6. PC Next Move
-    expect(storage.hasSeenStoryPcNextMove, isFalse);
     expect(controller.unlockNextMove(), isTrue);
-    expect(storage.hasSeenStoryPcNextMove, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.pcNextMove);
+    expect(controller.unlockedNextMove, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowNextMove(false);
     controller.toggleShowNextMove(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 7. Suggestion
-    expect(storage.hasSeenStorySuggestion, isFalse);
     expect(controller.unlockSuggestion(), isTrue);
-    expect(storage.hasSeenStorySuggestion, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.suggestion);
+    expect(controller.unlockedSuggestion, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowSuggestion(false);
     controller.toggleShowSuggestion(true);
-    expect(controller.pendingStoryChapter, isNull);
 
     // 8. Crystal Ball
-    expect(storage.hasSeenStoryCrystalBall, isFalse);
     expect(controller.unlockCrystalBall(), isTrue);
-    expect(storage.hasSeenStoryCrystalBall, isTrue);
-    expect(controller.consumePendingStory(), StoryChapter.crystalBall);
+    expect(controller.unlockedCrystalBall, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
     controller.toggleShowCrystalBall(false);
     controller.toggleShowCrystalBall(true);
-    expect(controller.pendingStoryChapter, isNull);
+
+    expect(controller.totalStoryMemoriesCount, 1);
+    expect(controller.unlockedStoryMemoriesCount, 1);
   });
 
   test('PC move is pre-selected before user plays turn and matches crystalBallMove', () async {

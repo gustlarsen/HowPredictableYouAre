@@ -148,8 +148,7 @@ void main() {
           unlockedAlgorithm: true,
           showReset: true,
           showAlgorithm: true,
-          hasSeenStoryReset: true,
-          hasSeenStoryAlgorithm: true,
+          hasSeenStoryIntro: true,
           lastUserMoveId: HandMove.scissors.id,
           lastComputerMoveId: HandMove.paper.id,
           markovMatrix3: const [
@@ -241,8 +240,7 @@ void main() {
         expect(controller.unlockedAlgorithm, isFalse);
         expect(controller.showReset, isFalse);
         expect(controller.showAlgorithm, isFalse);
-        expect(controller.hasSeenStoryReset, isFalse);
-        expect(controller.hasSeenStoryAlgorithm, isFalse);
+        expect(controller.hasSeenStoryIntro, isFalse);
         expect(controller.currentUserMove, isNull);
         expect(controller.currentComputerMove, isNull);
         expect(controller.lastUserMove, isNull);

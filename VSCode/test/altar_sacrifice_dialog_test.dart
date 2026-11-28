@@ -11,7 +11,6 @@ import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/theme/app_theme.dart';
 import 'package:how_predictable/views/dialogs/altar_sacrifice_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
-import 'package:how_predictable/views/dialogs/story_dialog.dart';
 import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
 
 Future<GameController> _buildTestController({
@@ -397,7 +396,7 @@ void main() {
           await tester.tap(resetUnlockBtn);
           await tester.pumpAndSettle();
 
-          expect(find.byType(StoryDialog), findsNothing);
+          expect(controller.pendingStoryChapter, isNull);
           expect(controller.unlockedReset, isFalse);
           expect(controller.fireOrbs, 30000);
 

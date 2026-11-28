@@ -540,7 +540,7 @@ void main() {
         expect(controller.unlockedReset, isFalse);
         expect(controller.unlockedAlgorithm, isFalse);
         expect(controller.hasSeenStoryIntro, isFalse);
-        expect(controller.hasSeenStoryReset, isFalse);
+        expect(storage.hasSeenStory('has_seen_story_reset'), isFalse);
         expect(controller.treasuryFireOrbs, 0);
         expect(controller.spoilsFireOrbs, 0);
         expect(controller.relicChamberStoredUpgrades, isEmpty);

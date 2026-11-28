@@ -279,14 +279,6 @@ class CloudSaveData {
 
   // Story Cutscene Persistence Flags
   final bool hasSeenStoryIntro;
-  final bool hasSeenStoryReset;
-  final bool hasSeenStoryPredictability;
-  final bool hasSeenStoryRandom;
-  final bool hasSeenStoryAlgorithm;
-  final bool hasSeenStoryYourPrediction;
-  final bool hasSeenStoryPcNextMove;
-  final bool hasSeenStorySuggestion;
-  final bool hasSeenStoryCrystalBall;
 
   // Last Played Hands & Markov Transition Matrices
   final int? lastUserMoveId;
@@ -453,14 +445,6 @@ class CloudSaveData {
     this.overchargedStaffEnabled = false,
     this.overchargedStaffSelectedSpeed = 1,
     this.hasSeenStoryIntro = false,
-    this.hasSeenStoryReset = false,
-    this.hasSeenStoryPredictability = false,
-    this.hasSeenStoryRandom = false,
-    this.hasSeenStoryAlgorithm = false,
-    this.hasSeenStoryYourPrediction = false,
-    this.hasSeenStoryPcNextMove = false,
-    this.hasSeenStorySuggestion = false,
-    this.hasSeenStoryCrystalBall = false,
     this.lastUserMoveId,
     this.lastComputerMoveId,
     this.markovMatrix3,
@@ -883,20 +867,6 @@ class CloudSaveData {
       overchargedStaffEnabled: overchargedStaffEnabled,
       overchargedStaffSelectedSpeed: overchargedStaffSelectedSpeed,
       hasSeenStoryIntro: hasSeenStoryIntro || local.hasSeenStoryIntro,
-      hasSeenStoryReset: hasSeenStoryReset || local.hasSeenStoryReset,
-      hasSeenStoryPredictability:
-          hasSeenStoryPredictability || local.hasSeenStoryPredictability,
-      hasSeenStoryRandom: hasSeenStoryRandom || local.hasSeenStoryRandom,
-      hasSeenStoryAlgorithm:
-          hasSeenStoryAlgorithm || local.hasSeenStoryAlgorithm,
-      hasSeenStoryYourPrediction:
-          hasSeenStoryYourPrediction || local.hasSeenStoryYourPrediction,
-      hasSeenStoryPcNextMove:
-          hasSeenStoryPcNextMove || local.hasSeenStoryPcNextMove,
-      hasSeenStorySuggestion:
-          hasSeenStorySuggestion || local.hasSeenStorySuggestion,
-      hasSeenStoryCrystalBall:
-          hasSeenStoryCrystalBall || local.hasSeenStoryCrystalBall,
       lastUserMoveId: lastUserMoveId ?? local.lastUserMoveId,
       lastComputerMoveId: lastComputerMoveId ?? local.lastComputerMoveId,
       markovMatrix3: markovMatrix3 ?? local.markovMatrix3,
@@ -1063,14 +1033,6 @@ class CloudSaveData {
       overchargedStaffEnabled: storage.overchargedStaffEnabled,
       overchargedStaffSelectedSpeed: storage.overchargedStaffSelectedSpeed,
       hasSeenStoryIntro: storage.hasSeenStoryIntro,
-      hasSeenStoryReset: storage.hasSeenStoryReset,
-      hasSeenStoryPredictability: storage.hasSeenStoryPredictability,
-      hasSeenStoryRandom: storage.hasSeenStoryRandom,
-      hasSeenStoryAlgorithm: storage.hasSeenStoryAlgorithm,
-      hasSeenStoryYourPrediction: storage.hasSeenStoryYourPrediction,
-      hasSeenStoryPcNextMove: storage.hasSeenStoryPcNextMove,
-      hasSeenStorySuggestion: storage.hasSeenStorySuggestion,
-      hasSeenStoryCrystalBall: storage.hasSeenStoryCrystalBall,
       lastUserMoveId: storage.lastUserMove?.id,
       lastComputerMoveId: storage.lastComputerMove?.id,
       markovMatrix3: storage.getMarkovMatrix(3),
@@ -1309,14 +1271,7 @@ class CloudSaveData {
         overchargedStaffLevel >= 1 ? overchargedStaffSelectedSpeed : 1);
 
     await storage.setHasSeenStoryIntro(hasSeenStoryIntro);
-    await storage.setHasSeenStoryReset(hasSeenStoryReset);
-    await storage.setHasSeenStoryPredictability(hasSeenStoryPredictability);
-    await storage.setHasSeenStoryRandom(hasSeenStoryRandom);
-    await storage.setHasSeenStoryAlgorithm(hasSeenStoryAlgorithm);
-    await storage.setHasSeenStoryYourPrediction(hasSeenStoryYourPrediction);
-    await storage.setHasSeenStoryPcNextMove(hasSeenStoryPcNextMove);
-    await storage.setHasSeenStorySuggestion(hasSeenStorySuggestion);
-    await storage.setHasSeenStoryCrystalBall(hasSeenStoryCrystalBall);
+    await storage.pruneObsoleteStoryMemories();
 
     HandMove? findMove(int? id) {
       if (id == null) return null;
@@ -1504,14 +1459,6 @@ class CloudSaveData {
       'overchargedStaffEnabled': overchargedStaffEnabled,
       'overchargedStaffSelectedSpeed': overchargedStaffSelectedSpeed,
       'hasSeenStoryIntro': hasSeenStoryIntro,
-      'hasSeenStoryReset': hasSeenStoryReset,
-      'hasSeenStoryPredictability': hasSeenStoryPredictability,
-      'hasSeenStoryRandom': hasSeenStoryRandom,
-      'hasSeenStoryAlgorithm': hasSeenStoryAlgorithm,
-      'hasSeenStoryYourPrediction': hasSeenStoryYourPrediction,
-      'hasSeenStoryPcNextMove': hasSeenStoryPcNextMove,
-      'hasSeenStorySuggestion': hasSeenStorySuggestion,
-      'hasSeenStoryCrystalBall': hasSeenStoryCrystalBall,
       'lastUserMoveId': lastUserMoveId,
       'lastComputerMoveId': lastComputerMoveId,
       'markovMatrix3': markovMatrix3,
@@ -1951,16 +1898,8 @@ class CloudSaveData {
             : 1;
       })(),
       hasSeenStoryIntro: map['hasSeenStoryIntro'] as bool? ?? false,
-      hasSeenStoryReset: map['hasSeenStoryReset'] as bool? ?? false,
-      hasSeenStoryPredictability:
-          map['hasSeenStoryPredictability'] as bool? ?? false,
-      hasSeenStoryRandom: map['hasSeenStoryRandom'] as bool? ?? false,
-      hasSeenStoryAlgorithm: map['hasSeenStoryAlgorithm'] as bool? ?? false,
-      hasSeenStoryYourPrediction:
-          map['hasSeenStoryYourPrediction'] as bool? ?? false,
-      hasSeenStoryPcNextMove: map['hasSeenStoryPcNextMove'] as bool? ?? false,
-      hasSeenStorySuggestion: map['hasSeenStorySuggestion'] as bool? ?? false,
-      hasSeenStoryCrystalBall: map['hasSeenStoryCrystalBall'] as bool? ?? false,
+      // Obsolete legacy artifact comic flags (hasSeenStoryReset, etc.) are
+      // intentionally ignored on load and pruned on subsequent cloud saves.
       lastUserMoveId: (map['lastUserMoveId'] as num?)?.toInt(),
       lastComputerMoveId: (map['lastComputerMoveId'] as num?)?.toInt(),
       markovMatrix3: _parseMatrix(map['markovMatrix3'], 3),

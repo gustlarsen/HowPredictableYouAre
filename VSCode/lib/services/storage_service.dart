@@ -3,11 +3,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/move.dart';
 
 class StorageService {
+  /// Obsolete local preference keys from the removed legacy artifact comics (#2-#9).
+  /// Pruned automatically on load so older installations migrate cleanly.
+  static const List<String> obsoleteLegacyStoryPrefsKeys = [
+    'has_seen_story_reset',
+    'has_seen_story_predictability',
+    'has_seen_story_random',
+    'has_seen_story_algorithm',
+    'has_seen_story_your_prediction',
+    'has_seen_story_pc_next_move',
+    'has_seen_story_suggestion',
+    'has_seen_story_crystal_ball',
+  ];
+
   late SharedPreferences _prefs;
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     await _migrateLegacyDiamondsIfNeeded();
+    await pruneObsoleteStoryMemories();
+  }
+
+  /// Removes obsolete legacy artifact comic persistence flags from local storage.
+  Future<void> pruneObsoleteStoryMemories() async {
+    for (final key in obsoleteLegacyStoryPrefsKeys) {
+      if (_prefs.containsKey(key)) {
+        await _prefs.remove(key);
+      }
+    }
   }
 
   /// Migrates legacy `diamonds` balance once into Elemental Orbs if the player
@@ -1024,46 +1047,6 @@ class StorageService {
   bool get hasSeenIntro => hasSeenStoryIntro;
   Future<void> setHasSeenIntro(bool val) => setHasSeenStoryIntro(val);
 
-  bool get hasSeenStoryReset =>
-      _prefs.getBool('has_seen_story_reset') ?? false;
-  Future<void> setHasSeenStoryReset(bool val) =>
-      _prefs.setBool('has_seen_story_reset', val);
-
-  bool get hasSeenStoryPredictability =>
-      _prefs.getBool('has_seen_story_predictability') ?? false;
-  Future<void> setHasSeenStoryPredictability(bool val) =>
-      _prefs.setBool('has_seen_story_predictability', val);
-
-  bool get hasSeenStoryRandom =>
-      _prefs.getBool('has_seen_story_random') ?? false;
-  Future<void> setHasSeenStoryRandom(bool val) =>
-      _prefs.setBool('has_seen_story_random', val);
-
-  bool get hasSeenStoryAlgorithm =>
-      _prefs.getBool('has_seen_story_algorithm') ?? false;
-  Future<void> setHasSeenStoryAlgorithm(bool val) =>
-      _prefs.setBool('has_seen_story_algorithm', val);
-
-  bool get hasSeenStoryYourPrediction =>
-      _prefs.getBool('has_seen_story_your_prediction') ?? false;
-  Future<void> setHasSeenStoryYourPrediction(bool val) =>
-      _prefs.setBool('has_seen_story_your_prediction', val);
-
-  bool get hasSeenStoryPcNextMove =>
-      _prefs.getBool('has_seen_story_pc_next_move') ?? false;
-  Future<void> setHasSeenStoryPcNextMove(bool val) =>
-      _prefs.setBool('has_seen_story_pc_next_move', val);
-
-  bool get hasSeenStorySuggestion =>
-      _prefs.getBool('has_seen_story_suggestion') ?? false;
-  Future<void> setHasSeenStorySuggestion(bool val) =>
-      _prefs.setBool('has_seen_story_suggestion', val);
-
-  bool get hasSeenStoryCrystalBall =>
-      _prefs.getBool('has_seen_story_crystal_ball') ?? false;
-  Future<void> setHasSeenStoryCrystalBall(bool val) =>
-      _prefs.setBool('has_seen_story_crystal_ball', val);
-
   bool hasSeenStory(String prefsKey) => _prefs.getBool(prefsKey) ?? false;
   Future<void> setHasSeenStory(String prefsKey, bool val) =>
       _prefs.setBool(prefsKey, val);
@@ -1752,17 +1735,8 @@ class StorageService {
       setOverchargedStaffLevel(0),
       setOverchargedStaffEnabled(false),
       setOverchargedStaffSelectedSpeed(1),
-      if (!preserveStoryFlags) ...[
-        setHasSeenStoryIntro(false),
-        setHasSeenStoryReset(false),
-        setHasSeenStoryPredictability(false),
-        setHasSeenStoryRandom(false),
-        setHasSeenStoryAlgorithm(false),
-        setHasSeenStoryYourPrediction(false),
-        setHasSeenStoryPcNextMove(false),
-        setHasSeenStorySuggestion(false),
-        setHasSeenStoryCrystalBall(false),
-      ],
+      if (!preserveStoryFlags) setHasSeenStoryIntro(false),
+      pruneObsoleteStoryMemories(),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
       _prefs.remove(pendingCrystalBallMoveKey),

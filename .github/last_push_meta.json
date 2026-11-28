@@ -1,5 +1,5 @@
 {
-  "summary": "- Replaced the orange robotic claw icon inside the Metal Wizard's Dominion map pin and selected realm lore card header in WorldMapWarDialog with the bespoke MetalWizardLairIcon metallic automaton head/helmet emblem while preserving the circular pin frame, border, and fixed layout dimensions.\n- Updated world_map_war_dialog_test.dart to verify MetalWizardLairIcon renders in both the Metal Wizard's Dominion pin and lore card header (with Icons.precision_manufacturing_rounded removed) and verified flutter analyze and all 475 flutter tests pass.",
+  "summary": "- Removed all 8 legacy artifact comic chapters (#2-#9) from StoryChapter, StoryMemoriesSection, GameController, StorageService, and PlayGamesService so Royal Castle Library Story Memories shows only #1 Prologue: The Metal Wizard's Plot (1 / 1) launching the 5-scene IntroStoryScreen carousel\n- Deleted all 8 obsolete cartoon comic image assets from VSCode/assets/images/story/ and removed legacy StoryDialog while keeping intro_1..intro_5 and robot_mage_cliff.webp intact\n- Pruned 220 obsolete legacy chapter localization keys across en/pt/es/de in stringsHowPredict.json and added automatic pruning/safe ignoring of obsolete local and Cloud Save memory flags on load\n- Added story_memories_cleanup_test.dart and updated existing tests; verified with flutter analyze (0 issues) and flutter test (478 passed)",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T10:12:57Z"
+  "updated_at_utc": "2026-11-28T10:50:25Z"
 }

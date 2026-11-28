@@ -3,7 +3,6 @@ import '../../controllers/game_controller.dart';
 import '../../models/story_chapter.dart';
 import '../../theme/app_theme.dart';
 import '../screens/intro_story_screen.dart';
-import 'story_dialog.dart';
 import 'world_map_war_dialog.dart';
 
 class StoryGalleryDialog extends StatelessWidget {
@@ -174,13 +173,15 @@ class StoryMemoriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = controller.localization;
-    final artifactChapters = controller.artifactStoryChapters;
-    final totalItems = 1 + artifactChapters.length;
-
-    final lockedTitle = loc.t('story_locked_title', fallback: 'Locked Chapter');
-    final lockedHint = loc.t(
-      'story_locked_hint',
-      fallback: 'Unlock this item in the Shop to reveal its story!',
+    const introChapter = StoryChapter.intro;
+    final isUnlocked = controller.isStoryChapterUnlocked(introChapter);
+    final introTitle = loc.t(
+      introChapter.titleKey,
+      fallback: introChapter.fallbackTitle,
+    );
+    final introSummary = loc.t(
+      introChapter.itemNameKey,
+      fallback: introChapter.fallbackItemName,
     );
     final replayLabel = loc.t('story_replay', fallback: 'Read Comic');
     final introBadgeLabel = loc.t(
@@ -191,79 +192,23 @@ class StoryMemoriesSection extends StatelessWidget {
     return ListView.separated(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-      itemCount: totalItems,
+      itemCount: StoryChapter.values.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        if (index == 0) {
-          const introChapter = StoryChapter.intro;
-          final introTitle = loc.t(
-            introChapter.titleKey,
-            fallback: introChapter.fallbackTitle,
-          );
-          final introSummary = loc.t(
-            introChapter.itemNameKey,
-            fallback: introChapter.fallbackItemName,
-          );
-
-          return StoryChapterCard(
-            key: ValueKey('story_gallery_item_${introChapter.id}'),
-            memoryId: introChapter.id,
-            assetPath: introChapter.assetPath,
-            icon: introChapter.icon,
-            chapterNumber: 1,
-            isUnlocked: true,
-            chapterTitle: introTitle,
-            subtitle: introSummary,
-            badgeLabel: introBadgeLabel,
-            replayLabel: replayLabel,
-            onTap: () {
-              controller.audio.playTapVibrate();
-              IntroStoryScreen.showReplay(context);
-            },
-          );
-        }
-
-        final chapter = artifactChapters[index - 1];
-        final isUnlocked = controller.isStoryChapterUnlocked(chapter);
-        final chapterTitle = loc.t(
-          chapter.titleKey,
-          fallback: chapter.fallbackTitle,
-        );
-        final itemName = loc.t(
-          chapter.itemNameKey,
-          fallback: chapter.fallbackItemName,
-        );
-
         return StoryChapterCard(
-          key: ValueKey(
-            isUnlocked
-                ? 'story_gallery_item_${chapter.id}'
-                : 'story_gallery_locked_${chapter.id}',
-          ),
-          memoryId: chapter.id,
-          assetPath: chapter.assetPath,
-          icon: chapter.icon,
-          chapterNumber: index + 1,
+          key: ValueKey('story_gallery_item_${introChapter.id}'),
+          memoryId: introChapter.id,
+          assetPath: introChapter.assetPath,
+          icon: introChapter.icon,
+          chapterNumber: 1,
           isUnlocked: isUnlocked,
-          chapterTitle: isUnlocked ? chapterTitle : lockedTitle,
-          subtitle: isUnlocked ? itemName : '$itemName • $lockedHint',
+          chapterTitle: introTitle,
+          subtitle: introSummary,
+          badgeLabel: introBadgeLabel,
           replayLabel: replayLabel,
           onTap: () {
             controller.audio.playTapVibrate();
-            if (isUnlocked) {
-              StoryDialog.show(
-                context,
-                chapter: chapter,
-                controller: controller,
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$itemName: $lockedHint'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
+            IntroStoryScreen.showReplay(context);
           },
         );
       },

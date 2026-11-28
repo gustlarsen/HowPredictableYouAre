@@ -18,7 +18,6 @@ import 'package:how_predictable/controllers/game_controller.dart';
 import 'package:how_predictable/views/dialogs/inventory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
 import 'package:how_predictable/views/dialogs/shop_dialog.dart';
-import 'package:how_predictable/views/dialogs/story_gallery_dialog.dart';
 import 'package:how_predictable/views/widgets/elemental_symbol_icon.dart';
 import 'package:how_predictable/views/widgets/hints_bar.dart';
 import 'package:how_predictable/views/widgets/markov_matrix_view.dart';
@@ -1029,7 +1028,7 @@ void main() {
     expect(find.text("Prologue: The Metal Wizard's Plot"), findsNothing);
   });
 
-  testWidgets('Unlocking an item in ShopDialog triggers its comic cutscene once and Story Gallery allows re-reading unlocked chapters', (WidgetTester tester) async {
+  testWidgets('Unlocking an item in ShopDialog completes cleanly via Altar Sacrifice and Story Memories shows only #1 Prologue (1 / 1)', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'has_seen_story_intro': true,
       'orbs_fire': 1000,
@@ -1087,7 +1086,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('altar_sacrifice_confirm_button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('altar_reveal_item_emblem')), findsOneWidget);
-    expect(storage.hasSeenStoryReset, isTrue);
+    expect(controller.unlockedReset, isTrue);
+    expect(controller.pendingStoryChapter, isNull);
 
     // Collect/Continue from the blessing modal
     await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
@@ -1125,12 +1125,14 @@ void main() {
     await tester.tap(storyMemoriesBtn);
     await tester.pumpAndSettle();
 
-    // 1 unified intro memory + Reset Button chapter are unlocked (2 / 9), while Predictability Score is still locked
-    expect(find.text('2 / 9'), findsOneWidget);
+    // Only the unified #1 Prologue memory exists (1 / 1) — all 8 legacy artifact comics are removed
+    expect(find.text('1 / 1'), findsOneWidget);
     expect(find.byKey(const ValueKey('story_gallery_item_intro')), findsOneWidget);
     expect(find.byKey(const ValueKey('story_gallery_item_intro_1')), findsNothing);
     expect(find.byKey(const ValueKey('story_gallery_badge_intro')), findsOneWidget);
     expect(find.text('5 Scenes'), findsOneWidget);
+    expect(find.byKey(const ValueKey('story_gallery_item_reset')), findsNothing);
+    expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsNothing);
 
     // Verify Story Memories layout: chapter name is above thumbnail and read button,
     // and thumbnail and read button are in the same horizontal line
@@ -1146,25 +1148,11 @@ void main() {
       equals(tester.getCenter(introReadBtnFinder).dy),
     );
 
-    final galleryScrollable = find.descendant(
-      of: find.byType(StoryMemoriesSection),
-      matching: find.byType(Scrollable),
-    );
-    final resetItemFinder = find.byKey(const ValueKey('story_gallery_item_reset'));
-    await tester.scrollUntilVisible(
-      resetItemFinder,
-      180,
-      scrollable: galleryScrollable,
-    );
+    // Tap the #1 Prologue entry to launch the 5-slide prologue carousel
+    await tester.tap(find.byKey(const ValueKey('story_gallery_item_intro')));
     await tester.pumpAndSettle();
-    expect(resetItemFinder, findsOneWidget);
-    expect(find.byKey(const ValueKey('story_gallery_locked_predictability')), findsOneWidget);
-
-    // Tap the unlocked Reset chapter in Story Gallery to replay its comic
-    await tester.tap(resetItemFinder);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('story_skip_button')), findsOneWidget);
-    expect(find.text('Panel 1 / 4'), findsOneWidget);
+    expect(find.byKey(const ValueKey('intro_skip_button')), findsOneWidget);
+    expect(find.text('1 / 5'), findsOneWidget);
   });
 
   testWidgets('ScoreHeader is completely hidden by default and when disabled, and reveals all 4 metrics with semantic RPG gauge colors when unlocked and enabled', (WidgetTester tester) async {

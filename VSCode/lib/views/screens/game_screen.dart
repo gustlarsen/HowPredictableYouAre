@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../../controllers/game_controller.dart';
 import '../../models/move.dart';
 import '../../models/sacred_blessing.dart';
-import '../../models/story_chapter.dart';
 import '../../services/ad_service.dart';
 import '../../services/audio_service.dart';
 import '../../services/localization_service.dart';
@@ -32,7 +31,6 @@ import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/temple_moral_choice_dialog.dart';
 import '../dialogs/settings_dialog.dart';
-import '../dialogs/story_dialog.dart';
 import '../dialogs/victory_cutscene_dialog.dart';
 
 class GameScreen extends StatefulWidget {
@@ -74,7 +72,6 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
-  bool _isIntroDialogScheduled = false;
   bool _hasCheckedForUpdate = false;
   bool _isInventoryDialogOpen = false;
   bool _isDeathSequenceActive = false;
@@ -541,28 +538,6 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted) return;
     if (state != AppLifecycleState.resumed) {
       _stopOverchargedHold();
-    }
-  }
-
-  void _checkIntroStory(BuildContext context, GameController controller) {
-    if (controller.pendingStoryChapter != StoryChapter.intro) {
-      _isIntroDialogScheduled = false;
-      return;
-    }
-    if (!_isIntroDialogScheduled && !controller.hasSeenStoryIntro) {
-      _isIntroDialogScheduled = true;
-      _stopOverchargedHold(notifyUi: false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final introChapter = controller.consumePendingStory(StoryChapter.intro);
-        if (introChapter != null) {
-          StoryDialog.show(
-            context,
-            chapter: introChapter,
-            controller: controller,
-          );
-        }
-      });
     }
   }
 
@@ -2293,7 +2268,6 @@ class _GameScreenState extends State<GameScreen>
     }
 
     _syncAtmosphereAnimations(controller);
-    _checkIntroStory(context, controller);
     _checkTempleSiegeIntroModal(context, controller);
     _checkDeathAlert(context, controller);
     _checkBossVictoryAlert(context, controller);

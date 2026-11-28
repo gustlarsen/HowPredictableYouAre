@@ -911,14 +911,6 @@ class GameController extends ChangeNotifier {
 
   // Story Cutscene Persistence & Pending State
   bool hasSeenStoryIntro = false;
-  bool hasSeenStoryReset = false;
-  bool hasSeenStoryPredictability = false;
-  bool hasSeenStoryRandom = false;
-  bool hasSeenStoryAlgorithm = false;
-  bool hasSeenStoryYourPrediction = false;
-  bool hasSeenStoryPcNextMove = false;
-  bool hasSeenStorySuggestion = false;
-  bool hasSeenStoryCrystalBall = false;
   StoryChapter? pendingStoryChapter;
 
   // Royal Castle Hub State
@@ -1894,14 +1886,6 @@ class GameController extends ChangeNotifier {
     }
 
     hasSeenStoryIntro = storage.hasSeenStoryIntro;
-    hasSeenStoryReset = storage.hasSeenStoryReset;
-    hasSeenStoryPredictability = storage.hasSeenStoryPredictability;
-    hasSeenStoryRandom = storage.hasSeenStoryRandom;
-    hasSeenStoryAlgorithm = storage.hasSeenStoryAlgorithm;
-    hasSeenStoryYourPrediction = storage.hasSeenStoryYourPrediction;
-    hasSeenStoryPcNextMove = storage.hasSeenStoryPcNextMove;
-    hasSeenStorySuggestion = storage.hasSeenStorySuggestion;
-    hasSeenStoryCrystalBall = storage.hasSeenStoryCrystalBall;
 
     if (!hasSeenStoryIntro && totalRounds == 0) {
       pendingStoryChapter = StoryChapter.intro;
@@ -4176,7 +4160,6 @@ class GameController extends ChangeNotifier {
       unlockByProductId(
         productId,
         recordAsIap: false,
-        triggerStory: false,
         triggerCloudSave: false,
       );
     }
@@ -4364,7 +4347,6 @@ class GameController extends ChangeNotifier {
       unlockByProductId(
         productId,
         recordAsIap: false,
-        triggerStory: false,
         triggerCloudSave: false,
       );
     }
@@ -4444,7 +4426,6 @@ class GameController extends ChangeNotifier {
       unlockByProductId(
         productId,
         recordAsIap: false,
-        triggerStory: false,
         triggerCloudSave: false,
       );
     }
@@ -4496,10 +4477,6 @@ class GameController extends ChangeNotifier {
   }
 
   bool get hasSeenIntro => hasSeenStoryIntro;
-
-  List<StoryChapter> get artifactStoryChapters => StoryChapter.values
-      .where((c) => c != StoryChapter.intro)
-      .toList(growable: false);
 
   int get totalStoryMemoriesCount => StoryChapter.values.length;
 
@@ -4578,22 +4555,6 @@ class GameController extends ChangeNotifier {
     switch (chapter) {
       case StoryChapter.intro:
         return hasSeenStoryIntro;
-      case StoryChapter.resetButton:
-        return hasSeenStoryReset;
-      case StoryChapter.predictabilityScore:
-        return hasSeenStoryPredictability;
-      case StoryChapter.randomButton:
-        return hasSeenStoryRandom;
-      case StoryChapter.showAlgorithm:
-        return hasSeenStoryAlgorithm;
-      case StoryChapter.yourPrediction:
-        return hasSeenStoryYourPrediction;
-      case StoryChapter.pcNextMove:
-        return hasSeenStoryPcNextMove;
-      case StoryChapter.suggestion:
-        return hasSeenStorySuggestion;
-      case StoryChapter.crystalBall:
-        return hasSeenStoryCrystalBall;
     }
   }
 
@@ -4601,22 +4562,6 @@ class GameController extends ChangeNotifier {
     switch (chapter) {
       case StoryChapter.intro:
         return true;
-      case StoryChapter.resetButton:
-        return unlockedReset || hasSeenStoryReset;
-      case StoryChapter.predictabilityScore:
-        return unlockedPredictability || hasSeenStoryPredictability;
-      case StoryChapter.randomButton:
-        return unlockedRandom || hasSeenStoryRandom;
-      case StoryChapter.showAlgorithm:
-        return unlockedAlgorithm || hasSeenStoryAlgorithm;
-      case StoryChapter.yourPrediction:
-        return unlockedYourPrediction || hasSeenStoryYourPrediction;
-      case StoryChapter.pcNextMove:
-        return unlockedNextMove || hasSeenStoryPcNextMove;
-      case StoryChapter.suggestion:
-        return unlockedSuggestion || hasSeenStorySuggestion;
-      case StoryChapter.crystalBall:
-        return unlockedCrystalBall || hasSeenStoryCrystalBall;
     }
   }
 
@@ -4626,38 +4571,6 @@ class GameController extends ChangeNotifier {
         hasSeenStoryIntro = true;
         storage.setHasSeenStoryIntro(true);
         _triggerCloudSave();
-        break;
-      case StoryChapter.resetButton:
-        hasSeenStoryReset = true;
-        storage.setHasSeenStoryReset(true);
-        break;
-      case StoryChapter.predictabilityScore:
-        hasSeenStoryPredictability = true;
-        storage.setHasSeenStoryPredictability(true);
-        break;
-      case StoryChapter.randomButton:
-        hasSeenStoryRandom = true;
-        storage.setHasSeenStoryRandom(true);
-        break;
-      case StoryChapter.showAlgorithm:
-        hasSeenStoryAlgorithm = true;
-        storage.setHasSeenStoryAlgorithm(true);
-        break;
-      case StoryChapter.yourPrediction:
-        hasSeenStoryYourPrediction = true;
-        storage.setHasSeenStoryYourPrediction(true);
-        break;
-      case StoryChapter.pcNextMove:
-        hasSeenStoryPcNextMove = true;
-        storage.setHasSeenStoryPcNextMove(true);
-        break;
-      case StoryChapter.suggestion:
-        hasSeenStorySuggestion = true;
-        storage.setHasSeenStorySuggestion(true);
-        break;
-      case StoryChapter.crystalBall:
-        hasSeenStoryCrystalBall = true;
-        storage.setHasSeenStoryCrystalBall(true);
         break;
     }
     if (pendingStoryChapter == chapter) {
@@ -4672,15 +4585,6 @@ class GameController extends ChangeNotifier {
     final chapter = pendingStoryChapter!;
     markStorySeen(chapter);
     return chapter;
-  }
-
-  void _triggerStoryOnFirstUnlock(StoryChapter chapter) {
-    if (!hasSeenStory(chapter)) {
-      markStorySeen(chapter);
-      pendingStoryChapter = chapter;
-    } else {
-      pendingStoryChapter = null;
-    }
   }
 
   void _applyMaxHpLevelGain() {
@@ -5720,7 +5624,6 @@ class GameController extends ChangeNotifier {
         showReset = false;
         storage.setUnlockedReset(true);
         storage.setShowReset(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
       },
     );
   }
@@ -5733,7 +5636,6 @@ class GameController extends ChangeNotifier {
         showPredictability = false;
         storage.setUnlockedPredictability(true);
         storage.setShowPredictability(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
       },
     );
   }
@@ -5746,7 +5648,6 @@ class GameController extends ChangeNotifier {
         showRandom = false;
         storage.setUnlockedRandom(true);
         storage.setShowRandom(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
       },
     );
   }
@@ -5759,7 +5660,6 @@ class GameController extends ChangeNotifier {
         showAlgorithm = false;
         storage.setUnlockedAlgorithm(true);
         storage.setShowAlgorithm(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
       },
     );
   }
@@ -5785,7 +5685,6 @@ class GameController extends ChangeNotifier {
         showYourPrediction = false;
         storage.setUnlockedYourPrediction(true);
         storage.setShowYourPrediction(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
       },
     );
   }
@@ -5798,7 +5697,6 @@ class GameController extends ChangeNotifier {
         showNextMove = false;
         storage.setUnlockedNextMove(true);
         storage.setShowNextMove(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
       },
     );
   }
@@ -5811,7 +5709,6 @@ class GameController extends ChangeNotifier {
         showSuggestion = false;
         storage.setUnlockedSuggestion(true);
         storage.setShowSuggestion(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
       },
     );
   }
@@ -5918,7 +5815,6 @@ class GameController extends ChangeNotifier {
         showCrystalBall = false;
         storage.setUnlockedCrystalBall(true);
         storage.setShowCrystalBall(false);
-        _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
       },
     );
   }
@@ -5965,7 +5861,6 @@ class GameController extends ChangeNotifier {
   bool unlockByProductId(
     String productId, {
     bool recordAsIap = true,
-    bool triggerStory = true,
     bool triggerCloudSave = true,
   }) {
     switch (productId) {
@@ -5976,9 +5871,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedReset = true;
         storage.setUnlockedReset(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.resetButton);
-        }
         break;
       case BillingService.productPredictabilityScore:
         if (!unlockedPredictability) {
@@ -5987,9 +5879,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedPredictability = true;
         storage.setUnlockedPredictability(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.predictabilityScore);
-        }
         break;
       case BillingService.productRandomButton:
         if (!unlockedRandom) {
@@ -5998,9 +5887,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedRandom = true;
         storage.setUnlockedRandom(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.randomButton);
-        }
         break;
       case BillingService.productShowAlgorithm:
         if (!unlockedAlgorithm) {
@@ -6009,9 +5895,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedAlgorithm = true;
         storage.setUnlockedAlgorithm(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.showAlgorithm);
-        }
         break;
       case BillingService.productNewHands:
         if (!unlockedNewHands) {
@@ -6029,9 +5912,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedYourPrediction = true;
         storage.setUnlockedYourPrediction(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.yourPrediction);
-        }
         break;
       case BillingService.productPcNextMove:
         if (!unlockedNextMove) {
@@ -6040,9 +5920,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedNextMove = true;
         storage.setUnlockedNextMove(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.pcNextMove);
-        }
         break;
       case BillingService.productSuggestion:
         if (!unlockedSuggestion) {
@@ -6051,9 +5928,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedSuggestion = true;
         storage.setUnlockedSuggestion(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.suggestion);
-        }
         break;
       case BillingService.productRemoveAds:
         final wasPreviouslyOwned = unlockedAds || storage.unlockedAds;
@@ -6072,9 +5946,6 @@ class GameController extends ChangeNotifier {
         }
         unlockedCrystalBall = true;
         storage.setUnlockedCrystalBall(true);
-        if (triggerStory) {
-          _triggerStoryOnFirstUnlock(StoryChapter.crystalBall);
-        }
         break;
       case BillingService.productConsumableSmall:
         addAllOrbs(allElementPackSmallBonus);

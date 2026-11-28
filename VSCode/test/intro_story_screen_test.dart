@@ -147,12 +147,26 @@ void main() {
         expect(IntroStoryCardData.cards[i - 1].assetPath, 'assets/images/story/intro_$i.jpeg');
       }
 
-      expect(
-        File('assets/images/story/intro_comic.jpeg').existsSync(),
-        isFalse,
-        reason: 'Obsolete intro_comic.jpeg should be deleted',
-      );
+      const removedLegacyComics = [
+        'assets/images/story/intro_comic.jpeg',
+        'assets/images/story/reset_button_comic.jpeg',
+        'assets/images/story/predictability_score_comic.jpeg',
+        'assets/images/story/random_button_comic.jpeg',
+        'assets/images/story/show_algorithm_comic.jpeg',
+        'assets/images/story/your_prediction_comic.jpeg',
+        'assets/images/story/pc_next_move_comic.jpeg',
+        'assets/images/story/suggestion_comic.jpeg',
+        'assets/images/story/crystal_ball_comic.jpeg',
+      ];
+      for (final legacyPath in removedLegacyComics) {
+        expect(
+          File(legacyPath).existsSync(),
+          isFalse,
+          reason: 'Obsolete legacy comic $legacyPath should be deleted',
+        );
+      }
 
+      expect(StoryChapter.values, const [StoryChapter.intro]);
       expect(StoryChapter.intro.assetPath, 'assets/images/story/intro_3.jpeg');
     });
 
@@ -644,8 +658,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('castle_wing_library')), findsOneWidget);
 
-        // Verify 1 / 9 Story Memories unlocked (unified #1 Intro card)
-        expect(find.text('1 / 9'), findsOneWidget);
+        // Verify 1 / 1 Story Memories unlocked (only unified #1 Prologue card)
+        expect(find.text('1 / 1'), findsOneWidget);
+        expect(find.text('1 / 9'), findsNothing);
+        expect(find.text('9 / 9'), findsNothing);
 
         final replayIntroBtn = find.byKey(
           const ValueKey('library_replay_intro_button'),
@@ -691,9 +707,9 @@ void main() {
           );
         }
 
-        // Remaining 8 artifact chapters are numbered #2..#9
+        // All 8 legacy artifact chapters (#2..#9) are permanently removed
         for (int n = 2; n <= 9; n++) {
-          expect(find.text('#$n'), findsOneWidget);
+          expect(find.text('#$n'), findsNothing);
         }
         expect(find.text('#10'), findsNothing);
 

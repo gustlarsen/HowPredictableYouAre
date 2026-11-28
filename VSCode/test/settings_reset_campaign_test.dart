@@ -339,12 +339,14 @@ void main() {
 
         // 5. Global account data preserved
         expect(controller.hasSeenStoryIntro, isTrue);
-        expect(controller.hasSeenStoryReset, isTrue);
-        expect(controller.hasSeenStoryAlgorithm, isTrue);
+        expect(storage.hasSeenStory('has_seen_story_reset'), isFalse);
+        expect(storage.hasSeenStory('has_seen_story_algorithm'), isFalse);
         expect(
-          controller.isStoryChapterUnlocked(StoryChapter.resetButton),
+          controller.isStoryChapterUnlocked(StoryChapter.intro),
           isTrue,
         );
+        expect(controller.totalStoryMemoriesCount, 1);
+        expect(controller.unlockedStoryMemoriesCount, 1);
         expect(
           controller.isEndingUnlocked(NarrativeEnding.triumphantStrategist),
           isTrue,
@@ -397,7 +399,7 @@ void main() {
         expect(cloud.peakManaUpgradeLevel, 2);
         expect(cloud.hallOfHeroesClaimAvailable, isTrue);
         expect(cloud.hasSeenStoryIntro, isTrue);
-        expect(cloud.hasSeenStoryReset, isTrue);
+        expect(playGamesClient.savedPayload, isNot(contains('hasSeenStoryReset')));
         expect(cloud.unlockedAds, isTrue);
       },
     );

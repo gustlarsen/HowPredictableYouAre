@@ -330,9 +330,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               duration: const Duration(seconds: 2),
             ),
           );
-        if (!isConsumable) {
-          controller.consumePendingStory();
-        }
         break;
       case BillingEventType.restored:
         _restoredDuringCurrentRequest = true;
@@ -400,7 +397,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     final loc = controller.localization;
     if (success) {
       controller.audio.playWinVibrate();
-      controller.consumePendingStory();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$title: Unlocked!'),
@@ -458,7 +454,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         final ok = onConfirmUnlock();
         if (ok) {
           controller.audio.playWinVibrate();
-          controller.consumePendingStory();
         } else {
           controller.audio.playVibrate();
         }
