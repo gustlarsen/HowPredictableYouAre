@@ -1019,6 +1019,24 @@ class StorageService {
     return _prefs.setInt('last_computer_move', move.id);
   }
 
+  static const String pendingCrystalBallMoveKey = 'pending_crystal_ball_move';
+
+  HandMove? get pendingCrystalBallMove {
+    final id = _prefs.getInt(pendingCrystalBallMoveKey);
+    if (id == null) return null;
+    for (final move in HandMove.values) {
+      if (move.id == id) return move;
+    }
+    return null;
+  }
+
+  Future<void> setPendingCrystalBallMove(HandMove? move) {
+    if (move == null) {
+      return _prefs.remove(pendingCrystalBallMoveKey);
+    }
+    return _prefs.setInt(pendingCrystalBallMoveKey, move.id);
+  }
+
   // Markov Matrix Persistence
   List<List<int>>? getMarkovMatrix(int size) {
     final str = _prefs.getString('markov_matrix_$size');
@@ -1548,6 +1566,7 @@ class StorageService {
       setPcHp(pcMaxHp),
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
+      _prefs.remove(pendingCrystalBallMoveKey),
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
       removeShortTermTransitions(),
@@ -1663,6 +1682,7 @@ class StorageService {
       ],
       _prefs.remove('last_user_move'),
       _prefs.remove('last_computer_move'),
+      _prefs.remove(pendingCrystalBallMoveKey),
       _prefs.remove('markov_matrix_3'),
       _prefs.remove('markov_matrix_5'),
       removeShortTermTransitions(),

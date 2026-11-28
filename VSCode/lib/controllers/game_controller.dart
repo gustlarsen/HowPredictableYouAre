@@ -945,6 +945,7 @@ class GameController extends ChangeNotifier {
   Duration? pendingOfflineOffertoryDuration;
   bool _offlineOffertoryDismissedThisSession = false;
   bool _hasEvaluatedInitialOfflineReturn = false;
+  bool _hasLoadedState = false;
   bool _isAppBackgrounded = false;
 
   /// Legacy alias for [offertoryRateLevel] kept for backward compatibility.
@@ -1499,7 +1500,50 @@ class GameController extends ChangeNotifier {
 
   int get bossWinDamageToPlayer => damagePerLoss;
 
-  void _loadState({bool restartAudio = true}) {
+  static bool _matricesEqual(List<List<int>>? a, List<List<int>> b) {
+    if (a == null || a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      final rowA = a[i];
+      final rowB = b[i];
+      if (rowA.length != rowB.length) return false;
+      for (int j = 0; j < rowA.length; j++) {
+        if (rowA[j] != rowB[j]) return false;
+      }
+    }
+    return true;
+  }
+
+  static bool _transitionMapsEqual(
+    Map<HandMove, HandMove>? a,
+    Map<HandMove, HandMove> b,
+  ) {
+    if (a == null || a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  void _loadState({
+    bool restartAudio = true,
+    bool preservePendingCrystalBall = true,
+  }) {
+    final bool hadLoadedState = _hasLoadedState;
+    final int prevEnemyStage = enemyStage;
+    final int prevTotalRounds = totalRounds;
+    final HandMove? prevLastUserMove = lastUserMove;
+    final bool prevShowNewHands = showNewHands;
+    final bool prevIsElementalMode = isElementalMode;
+    final List<List<int>>? prevMatrix = hadLoadedState
+        ? _engine.matrix
+              .map((row) => List<int>.from(row))
+              .toList(growable: false)
+        : null;
+    final Map<HandMove, HandMove>? prevShortTerm = hadLoadedState
+        ? Map<HandMove, HandMove>.from(_engine.lastTransitionFrom)
+        : null;
+    final HandMove? prevCrystalBallMove = _crystalBallMove;
+
     _syncOrbsFromStorage();
     if (storage.hasTurn0OrbSnapshot) {
       _syncTurn0OrbsFromStorage();
@@ -1735,7 +1779,30 @@ class GameController extends ChangeNotifier {
     }
     lastUserMove = currentUserMove;
 
-    _computeNextHints();
+    HandMove? preservedCrystalBallCandidate;
+    if (preservePendingCrystalBall) {
+      final persistedMove = storage.pendingCrystalBallMove;
+      if (!hadLoadedState) {
+        preservedCrystalBallCandidate = persistedMove;
+      } else if (persistedMove != null) {
+        final bool battleUnchanged =
+            prevEnemyStage == enemyStage &&
+            prevTotalRounds == totalRounds &&
+            prevLastUserMove == lastUserMove &&
+            prevShowNewHands == showNewHands &&
+            prevIsElementalMode == isElementalMode &&
+            _matricesEqual(prevMatrix, _engine.matrix) &&
+            _transitionMapsEqual(prevShortTerm, _engine.lastTransitionFrom);
+        if (battleUnchanged) {
+          preservedCrystalBallCandidate = prevCrystalBallMove ?? persistedMove;
+        }
+      }
+    }
+    _hasLoadedState = true;
+
+    _computeNextHints(
+      preserveCrystalBallCandidate: preservedCrystalBallCandidate,
+    );
 
     treasuryFireOrbs = storage.treasuryFireOrbs;
     treasuryWaterOrbs = storage.treasuryWaterOrbs;
@@ -2604,7 +2671,7 @@ class GameController extends ChangeNotifier {
       _resetBattleState();
     } else {
       _engine.enableElementalMode = isElementalMode;
-      _computeNextHints();
+      _computeNextHints(preserveCrystalBallCandidate: _crystalBallMove);
     }
 
     relicChamberStoredUpgrades = [];
@@ -3276,13 +3343,19 @@ class GameController extends ChangeNotifier {
     return List.unmodifiable(counters);
   }
 
-  void _computeNextHints() {
+  void _computeNextHints({HandMove? preserveCrystalBallCandidate}) {
     _syncEngineEnemyPool();
 
     if (enemyStage == 5) {
       // Stage 5 Temple High Master: pure uniform random (1/5 per element).
-      crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
+      final canPreserve =
+          preserveCrystalBallCandidate != null &&
+          bossAllowedMoves.contains(preserveCrystalBallCandidate);
+      _crystalBallMove = canPreserve
+          ? preserveCrystalBallCandidate
+          : _chooseComputerMoveForCurrentPhase(lastUserMove);
       crystalBallSecondaryMove = null;
+      storage.setPendingCrystalBallMove(_crystalBallMove);
       predictedUserMoves = const [];
       pcNextMoves = const [];
       suggestedMoves = const [];
@@ -3297,6 +3370,7 @@ class GameController extends ChangeNotifier {
       final dualSpells = currentBabyMageDualSpells;
       _crystalBallMove = dualSpells.first;
       crystalBallSecondaryMove = dualSpells.last;
+      storage.setPendingCrystalBallMove(null);
       predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
       pcNextMoves = List.unmodifiable(dualSpells);
       suggestedMoves = optimalCountersForDualSpells(
@@ -3311,13 +3385,12 @@ class GameController extends ChangeNotifier {
       return;
     }
 
-    _crystalBallMove = _chooseComputerMoveForCurrentPhase(lastUserMove);
-    crystalBallSecondaryMove = null;
-
     if (enemyStage == 3) {
       // Stage 3 Metal Wizard: exact upcoming move from MetalWizardAiState.
       final upcomingMove = _metalWizardAiState.currentMove;
       _crystalBallMove = upcomingMove;
+      crystalBallSecondaryMove = null;
+      storage.setPendingCrystalBallMove(null);
       predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
       pcNextMoves = [upcomingMove];
       suggestedMoves = _computeMetalWizardCounters(upcomingMove);
@@ -3328,29 +3401,67 @@ class GameController extends ChangeNotifier {
       return;
     }
 
-    if (enemyStage == 2 && isMarkovRecalibratorActive) {
-      predictedUserMoves =
-          _engine.predictShortTermNextUserMoves(lastUserMove);
-      pcNextMoves = _engine.computeShortTermSmartChoices(lastUserMove);
+    if (enemyStage == 2) {
+      // Stage 2 Robot Archmage: 1-step short-term memory counter if available.
+      final shortTermChoices = _engine.computeShortTermSmartChoices(
+        lastUserMove,
+      );
+      final validPool = shortTermChoices.isNotEmpty
+          ? shortTermChoices
+          : bossAllowedMoves;
+      final canPreserve =
+          preserveCrystalBallCandidate != null &&
+          bossAllowedMoves.contains(preserveCrystalBallCandidate) &&
+          validPool.contains(preserveCrystalBallCandidate);
+      _crystalBallMove = canPreserve
+          ? preserveCrystalBallCandidate
+          : _chooseComputerMoveForCurrentPhase(lastUserMove);
+      crystalBallSecondaryMove = null;
+      storage.setPendingCrystalBallMove(_crystalBallMove);
+
+      if (isMarkovRecalibratorActive) {
+        predictedUserMoves = _engine.predictShortTermNextUserMoves(
+          lastUserMove,
+        );
+        pcNextMoves = shortTermChoices;
+        suggestedMoves = _engine.computeSuggestions(pcNextMoves);
+        predictedUserMove =
+            predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
+        pcNextMove = crystalBallMove;
+        suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
+        return;
+      }
+
+      // Deceptive un-recalibrated cumulative frequency view during Stage 2.
+      predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
+      pcNextMoves = _engine.computeSmartChoices(lastUserMove);
       suggestedMoves = _engine.computeSuggestions(pcNextMoves);
       predictedUserMove =
           predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-      pcNextMove = crystalBallMove;
+      pcNextMove = pcNextMoves.isNotEmpty ? pcNextMoves.first : null;
       suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
       return;
     }
 
-    // Standard cumulative frequency hints (used for Stage 1 AND as the
-    // deceptive un-recalibrated view during Stage 2 Robot Archmage).
+    // Stage 1 Guardian Robot: standard cumulative frequency hints.
     predictedUserMoves = _engine.predictNextUserMoves(lastUserMove);
     pcNextMoves = _engine.computeSmartChoices(lastUserMove);
     suggestedMoves = _engine.computeSuggestions(pcNextMoves);
 
+    final validPool = pcNextMoves.isNotEmpty ? pcNextMoves : bossAllowedMoves;
+    final canPreserve =
+        preserveCrystalBallCandidate != null &&
+        bossAllowedMoves.contains(preserveCrystalBallCandidate) &&
+        validPool.contains(preserveCrystalBallCandidate);
+    _crystalBallMove = canPreserve
+        ? preserveCrystalBallCandidate
+        : _chooseComputerMoveForCurrentPhase(lastUserMove);
+    crystalBallSecondaryMove = null;
+    storage.setPendingCrystalBallMove(_crystalBallMove);
+
     predictedUserMove =
         predictedUserMoves.isNotEmpty ? predictedUserMoves.first : null;
-    pcNextMove = (enemyStage == 2)
-        ? (pcNextMoves.isNotEmpty ? pcNextMoves.first : null)
-        : crystalBallMove;
+    pcNextMove = crystalBallMove;
     suggestedMove = suggestedMoves.isNotEmpty ? suggestedMoves.first : null;
   }
 
@@ -3868,7 +3979,7 @@ class GameController extends ChangeNotifier {
     pendingBossVictoryPhase = null;
     pendingBossVictoryWeek = null;
 
-    _loadState(restartAudio: false);
+    _loadState(restartAudio: false, preservePendingCrystalBall: false);
 
     for (final productId in verifiedPaidIds) {
       unlockByProductId(
@@ -4056,7 +4167,7 @@ class GameController extends ChangeNotifier {
     pendingBossVictoryPhase = null;
     pendingBossVictoryWeek = null;
 
-    _loadState(restartAudio: false);
+    _loadState(restartAudio: false, preservePendingCrystalBall: false);
 
     for (final productId in verifiedPaidIds) {
       unlockByProductId(
@@ -4136,7 +4247,7 @@ class GameController extends ChangeNotifier {
     pendingOfflineOffertoryDuration = null;
     _offlineOffertoryDismissedThisSession = false;
 
-    _loadState(restartAudio: false);
+    _loadState(restartAudio: false, preservePendingCrystalBall: false);
 
     for (final productId in verifiedPaidIds) {
       unlockByProductId(
@@ -5632,7 +5743,7 @@ class GameController extends ChangeNotifier {
         showMarkovRecalibrator = true;
         storage.setUnlockedMarkovRecalibrator(true);
         storage.setShowMarkovRecalibrator(true);
-        _computeNextHints();
+        _computeNextHints(preserveCrystalBallCandidate: _crystalBallMove);
       },
     );
   }
@@ -6044,7 +6155,7 @@ class GameController extends ChangeNotifier {
     }
     showMarkovRecalibrator = val;
     storage.setShowMarkovRecalibrator(val);
-    _computeNextHints();
+    _computeNextHints(preserveCrystalBallCandidate: _crystalBallMove);
     _triggerCloudSave();
     notifyListeners();
   }
@@ -6140,7 +6251,7 @@ class GameController extends ChangeNotifier {
             );
     }
 
-    _computeNextHints();
+    _computeNextHints(preserveCrystalBallCandidate: _crystalBallMove);
     _triggerCloudSave();
     notifyListeners();
   }
