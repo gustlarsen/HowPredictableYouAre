@@ -1,5 +1,5 @@
 {
-  "summary": "- Buffed Sacred Blessings: Vitality (+50 temp HP), Clairvoyance (first 10 enemy moves), and Harvest (5x Elemental Orbs on defeat)\n- Added Blessing of Mana (+100 temp Mana for the next battle) with separate temporary battle mana tracking and cleanup on battle end\n- Added cohesive CustomPainter RPG icons for all 4 Sacred Blessings (including BlessingOfManaIcon) in temple_wing_icons.dart\n- Enabled activating any combination or all 4 Sacred Blessings simultaneously with updated Remove Ads Perk banner, stacked battle HUD pills, storage/cloud sync support, 4-language localizations (en/pt/es/de), and updated tests",
+  "summary": "- Replaced the orange robotic claw icon inside the Metal Wizard's Dominion map pin and selected realm lore card header in WorldMapWarDialog with the bespoke MetalWizardLairIcon metallic automaton head/helmet emblem while preserving the circular pin frame, border, and fixed layout dimensions.\n- Updated world_map_war_dialog_test.dart to verify MetalWizardLairIcon renders in both the Metal Wizard's Dominion pin and lore card header (with Icons.precision_manufacturing_rounded removed) and verified flutter analyze and all 475 flutter tests pass.",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T10:00:22Z"
+  "updated_at_utc": "2026-11-28T10:12:57Z"
 }

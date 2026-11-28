@@ -11,6 +11,7 @@ import 'package:how_predictable/services/localization_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/observatory_dialog.dart';
 import 'package:how_predictable/views/dialogs/world_map_war_dialog.dart';
+import 'package:how_predictable/views/widgets/metal_wizard_lair_icon.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -534,14 +535,58 @@ void main() {
           expect(pinTextRect.left, greaterThanOrEqualTo(mapRect.left));
           expect(pinTextRect.right, lessThanOrEqualTo(mapRect.right));
 
-          // Tap each pin and verify lore card header name + status badge sit on separate rows without ellipsis
-          await tester.tap(
-            find.descendant(
-              of: pinFinder,
-              matching: find.byIcon(region.icon),
-            ),
-          );
+          // Tap each pin and verify its emblem icon, lore card icon, and single-line header layout
+          final pinIconFinder = region == WorldRealmRegion.metalWizardDominion
+              ? find.descendant(
+                  of: pinFinder,
+                  matching: find.byType(MetalWizardLairIcon),
+                )
+              : find.descendant(
+                  of: pinFinder,
+                  matching: find.byIcon(region.icon),
+                );
+          expect(pinIconFinder, findsOneWidget);
+          if (region == WorldRealmRegion.metalWizardDominion) {
+            expect(
+              find.descendant(
+                of: pinFinder,
+                matching: find.byIcon(Icons.precision_manufacturing_rounded),
+              ),
+              findsNothing,
+            );
+          }
+
+          await tester.tap(pinIconFinder);
           await tester.pumpAndSettle();
+
+          final loreIconBadgeFinder = find.byKey(
+            const ValueKey('world_map_selected_realm_icon_badge'),
+          );
+          expect(loreIconBadgeFinder, findsOneWidget);
+          if (region == WorldRealmRegion.metalWizardDominion) {
+            expect(
+              find.descendant(
+                of: loreIconBadgeFinder,
+                matching: find.byType(MetalWizardLairIcon),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: loreIconBadgeFinder,
+                matching: find.byIcon(Icons.precision_manufacturing_rounded),
+              ),
+              findsNothing,
+            );
+          } else {
+            expect(
+              find.descendant(
+                of: loreIconBadgeFinder,
+                matching: find.byIcon(region.icon),
+              ),
+              findsOneWidget,
+            );
+          }
 
           expect(
             tester.getSize(

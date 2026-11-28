@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/game_controller.dart';
 import '../../services/localization_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/metal_wizard_lair_icon.dart';
 import '../widgets/watch_tower_icon.dart';
 
 /// Represents the war status of a continental realm at a specific campaign week.
@@ -782,9 +783,11 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
               width: badgeDiameter,
               height: badgeDiameter,
               child: AnimatedContainer(
+                key: ValueKey('world_map_pin_badge_${region.id}'),
                 duration: const Duration(milliseconds: 180),
                 width: badgeDiameter,
                 height: badgeDiameter,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFF14161D).withValues(alpha: 0.90),
@@ -803,9 +806,10 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                     ),
                   ],
                 ),
-                child: Icon(
-                  region.icon,
-                  size: isSelected ? 17 : 14.5,
+                child: _buildRegionIcon(
+                  region: region,
+                  iconSize: isSelected ? 17 : 14.5,
+                  customIconSize: isSelected ? 20.0 : 17.5,
                   color: isSelected ? const Color(0xFFF5C22B) : accent,
                 ),
               ),
@@ -845,6 +849,22 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
     );
   }
 
+  Widget _buildRegionIcon({
+    required WorldRealmRegion region,
+    required double iconSize,
+    required double customIconSize,
+    required Color color,
+  }) {
+    if (region == WorldRealmRegion.metalWizardDominion) {
+      return MetalWizardLairIcon(size: customIconSize);
+    }
+    return Icon(
+      region.icon,
+      size: iconSize,
+      color: color,
+    );
+  }
+
   Widget _buildSelectedRealmCard({
     required BuildContext context,
     required WorldRealmRegion region,
@@ -880,7 +900,10 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(5),
+                  key: const ValueKey('world_map_selected_realm_icon_badge'),
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(9),
@@ -888,9 +911,10 @@ class _WorldMapWarDialogState extends State<WorldMapWarDialog>
                       color: statusColor.withValues(alpha: 0.55),
                     ),
                   ),
-                  child: Icon(
-                    region.icon,
-                    size: 16,
+                  child: _buildRegionIcon(
+                    region: region,
+                    iconSize: 16,
+                    customIconSize: 19,
                     color: statusColor,
                   ),
                 ),
