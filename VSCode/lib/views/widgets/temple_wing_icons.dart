@@ -4495,4 +4495,965 @@ class _BlessingOfManaPainter extends CustomPainter {
   bool shouldRepaint(_BlessingOfManaPainter oldDelegate) => false;
 }
 
+// =============================================================================
+// WING 4 (ADORATION) — ALL-ELEMENT ORB BUNDLE TIER ICONS
+// =============================================================================
+
+/// Dispatcher rendering the bespoke escalating RPG [CustomPainter] icon for
+/// each [ConsumableOrbBundle] tier in the Sacred Temple Adoration wing.
+class ConsumableOrbBundleIcon extends StatelessWidget {
+  final ConsumableOrbBundle bundle;
+  final double size;
+
+  const ConsumableOrbBundleIcon({
+    super.key,
+    required this.bundle,
+    this.size = 28.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    switch (bundle) {
+      case ConsumableOrbBundle.small:
+        return BlessingPouchIcon(size: size);
+      case ConsumableOrbBundle.medium:
+        return SacredReliquaryIcon(size: size);
+      case ConsumableOrbBundle.large:
+        return DivineAbundanceIcon(size: size);
+    }
+  }
+}
+
+/// Tier 1 — `Blessing Pouch` (+500 of all 5 Elemental Orbs):
+/// Plump sacred royal-velvet & gold-trimmed offering pouch cinched with a
+/// golden cord, embroidered cross emblem, soft fabric folds, and 3 glowing
+/// elemental orbs peeking from the gathered top opening.
+class BlessingPouchIcon extends StatelessWidget {
+  final double size;
+
+  const BlessingPouchIcon({super.key, this.size = 28.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _BlessingPouchPainter(),
+    );
+  }
+}
+
+class _BlessingPouchPainter extends CustomPainter {
+  const _BlessingPouchPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.24);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.88);
+    final foldPaint = Paint()
+      ..color = const Color(0xFF2D0B45).withValues(alpha: 0.65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.65, 0.85 * scale)
+      ..strokeCap = StrokeCap.round;
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Back gathered velvet collar behind the peeking orbs
+    final backCollar = Path()
+      ..moveTo(s * 0.25, s * 0.28)
+      ..quadraticBezierTo(s * 0.37, s * 0.21, s * 0.50, s * 0.23)
+      ..quadraticBezierTo(s * 0.63, s * 0.21, s * 0.75, s * 0.28)
+      ..lineTo(s * 0.67, s * 0.40)
+      ..lineTo(s * 0.33, s * 0.40)
+      ..close();
+    canvas.drawPath(
+      backCollar,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF4A148C), Color(0xFF2D0B45)],
+        ).createShader(Rect.fromLTRB(s * 0.25, s * 0.21, s * 0.75, s * 0.40)),
+    );
+    canvas.drawPath(backCollar, thinOutline);
+
+    // 2. Three glowing elemental orbs peeking from the top opening
+    void drawMiniOrb(
+      Offset center,
+      double radius,
+      Color glowColor,
+      List<Color> colors,
+    ) {
+      canvas.drawCircle(
+        center,
+        radius * 1.45,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              glowColor.withValues(alpha: 0.45),
+              glowColor.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromCircle(center: center, radius: radius * 1.45),
+          ),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            center: const Alignment(-0.32, -0.32),
+            colors: colors,
+            stops: const [0.0, 0.52, 1.0],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+      canvas.drawCircle(
+        center + Offset(-radius * 0.30, -radius * 0.30),
+        radius * 0.24,
+        Paint()..color = Colors.white.withValues(alpha: 0.90),
+      );
+      canvas.drawCircle(center, radius, thinOutline);
+    }
+
+    // Fire (left), Wood (right), and Water (center-top)
+    drawMiniOrb(
+      Offset(s * 0.335, s * 0.235),
+      s * 0.105,
+      const Color(0xFFFF5252),
+      const [Color(0xFFFFCDD2), Color(0xFFFF5252), Color(0xFFB71C1C)],
+    );
+    drawMiniOrb(
+      Offset(s * 0.665, s * 0.235),
+      s * 0.105,
+      const Color(0xFF69F0AE),
+      const [Color(0xFFB9F6CA), Color(0xFF69F0AE), Color(0xFF1B5E20)],
+    );
+    drawMiniOrb(
+      Offset(s * 0.50, s * 0.185),
+      s * 0.116,
+      const Color(0xFF40C4FF),
+      const [Color(0xFFE1F5FE), Color(0xFF40C4FF), Color(0xFF01579B)],
+    );
+
+    // 3. Plump royal-velvet pouch body (y: 0.34..0.92)
+    final pouchBody = Path()
+      ..moveTo(s * 0.34, s * 0.36)
+      ..lineTo(s * 0.66, s * 0.36)
+      ..cubicTo(s * 0.72, s * 0.45, s * 0.85, s * 0.56, s * 0.84, s * 0.72)
+      ..cubicTo(s * 0.83, s * 0.87, s * 0.69, s * 0.925, s * 0.50, s * 0.925)
+      ..cubicTo(s * 0.31, s * 0.925, s * 0.17, s * 0.87, s * 0.16, s * 0.72)
+      ..cubicTo(s * 0.15, s * 0.56, s * 0.28, s * 0.45, s * 0.34, s * 0.36)
+      ..close();
+    canvas.drawPath(
+      pouchBody,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFAB47BC),
+            Color(0xFF8E24AA),
+            Color(0xFF6A1B9A),
+            Color(0xFF431166),
+          ],
+          stops: [0.0, 0.32, 0.68, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.16, s * 0.36, s * 0.84, s * 0.925)),
+    );
+
+    // Front gathered collar lip overlapping base of the orbs
+    final frontCollar = Path()
+      ..moveTo(s * 0.27, s * 0.315)
+      ..quadraticBezierTo(s * 0.38, s * 0.285, s * 0.50, s * 0.31)
+      ..quadraticBezierTo(s * 0.62, s * 0.285, s * 0.73, s * 0.315)
+      ..lineTo(s * 0.67, s * 0.38)
+      ..lineTo(s * 0.33, s * 0.38)
+      ..close();
+    canvas.drawPath(
+      frontCollar,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFBA68C8), Color(0xFF8E24AA), Color(0xFF5A1682)],
+        ).createShader(Rect.fromLTRB(s * 0.27, s * 0.285, s * 0.73, s * 0.38)),
+    );
+    canvas.drawPath(frontCollar, thinOutline);
+
+    // Subtle golden embroidered trim edge along front collar crest
+    final collarTrim = Path()
+      ..moveTo(s * 0.28, s * 0.315)
+      ..quadraticBezierTo(s * 0.38, s * 0.288, s * 0.50, s * 0.312)
+      ..quadraticBezierTo(s * 0.62, s * 0.288, s * 0.72, s * 0.315);
+    canvas.drawPath(
+      collarTrim,
+      Paint()
+        ..color = const Color(0xFFFFD54F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.75, 1.05 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Soft vertical velvet fabric folds & specular left sheen
+    final leftSheen = Path()
+      ..moveTo(s * 0.27, s * 0.53)
+      ..cubicTo(s * 0.22, s * 0.64, s * 0.22, s * 0.75, s * 0.28, s * 0.83)
+      ..cubicTo(s * 0.26, s * 0.74, s * 0.26, s * 0.63, s * 0.31, s * 0.54)
+      ..close();
+    canvas.drawPath(
+      leftSheen,
+      Paint()..color = const Color(0xFFE1BEE7).withValues(alpha: 0.32),
+    );
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.40, s * 0.43)
+        ..quadraticBezierTo(s * 0.33, s * 0.58, s * 0.32, s * 0.76),
+      foldPaint,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.60, s * 0.43)
+        ..quadraticBezierTo(s * 0.67, s * 0.58, s * 0.68, s * 0.76),
+      foldPaint,
+    );
+
+    // Gold base trim arc near bottom edge
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.24, s * 0.825)
+        ..quadraticBezierTo(s * 0.50, s * 0.905, s * 0.76, s * 0.825),
+      Paint()
+        ..color = const Color(0xFFFFB300).withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.85, 1.15 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+
+    canvas.drawPath(pouchBody, outline);
+
+    // 4. Golden embroidered sacred cross emblem on the front belly
+    final crossEmblem = Path()
+      ..moveTo(s * 0.50, s * 0.525)
+      ..lineTo(s * 0.54, s * 0.605)
+      ..lineTo(s * 0.625, s * 0.645)
+      ..lineTo(s * 0.54, s * 0.685)
+      ..lineTo(s * 0.50, s * 0.775)
+      ..lineTo(s * 0.46, s * 0.685)
+      ..lineTo(s * 0.375, s * 0.645)
+      ..lineTo(s * 0.46, s * 0.605)
+      ..close();
+    canvas.drawPath(
+      crossEmblem,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFD54F), Color(0xFFC88A00)],
+        ).createShader(Rect.fromLTRB(s * 0.375, s * 0.525, s * 0.625, s * 0.775)),
+    );
+    canvas.drawPath(crossEmblem, thinOutline);
+
+    // 5. Golden cord tied at the neck with hanging knotted tassels
+    final leftTail = Path()
+      ..moveTo(s * 0.47, s * 0.40)
+      ..quadraticBezierTo(s * 0.41, s * 0.46, s * 0.39, s * 0.51)
+      ..lineTo(s * 0.435, s * 0.52)
+      ..quadraticBezierTo(s * 0.46, s * 0.46, s * 0.50, s * 0.41)
+      ..close();
+    final rightTail = Path()
+      ..moveTo(s * 0.53, s * 0.40)
+      ..quadraticBezierTo(s * 0.59, s * 0.46, s * 0.61, s * 0.51)
+      ..lineTo(s * 0.565, s * 0.52)
+      ..quadraticBezierTo(s * 0.54, s * 0.46, s * 0.50, s * 0.41)
+      ..close();
+    for (final tail in [leftTail, rightTail]) {
+      canvas.drawPath(
+        tail,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFD54F), Color(0xFFFFB300), Color(0xFFB27800)],
+          ).createShader(Rect.fromLTRB(s * 0.38, s * 0.40, s * 0.62, s * 0.52)),
+      );
+      canvas.drawPath(tail, thinOutline);
+    }
+
+    final cordBand = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.315, s * 0.352, s * 0.685, s * 0.418),
+      Radius.circular(s * 0.032),
+    );
+    canvas.drawRRect(
+      cordBand,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFD54F), Color(0xFFFFB300)],
+        ).createShader(cordBand.outerRect),
+    );
+    canvas.drawRRect(cordBand, outline);
+
+    // Center drawstring knot
+    final knotRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(s * 0.50, s * 0.39),
+        width: s * 0.11,
+        height: s * 0.085,
+      ),
+      Radius.circular(s * 0.03),
+    );
+    canvas.drawRRect(
+      knotRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFC88A00)],
+        ).createShader(knotRect.outerRect),
+    );
+    canvas.drawRRect(knotRect, thinOutline);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BlessingPouchPainter oldDelegate) => false;
+}
+
+/// Tier 2 — `Sacred Reliquary` (+2,500 of all 5 Elemental Orbs):
+/// Ornate golden & ivory-marble sacred reliquary chest with sculpted gold bands,
+/// a slightly ajar domed lid emitting a warm golden-cyan inner light beam, and
+/// a central diamond-shaped cyan crystal clasp.
+class SacredReliquaryIcon extends StatelessWidget {
+  final double size;
+
+  const SacredReliquaryIcon({super.key, this.size = 28.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _SacredReliquaryPainter(),
+    );
+  }
+}
+
+class _SacredReliquaryPainter extends CustomPainter {
+  const _SacredReliquaryPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.22);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.85);
+    final detail = _detailPaint(scale, alpha: 0.55, baseWidth: 0.72);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Warm golden-cyan inner light beam radiating out from the ajar lid
+    canvas.drawCircle(
+      Offset(s * 0.50, s * 0.36),
+      s * 0.42,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFF59D).withValues(alpha: 0.55),
+            const Color(0xFF80DEEA).withValues(alpha: 0.32),
+            const Color(0xFF80DEEA).withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.48, 1.0],
+        ).createShader(
+          Rect.fromCircle(center: Offset(s * 0.50, s * 0.36), radius: s * 0.42),
+        ),
+    );
+
+    final lightBeam = Path()
+      ..moveTo(s * 0.16, s * 0.49)
+      ..lineTo(s * 0.08, s * 0.12)
+      ..lineTo(s * 0.92, s * 0.12)
+      ..lineTo(s * 0.84, s * 0.49)
+      ..close();
+    canvas.drawPath(
+      lightBeam,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            const Color(0xFFFFF59D).withValues(alpha: 0.82),
+            const Color(0xFF80DEEA).withValues(alpha: 0.36),
+            const Color(0xFF80DEEA).withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.52, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.08, s * 0.12, s * 0.92, s * 0.49)),
+    );
+
+    // 2. Glowing ajar interior cavity slit between lid and chest base
+    final cavity = Path()
+      ..moveTo(s * 0.13, s * 0.41)
+      ..lineTo(s * 0.87, s * 0.44)
+      ..lineTo(s * 0.87, s * 0.515)
+      ..lineTo(s * 0.13, s * 0.515)
+      ..close();
+    canvas.drawPath(
+      cavity,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFF59D), Color(0xFF80DEEA)],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.41, s * 0.87, s * 0.515)),
+    );
+    canvas.drawPath(cavity, thinOutline);
+
+    // 3. Lower chest body with ivory-marble side panels & sculpted gold bands
+    final lowerBody = Path()
+      ..moveTo(s * 0.13, s * 0.505)
+      ..lineTo(s * 0.87, s * 0.505)
+      ..lineTo(s * 0.84, s * 0.85)
+      ..lineTo(s * 0.16, s * 0.85)
+      ..close();
+    canvas.drawPath(
+      lowerBody,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFAF6EE), Color(0xFFEFE8DF), Color(0xFFD7CCC8)],
+          stops: [0.0, 0.55, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.505, s * 0.87, s * 0.85)),
+    );
+
+    // Subtle recessed marble panel lines
+    canvas.drawLine(Offset(s * 0.21, s * 0.57), Offset(s * 0.22, s * 0.79), detail);
+    canvas.drawLine(Offset(s * 0.79, s * 0.57), Offset(s * 0.78, s * 0.79), detail);
+
+    // Left & right vertical sculpted gold bands + edge trim
+    for (final xRange in [
+      (s * 0.13, s * 0.195),
+      (s * 0.295, s * 0.375),
+      (s * 0.625, s * 0.705),
+      (s * 0.805, s * 0.87),
+    ]) {
+      final band = Rect.fromLTRB(xRange.$1, s * 0.505, xRange.$2, s * 0.85);
+      canvas.drawRect(
+        band,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFC88A00)],
+            stops: [0.0, 0.45, 1.0],
+          ).createShader(band),
+      );
+      canvas.drawRect(band, thinOutline);
+    }
+    canvas.drawPath(lowerBody, outline);
+
+    // Sculpted gold top rim & stepped plinth foot of chest base
+    final lowerRim = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.105, s * 0.48, s * 0.895, s * 0.545),
+      Radius.circular(s * 0.025),
+    );
+    canvas.drawRRect(
+      lowerRim,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(lowerRim.outerRect),
+    );
+    canvas.drawRRect(lowerRim, outline);
+
+    final plinth = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.12, s * 0.84, s * 0.88, s * 0.905),
+      Radius.circular(s * 0.028),
+    );
+    canvas.drawRRect(
+      plinth,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(plinth.outerRect),
+    );
+    canvas.drawRRect(plinth, outline);
+
+    // 4. Slightly ajar domed lid (tilted gently up on the left to reveal glow)
+    canvas.save();
+    canvas.translate(s * 0.85, s * 0.425);
+    canvas.rotate(-0.085);
+    canvas.translate(-s * 0.85, -s * 0.425);
+
+    final domePath = Path()
+      ..moveTo(s * 0.13, s * 0.37)
+      ..cubicTo(s * 0.14, s * 0.155, s * 0.32, s * 0.115, s * 0.50, s * 0.115)
+      ..cubicTo(s * 0.68, s * 0.115, s * 0.86, s * 0.155, s * 0.87, s * 0.37)
+      ..close();
+    canvas.drawPath(
+      domePath,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFAF6EE), Color(0xFFEFE8DF), Color(0xFFD7CCC8)],
+        ).createShader(Rect.fromLTRB(s * 0.13, s * 0.115, s * 0.87, s * 0.37)),
+    );
+
+    // Sculpted gold bands arching across the domed lid
+    for (final bx in [
+      (s * 0.295, s * 0.375),
+      (s * 0.625, s * 0.705),
+    ]) {
+      final lidBand = Path()
+        ..moveTo(bx.$1, s * 0.37)
+        ..quadraticBezierTo(bx.$1 + s * 0.01, s * 0.15, bx.$1 + s * 0.02, s * 0.12)
+        ..lineTo(bx.$2 - s * 0.01, s * 0.12)
+        ..quadraticBezierTo(bx.$2 - s * 0.005, s * 0.15, bx.$2, s * 0.37)
+        ..close();
+      canvas.save();
+      canvas.clipPath(domePath);
+      canvas.drawPath(
+        lidBand,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFC88A00)],
+          ).createShader(Rect.fromLTRB(bx.$1, s * 0.115, bx.$2, s * 0.37)),
+      );
+      canvas.drawPath(lidBand, thinOutline);
+      canvas.restore();
+    }
+    canvas.drawPath(domePath, outline);
+
+    // Sculpted gold lid base rim
+    final lidRim = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.10, s * 0.355, s * 0.90, s * 0.42),
+      Radius.circular(s * 0.028),
+    );
+    canvas.drawRRect(
+      lidRim,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(lidRim.outerRect),
+    );
+    canvas.drawRRect(lidRim, outline);
+
+    // Crown crest stud on dome apex
+    final apexStud = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(s * 0.50, s * 0.12),
+        width: s * 0.14,
+        height: s * 0.065,
+      ),
+      Radius.circular(s * 0.03),
+    );
+    canvas.drawRRect(
+      apexStud,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(apexStud.outerRect),
+    );
+    canvas.drawRRect(apexStud, thinOutline);
+
+    canvas.restore();
+
+    // 5. Central diamond-shaped cyan crystal clasp mounted on a gold bezel
+    final claspC = Offset(s * 0.50, s * 0.575);
+    final outerDiamond = Path()
+      ..moveTo(claspC.dx, claspC.dy - s * 0.125)
+      ..lineTo(claspC.dx + s * 0.115, claspC.dy)
+      ..lineTo(claspC.dx, claspC.dy + s * 0.125)
+      ..lineTo(claspC.dx - s * 0.115, claspC.dy)
+      ..close();
+    canvas.drawPath(
+      outerDiamond,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(Rect.fromCircle(center: claspC, radius: s * 0.125)),
+    );
+    canvas.drawPath(outerDiamond, outline);
+
+    final innerCrystal = Path()
+      ..moveTo(claspC.dx, claspC.dy - s * 0.082)
+      ..lineTo(claspC.dx + s * 0.075, claspC.dy)
+      ..lineTo(claspC.dx, claspC.dy + s * 0.082)
+      ..lineTo(claspC.dx - s * 0.075, claspC.dy)
+      ..close();
+    canvas.drawPath(
+      innerCrystal,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE0F7FA), Color(0xFF00E5FF), Color(0xFF00838F)],
+        ).createShader(Rect.fromCircle(center: claspC, radius: s * 0.082)),
+    );
+    canvas.drawPath(innerCrystal, thinOutline);
+
+    // Crisp specular gleam on cyan crystal clasp
+    canvas.drawCircle(
+      claspC + Offset(-s * 0.022, -s * 0.022),
+      s * 0.022,
+      Paint()..color = Colors.white.withValues(alpha: 0.92),
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SacredReliquaryPainter oldDelegate) => false;
+}
+
+/// Tier 3 — `Divine Abundance` (+10,000 of all 5 Elemental Orbs):
+/// Radiant celestial golden chalice / overflowing grail of abundance framed by
+/// a soft golden-white sunburst halo, fluted golden cup, luminous golden
+/// overflow, and a miniature arc of all 5 glowing elemental orbs (Fire, Water,
+/// Wood, Earth, Metal).
+class DivineAbundanceIcon extends StatelessWidget {
+  final double size;
+
+  const DivineAbundanceIcon({super.key, this.size = 28.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _DivineAbundancePainter(),
+    );
+  }
+}
+
+class _DivineAbundancePainter extends CustomPainter {
+  const _DivineAbundancePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.20);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.82);
+    final flutePaint = Paint()
+      ..color = const Color(0xFF8C5A00).withValues(alpha: 0.72)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.65, 0.85 * scale)
+      ..strokeCap = StrokeCap.round;
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    final haloCenter = Offset(s * 0.50, s * 0.34);
+
+    // 1. Soft golden-white sunburst halo behind the bowl & 5-orb arc
+    canvas.drawCircle(
+      haloCenter,
+      s * 0.44,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFF8E1).withValues(alpha: 0.88),
+            const Color(0xFFFFE082).withValues(alpha: 0.52),
+            const Color(0xFFFFE082).withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.52, 1.0],
+        ).createShader(Rect.fromCircle(center: haloCenter, radius: s * 0.44)),
+    );
+
+    // Sunburst rays radiating behind the chalice bowl
+    const rayCount = 9;
+    for (int i = 0; i < rayCount; i++) {
+      final angle = -math.pi * 0.94 + (i / (rayCount - 1)) * (math.pi * 0.88);
+      final outerR = i.isEven ? s * 0.45 : s * 0.38;
+      final rayPath = Path()
+        ..moveTo(haloCenter.dx, haloCenter.dy)
+        ..lineTo(
+          haloCenter.dx + math.cos(angle - 0.07) * outerR,
+          haloCenter.dy + math.sin(angle - 0.07) * outerR,
+        )
+        ..lineTo(
+          haloCenter.dx + math.cos(angle + 0.07) * outerR,
+          haloCenter.dy + math.sin(angle + 0.07) * outerR,
+        )
+        ..close();
+      canvas.drawPath(
+        rayPath,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              const Color(0xFFFFF8E1).withValues(alpha: 0.92),
+              const Color(0xFFFFE082).withValues(alpha: 0.35),
+              const Color(0xFFFFE082).withValues(alpha: 0.0),
+            ],
+          ).createShader(Rect.fromCircle(center: haloCenter, radius: outerR)),
+      );
+    }
+
+    // 2. Ornate twin golden scroll handles flanking the cup (y: 0.36..0.54)
+    for (final isLeft in [true, false]) {
+      final sign = isLeft ? -1.0 : 1.0;
+      double px(double dx) => s * (0.50 + sign * dx);
+      final handle = Path()
+        ..moveTo(px(0.24), s * 0.365)
+        ..cubicTo(px(0.41), s * 0.345, px(0.42), s * 0.515, px(0.22), s * 0.525)
+        ..lineTo(px(0.20), s * 0.485)
+        ..cubicTo(px(0.34), s * 0.475, px(0.34), s * 0.395, px(0.24), s * 0.405)
+        ..close();
+      canvas.drawPath(
+        handle,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+          ).createShader(Rect.fromLTRB(s * 0.08, s * 0.35, s * 0.92, s * 0.53)),
+      );
+      canvas.drawPath(handle, thinOutline);
+    }
+
+    // 3. Tiered royal golden pedestal base & sculpted stem (y: 0.61..0.93)
+    final footSlope = Path()
+      ..moveTo(s * 0.42, s * 0.75)
+      ..lineTo(s * 0.58, s * 0.75)
+      ..lineTo(s * 0.72, s * 0.87)
+      ..lineTo(s * 0.28, s * 0.87)
+      ..close();
+    canvas.drawPath(
+      footSlope,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(Rect.fromLTRB(s * 0.28, s * 0.75, s * 0.72, s * 0.87)),
+    );
+    canvas.drawPath(footSlope, outline);
+
+    final footPlinth = RRect.fromRectAndRadius(
+      Rect.fromLTRB(s * 0.23, s * 0.86, s * 0.77, s * 0.925),
+      Radius.circular(s * 0.028),
+    );
+    canvas.drawRRect(
+      footPlinth,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(footPlinth.outerRect),
+    );
+    canvas.drawRRect(footPlinth, outline);
+
+    final stemRect = Rect.fromLTRB(s * 0.435, s * 0.60, s * 0.565, s * 0.77);
+    canvas.drawRect(
+      stemRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFFFF59D), Color(0xFFFFB300), Color(0xFFC88A00)],
+        ).createShader(stemRect),
+    );
+    canvas.drawRect(stemRect, outline);
+
+    final stemNode = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(s * 0.50, s * 0.695),
+        width: s * 0.25,
+        height: s * 0.085,
+      ),
+      Radius.circular(s * 0.04),
+    );
+    canvas.drawRRect(
+      stemNode,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFC88A00)],
+        ).createShader(stemNode.outerRect),
+    );
+    canvas.drawRRect(stemNode, outline);
+
+    // 4. Ornate fluted golden chalice cup (y: 0.33..0.625)
+    final cupBody = Path()
+      ..moveTo(s * 0.21, s * 0.335)
+      ..lineTo(s * 0.79, s * 0.335)
+      ..cubicTo(s * 0.78, s * 0.525, s * 0.65, s * 0.625, s * 0.50, s * 0.625)
+      ..cubicTo(s * 0.35, s * 0.625, s * 0.22, s * 0.525, s * 0.21, s * 0.335)
+      ..close();
+    canvas.drawPath(
+      cupBody,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFF59D),
+            Color(0xFFFFD54F),
+            Color(0xFFFFB300),
+            Color(0xFFC88A00),
+          ],
+          stops: [0.0, 0.28, 0.66, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.21, s * 0.335, s * 0.79, s * 0.625)),
+    );
+
+    // Fluted vertical chalice ribs & bright left specular highlight
+    final leftCupGlint = Path()
+      ..moveTo(s * 0.26, s * 0.38)
+      ..cubicTo(s * 0.27, s * 0.48, s * 0.33, s * 0.55, s * 0.40, s * 0.58)
+      ..cubicTo(s * 0.35, s * 0.53, s * 0.31, s * 0.46, s * 0.305, s * 0.38)
+      ..close();
+    canvas.drawPath(
+      leftCupGlint,
+      Paint()..color = Colors.white.withValues(alpha: 0.72),
+    );
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.355, s * 0.38)
+        ..quadraticBezierTo(s * 0.365, s * 0.495, s * 0.42, s * 0.575),
+      flutePaint,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.50, s * 0.38)
+        ..lineTo(s * 0.50, s * 0.60),
+      flutePaint,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(s * 0.645, s * 0.38)
+        ..quadraticBezierTo(s * 0.635, s * 0.495, s * 0.58, s * 0.575),
+      flutePaint,
+    );
+    canvas.drawPath(cupBody, outline);
+
+    // Elliptical sculpted rim collar
+    final cupRim = Rect.fromLTRB(s * 0.19, s * 0.295, s * 0.81, s * 0.38);
+    canvas.drawOval(
+      cupRim,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFC88A00)],
+        ).createShader(cupRim),
+    );
+    canvas.drawOval(cupRim, outline);
+
+    // 5. Overflowing luminous golden light inside & spilling over the rim
+    final overflowLight = Path()
+      ..moveTo(s * 0.24, s * 0.335)
+      ..quadraticBezierTo(s * 0.36, s * 0.245, s * 0.50, s * 0.24)
+      ..quadraticBezierTo(s * 0.64, s * 0.245, s * 0.76, s * 0.335)
+      ..quadraticBezierTo(s * 0.50, s * 0.368, s * 0.24, s * 0.335)
+      ..close();
+    canvas.drawPath(
+      overflowLight,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(0.0, -0.2),
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFF59D), Color(0xFFFFD54F)],
+        ).createShader(Rect.fromLTRB(s * 0.24, s * 0.24, s * 0.76, s * 0.368)),
+    );
+
+    // 6. Miniature arc of all 5 glowing elemental orbs (Fire, Water, Wood, Earth, Metal)
+    void drawArcOrb(
+      Offset center,
+      double radius,
+      Color glowColor,
+      List<Color> gradientColors,
+    ) {
+      canvas.drawCircle(
+        center,
+        radius * 1.4,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              glowColor.withValues(alpha: 0.48),
+              glowColor.withValues(alpha: 0.0),
+            ],
+          ).createShader(
+            Rect.fromCircle(center: center, radius: radius * 1.4),
+          ),
+      );
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            center: const Alignment(-0.32, -0.32),
+            colors: gradientColors,
+            stops: const [0.0, 0.54, 1.0],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+      canvas.drawCircle(
+        center + Offset(-radius * 0.30, -radius * 0.30),
+        radius * 0.25,
+        Paint()..color = Colors.white.withValues(alpha: 0.92),
+      );
+      canvas.drawCircle(center, radius, thinOutline);
+    }
+
+    // Outer pair first, inner pair next, center apex last for clean 3D depth
+    drawArcOrb(
+      Offset(s * 0.22, s * 0.265),
+      s * 0.080,
+      const Color(0xFFFF5252), // Fire (Red)
+      const [Color(0xFFFFCDD2), Color(0xFFFF5252), Color(0xFFB71C1C)],
+    );
+    drawArcOrb(
+      Offset(s * 0.78, s * 0.265),
+      s * 0.080,
+      const Color(0xFF80D8FF), // Metal (Silver-Cyan)
+      const [Color(0xFFFFFFFF), Color(0xFFB0BEC5), Color(0xFF455A64)],
+    );
+    drawArcOrb(
+      Offset(s * 0.35, s * 0.185),
+      s * 0.082,
+      const Color(0xFF00B0FF), // Water (Blue)
+      const [Color(0xFFE1F5FE), Color(0xFF00B0FF), Color(0xFF01579B)],
+    );
+    drawArcOrb(
+      Offset(s * 0.65, s * 0.185),
+      s * 0.082,
+      const Color(0xFFD9822B), // Earth (Amber-Brown)
+      const [Color(0xFFFFE0B2), Color(0xFFC47A38), Color(0xFF593214)],
+    );
+    drawArcOrb(
+      Offset(s * 0.50, s * 0.145),
+      s * 0.086,
+      const Color(0xFF00E676), // Wood (Green)
+      const [Color(0xFFB9F6CA), Color(0xFF00E676), Color(0xFF1B5E20)],
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_DivineAbundancePainter oldDelegate) => false;
+}
+
+
 

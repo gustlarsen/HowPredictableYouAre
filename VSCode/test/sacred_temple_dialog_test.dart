@@ -1198,6 +1198,14 @@ void main() {
           const BlessingOfManaIcon(size: 22),
           for (final blessing in SacredBlessing.values)
             SacredBlessingBadgeIcon(blessing: blessing, size: 18),
+          const BlessingPouchIcon(size: 24),
+          const BlessingPouchIcon(size: 28),
+          const SacredReliquaryIcon(size: 24),
+          const SacredReliquaryIcon(size: 28),
+          const DivineAbundanceIcon(size: 24),
+          const DivineAbundanceIcon(size: 30),
+          for (final bundle in ConsumableOrbBundle.values)
+            ConsumableOrbBundleIcon(bundle: bundle, size: 28),
           const VowOfSilenceIcon(size: 28, isActive: true),
           const VowOfSilenceIcon(size: 28, isActive: false),
           const VowOfSilenceIcon(size: 28, isActive: true, isOnGoldBackground: true),
@@ -1388,6 +1396,61 @@ void main() {
           expectTempleTabStyling(adorationTab, active: true);
           expect(find.byType(ReliquaryBundleIcon), findsOneWidget);
           expect(find.byType(ElementalCrystalIcon), findsOneWidget);
+
+          final smallCard = find.byKey(
+            const ValueKey('adoration_bundle_${BillingService.productConsumableSmall}'),
+          );
+          final mediumCard = find.byKey(
+            const ValueKey('adoration_bundle_${BillingService.productConsumableMedium}'),
+          );
+          final largeCard = find.byKey(
+            const ValueKey('adoration_bundle_${BillingService.productConsumableLarge}'),
+          );
+          expect(
+            find.descendant(of: smallCard, matching: find.byType(BlessingPouchIcon)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: mediumCard, matching: find.byType(SacredReliquaryIcon)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: largeCard, matching: find.byType(DivineAbundanceIcon)),
+            findsOneWidget,
+          );
+          expect(
+            tester.getSize(find.byType(BlessingPouchIcon)),
+            equals(const Size(28.0, 28.0)),
+          );
+          expect(
+            tester.getSize(find.byType(SacredReliquaryIcon)),
+            equals(const Size(28.0, 28.0)),
+          );
+          expect(
+            tester.getSize(find.byType(DivineAbundanceIcon)),
+            equals(const Size(28.0, 28.0)),
+          );
+          expect(
+            find.descendant(
+              of: smallCard,
+              matching: find.byIcon(Icons.card_giftcard_rounded),
+            ),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: mediumCard,
+              matching: find.byIcon(Icons.inventory_2_rounded),
+            ),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: largeCard,
+              matching: find.byIcon(Icons.auto_awesome_rounded),
+            ),
+            findsNothing,
+          );
 
           // Wing 5 (Prayer)
           await tester.tap(prayerTab);

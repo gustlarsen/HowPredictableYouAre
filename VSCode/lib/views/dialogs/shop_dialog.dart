@@ -3650,7 +3650,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             _ConsumableBundleTile(
               cardKey: ValueKey('adoration_bundle_${bundle.productId}'),
               buttonKey: ValueKey('real_money_unlock_${bundle.productId}'),
-              icon: bundle.icon,
+              iconWidget: ConsumableOrbBundleIcon(bundle: bundle, size: 28),
               title: loc.t(bundle.titleKey, fallback: bundle.fallbackTitle),
               subtitle: loc.t(bundle.descKey, fallback: bundle.fallbackDesc),
               amountPerElement: bundle.amountPerElement,
@@ -8240,7 +8240,8 @@ class _InfiniteStatUpgradeTile extends StatelessWidget {
 class _ConsumableBundleTile extends StatelessWidget {
   final Key cardKey;
   final Key buttonKey;
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String title;
   final String subtitle;
   final int amountPerElement;
@@ -8255,7 +8256,8 @@ class _ConsumableBundleTile extends StatelessWidget {
   const _ConsumableBundleTile({
     required this.cardKey,
     required this.buttonKey,
-    required this.icon,
+    this.icon,
+    this.iconWidget,
     required this.title,
     required this.subtitle,
     required this.amountPerElement,
@@ -8291,26 +8293,46 @@ class _ConsumableBundleTile extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (iconWidget != null) ...[
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _ShopDialogState._goldFill.withValues(
+                  alpha: palette.isDark ? 0.14 : 0.20,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.40 : 0.50,
+                  ),
+                ),
+              ),
+              child: iconWidget,
+            ),
+            const SizedBox(width: 10),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    if (singleMove != null)
+                    if (singleMove != null) ...[
                       ElementalEnergySphere(
                         size: 17,
                         primaryColor: singleMove!.elementalPrimaryColor,
                         secondaryColor: singleMove!.elementalSecondaryColor,
                         isDark: palette.isDark,
-                      )
-                    else
+                      ),
+                      const SizedBox(width: 6),
+                    ] else if (iconWidget == null && icon != null) ...[
                       Icon(
                         icon,
                         size: 17,
                         color: palette.amberIcon,
                       ),
-                    const SizedBox(width: 6),
+                      const SizedBox(width: 6),
+                    ],
                     Expanded(
                       child: Text(
                         title,

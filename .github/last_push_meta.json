@@ -1,5 +1,5 @@
 {
-  "summary": "- Refactored Sacred Temple ShopDialog._buildOrbSummaryBar into a centered 3-top (Fire, Water, Wood) and 2-bottom (Earth, Metal) pyramid layout\n- Rendered only the centered 3-orb primary row without empty vertical gap when Earth & Metal are not yet unlocked\n- Added and updated widget tests in sacred_temple_dialog_test.dart and shop_3d_orbs_test.dart verifying 3+2 symmetry and locked 3-orb layout",
+  "summary": "- Added BlessingPouchIcon, SacredReliquaryIcon, DivineAbundanceIcon, and ConsumableOrbBundleIcon CustomPainter widgets in temple_wing_icons.dart\n- Replaced flat Material icons on All-Element Orb Bundles cards in SacredTempleDialog Adoration wing with bespoke 28px RPG CustomPainter badges\n- Added Dark/Light mode and standalone widget tests in sacred_temple_dialog_test.dart",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T11:43:08Z"
+  "updated_at_utc": "2026-11-28T12:18:29Z"
 }
