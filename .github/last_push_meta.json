@@ -1,5 +1,5 @@
 {
-  "summary": "- Added BlessingPouchIcon, SacredReliquaryIcon, DivineAbundanceIcon, and ConsumableOrbBundleIcon CustomPainter widgets in temple_wing_icons.dart\n- Replaced flat Material icons on All-Element Orb Bundles cards in SacredTempleDialog Adoration wing with bespoke 28px RPG CustomPainter badges\n- Added Dark/Light mode and standalone widget tests in sacred_temple_dialog_test.dart",
+  "summary": "- Hide the 'Looking for Remove Ads? Visit the Prayer Room →' helper banner in SacredTempleDialog's Offerings tab when Remove Ads (Vow of Silence) is owned and enabled (isRemoveAdsOwned && isRemoveAdsEnabled)\n- Keep the Offerings helper banner visible with its Prayer Room tap action when Remove Ads is unowned or paused (owned and toggled OFF)\n- Add widget tests in sacred_temple_dialog_test.dart covering unowned, paused, active, and live-toggled states and verify flutter analyze and flutter test pass",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T12:18:29Z"
+  "updated_at_utc": "2026-11-28T12:27:26Z"
 }

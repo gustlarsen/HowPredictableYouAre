@@ -3013,51 +3013,52 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               );
             },
           ),
-        Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 4),
-          child: InkWell(
-            key: const ValueKey('offerings_remove_ads_prayer_hint'),
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => _selectWing(TempleWing.prayer),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: palette.rewardedAdCardSurface.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: palette.amberBorder.withValues(
-                    alpha: palette.isDark ? 0.30 : 0.45,
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  RemoveAdsIcon(
-                    size: 20,
-                    isActive: controller.isRemoveAdsActive,
-                  ),
-                  const SizedBox(width: 7),
-                  Flexible(
-                    child: Text(
-                      loc.t(
-                        'temple_offerings_vow_hint',
-                        fallback:
-                            'Looking for Remove Ads? Visit the Prayer Room →',
-                      ),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: palette.amberText,
-                      ),
+        if (!(controller.isRemoveAdsOwned && controller.isRemoveAdsEnabled))
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
+            child: InkWell(
+              key: const ValueKey('offerings_remove_ads_prayer_hint'),
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _selectWing(TempleWing.prayer),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: palette.rewardedAdCardSurface.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: palette.amberBorder.withValues(
+                      alpha: palette.isDark ? 0.30 : 0.45,
                     ),
                   ),
-                ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    RemoveAdsIcon(
+                      size: 20,
+                      isActive: controller.isRemoveAdsActive,
+                    ),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: Text(
+                        loc.t(
+                          'temple_offerings_vow_hint',
+                          fallback:
+                              'Looking for Remove Ads? Visit the Prayer Room →',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: palette.amberText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

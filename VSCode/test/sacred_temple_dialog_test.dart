@@ -1662,6 +1662,173 @@ void main() {
     );
 
     testWidgets(
+      'Offerings "Looking for Remove Ads?" banner hides when Vow of Silence is owned and enabled, and shows when unowned or paused',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final hintFinder = find.byKey(
+          const ValueKey('offerings_remove_ads_prayer_hint'),
+        );
+        const hintText = 'Looking for Remove Ads? Visit the Prayer Room →';
+
+        Future<void> scrollOfferingsToBottom() async {
+          final scrollable = find.descendant(
+            of: find.byKey(const ValueKey('temple_wing_offerings')),
+            matching: find.byType(Scrollable),
+          );
+          if (scrollable.evaluate().isNotEmpty) {
+            await tester.drag(scrollable.first, const Offset(0, -2500));
+            await tester.pumpAndSettle();
+          }
+        }
+
+        // 1. Not owned -> banner is visible in Offerings and taps through to Prayer
+        final unownedHarness = await _createTempleHarness(
+          prefs: {'unlockedAds': false},
+        );
+        final unownedCtrl = unownedHarness.controller;
+        addTearDown(() {
+          unownedCtrl.dispose();
+          unownedHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: unownedCtrl,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: const ValueKey('offerings_hint_unowned'),
+                  controller: unownedCtrl,
+                  initialWing: TempleWing.offerings,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(unownedCtrl.isRemoveAdsOwned, isFalse);
+        expect(unownedCtrl.isRemoveAdsEnabled, isFalse);
+
+        await scrollOfferingsToBottom();
+        expect(hintFinder, findsOneWidget);
+        expect(find.text(hintText), findsOneWidget);
+
+        // 2. Owned and toggled OFF (paused) -> banner remains visible and switches to Prayer on tap
+        final pausedHarness = await _createTempleHarness(
+          prefs: {
+            'unlockedAds': true,
+            'removeAdsEnabled': false,
+          },
+        );
+        final pausedCtrl = pausedHarness.controller;
+        addTearDown(() {
+          pausedCtrl.dispose();
+          pausedHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: pausedCtrl,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: const ValueKey('offerings_hint_paused'),
+                  controller: pausedCtrl,
+                  initialWing: TempleWing.offerings,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(pausedCtrl.isRemoveAdsOwned, isTrue);
+        expect(pausedCtrl.isRemoveAdsEnabled, isFalse);
+
+        await scrollOfferingsToBottom();
+        expect(hintFinder, findsOneWidget);
+        expect(find.text(hintText), findsOneWidget);
+
+        await tester.tap(hintFinder);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('temple_wing_prayer')),
+          findsOneWidget,
+        );
+
+        // 3. Owned and enabled -> banner is completely hidden in Offerings
+        final activeHarness = await _createTempleHarness(
+          prefs: {
+            'unlockedAds': true,
+            'removeAdsEnabled': true,
+          },
+        );
+        final activeCtrl = activeHarness.controller;
+        addTearDown(() {
+          activeCtrl.dispose();
+          activeHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: activeCtrl,
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: const ValueKey('offerings_hint_active'),
+                  controller: activeCtrl,
+                  initialWing: TempleWing.offerings,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(activeCtrl.isRemoveAdsOwned, isTrue);
+        expect(activeCtrl.isRemoveAdsEnabled, isTrue);
+
+        await scrollOfferingsToBottom();
+        expect(hintFinder, findsNothing);
+        expect(find.text(hintText), findsNothing);
+
+        // 4. Live toggle in Prayer updates Offerings banner visibility immediately
+        await tester.tap(find.byKey(const ValueKey('temple_tab_prayer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('vow_of_silence_switch')));
+        await tester.pumpAndSettle();
+        expect(activeCtrl.isRemoveAdsOwned, isTrue);
+        expect(activeCtrl.isRemoveAdsEnabled, isFalse);
+
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+        await tester.pumpAndSettle();
+        await scrollOfferingsToBottom();
+        expect(hintFinder, findsOneWidget);
+        expect(find.text(hintText), findsOneWidget);
+
+        await tester.tap(hintFinder);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('vow_of_silence_switch')));
+        await tester.pumpAndSettle();
+        expect(activeCtrl.isRemoveAdsOwned, isTrue);
+        expect(activeCtrl.isRemoveAdsEnabled, isTrue);
+
+        await tester.tap(find.byKey(const ValueKey('temple_tab_offerings')));
+        await tester.pumpAndSettle();
+        await scrollOfferingsToBottom();
+        expect(hintFinder, findsNothing);
+        expect(find.text(hintText), findsNothing);
+      },
+    );
+
+    testWidgets(
       'Acquiring Vow of Silence via Orbs or IAP enables silence, stays pinned during switch toggle, smoothly collapses Free Elemental Orbs, and hides/shows GameScreen ad pill',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
