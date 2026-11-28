@@ -14,6 +14,7 @@ import '../../services/localization_service.dart';
 import '../../services/play_games_service.dart';
 import '../../services/update_service.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/battle_orb_loot_bar.dart';
 import '../widgets/score_header.dart';
 import '../widgets/hints_bar.dart';
 import '../widgets/versus_arena.dart';
@@ -106,6 +107,7 @@ class _GameScreenState extends State<GameScreen>
   int _lastHandledTurnCount = 0;
   HandMove? _activeFlyingOrbMove;
   HandMove? _lastAbsorbedOrbMove;
+  Set<HandMove> _lastAbsorbedOrbMoves = const <HandMove>{};
 
   @override
   void initState() {
@@ -387,6 +389,7 @@ class _GameScreenState extends State<GameScreen>
       if (turnChanged) {
         _flyingOrbController.stop();
         _flyingOrbController.reset();
+        _lastAbsorbedOrbMoves = const <HandMove>{};
       }
       return;
     }
@@ -396,12 +399,36 @@ class _GameScreenState extends State<GameScreen>
 
     _activeFlyingOrbMove = collectedMove;
     _lastAbsorbedOrbMove = collectedMove;
+    _lastAbsorbedOrbMoves = controller.lastCollectedOrbMoves.isNotEmpty
+        ? controller.lastCollectedOrbMoves.toSet()
+        : {collectedMove};
     if (controller.animationsEnabled) {
       _flyingOrbController.forward(from: 0.0);
     } else {
       _flyingOrbController.stop();
       _flyingOrbController.reset();
     }
+  }
+
+  void _openInventoryDialog(BuildContext context, GameController controller) {
+    if (!_isInventoryDialogOpen) {
+      _isInventoryDialogOpen = true;
+      showDialog(
+        context: context,
+        builder: (_) => InventoryDialog(
+          controller: controller,
+          isInBattle: true,
+        ),
+      ).whenComplete(() {
+        _isInventoryDialogOpen = false;
+      });
+    }
+  }
+
+  void _handleLootBarTap(BuildContext context, GameController controller) {
+    _stopOverchargedHold();
+    controller.audio.playTapVibrate();
+    _openInventoryDialog(context, controller);
   }
 
   void _handleBackpackTap(BuildContext context, GameController controller) {
@@ -418,18 +445,7 @@ class _GameScreenState extends State<GameScreen>
           ),
         );
     }
-    if (!_isInventoryDialogOpen) {
-      _isInventoryDialogOpen = true;
-      showDialog(
-        context: context,
-        builder: (_) => InventoryDialog(
-          controller: controller,
-          isInBattle: true,
-        ),
-      ).whenComplete(() {
-        _isInventoryDialogOpen = false;
-      });
-    }
+    _openInventoryDialog(context, controller);
   }
 
   Future<void> _handleTeleportTap(
@@ -2366,16 +2382,70 @@ class _GameScreenState extends State<GameScreen>
                   if (controller.isTempleSiegeActive)
                     _buildTempleSiegeBanner(context, controller, loc),
 
+                  // 0b. Current-Battle Orb Loot Bar (between top HUD bar and ScoreHeader)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 2),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: BattleOrbLootBar(
+                          controller: controller,
+                          onTap: () => _handleLootBarTap(context, controller),
+                          orbFlightAnimation: _flyingOrbController,
+                          pulsingOrbMoves: _lastAbsorbedOrbMoves,
+                          orbTotalSequenceMs: GameScreen.orbTotalSequenceMs,
+                          orbPulseStartMs: GameScreen.orbSpawnDelayMs +
+                              GameScreen.orbFlightDurationMs,
+                          orbPulseDurationMs:
+                              GameScreen.backpackPulseDurationMs,
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // 1. Bounded Top Scrollable HUD + Stationary Grounded VersusArena
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, middleConstraints) {
+                        final isScoreVisible =
+                            controller.unlockedPredictability &&
+                                controller.showPredictability;
+                        final hasTopHintRow = controller.showYourPrediction ||
+                            controller.showNextMove;
+                        final hasBottomHintRow = controller.showSuggestion ||
+                            (controller.showCrystalBall &&
+                                ((controller.showCrystalBallPlus &&
+                                        controller
+                                            .crystalBallPlusMoves.isNotEmpty) ||
+                                    controller.crystalBallMoves.isNotEmpty));
+                        final visibleHintRows = (hasTopHintRow ? 1 : 0) +
+                            (hasBottomHintRow ? 1 : 0);
                         final hasVisibleHints = controller.showYourPrediction ||
                             controller.showNextMove ||
                             controller.showSuggestion ||
                             controller.showCrystalBall;
+                        final hasActiveBlessing =
+                            controller.activeBattleBlessing != null;
                         final isCompactHeight =
                             middleConstraints.maxHeight < 370.0;
+
+                        // Reserve vertical space for VersusArena + 4px head clearance
+                        // and upper HUD widgets so MarkovMatrixView scrolls cleanly
+                        // inside its card without encroaching on arena combatants.
+                        final versusReservedHeight =
+                            isCompactHeight ? 178.0 : 186.0;
+                        final upperScrollHeight =
+                            middleConstraints.maxHeight - versusReservedHeight;
+                        final upperChromeHeight = 8.0 +
+                            (isScoreVisible ? 38.0 : 0.0) +
+                            (visibleHintRows == 2
+                                ? 86.0
+                                : (visibleHintRows == 1 ? 46.0 : 0.0)) +
+                            (hasActiveBlessing ? 34.0 : 0.0) +
+                            54.0;
+                        final markovMaxBodyHeight =
+                            (upperScrollHeight - upperChromeHeight)
+                                .clamp(160.0, 210.0);
 
                         return Column(
                           children: [
@@ -2456,6 +2526,8 @@ class _GameScreenState extends State<GameScreen>
                                               elementalMode:
                                                   controller.isElementalMode,
                                               localization: loc,
+                                              maxBodyHeight:
+                                                  markovMaxBodyHeight,
                                               isArchmageShortTermView: controller
                                                       .isArchmageBoss &&
                                                   controller
@@ -2484,6 +2556,8 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ),
                             ),
+
+                            const SizedBox(height: 4),
 
                             // 1b. Stationary Grounded VersusArena Locked Directly Above Bottom Move Card
                             Padding(

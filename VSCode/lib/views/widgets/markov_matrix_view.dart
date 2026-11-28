@@ -19,6 +19,7 @@ class MarkovMatrixView extends StatelessWidget {
   final MetalWizardAiState? metalWizardAiState;
   final int? currentPiDigit;
   final bool initiallyExpanded;
+  final double? maxBodyHeight;
 
   const MarkovMatrixView({
     super.key,
@@ -33,6 +34,7 @@ class MarkovMatrixView extends StatelessWidget {
     this.metalWizardAiState,
     this.currentPiDigit,
     this.initiallyExpanded = true,
+    this.maxBodyHeight,
   });
 
   bool get _dimsTransitionMatrix =>
@@ -711,6 +713,7 @@ class MarkovMatrixView extends StatelessWidget {
       headerTitle: headerTitle,
       palette: palette,
       theme: theme,
+      maxBodyHeight: maxBodyHeight,
       body: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -883,6 +886,7 @@ class _MarkovCollapsibleCard extends StatefulWidget {
   final String headerTitle;
   final AppPalette palette;
   final ThemeData theme;
+  final double? maxBodyHeight;
   final Widget body;
 
   const _MarkovCollapsibleCard({
@@ -890,6 +894,7 @@ class _MarkovCollapsibleCard extends StatefulWidget {
     required this.headerTitle,
     required this.palette,
     required this.theme,
+    this.maxBodyHeight,
     required this.body,
   });
 
@@ -910,6 +915,15 @@ class _MarkovCollapsibleCardState extends State<_MarkovCollapsibleCard> {
   Widget build(BuildContext context) {
     final palette = widget.palette;
     final theme = widget.theme;
+    final expandedBody = widget.maxBodyHeight != null
+        ? ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: widget.maxBodyHeight!),
+            child: SingleChildScrollView(
+              key: const ValueKey('markov_matrix_body_scroll_view'),
+              child: widget.body,
+            ),
+          )
+        : widget.body;
 
     return Card(
       color: palette.isDark
@@ -973,7 +987,7 @@ class _MarkovCollapsibleCardState extends State<_MarkovCollapsibleCard> {
               curve: Curves.easeInOut,
               alignment: Alignment.topCenter,
               child: _isExpanded
-                  ? widget.body
+                  ? expandedBody
                   : const SizedBox.shrink(
                       key: ValueKey('markov_matrix_collapsed_body'),
                     ),

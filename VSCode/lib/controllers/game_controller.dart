@@ -640,6 +640,10 @@ class GameController extends ChangeNotifier {
   int lostOrbsFor(HandMove move) =>
       math.max(0, orbsFor(move) - turn0OrbsFor(move));
 
+  /// Positive count of [move] orbs collected during the active battle/run
+  /// since Turn 0 (excluding permanent account inventory).
+  int battleCollectedOrbsFor(HandMove move) => lostOrbsFor(move);
+
   /// Per-element breakdown of reversible orbs that will be lost on Reset.
   Map<HandMove, int> get lostOrbsOnReset => {
     for (final move in HandMove.values) move: lostOrbsFor(move),
@@ -1443,6 +1447,19 @@ class GameController extends ChangeNotifier {
   List<HandMove> get bonusOrbMoves => includesEarthAndMetalInBonuses
       ? HandMove.values
       : const [HandMove.rock, HandMove.paper, HandMove.scissors];
+
+  /// Active elemental slots shown in the in-battle horizontal orb loot bar:
+  /// Fire, Water, Wood always, plus Earth & Metal when unlocked/active or
+  /// present in the current battle's collected loot.
+  List<HandMove> get battleLootMoves {
+    final showExtended = showNewHands ||
+        includesEarthAndMetalInBonuses ||
+        lostOrbsFor(HandMove.lizard) > 0 ||
+        lostOrbsFor(HandMove.spock) > 0;
+    return showExtended
+        ? HandMove.values
+        : const [HandMove.rock, HandMove.paper, HandMove.scissors];
+  }
 
   String get rewardedAdDescription => includesEarthAndMetalInBonuses
       ? localization.t(

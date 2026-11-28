@@ -1,5 +1,5 @@
 {
-  "summary": "- Persisted pending Crystal Ball enemy move (pending_crystal_ball_move) in StorageService and cleared it on battle/progress resets\n- Preserved the committed Crystal Ball prediction in GameController across unchanged _loadState reloads (e.g., Play Games cloud sync on AppLifecycleState.resumed), cold restarts, Relic Chamber restores without battle reset, and Markov Recalibrator / New Skin toggles while still recomputing when battle state changes\n- Added unit tests in VSCode/test/crystal_ball_resume_persistence_test.dart covering Turn 0 resume cloud syncs, cold restarts, Stage 5 pure-random boss resume, UI toggles, and remote cloud battle restoration",
+  "summary": "- Added compact single-row BattleOrbLootBar directly between the top HUD bar and ScoreHeader in GameScreen showing live current-battle collected elemental orbs (+N) with 3D ElementalEnergySphere visuals and tap-to-open InventoryDialog shortcut.\n- Synchronized a 1.0 -> 1.18 -> 1.0 scale pulse on the collected elemental slot upon parabolic orb flight arrival at the top-left backpack (and on passive/gift orb gains).\n- Constrained expanded MarkovMatrixView body height with internal scrolling and preserved vertical head clearance above VersusArena.\n- Added widget tests in VSCode/test/battle_orb_loot_bar_test.dart and verified all 471 tests and flutter analyze pass.",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T06:56:51Z"
+  "updated_at_utc": "2026-11-28T08:37:19Z"
 }
