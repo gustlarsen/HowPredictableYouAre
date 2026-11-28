@@ -9,7 +9,7 @@ enum SacredBlessing {
     titleKey: 'temple_blessing_vitality_title',
     fallbackTitle: 'Blessing of Vitality',
     descKey: 'temple_blessing_vitality_desc',
-    fallbackDesc: 'Start the next battle with +15 bonus temporary HP.',
+    fallbackDesc: 'Start the next battle with +50 bonus temporary HP.',
     icon: Icons.favorite_rounded,
     accentColor: Color(0xFFEF5350),
   ),
@@ -19,7 +19,7 @@ enum SacredBlessing {
     fallbackTitle: 'Blessing of Clairvoyance',
     descKey: 'temple_blessing_clairvoyance_desc',
     fallbackDesc:
-        "Automatically reveal the enemy's first 3 moves in the next battle.",
+        "Automatically reveal the enemy's first 10 moves in the next battle.",
     icon: Icons.visibility_rounded,
     accentColor: Color(0xFFAB47BC),
   ),
@@ -29,9 +29,18 @@ enum SacredBlessing {
     fallbackTitle: 'Blessing of Harvest',
     descKey: 'temple_blessing_harvest_desc',
     fallbackDesc:
-        'Earn 2x Elemental Orbs from defeated enemies during the next battle.',
+        'Earn 5x Elemental Orbs from defeated enemies during the next battle.',
     icon: Icons.auto_awesome_rounded,
     accentColor: Color(0xFF66BB6A),
+  ),
+  mana(
+    id: 'mana',
+    titleKey: 'temple_blessing_mana_title',
+    fallbackTitle: 'Blessing of Mana',
+    descKey: 'temple_blessing_mana_desc',
+    fallbackDesc: 'Start the next battle with +100 bonus temporary Mana.',
+    icon: Icons.water_drop_rounded,
+    accentColor: Color(0xFF29B6F6),
   );
 
   final String id;
@@ -59,6 +68,41 @@ enum SacredBlessing {
       if (blessing.id == clean) return blessing;
     }
     return null;
+  }
+
+  /// Parses an iterable of blessing IDs (including comma-delimited strings)
+  /// into a deduplicated set ordered by [SacredBlessing.values].
+  static Set<SacredBlessing> fromIds(Iterable<String> ids) {
+    final parsed = <SacredBlessing>{};
+    for (final raw in ids) {
+      for (final token in raw.split(',')) {
+        final blessing = fromId(token);
+        if (blessing != null) {
+          parsed.add(blessing);
+        }
+      }
+    }
+    return <SacredBlessing>{
+      for (final blessing in SacredBlessing.values)
+        if (parsed.contains(blessing)) blessing,
+    };
+  }
+
+  /// Parses a legacy single-ID or comma-delimited blessing string into an
+  /// ordered set of [SacredBlessing] values.
+  static Set<SacredBlessing> fromSerialized(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return <SacredBlessing>{};
+    return fromIds([raw]);
+  }
+
+  /// Serializes an iterable of blessings to deduplicated IDs in canonical
+  /// [SacredBlessing.values] order.
+  static List<String> toIdList(Iterable<SacredBlessing> blessings) {
+    final set = blessings.toSet();
+    return <String>[
+      for (final blessing in SacredBlessing.values)
+        if (set.contains(blessing)) blessing.id,
+    ];
   }
 }
 

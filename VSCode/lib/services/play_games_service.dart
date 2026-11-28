@@ -354,10 +354,26 @@ class CloudSaveData {
 
   // Sacred Temple Consagration & Blessings State
   final int adConsagrationsThisWeek;
-  final String? pendingBattleBlessing;
-  final String? activeBattleBlessing;
+  final List<String>? _pendingBattleBlessingsRaw;
+  final String? _pendingBattleBlessingLegacy;
+  final List<String>? _activeBattleBlessingsRaw;
+  final String? _activeBattleBlessingLegacy;
   final int battleBonusTempHp;
+  final int battleBonusTempMana;
   final String? lastFreeDailyPrayerDate;
+
+  List<String> get pendingBattleBlessings => _normalizeBlessingIds(
+    _pendingBattleBlessingsRaw,
+    legacySingle: _pendingBattleBlessingLegacy,
+  );
+  List<String> get activeBattleBlessings => _normalizeBlessingIds(
+    _activeBattleBlessingsRaw,
+    legacySingle: _activeBattleBlessingLegacy,
+  );
+  String? get pendingBattleBlessing =>
+      pendingBattleBlessings.isEmpty ? null : pendingBattleBlessings.first;
+  String? get activeBattleBlessing =>
+      activeBattleBlessings.isEmpty ? null : activeBattleBlessings.first;
 
   // Sacred Temple Offertory Permanent Idle Orb Generator
   final int offertoryRateLevel;
@@ -501,9 +517,12 @@ class CloudSaveData {
     this.templeMasterDefeatedCount = 0,
     this.babyMageRobotDefeatedCount = 0,
     this.adConsagrationsThisWeek = 0,
-    this.pendingBattleBlessing,
-    this.activeBattleBlessing,
+    List<String>? pendingBattleBlessings,
+    String? pendingBattleBlessing,
+    List<String>? activeBattleBlessings,
+    String? activeBattleBlessing,
     this.battleBonusTempHp = 0,
+    this.battleBonusTempMana = 0,
     this.lastFreeDailyPrayerDate,
     int? offertoryRateLevel,
     int? offertoryLevel,
@@ -516,6 +535,10 @@ class CloudSaveData {
     this.offertoryFreeDoubleReadyAt,
     this.updatedAtMillis = 0,
   }) : enemyStage = enemyStage ?? enemyPhase,
+       _pendingBattleBlessingsRaw = pendingBattleBlessings,
+       _pendingBattleBlessingLegacy = pendingBattleBlessing,
+       _activeBattleBlessingsRaw = activeBattleBlessings,
+       _activeBattleBlessingLegacy = activeBattleBlessing,
        removeAdsEnabled = removeAdsEnabled ?? unlockedAds,
        hasExplicitRemoveAdsEnabled =
            hasExplicitRemoveAdsEnabled ?? (removeAdsEnabled != null),
@@ -523,6 +546,31 @@ class CloudSaveData {
            ? 0
            : (offertoryRateLevel ?? offertoryLevel ?? 0),
        offertoryCapLevel = offertoryCapLevel < 0 ? 0 : offertoryCapLevel;
+
+  static List<String> _normalizeBlessingIds(
+    Iterable<String>? ids, {
+    String? legacySingle,
+  }) {
+    final seen = <String>{};
+    final out = <String>[];
+    void addRaw(String raw) {
+      for (final token in raw.split(',')) {
+        final clean = token.trim();
+        if (clean.isNotEmpty && seen.add(clean)) {
+          out.add(clean);
+        }
+      }
+    }
+
+    if (ids != null) {
+      for (final raw in ids) {
+        addRaw(raw);
+      }
+    } else if (legacySingle != null && legacySingle.trim().isNotEmpty) {
+      addRaw(legacySingle);
+    }
+    return List.unmodifiable(out);
+  }
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -925,9 +973,13 @@ class CloudSaveData {
       babyMageRobotDefeatedCount:
           _maxInt(babyMageRobotDefeatedCount, local.babyMageRobotDefeatedCount),
       adConsagrationsThisWeek: adConsagrationsThisWeek,
-      pendingBattleBlessing: pendingBattleBlessing ?? local.pendingBattleBlessing,
-      activeBattleBlessing: activeBattleBlessing,
+      pendingBattleBlessings: _normalizeBlessingIds([
+        ...pendingBattleBlessings,
+        ...local.pendingBattleBlessings,
+      ]),
+      activeBattleBlessings: activeBattleBlessings,
       battleBonusTempHp: battleBonusTempHp,
+      battleBonusTempMana: battleBonusTempMana,
       lastFreeDailyPrayerDate:
           lastFreeDailyPrayerDate ?? local.lastFreeDailyPrayerDate,
       offertoryRateLevel: mergedOffertoryRateLevel,
@@ -1076,9 +1128,10 @@ class CloudSaveData {
       templeMasterDefeatedCount: storage.templeMasterDefeatedCount,
       babyMageRobotDefeatedCount: storage.babyMageRobotDefeatedCount,
       adConsagrationsThisWeek: storage.adConsagrationsThisWeek,
-      pendingBattleBlessing: storage.pendingBattleBlessing,
-      activeBattleBlessing: storage.activeBattleBlessing,
+      pendingBattleBlessings: storage.pendingBattleBlessings,
+      activeBattleBlessings: storage.activeBattleBlessings,
       battleBonusTempHp: storage.battleBonusTempHp,
+      battleBonusTempMana: storage.battleBonusTempMana,
       lastFreeDailyPrayerDate: storage.lastFreeDailyPrayerDate,
       offertoryRateLevel: storage.offertoryRateLevel,
       offertoryCapLevel: storage.offertoryCapLevel,
@@ -1132,9 +1185,10 @@ class CloudSaveData {
     await storage.setIsTempleSiegeActive(isTempleSiegeActive);
     await storage.setHasShownTempleSiegeIntro(hasShownTempleSiegeIntro);
     await storage.setAdConsagrationsThisWeek(adConsagrationsThisWeek);
-    await storage.setPendingBattleBlessing(pendingBattleBlessing);
-    await storage.setActiveBattleBlessing(activeBattleBlessing);
+    await storage.setPendingBattleBlessings(pendingBattleBlessings);
+    await storage.setActiveBattleBlessings(activeBattleBlessings);
     await storage.setBattleBonusTempHp(battleBonusTempHp);
+    await storage.setBattleBonusTempMana(battleBonusTempMana);
     await storage.setLastFreeDailyPrayerDate(lastFreeDailyPrayerDate);
     await storage.setOffertoryRateLevel(offertoryRateLevel);
     await storage.setOffertoryCapLevel(offertoryCapLevel);
@@ -1372,11 +1426,16 @@ class CloudSaveData {
       'templeMasterDefeatedCount': templeMasterDefeatedCount,
       'babyMageRobotDefeatedCount': babyMageRobotDefeatedCount,
       'adConsagrationsThisWeek': adConsagrationsThisWeek,
-      if (pendingBattleBlessing != null)
-        'pendingBattleBlessing': pendingBattleBlessing,
-      if (activeBattleBlessing != null)
-        'activeBattleBlessing': activeBattleBlessing,
+      if (pendingBattleBlessings.isNotEmpty) ...{
+        'pendingBattleBlessings': pendingBattleBlessings,
+        'pendingBattleBlessing': pendingBattleBlessings.join(','),
+      },
+      if (activeBattleBlessings.isNotEmpty) ...{
+        'activeBattleBlessings': activeBattleBlessings,
+        'activeBattleBlessing': activeBattleBlessings.join(','),
+      },
       'battleBonusTempHp': battleBonusTempHp,
+      'battleBonusTempMana': battleBonusTempMana,
       if (lastFreeDailyPrayerDate != null)
         'lastFreeDailyPrayerDate': lastFreeDailyPrayerDate,
       'offertoryLevel': offertoryRateLevel,
@@ -1749,12 +1808,20 @@ class CloudSaveData {
           ((map['adConsagrationsThisWeek'] as num?)?.toInt() ?? 0) < 0
               ? 0
               : ((map['adConsagrationsThisWeek'] as num?)?.toInt() ?? 0),
+      pendingBattleBlessings: map['pendingBattleBlessings'] is List
+          ? (map['pendingBattleBlessings'] as List)
+                .map((e) => e.toString())
+                .toList()
+          : null,
       pendingBattleBlessing: (map['pendingBattleBlessing'] as String?)?.trim(),
+      activeBattleBlessings: map['activeBattleBlessings'] is List
+          ? (map['activeBattleBlessings'] as List)
+                .map((e) => e.toString())
+                .toList()
+          : null,
       activeBattleBlessing: (map['activeBattleBlessing'] as String?)?.trim(),
-      battleBonusTempHp:
-          ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0) < 0
-              ? 0
-              : ((map['battleBonusTempHp'] as num?)?.toInt() ?? 0),
+      battleBonusTempHp: _parseNonNegativeInt(map['battleBonusTempHp']),
+      battleBonusTempMana: _parseNonNegativeInt(map['battleBonusTempMana']),
       lastFreeDailyPrayerDate:
           (map['lastFreeDailyPrayerDate'] as String?)?.trim(),
       offertoryRateLevel: _parseNonNegativeInt(

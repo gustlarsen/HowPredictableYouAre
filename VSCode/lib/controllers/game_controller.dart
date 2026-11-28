@@ -54,8 +54,10 @@ class GameController extends ChangeNotifier {
   static const int treasuryEarthMetalBonus = 100;
   static const int treasuryClaimCapacityBonus = 20;
   static const int maxWeeklyAdConsagrations = 3;
-  static const int vitalityBlessingBonusHp = 15;
-  static const int clairvoyanceBlessingMoves = 3;
+  static const int vitalityBlessingBonusHp = 50;
+  static const int clairvoyanceBlessingMoves = 10;
+  static const int harvestBlessingOrbMultiplier = 5;
+  static const int manaBlessingBonusMana = 100;
   static const int allElementPackSmallBonus = 500;
   static const int allElementPackMediumBonus = 2500;
   static const int allElementPackLargeBonus = 10000;
@@ -672,7 +674,8 @@ class GameController extends ChangeNotifier {
       maxHpUpgradeCostForLevel(hpUpgradeLevel);
   ElementalCost get nextMaxManaUpgradeCost =>
       maxManaUpgradeCostForLevel(manaUpgradeLevel);
-  int get remainingMana => (playerMaxMana - totalRounds).clamp(0, playerMaxMana);
+  int get remainingMana =>
+      (effectivePlayerMaxMana - totalRounds).clamp(0, effectivePlayerMaxMana);
   int turnCount = 0;
   int userHp = baseMaxHp;
   int computerHp = pcMaxHp;
@@ -730,12 +733,28 @@ class GameController extends ChangeNotifier {
 
   // Sacred Temple Consagration Weekly Ad Cap & Prayer Room Blessings
   int adConsagrationsThisWeek = 0;
-  SacredBlessing? pendingBattleBlessing;
-  SacredBlessing? activeBattleBlessing;
+  Set<SacredBlessing> pendingBattleBlessings = <SacredBlessing>{};
+  Set<SacredBlessing> activeBattleBlessings = <SacredBlessing>{};
   int battleBonusTempHp = 0;
+  int battleBonusTempMana = 0;
   String? lastFreeDailyPrayerDate;
 
+  SacredBlessing? get pendingBattleBlessing =>
+      pendingBattleBlessings.isEmpty ? null : pendingBattleBlessings.first;
+  SacredBlessing? get activeBattleBlessing =>
+      activeBattleBlessings.isEmpty ? null : activeBattleBlessings.first;
+
+  bool isBlessingPending(SacredBlessing blessing) =>
+      pendingBattleBlessings.contains(blessing);
+  bool isBlessingActive(SacredBlessing blessing) =>
+      activeBattleBlessings.contains(blessing);
+  bool get hasPendingBattleBlessings => pendingBattleBlessings.isNotEmpty;
+  bool get hasActiveBattleBlessings => activeBattleBlessings.isNotEmpty;
+  bool get areAllBattleBlessingsPending =>
+      pendingBattleBlessings.length >= SacredBlessing.values.length;
+
   int get effectivePlayerMaxHp => playerMaxHp + battleBonusTempHp;
+  int get effectivePlayerMaxMana => playerMaxMana + battleBonusTempMana;
   int get remainingWeeklyAdConsagrations =>
       (maxWeeklyAdConsagrations - adConsagrationsThisWeek)
           .clamp(0, maxWeeklyAdConsagrations);
@@ -744,18 +763,22 @@ class GameController extends ChangeNotifier {
       adService.isRewardedAdReady &&
       remainingWeeklyAdConsagrations > 0;
   bool get isVitalityBlessingActive =>
-      activeBattleBlessing == SacredBlessing.vitality && battleBonusTempHp > 0;
+      activeBattleBlessings.contains(SacredBlessing.vitality) &&
+      battleBonusTempHp > 0;
   bool get isClairvoyanceActive =>
-      activeBattleBlessing == SacredBlessing.clairvoyance &&
+      activeBattleBlessings.contains(SacredBlessing.clairvoyance) &&
       totalRounds < clairvoyanceBlessingMoves &&
       crystalBallMove != null;
   int get clairvoyanceMovesRemaining =>
-      activeBattleBlessing == SacredBlessing.clairvoyance
+      activeBattleBlessings.contains(SacredBlessing.clairvoyance)
           ? (clairvoyanceBlessingMoves - totalRounds)
               .clamp(0, clairvoyanceBlessingMoves)
           : 0;
   bool get isHarvestBlessingActive =>
-      activeBattleBlessing == SacredBlessing.harvest;
+      activeBattleBlessings.contains(SacredBlessing.harvest);
+  bool get isManaBlessingActive =>
+      activeBattleBlessings.contains(SacredBlessing.mana) &&
+      battleBonusTempMana > 0;
 
   static String dateKeyFor(DateTime dt) =>
       '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
@@ -764,11 +787,23 @@ class GameController extends ChangeNotifier {
       lastFreeDailyPrayerDate != dateKeyFor(now ?? DateTime.now());
 
   bool canActivateSacredBlessingFree([DateTime? now]) =>
-      pendingBattleBlessing == null &&
+      !areAllBattleBlessingsPending &&
+      (isRemoveAdsActive || hasFreeDailyPrayerAvailable(now));
+
+  bool canActivateSpecificBlessingFree(
+    SacredBlessing blessing, [
+    DateTime? now,
+  ]) =>
+      !pendingBattleBlessings.contains(blessing) &&
       (isRemoveAdsActive || hasFreeDailyPrayerAvailable(now));
 
   bool canActivateSacredBlessingWithAd() =>
-      pendingBattleBlessing == null &&
+      !areAllBattleBlessingsPending &&
+      !isRemoveAdsActive &&
+      adService.isRewardedAdReady;
+
+  bool canActivateSpecificBlessingWithAd(SacredBlessing blessing) =>
+      !pendingBattleBlessings.contains(blessing) &&
       !isRemoveAdsActive &&
       adService.isRewardedAdReady;
 
@@ -1696,12 +1731,21 @@ class GameController extends ChangeNotifier {
     hpUpgradeLevel = storage.hpUpgradeLevel;
     manaUpgradeLevel = storage.manaUpgradeLevel;
     adConsagrationsThisWeek = storage.adConsagrationsThisWeek;
-    pendingBattleBlessing = SacredBlessing.fromId(storage.pendingBattleBlessing);
-    activeBattleBlessing = SacredBlessing.fromId(storage.activeBattleBlessing);
-    battleBonusTempHp = activeBattleBlessing == SacredBlessing.vitality
+    pendingBattleBlessings = SacredBlessing.fromIds(
+      storage.pendingBattleBlessings,
+    );
+    activeBattleBlessings = SacredBlessing.fromIds(
+      storage.activeBattleBlessings,
+    );
+    battleBonusTempHp = activeBattleBlessings.contains(SacredBlessing.vitality)
         ? (storage.battleBonusTempHp > 0
               ? storage.battleBonusTempHp
               : vitalityBlessingBonusHp)
+        : 0;
+    battleBonusTempMana = activeBattleBlessings.contains(SacredBlessing.mana)
+        ? (storage.battleBonusTempMana > 0
+              ? storage.battleBonusTempMana
+              : manaBlessingBonusMana)
         : 0;
     lastFreeDailyPrayerDate = storage.lastFreeDailyPrayerDate;
     offertoryRateLevel = storage.offertoryRateLevel;
@@ -1822,7 +1866,7 @@ class GameController extends ChangeNotifier {
     isDeathAlertPending = userHp <= 0 ||
         (isTempleSiegeActive &&
             computerHp > 0 &&
-            totalRounds >= playerMaxMana);
+            totalRounds >= effectivePlayerMaxMana);
     isBossVictoryPending = !isDeathAlertPending && computerHp <= 0;
     if (isBossVictoryPending) {
       pendingBossVictoryPhase = enemyPhase;
@@ -1834,7 +1878,7 @@ class GameController extends ChangeNotifier {
     is100RoundsAlertPending = !isDeathAlertPending &&
         !isBossVictoryPending &&
         !isTempleSiegeActive &&
-        totalRounds >= playerMaxMana;
+        totalRounds >= effectivePlayerMaxMana;
     if (totalRounds == 0 && storage.lastUserMove == null) {
       turnCount = 0;
     }
@@ -2983,7 +3027,7 @@ class GameController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (totalRounds >= playerMaxMana) {
+    if (totalRounds >= effectivePlayerMaxMana) {
       if (isTempleSiegeActive) {
         isDeathAlertPending = true;
         is100RoundsAlertPending = false;
@@ -3029,7 +3073,8 @@ class GameController extends ChangeNotifier {
       lastRoundComputerDamage = dualRes.bossDamage * playerWinDamageToBoss;
       lastRoundUserDamage = dualRes.playerDamage * bossWinDamageToPlayer;
 
-      final orbGain = isHarvestBlessingActive ? 2 : 1;
+      final orbGain =
+          isHarvestBlessingActive ? harvestBlessingOrbMultiplier : 1;
       for (final defeatedMove in dualRes.defeatedEnemySpells) {
         _incrementOrbForMove(defeatedMove, orbGain);
         _depositTreasuryOrbForMove(defeatedMove, 1);
@@ -3119,7 +3164,8 @@ class GameController extends ChangeNotifier {
         lastRoundUserDamage = 0;
         lastRoundComputerDamage = playerWinDamageToBoss;
         userScore += 1;
-        final orbGain = isHarvestBlessingActive ? 2 : 1;
+        final orbGain =
+            isHarvestBlessingActive ? harvestBlessingOrbMultiplier : 1;
         _incrementOrbForMove(currentComputerMove!, orbGain);
         _depositTreasuryOrbForMove(currentComputerMove!, 1);
         lastCollectedOrbMove = currentComputerMove;
@@ -3194,7 +3240,7 @@ class GameController extends ChangeNotifier {
       _applyImmediateBossDefeatMetadata(enemyStage, currentWeek);
       audio.playWinVibrate();
       audio.playStoryChime();
-    } else if (totalRounds >= playerMaxMana) {
+    } else if (totalRounds >= effectivePlayerMaxMana) {
       if (isTempleSiegeActive) {
         isDeathAlertPending = true;
         is100RoundsAlertPending = false;
@@ -3207,7 +3253,7 @@ class GameController extends ChangeNotifier {
     if (lastWinner == RoundWinner.user ||
         lastRoundComputerDamage > 0 ||
         computerHp <= 0 ||
-        totalRounds >= playerMaxMana) {
+        totalRounds >= effectivePlayerMaxMana) {
       _triggerCloudSave();
     }
 
@@ -3365,8 +3411,7 @@ class GameController extends ChangeNotifier {
       enemyMaxHp = pcMaxHp;
       currentWeek = 0;
       adConsagrationsThisWeek = 0;
-      activeBattleBlessing = null;
-      battleBonusTempHp = 0;
+      _clearActiveBattleBlessings();
       hasShownWeek0ScreamWarning = false;
       pendingWeek0ScreamWarning = false;
       hasInspectedPrincessCellAfterScream = false;
@@ -3381,8 +3426,6 @@ class GameController extends ChangeNotifier {
       storage.setEnemyMaxHp(pcMaxHp);
       storage.setCurrentWeek(0);
       storage.setAdConsagrationsThisWeek(0);
-      storage.setActiveBattleBlessing(null);
-      storage.setBattleBonusTempHp(0);
       storage.setHasShownWeek0ScreamWarning(false);
       storage.setPendingWeek0ScreamWarning(false);
       storage.setHasInspectedPrincessCellAfterScream(false);
@@ -3714,19 +3757,34 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
-  /// Starts a fresh battle ([playerMaxMana] Mana, [effectivePlayerMaxHp] HP) from the World Map while
-  /// promoting any pending Sacred Blessing into the active expedition buff,
+  void _clearActiveBattleBlessings() {
+    activeBattleBlessings.clear();
+    battleBonusTempHp = 0;
+    battleBonusTempMana = 0;
+    storage.setActiveBattleBlessings(const []);
+    storage.setBattleBonusTempHp(0);
+    storage.setBattleBonusTempMana(0);
+  }
+
+  /// Starts a fresh battle ([effectivePlayerMaxMana] Mana, [effectivePlayerMaxHp] HP) from the World Map while
+  /// promoting all pending Sacred Blessings into active expedition buffs,
   /// preserving Elemental Orbs, shop unlocks, and campaign week progress,
   /// and recording the Turn 0 Orb Snapshot for the new battle.
   void startNewBattle() {
-    activeBattleBlessing = pendingBattleBlessing;
-    pendingBattleBlessing = null;
-    battleBonusTempHp = activeBattleBlessing == SacredBlessing.vitality
+    activeBattleBlessings = Set<SacredBlessing>.from(pendingBattleBlessings);
+    pendingBattleBlessings.clear();
+    battleBonusTempHp = activeBattleBlessings.contains(SacredBlessing.vitality)
         ? vitalityBlessingBonusHp
         : 0;
-    storage.setActiveBattleBlessing(activeBattleBlessing?.id);
-    storage.setPendingBattleBlessing(null);
+    battleBonusTempMana = activeBattleBlessings.contains(SacredBlessing.mana)
+        ? manaBlessingBonusMana
+        : 0;
+    storage.setActiveBattleBlessings(
+      SacredBlessing.toIdList(activeBattleBlessings),
+    );
+    storage.setPendingBattleBlessings(const []);
     storage.setBattleBonusTempHp(battleBonusTempHp);
+    storage.setBattleBonusTempMana(battleBonusTempMana);
     interceptMetalWizardForWeek10IfNeeded();
     if (enemyStage == 2) {
       _markBestiaryEncountered(BestiaryCreature.archmageRobot);
@@ -3835,8 +3893,7 @@ class GameController extends ChangeNotifier {
     final wasWeek0 = currentWeek == 0;
     currentWeek += 1;
     adConsagrationsThisWeek = 0;
-    activeBattleBlessing = null;
-    battleBonusTempHp = 0;
+    _clearActiveBattleBlessings();
     if (wasWeek0 && !hasShownWeek0ScreamWarning) {
       pendingWeek0ScreamWarning = true;
       storage.setPendingWeek0ScreamWarning(true);
@@ -3844,8 +3901,6 @@ class GameController extends ChangeNotifier {
     interceptMetalWizardForWeek10IfNeeded();
     storage.setCurrentWeek(currentWeek);
     storage.setAdConsagrationsThisWeek(0);
-    storage.setActiveBattleBlessing(null);
-    storage.setBattleBonusTempHp(0);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
     recordTurn0OrbSnapshot();
@@ -3883,8 +3938,7 @@ class GameController extends ChangeNotifier {
     hasShownTempleSiegeIntro = false;
     currentWeek = siegeInvasionWeek;
     adConsagrationsThisWeek = 0;
-    activeBattleBlessing = null;
-    battleBonusTempHp = 0;
+    _clearActiveBattleBlessings();
     savedMetalWizardHp = null;
     if (enemyStage == 5) {
       enemyStage = 4;
@@ -3902,8 +3956,6 @@ class GameController extends ChangeNotifier {
     storage.setHasShownTempleSiegeIntro(false);
     storage.setCurrentWeek(siegeInvasionWeek);
     storage.setAdConsagrationsThisWeek(0);
-    storage.setActiveBattleBlessing(null);
-    storage.setBattleBonusTempHp(0);
     storage.setSavedMetalWizardHp(null);
     _refreshCompletedDecreesAndResetBattleTrackers();
     _resetBattleState();
@@ -3926,10 +3978,7 @@ class GameController extends ChangeNotifier {
   /// restores HP and battle Mana to [playerMaxHp] / [playerMaxMana], keeps all Elemental Orbs collected,
   /// preserves unlocks and current campaign week, persists & syncs to Cloud Save.
   void reviveAndRetreatToMap() {
-    activeBattleBlessing = null;
-    battleBonusTempHp = 0;
-    storage.setActiveBattleBlessing(null);
-    storage.setBattleBonusTempHp(0);
+    _clearActiveBattleBlessings();
     _resetBattleState();
     recordTurn0OrbSnapshot();
     _triggerCloudSave();
@@ -4825,7 +4874,7 @@ class GameController extends ChangeNotifier {
     } else {
       updatedPeakMana = null;
     }
-    if (totalRounds < playerMaxMana) {
+    if (totalRounds < effectivePlayerMaxMana) {
       is100RoundsAlertPending = false;
     }
 
@@ -4899,8 +4948,9 @@ class GameController extends ChangeNotifier {
 
   /// Activates a pre-battle [SacredBlessing] for the next battle expedition
   /// using either the player's 1 free daily prayer or the Remove Ads perk.
+  /// Multiple blessings (including all of them) can be active simultaneously.
   bool activateSacredBlessingFree(SacredBlessing blessing, {DateTime? now}) {
-    if (!canActivateSacredBlessingFree(now)) {
+    if (!canActivateSpecificBlessingFree(blessing, now)) {
       audio.playVibrate();
       return false;
     }
@@ -4909,8 +4959,13 @@ class GameController extends ChangeNotifier {
       lastFreeDailyPrayerDate = today;
       storage.setLastFreeDailyPrayerDate(today);
     }
-    pendingBattleBlessing = blessing;
-    storage.setPendingBattleBlessing(blessing.id);
+    pendingBattleBlessings = SacredBlessing.fromIds([
+      ...pendingBattleBlessings.map((b) => b.id),
+      blessing.id,
+    ]);
+    storage.setPendingBattleBlessings(
+      SacredBlessing.toIdList(pendingBattleBlessings),
+    );
     audio.playWinVibrate();
     _triggerCloudSave();
     notifyListeners();
@@ -4919,17 +4974,23 @@ class GameController extends ChangeNotifier {
 
   /// Displays a rewarded video ad to activate a temporary [SacredBlessing] for
   /// the Cleric's next battle expedition exclusively inside `onUserEarnedReward`.
+  /// Multiple blessings (including all of them) can be stacked simultaneously.
   Future<bool> watchAdToActivateSacredBlessing(
     SacredBlessing blessing, {
     VoidCallback? onActivated,
   }) async {
-    if (!canActivateSacredBlessingWithAd()) return false;
+    if (!canActivateSpecificBlessingWithAd(blessing)) return false;
     bool earned = false;
     final shown = await adService.showRewardedAd(
       onUserEarnedReward: () {
         earned = true;
-        pendingBattleBlessing = blessing;
-        storage.setPendingBattleBlessing(blessing.id);
+        pendingBattleBlessings = SacredBlessing.fromIds([
+          ...pendingBattleBlessings.map((b) => b.id),
+          blessing.id,
+        ]);
+        storage.setPendingBattleBlessings(
+          SacredBlessing.toIdList(pendingBattleBlessings),
+        );
         audio.playWinVibrate();
         _triggerCloudSave();
         notifyListeners();

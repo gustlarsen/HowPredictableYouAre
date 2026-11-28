@@ -3712,30 +3712,64 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     AppPalette palette,
     LocalizationService loc,
   ) {
-    final pendingBlessing = controller.pendingBattleBlessing;
-    final canFreePray = controller.canActivateSacredBlessingFree();
-    final canAdPray = controller.canActivateSacredBlessingWithAd();
+    final pendingBlessings = <SacredBlessing>[
+      for (final b in SacredBlessing.values)
+        if (controller.isBlessingPending(b)) b,
+    ];
+    final hasAnyPending = pendingBlessings.isNotEmpty;
+    final allPending = controller.areAllBattleBlessingsPending;
     final isRemoveAds = controller.isRemoveAdsActive;
+    final hasDailyFree = controller.hasFreeDailyPrayerAvailable();
 
-    final String statusMessage;
-    if (pendingBlessing != null) {
-      statusMessage =
-          '${loc.t('temple_blessing_active_next', fallback: 'Active for Next Battle')}: ${loc.t(pendingBlessing.titleKey, fallback: pendingBlessing.fallbackTitle)}';
+    final perkBannerText = loc.t(
+      'temple_blessing_perk_ready',
+      fallback:
+          'Remove Ads Perk: Activate any or all blessings freely before battle.',
+    );
+    final activeNames = pendingBlessings
+        .map((b) => loc.t(b.titleKey, fallback: b.fallbackTitle))
+        .join(', ');
+    final activeSummaryText = hasAnyPending
+        ? '${loc.t('temple_blessing_active_next', fallback: 'Active for Next Battle')} (${pendingBlessings.length}/${SacredBlessing.values.length}): $activeNames'
+        : null;
+
+    final String? primaryAmberLine;
+    final String? secondaryLine;
+    final bool useGreenBannerStyle;
+
+    if (allPending) {
+      primaryAmberLine = null;
+      secondaryLine = activeSummaryText;
+      useGreenBannerStyle = true;
     } else if (isRemoveAds) {
-      statusMessage = loc.t(
-        'temple_blessing_perk_ready',
-        fallback: 'Remove Ads Perk: Activate 1 blessing before battle.',
-      );
-    } else if (controller.hasFreeDailyPrayerAvailable()) {
-      statusMessage = loc.t(
-        'temple_blessing_daily_free_ready',
-        fallback: '1 Free Daily Prayer available today!',
-      );
+      primaryAmberLine = perkBannerText;
+      secondaryLine = activeSummaryText;
+      useGreenBannerStyle = false;
+    } else if (hasAnyPending) {
+      primaryAmberLine = hasDailyFree
+          ? loc.t(
+              'temple_blessing_daily_free_ready',
+              fallback: '1 Free Daily Prayer available today!',
+            )
+          : loc.t(
+              'temple_blessing_stack_more_ad',
+              fallback: 'Watch an ad to stack additional blessings.',
+            );
+      secondaryLine = activeSummaryText;
+      useGreenBannerStyle = true;
     } else {
-      statusMessage = loc.t(
-        'temple_blessing_ad_only_ready',
-        fallback: 'Daily free prayer used — watch an ad to receive a blessing.',
-      );
+      primaryAmberLine = hasDailyFree
+          ? loc.t(
+              'temple_blessing_daily_free_ready',
+              fallback: '1 Free Daily Prayer available today!',
+            )
+          : loc.t(
+              'temple_blessing_ad_only_ready',
+              fallback:
+                  'Daily free prayer used — watch an ad to receive a blessing.',
+            );
+      secondaryLine = null;
+      useGreenBannerStyle = false;
     }
 
     return SingleChildScrollView(
@@ -3800,96 +3834,138 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             key: const ValueKey('prayer_blessing_status_banner'),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: pendingBlessing != null
+              color: useGreenBannerStyle
                   ? palette.successText.withValues(alpha: 0.12)
                   : palette.rewardedAdCardSurface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: pendingBlessing != null
+                color: useGreenBannerStyle
                     ? palette.successText.withValues(alpha: 0.45)
                     : palette.rewardedAdCardBorder,
               ),
             ),
-            child: Text(
-              statusMessage,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: pendingBlessing != null
-                    ? palette.successText
-                    : palette.amberText,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (primaryAmberLine != null && !useGreenBannerStyle)
+                  Text(
+                    primaryAmberLine,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: palette.amberText,
+                    ),
+                  ),
+                if (secondaryLine != null) ...[
+                  if (primaryAmberLine != null && !useGreenBannerStyle)
+                    const SizedBox(height: 3),
+                  Text(
+                    secondaryLine,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: palette.successText,
+                    ),
+                  ),
+                ],
+                if (primaryAmberLine != null && useGreenBannerStyle) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    primaryAmberLine,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: palette.amberText,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: 8),
 
           for (final blessing in SacredBlessing.values)
-            _SacredBlessingCard(
-              key: ValueKey('temple_blessing_card_${blessing.id}'),
-              buttonKey: ValueKey('temple_blessing_pray_button_${blessing.id}'),
-              blessing: blessing,
-              title: loc.t(blessing.titleKey, fallback: blessing.fallbackTitle),
-              description: loc.t(blessing.descKey, fallback: blessing.fallbackDesc),
-              isThisActive: pendingBlessing == blessing,
-              hasAnotherActive:
-                  pendingBlessing != null && pendingBlessing != blessing,
-              canFreePray: canFreePray,
-              canAdPray: canAdPray,
-              isRemoveAds: isRemoveAds,
-              activeLabel: loc.t(
-                'temple_blessing_active_badge',
-                fallback: 'Active',
-              ),
-              freePrayLabel: isRemoveAds
-                  ? loc.t('temple_blessing_pray_perk', fallback: 'Bless (Perk)')
-                  : loc.t('temple_blessing_pray_free', fallback: 'Pray (Free)'),
-              adPrayLabel: loc.t(
-                'temple_blessing_pray_ad',
-                fallback: 'Watch Ad: Pray',
-              ),
-              palette: palette,
-              onTap: () {
-                if (canFreePray) {
-                  final ok = controller.activateSacredBlessingFree(blessing);
-                  if (ok && context.mounted) {
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
-                          ),
-                          duration: const Duration(seconds: 2),
+            Builder(
+              builder: (context) {
+                final isThisActive = controller.isBlessingPending(blessing);
+                final canFreeForThis =
+                    controller.canActivateSpecificBlessingFree(blessing);
+                final canAdForThis =
+                    controller.canActivateSpecificBlessingWithAd(blessing);
+                return _SacredBlessingCard(
+                  key: ValueKey('temple_blessing_card_${blessing.id}'),
+                  buttonKey: ValueKey('temple_blessing_pray_button_${blessing.id}'),
+                  blessing: blessing,
+                  title: loc.t(blessing.titleKey, fallback: blessing.fallbackTitle),
+                  description:
+                      loc.t(blessing.descKey, fallback: blessing.fallbackDesc),
+                  isThisActive: isThisActive,
+                  canFreePray: canFreeForThis,
+                  canAdPray: canAdForThis,
+                  activeLabel: loc.t(
+                    'temple_blessing_active_badge',
+                    fallback: 'Active',
+                  ),
+                  freePrayLabel: isRemoveAds
+                      ? loc.t(
+                          'temple_blessing_pray_perk',
+                          fallback: 'Bless (Perk)',
+                        )
+                      : loc.t(
+                          'temple_blessing_pray_free',
+                          fallback: 'Pray (Free)',
                         ),
-                      );
-                  }
-                } else if (canAdPray) {
-                  controller.watchAdToActivateSacredBlessing(
-                    blessing,
-                    onActivated: () {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
+                  adPrayLabel: loc.t(
+                    'temple_blessing_pray_ad',
+                    fallback: 'Watch Ad: Pray',
+                  ),
+                  palette: palette,
+                  onTap: () {
+                    if (canFreeForThis) {
+                      final ok =
+                          controller.activateSacredBlessingFree(blessing);
+                      if (ok && context.mounted) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                    },
-                  );
-                }
+                          );
+                      }
+                    } else if (canAdForThis) {
+                      controller.watchAdToActivateSacredBlessing(
+                        blessing,
+                        onActivated: () {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${loc.t(blessing.titleKey, fallback: blessing.fallbackTitle)}: ${loc.t('temple_blessing_ready_msg', fallback: 'Ready for next battle!')}',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                        },
+                      );
+                    }
+                  },
+                );
               },
             ),
-          if (!isRemoveAds && !canFreePray && pendingBlessing == null) ...[
+          if (!isRemoveAds && !hasDailyFree && !allPending) ...[
             const SizedBox(height: 6),
             Text(
               loc.t(
                 'temple_blessing_ad_disclosure',
                 fallback:
-                    'Rewarded Video Ad: watch an ad to activate 1 temporary blessing for your next battle.',
+                    'Rewarded Video Ad: watch an ad to activate each temporary blessing for your next battle. Blessings can be stacked.',
               ),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 10.5, color: palette.mutedText),
@@ -8351,10 +8427,8 @@ class _SacredBlessingCard extends StatelessWidget {
   final String title;
   final String description;
   final bool isThisActive;
-  final bool hasAnotherActive;
   final bool canFreePray;
   final bool canAdPray;
-  final bool isRemoveAds;
   final String activeLabel;
   final String freePrayLabel;
   final String adPrayLabel;
@@ -8368,10 +8442,8 @@ class _SacredBlessingCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.isThisActive,
-    required this.hasAnotherActive,
     required this.canFreePray,
     required this.canAdPray,
-    required this.isRemoveAds,
     required this.activeLabel,
     required this.freePrayLabel,
     required this.adPrayLabel,
@@ -8381,7 +8453,7 @@ class _SacredBlessingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canTap = !isThisActive && !hasAnotherActive && (canFreePray || canAdPray);
+    final canTap = !isThisActive && (canFreePray || canAdPray);
     final accent = blessing.accentColor;
 
     return Container(
@@ -8402,12 +8474,16 @@ class _SacredBlessingCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: accent.withValues(alpha: palette.isDark ? 0.35 : 0.42),
+                width: 0.9,
+              ),
             ),
-            child: Icon(blessing.icon, size: 19, color: accent),
+            child: SacredBlessingBadgeIcon(blessing: blessing, size: 22),
           ),
           const SizedBox(width: 10),
           Expanded(

@@ -797,7 +797,7 @@ void main() {
     );
 
     testWidgets(
-      'Wing 5 Prayer Room handles Free Daily Prayer, Ad Blessings, Remove Ads Perk, and applies Vitality/Clairvoyance/Harvest in battle',
+      'Wing 5 Prayer Room handles Free Daily Prayer, Ad Blessings, Remove Ads Perk, simultaneous multi-blessing stacking, and applies Vitality (+50 HP), Clairvoyance (10 moves), Harvest (5x Orbs), and Mana (+100 Mana) in battle',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1.0;
@@ -837,29 +837,39 @@ void main() {
           of: find.byType(SacredTempleDialog),
           matching: find.byType(Scrollable),
         );
+
+        // Verify all 4 Sacred Blessing cards + custom RPG CustomPainter icons are present
+        for (final blessing in SacredBlessing.values) {
+          final cardFinder = find.byKey(
+            ValueKey('temple_blessing_card_${blessing.id}'),
+          );
+          await tester.scrollUntilVisible(
+            cardFinder,
+            120,
+            scrollable: prayerScrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(cardFinder, findsOneWidget);
+          expect(
+            find.descendant(
+              of: cardFinder,
+              matching: find.byType(SacredBlessingBadgeIcon),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: cardFinder, matching: find.text('Pray (Free)')),
+            findsOneWidget,
+          );
+        }
+        expect(find.byType(BlessingOfManaIcon), findsOneWidget);
+        expect(find.text('Blessing of Mana'), findsOneWidget);
+        expect(find.textContaining('+100'), findsWidgets);
+
         await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('temple_blessing_card_clairvoyance')),
-          120,
-          scrollable: prayerScrollable,
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('Pray (Free)'), findsWidgets);
-        final harvestCard = find.byKey(
-          const ValueKey('temple_blessing_card_harvest'),
-        );
-        await tester.scrollUntilVisible(
-          harvestCard,
-          120,
-          scrollable: prayerScrollable,
-        );
-        await tester.pumpAndSettle();
-        expect(harvestCard, findsOneWidget);
-        expect(
-          find.descendant(of: harvestCard, matching: find.text('Pray (Free)')),
-          findsOneWidget,
-        );
-        await tester.ensureVisible(
           find.byKey(const ValueKey('temple_blessing_pray_button_vitality')),
+          -120,
+          scrollable: prayerScrollable,
         );
         await tester.pumpAndSettle();
 
@@ -868,25 +878,46 @@ void main() {
           find.byKey(const ValueKey('temple_blessing_pray_button_vitality')),
         );
         await tester.pumpAndSettle();
-        expect(controller.pendingBattleBlessing, SacredBlessing.vitality);
+        expect(controller.pendingBattleBlessings, {SacredBlessing.vitality});
         expect(harness.adClient.showRewardedCallCount, 0);
         expect(find.text('Active'), findsOneWidget);
-        expect(find.text('Watch Ad: Pray'), findsNWidgets(2));
 
-        // While Vitality is pending, mutual exclusion prevents activating Clairvoyance
-        final blockedBtn = tester.widget<ElevatedButton>(
-          find.byKey(
-            const ValueKey('temple_blessing_pray_button_clairvoyance'),
-          ),
+        // No mutual exclusion: Clairvoyance remains enabled as Watch Ad: Pray
+        final clairvoyanceBtnFinder = find.byKey(
+          const ValueKey('temple_blessing_pray_button_clairvoyance'),
         );
-        expect(blockedBtn.onPressed, isNull);
+        await tester.scrollUntilVisible(
+          clairvoyanceBtnFinder,
+          120,
+          scrollable: prayerScrollable,
+        );
+        await tester.pumpAndSettle();
+        final clairvoyanceBtn = tester.widget<ElevatedButton>(
+          clairvoyanceBtnFinder,
+        );
+        expect(clairvoyanceBtn.onPressed, isNotNull);
 
-        // 2. Start Battle 1 -> Vitality grants +15 Temp HP & GameScreen HUD pill, freeing pending slot
+        // 2. Stack Blessing of Clairvoyance via Watch Ad while Vitality is pending
+        await tester.tap(clairvoyanceBtnFinder);
+        await tester.pumpAndSettle();
+        expect(harness.adClient.showRewardedCallCount, 1);
+        expect(controller.pendingBattleBlessings, {
+          SacredBlessing.vitality,
+          SacredBlessing.clairvoyance,
+        });
+
+        // 3. Start Battle 1 -> Vitality (+50 HP) + Clairvoyance (10 moves) both active
         controller.startNewBattle();
-        expect(controller.activeBattleBlessing, SacredBlessing.vitality);
-        expect(controller.pendingBattleBlessing, isNull);
-        expect(controller.effectivePlayerMaxHp, 65);
-        expect(controller.userHp, 65);
+        expect(controller.activeBattleBlessings, {
+          SacredBlessing.vitality,
+          SacredBlessing.clairvoyance,
+        });
+        expect(controller.pendingBattleBlessings, isEmpty);
+        expect(controller.playerMaxHp, 50);
+        expect(controller.effectivePlayerMaxHp, 100);
+        expect(controller.userHp, 100);
+        expect(controller.isClairvoyanceActive, isTrue);
+        expect(controller.clairvoyanceMovesRemaining, 10);
 
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
@@ -899,14 +930,32 @@ void main() {
           find.byKey(const ValueKey('battle_sacred_blessing_pill_vitality')),
           findsOneWidget,
         );
+        expect(
+          find.byKey(const ValueKey('battle_sacred_blessing_pill_clairvoyance')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('10/10'), findsOneWidget);
 
-        // 3. Re-open Prayer Room (daily free used, pending null) -> activate Clairvoyance via Watch Ad: Pray
+        // Play 10 rounds -> Clairvoyance stays active for moves 1..10, expires at move 11
+        for (int i = 0; i < 10; i++) {
+          expect(controller.isClairvoyanceActive, isTrue);
+          expect(controller.clairvoyanceMovesRemaining, 10 - i);
+          controller.crystalBallMove = HandMove.scissors;
+          controller.playTurn(HandMove.scissors); // draw to keep both alive
+        }
+        expect(controller.clairvoyanceMovesRemaining, 0);
+        expect(controller.isClairvoyanceActive, isFalse);
+
+        // 4. Remove Ads Perk: activate ALL 4 blessings simultaneously without blocking
+        controller.unlockedAds = true;
+        controller.removeAdsEnabled = true;
+
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData.dark(useMaterial3: true),
             home: Scaffold(
               body: SacredTempleDialog(
-                key: const ValueKey('prayer_ad_reopen'),
+                key: const ValueKey('prayer_perk_all_blessings'),
                 controller: controller,
                 initialWing: TempleWing.prayer,
               ),
@@ -914,31 +963,56 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final clairvoyanceBtn = find.byKey(
-          const ValueKey('temple_blessing_pray_button_clairvoyance'),
-        );
-        await tester.scrollUntilVisible(
-          clairvoyanceBtn,
-          120,
-          scrollable: find.descendant(
-            of: find.byType(SacredTempleDialog),
-            matching: find.byType(Scrollable),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(clairvoyanceBtn);
-        await tester.pumpAndSettle();
-        expect(harness.adClient.showRewardedCallCount, 1);
-        expect(controller.pendingBattleBlessing, SacredBlessing.clairvoyance);
 
-        // Start Battle 2 -> Clairvoyance reveals enemy's first 3 moves in GameScreen
+        final perkScrollable = find.descendant(
+          of: find.byType(SacredTempleDialog),
+          matching: find.byType(Scrollable),
+        );
+        expect(
+          find.byKey(const ValueKey('prayer_blessing_status_banner')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Activate any or all blessings freely'),
+          findsOneWidget,
+        );
+
+        for (final blessing in SacredBlessing.values) {
+          final btnFinder = find.byKey(
+            ValueKey('temple_blessing_pray_button_${blessing.id}'),
+          );
+          await tester.scrollUntilVisible(
+            btnFinder,
+            120,
+            scrollable: perkScrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<ElevatedButton>(btnFinder).onPressed,
+            isNotNull,
+          );
+          await tester.tap(btnFinder);
+          await tester.pumpAndSettle();
+        }
+        expect(harness.adClient.showRewardedCallCount, 1); // zero extra ads
+        expect(controller.pendingBattleBlessings, SacredBlessing.values.toSet());
+        expect(controller.areAllBattleBlessingsPending, isTrue);
+
+        // 5. Start Battle 2 with ALL 4 blessings stacked simultaneously
         controller.startNewBattle();
-        expect(controller.activeBattleBlessing, SacredBlessing.clairvoyance);
-        expect(controller.pendingBattleBlessing, isNull);
-        expect(controller.effectivePlayerMaxHp, 50);
+        expect(controller.pendingBattleBlessings, isEmpty);
+        expect(controller.activeBattleBlessings, SacredBlessing.values.toSet());
+        expect(controller.playerMaxHp, 50);
+        expect(controller.effectivePlayerMaxHp, 100);
+        expect(controller.userHp, 100);
+        expect(controller.playerMaxMana, 100);
+        expect(controller.effectivePlayerMaxMana, 200);
+        expect(controller.remainingMana, 200);
+        expect(controller.isVitalityBlessingActive, isTrue);
         expect(controller.isClairvoyanceActive, isTrue);
-        expect(controller.clairvoyanceMovesRemaining, 3);
-        final predictedTurn1 = controller.crystalBallMove!;
+        expect(controller.clairvoyanceMovesRemaining, 10);
+        expect(controller.isHarvestBlessingActive, isTrue);
+        expect(controller.isManaBlessingActive, isTrue);
 
         await tester.pumpWidget(
           ChangeNotifierProvider.value(
@@ -948,43 +1022,140 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
+          find.byKey(const ValueKey('battle_sacred_blessing_pill_vitality')),
+          findsOneWidget,
+        );
+        expect(
           find.byKey(const ValueKey('battle_sacred_blessing_pill_clairvoyance')),
           findsOneWidget,
         );
-
-        // Play 3 rounds -> Clairvoyance stays active for moves 1..3, expires at move 4
-        controller.playTurn(predictedTurn1);
-        expect(controller.clairvoyanceMovesRemaining, 2);
-        controller.playTurn(HandMove.rock);
-        expect(controller.clairvoyanceMovesRemaining, 1);
-        controller.playTurn(HandMove.paper);
-        expect(controller.clairvoyanceMovesRemaining, 0);
-        expect(controller.isClairvoyanceActive, isFalse);
-
-        // 4. Battle effect for Harvest (2x Elemental Orbs on round win) + Remove Ads Perk
-        controller.unlockedAds = true;
-        controller.removeAdsEnabled = true;
-        expect(controller.canActivateSacredBlessingFree(), isTrue);
-        expect(
-          controller.activateSacredBlessingFree(SacredBlessing.harvest),
-          isTrue,
-        );
-        controller.startNewBattle();
-        expect(controller.isHarvestBlessingActive, isTrue);
-        expect(controller.effectivePlayerMaxHp, 50);
-
-        await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('battle_sacred_blessing_pill_harvest')),
           findsOneWidget,
         );
+        expect(
+          find.byKey(const ValueKey('battle_sacred_blessing_pill_mana')),
+          findsOneWidget,
+        );
 
+        // Harvest grants 5x Elemental Orbs on round win
         final woodBefore = controller.woodOrbs;
-        // Fire (rock) beats Wood (scissors); grants 2x Wood orbs of the defeated enemy element
         controller.crystalBallMove = HandMove.scissors;
         controller.playTurn(HandMove.rock);
         expect(controller.lastWinner, RoundWinner.user);
-        expect(controller.woodOrbs - woodBefore, 2);
+        expect(controller.woodOrbs - woodBefore, 5);
+        expect(controller.remainingMana, 199);
+
+        // 6. Battle end cleans up all temporary blessings, HP, and Mana
+        controller.completeBattleWeek();
+        expect(controller.activeBattleBlessings, isEmpty);
+        expect(controller.battleBonusTempHp, 0);
+        expect(controller.battleBonusTempMana, 0);
+        expect(controller.effectivePlayerMaxHp, 50);
+        expect(controller.effectivePlayerMaxMana, 100);
+        expect(controller.remainingMana, 100);
+        expect(controller.isVitalityBlessingActive, isFalse);
+        expect(controller.isClairvoyanceActive, isFalse);
+        expect(controller.isHarvestBlessingActive, isFalse);
+        expect(controller.isManaBlessingActive, isFalse);
+      },
+    );
+
+    testWidgets(
+      'Blessing of Mana stacks with permanent Mana upgrades, extends battle turns beyond 100, Harvest 5x applies to Stage 4 dual spells, and CloudSaveData + all 4 localizations stay consistent',
+      (WidgetTester tester) async {
+        final harness = await _createTempleHarness(
+          prefs: {'current_week': 12, 'mana_upgrade_level': 5},
+        );
+        final controller = harness.controller;
+        addTearDown(() {
+          controller.dispose();
+          harness.billingClient.dispose();
+        });
+
+        controller.unlockedAds = true;
+        controller.removeAdsEnabled = true;
+        expect(controller.playerMaxMana, 105);
+
+        // Activate Mana + Harvest simultaneously
+        expect(controller.activateSacredBlessingFree(SacredBlessing.mana), isTrue);
+        expect(controller.activateSacredBlessingFree(SacredBlessing.harvest), isTrue);
+
+        // Verify StorageService persistence & CloudSaveData roundtrip (plus legacy compat)
+        expect(
+          harness.storage.pendingBattleBlessings,
+          containsAll(['harvest', 'mana']),
+        );
+        final cloudSnap = CloudSaveData.fromStorage(harness.storage);
+        final parsedCloud = CloudSaveData.tryParse(cloudSnap.toJsonString())!;
+        expect(parsedCloud.pendingBattleBlessings, ['harvest', 'mana']);
+
+        final legacyCloud = CloudSaveData.tryParse(
+          '{"pendingBattleBlessing":"vitality","activeBattleBlessing":"clairvoyance","battleBonusTempHp":50}',
+        )!;
+        expect(legacyCloud.pendingBattleBlessings, ['vitality']);
+        expect(legacyCloud.activeBattleBlessings, ['clairvoyance']);
+        expect(legacyCloud.battleBonusTempHp, 50);
+
+        controller.startNewBattle();
+        expect(controller.playerMaxMana, 105);
+        expect(controller.effectivePlayerMaxMana, 205);
+        expect(controller.remainingMana, 205);
+        expect(controller.battleBonusTempMana, 100);
+
+        // Play 120 draw rounds -> still has 85 mana left and does NOT trigger 100-round alert
+        for (int i = 0; i < 120; i++) {
+          controller.crystalBallMove = HandMove.rock;
+          controller.playTurn(HandMove.rock);
+        }
+        expect(controller.totalRounds, 120);
+        expect(controller.remainingMana, 85);
+        expect(controller.is100RoundsAlertPending, isFalse);
+
+        // Play remaining 85 draw rounds -> hits out-of-mana at 205
+        for (int i = 0; i < 85; i++) {
+          controller.crystalBallMove = HandMove.rock;
+          controller.playTurn(HandMove.rock);
+        }
+        expect(controller.totalRounds, 205);
+        expect(controller.remainingMana, 0);
+        expect(controller.is100RoundsAlertPending, isTrue);
+
+        // Revive & retreat clears temporary Mana back to permanent 105
+        controller.reviveAndRetreatToMap();
+        expect(controller.activeBattleBlessings, isEmpty);
+        expect(controller.battleBonusTempMana, 0);
+        expect(controller.effectivePlayerMaxMana, 105);
+        expect(controller.remainingMana, 105);
+
+        // Stage 4 Baby Mage dual-spell Harvest 5x verification
+        expect(controller.activateSacredBlessingFree(SacredBlessing.harvest), isTrue);
+        controller.enemyStage = 4;
+        controller.startNewBattle();
+        final woodBefore = controller.woodOrbs;
+        final metalBefore = controller.metalOrbs;
+        // Fire (rock) beats both Wood (scissors) and Metal (spock) in Elemental Mode
+        controller.crystalBallMove = HandMove.scissors;
+        controller.crystalBallSecondaryMove = HandMove.spock;
+        controller.playTurn(HandMove.rock);
+        expect(controller.woodOrbs - woodBefore, 5);
+        expect(controller.metalOrbs - metalBefore, 5);
+
+        // Verify all 4 supported languages contain updated & new Sacred Blessing strings
+        final loc = controller.localization;
+        for (final lang in LocalizationService.supportedLanguages) {
+          loc.setLanguage(lang);
+          expect(loc.t('temple_blessing_vitality_desc'), contains('50'));
+          expect(loc.t('temple_blessing_clairvoyance_desc'), contains('10'));
+          expect(loc.t('temple_blessing_harvest_desc'), contains('5x'));
+          expect(loc.t('temple_blessing_mana_title'), isNotEmpty);
+          expect(loc.t('temple_blessing_mana_desc'), contains('100'));
+          expect(loc.t('temple_blessing_battle_clairvoyance'), contains('/10'));
+          expect(loc.t('temple_blessing_battle_harvest'), contains('5x'));
+          expect(loc.t('temple_blessing_battle_mana'), contains('{mana}'));
+          expect(loc.t('temple_blessing_perk_ready'), isNot(contains(' 1 ')));
+        }
+        loc.setLanguage('en');
       },
     );
 
@@ -998,7 +1169,7 @@ void main() {
           tester.view.resetDevicePixelRatio();
         });
 
-        // 1. Standalone smoke checks across all 14 Sacred Temple vector painters
+        // 1. Standalone smoke checks across all Sacred Temple vector painters
         final allPainters = <Widget>[
           const ConsagrationChaliceIcon(size: 28, isOnGoldBackground: false),
           const ConsagrationChaliceIcon(size: 28, isOnGoldBackground: true),
@@ -1021,6 +1192,12 @@ void main() {
           const ElementalCrystalIcon(size: 22),
           const MeditationHaloIcon(size: 24),
           const SacredBlessingIcon(size: 24),
+          const BlessingOfVitalityIcon(size: 22),
+          const BlessingOfClairvoyanceIcon(size: 22),
+          const BlessingOfHarvestIcon(size: 22),
+          const BlessingOfManaIcon(size: 22),
+          for (final blessing in SacredBlessing.values)
+            SacredBlessingBadgeIcon(blessing: blessing, size: 18),
           const VowOfSilenceIcon(size: 28, isActive: true),
           const VowOfSilenceIcon(size: 28, isActive: false),
           const VowOfSilenceIcon(size: 28, isActive: true, isOnGoldBackground: true),

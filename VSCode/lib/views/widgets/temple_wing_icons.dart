@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../models/sacred_blessing.dart';
 import 'sacred_temple_icon.dart';
 
 /// Shared helper wrapper matching [RoyalCastleIcon] and [castle_wing_icons.dart]
@@ -3051,6 +3052,592 @@ class _TitheBlessingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_TitheBlessingPainter oldDelegate) =>
       oldDelegate.isOnGoldBackground != isOnGoldBackground;
+}
+
+/// Dispatcher rendering the bespoke custom RPG [CustomPainter] icon for each
+/// [SacredBlessing] in the Sacred Temple Prayer tab and Battle HUD pills.
+class SacredBlessingBadgeIcon extends StatelessWidget {
+  final SacredBlessing blessing;
+  final double size;
+
+  const SacredBlessingBadgeIcon({
+    super.key,
+    required this.blessing,
+    this.size = 22.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    switch (blessing) {
+      case SacredBlessing.vitality:
+        return BlessingOfVitalityIcon(size: size);
+      case SacredBlessing.clairvoyance:
+        return BlessingOfClairvoyanceIcon(size: size);
+      case SacredBlessing.harvest:
+        return BlessingOfHarvestIcon(size: size);
+      case SacredBlessing.mana:
+        return BlessingOfManaIcon(size: size);
+    }
+  }
+}
+
+/// Prayer Room — `Blessing of Vitality`: Beveled golden heart bezel enclosing
+/// a faceted crimson-ruby crystal heart topped with a floating golden halo.
+class BlessingOfVitalityIcon extends StatelessWidget {
+  final double size;
+
+  const BlessingOfVitalityIcon({super.key, this.size = 22.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _BlessingOfVitalityPainter(),
+    );
+  }
+}
+
+class _BlessingOfVitalityPainter extends CustomPainter {
+  const _BlessingOfVitalityPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.2);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.85);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Floating golden oval halo above the heart
+    final haloOuter = Rect.fromCenter(
+      center: Offset(s * 0.50, s * 0.14),
+      width: s * 0.50,
+      height: s * 0.14,
+    );
+    final haloInner = Rect.fromCenter(
+      center: Offset(s * 0.50, s * 0.14),
+      width: s * 0.28,
+      height: s * 0.05,
+    );
+    final haloPath = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addOval(haloOuter)
+      ..addOval(haloInner);
+    canvas.drawPath(
+      haloPath,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFB27800)],
+        ).createShader(haloOuter),
+    );
+    canvas.drawOval(haloOuter, thinOutline);
+
+    // 2. Beveled golden outer heart bezel
+    final outerHeart = Path()
+      ..moveTo(s * 0.50, s * 0.34)
+      ..cubicTo(s * 0.40, s * 0.21, s * 0.12, s * 0.23, s * 0.12, s * 0.47)
+      ..cubicTo(s * 0.12, s * 0.69, s * 0.37, s * 0.82, s * 0.50, s * 0.92)
+      ..cubicTo(s * 0.63, s * 0.82, s * 0.88, s * 0.69, s * 0.88, s * 0.47)
+      ..cubicTo(s * 0.88, s * 0.23, s * 0.60, s * 0.21, s * 0.50, s * 0.34)
+      ..close();
+    canvas.drawPath(
+      outerHeart,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFB27800)],
+        ).createShader(Rect.fromLTRB(s * 0.12, s * 0.22, s * 0.88, s * 0.92)),
+    );
+    canvas.drawPath(outerHeart, outline);
+
+    // 3. Radiant ruby crystal inner heart
+    final innerHeart = Path()
+      ..moveTo(s * 0.50, s * 0.41)
+      ..cubicTo(s * 0.42, s * 0.30, s * 0.21, s * 0.32, s * 0.21, s * 0.49)
+      ..cubicTo(s * 0.21, s * 0.65, s * 0.40, s * 0.76, s * 0.50, s * 0.84)
+      ..cubicTo(s * 0.60, s * 0.76, s * 0.79, s * 0.65, s * 0.79, s * 0.49)
+      ..cubicTo(s * 0.79, s * 0.32, s * 0.58, s * 0.30, s * 0.50, s * 0.41)
+      ..close();
+    canvas.drawPath(
+      innerHeart,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFF5252), Color(0xFFE53935), Color(0xFF8E0000)],
+        ).createShader(Rect.fromLTRB(s * 0.21, s * 0.30, s * 0.79, s * 0.84)),
+    );
+    canvas.drawPath(innerHeart, thinOutline);
+
+    // 4. Specular highlight & subtle ivory cross glint
+    final glintPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.92)
+      ..strokeWidth = math.max(0.9, 1.35 * scale)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(s * 0.50, s * 0.47),
+      Offset(s * 0.50, s * 0.67),
+      glintPaint,
+    );
+    canvas.drawLine(
+      Offset(s * 0.40, s * 0.57),
+      Offset(s * 0.60, s * 0.57),
+      glintPaint,
+    );
+    canvas.drawCircle(
+      Offset(s * 0.32, s * 0.43),
+      s * 0.045,
+      Paint()..color = Colors.white.withValues(alpha: 0.85),
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BlessingOfVitalityPainter oldDelegate) => false;
+}
+
+/// Prayer Room — `Blessing of Clairvoyance`: Golden-framed mystic oracle eye
+/// with luminous amethyst iris, celestial foresight rays, and starlight pupil.
+class BlessingOfClairvoyanceIcon extends StatelessWidget {
+  final double size;
+
+  const BlessingOfClairvoyanceIcon({super.key, this.size = 22.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _BlessingOfClairvoyancePainter(),
+    );
+  }
+}
+
+class _BlessingOfClairvoyancePainter extends CustomPainter {
+  const _BlessingOfClairvoyancePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.2);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.85);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Three golden prophetic sunbeams crowning the eye
+    final rayPaint = Paint()
+      ..color = const Color(0xFFFFD54F)
+      ..strokeWidth = math.max(1.0, 1.55 * scale)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(s * 0.50, s * 0.10), Offset(s * 0.50, s * 0.22), rayPaint);
+    canvas.drawLine(Offset(s * 0.27, s * 0.16), Offset(s * 0.34, s * 0.26), rayPaint);
+    canvas.drawLine(Offset(s * 0.73, s * 0.16), Offset(s * 0.66, s * 0.26), rayPaint);
+
+    // 2. Beveled golden outer eye almond bezel
+    final outerEye = Path()
+      ..moveTo(s * 0.08, s * 0.55)
+      ..quadraticBezierTo(s * 0.50, s * 0.21, s * 0.92, s * 0.55)
+      ..quadraticBezierTo(s * 0.50, s * 0.89, s * 0.08, s * 0.55)
+      ..close();
+    canvas.drawPath(
+      outerEye,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFB27800)],
+        ).createShader(Rect.fromLTRB(s * 0.08, s * 0.26, s * 0.92, s * 0.84)),
+    );
+    canvas.drawPath(outerEye, outline);
+
+    // 3. Soft lavender-ivory inner eye sclera
+    final innerEye = Path()
+      ..moveTo(s * 0.17, s * 0.55)
+      ..quadraticBezierTo(s * 0.50, s * 0.30, s * 0.83, s * 0.55)
+      ..quadraticBezierTo(s * 0.50, s * 0.80, s * 0.17, s * 0.55)
+      ..close();
+    canvas.drawPath(
+      innerEye,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFF3E5F5), Color(0xFFD1C4E9)],
+        ).createShader(Rect.fromLTRB(s * 0.17, s * 0.34, s * 0.83, s * 0.76)),
+    );
+    canvas.drawPath(innerEye, thinOutline);
+
+    // 4. Luminous amethyst iris + deep violet pupil + starlight gleam
+    final center = Offset(s * 0.50, s * 0.55);
+    final irisR = s * 0.175;
+    canvas.drawCircle(
+      center,
+      irisR,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.25, -0.25),
+          colors: [Color(0xFFE040FB), Color(0xFF9C27B0), Color(0xFF4A148C)],
+        ).createShader(Rect.fromCircle(center: center, radius: irisR)),
+    );
+    canvas.drawCircle(center, irisR, thinOutline);
+
+    // Deep cosmic pupil
+    canvas.drawCircle(
+      center,
+      s * 0.075,
+      Paint()..color = const Color(0xFF1A0730),
+    );
+
+    // Crisp white specular dot
+    canvas.drawCircle(
+      Offset(s * 0.44, s * 0.49),
+      s * 0.042,
+      Paint()..color = Colors.white.withValues(alpha: 0.95),
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BlessingOfClairvoyancePainter oldDelegate) => false;
+}
+
+/// Prayer Room — `Blessing of Harvest`: Twin beveled golden abundance wreaths
+/// cradling a faceted emerald Elemental Orb crowned with a radiant star burst.
+class BlessingOfHarvestIcon extends StatelessWidget {
+  final double size;
+
+  const BlessingOfHarvestIcon({super.key, this.size = 22.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _BlessingOfHarvestPainter(),
+    );
+  }
+}
+
+class _BlessingOfHarvestPainter extends CustomPainter {
+  const _BlessingOfHarvestPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.15);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.8);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Symmetrical golden harvest crescent leaves cradling the central orb
+    for (final isLeft in [true, false]) {
+      final sign = isLeft ? -1.0 : 1.0;
+      double px(double d) => s * (0.50 + sign * d);
+
+      final leaf = Path()
+        ..moveTo(px(0.05), s * 0.87)
+        ..cubicTo(px(0.36), s * 0.82, px(0.45), s * 0.56, px(0.38), s * 0.30)
+        ..cubicTo(px(0.31), s * 0.47, px(0.25), s * 0.67, px(0.05), s * 0.76)
+        ..close();
+      canvas.drawPath(
+        leaf,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF3B0), Color(0xFFFFCA28), Color(0xFFB27800)],
+          ).createShader(Rect.fromLTRB(s * 0.06, s * 0.28, s * 0.94, s * 0.88)),
+      );
+      canvas.drawPath(leaf, thinOutline);
+    }
+
+    // 2. Radiant beveled golden ring around the emerald harvest orb
+    final orbCenter = Offset(s * 0.50, s * 0.56);
+    final bezelR = s * 0.255;
+    final orbR = s * 0.195;
+    canvas.drawCircle(
+      orbCenter,
+      bezelR,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFF9A6500)],
+        ).createShader(Rect.fromCircle(center: orbCenter, radius: bezelR)),
+    );
+    canvas.drawCircle(orbCenter, bezelR, outline);
+
+    // 3. Faceted emerald elemental harvest orb
+    canvas.drawCircle(
+      orbCenter,
+      orbR,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.30, -0.30),
+          colors: [Color(0xFFB9F6CA), Color(0xFF43A047), Color(0xFF1B5E20)],
+        ).createShader(Rect.fromCircle(center: orbCenter, radius: orbR)),
+    );
+    canvas.drawCircle(orbCenter, orbR, thinOutline);
+    canvas.drawCircle(
+      Offset(s * 0.435, s * 0.495),
+      s * 0.045,
+      Paint()..color = Colors.white.withValues(alpha: 0.92),
+    );
+
+    // 4. Crown 4-point golden abundance star sparkle above the orb
+    final starC = Offset(s * 0.50, s * 0.19);
+    final star = Path();
+    for (int i = 0; i < 8; i++) {
+      final r = i.isEven ? s * 0.145 : s * 0.048;
+      final a = -math.pi / 2 + i * (math.pi / 4);
+      final pt = starC + Offset(math.cos(a), math.sin(a)) * r;
+      if (i == 0) {
+        star.moveTo(pt.dx, pt.dy);
+      } else {
+        star.lineTo(pt.dx, pt.dy);
+      }
+    }
+    star.close();
+    canvas.drawPath(
+      star,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFE082), Color(0xFFFFB300)],
+        ).createShader(Rect.fromCircle(center: starC, radius: s * 0.145)),
+    );
+    canvas.drawPath(star, thinOutline);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BlessingOfHarvestPainter oldDelegate) => false;
+}
+
+/// Prayer Room — `Blessing of Mana`: Faceted sapphire-cyan arcane mana crystal
+/// droplet set inside a beveled golden teardrop bezel with an orbiting golden
+/// arcane ring and twin shimmering cyan-white energy sparkles.
+class BlessingOfManaIcon extends StatelessWidget {
+  final double size;
+
+  const BlessingOfManaIcon({super.key, this.size = 22.0});
+
+  @override
+  Widget build(BuildContext context) {
+    return _TempleVectorIcon(
+      size: size,
+      painter: const _BlessingOfManaPainter(),
+    );
+  }
+}
+
+class _BlessingOfManaPainter extends CustomPainter {
+  const _BlessingOfManaPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = math.min(size.width, size.height);
+    final ox = (size.width - s) * 0.5;
+    final oy = (size.height - s) * 0.5;
+    final scale = s / 24.0;
+    final outline = _outlinePaint(scale, baseWidth: 1.2);
+    final thinOutline = _outlinePaint(scale, baseWidth: 0.8);
+
+    canvas.save();
+    canvas.translate(ox, oy);
+
+    // 1. Soft radiant arcane glow aura behind the droplet
+    canvas.drawCircle(
+      Offset(s * 0.50, s * 0.58),
+      s * 0.36,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF40C4FF).withValues(alpha: 0.35),
+            const Color(0xFF0288D1).withValues(alpha: 0.0),
+          ],
+        ).createShader(
+          Rect.fromCircle(center: Offset(s * 0.50, s * 0.58), radius: s * 0.36),
+        ),
+    );
+
+    // 2. Back arc of tilted golden arcane ring orbiting the mana droplet
+    canvas.save();
+    canvas.translate(s * 0.50, s * 0.58);
+    canvas.rotate(-0.34);
+    final ringRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: s * 0.84,
+      height: s * 0.25,
+    );
+    canvas.drawArc(
+      ringRect,
+      math.pi,
+      math.pi,
+      false,
+      Paint()
+        ..color = const Color(0xFFB27800)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.4, 2.0 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.restore();
+
+    Path buildDrop(double pad) {
+      final t = pad;
+      return Path()
+        ..moveTo(s * 0.50, s * (0.10 + t * 1.15))
+        ..cubicTo(
+          s * (0.66 - t * 0.4),
+          s * 0.34,
+          s * (0.81 - t),
+          s * 0.49,
+          s * (0.81 - t),
+          s * 0.61,
+        )
+        ..arcToPoint(
+          Offset(s * (0.19 + t), s * 0.61),
+          radius: Radius.circular(s * (0.31 - t)),
+          clockwise: true,
+        )
+        ..cubicTo(
+          s * (0.19 + t),
+          s * 0.49,
+          s * (0.34 + t * 0.4),
+          s * 0.34,
+          s * 0.50,
+          s * (0.10 + t * 1.15),
+        )
+        ..close();
+    }
+
+    // 3. Beveled golden teardrop bezel
+    final outerDrop = buildDrop(0.0);
+    canvas.drawPath(
+      outerDrop,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFF8E1),
+            Color(0xFFFFE082),
+            Color(0xFFFFB300),
+            Color(0xFFB27800),
+          ],
+          stops: [0.0, 0.35, 0.72, 1.0],
+        ).createShader(Rect.fromLTRB(s * 0.19, s * 0.10, s * 0.81, s * 0.92)),
+    );
+    canvas.drawPath(outerDrop, outline);
+
+    // 4. Faceted sapphire-cyan mana crystal core inside the bezel
+    final innerDrop = buildDrop(0.075);
+    canvas.save();
+    canvas.clipPath(innerDrop);
+
+    canvas.drawRect(
+      Rect.fromLTRB(s * 0.22, s * 0.16, s * 0.78, s * 0.90),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFB2F5FF), Color(0xFF29B6F6), Color(0xFF01579B)],
+        ).createShader(Rect.fromLTRB(s * 0.22, s * 0.16, s * 0.78, s * 0.90)),
+    );
+
+    // Central bright diamond crystal table facet
+    final tableFacet = Path()
+      ..moveTo(s * 0.50, s * 0.34)
+      ..lineTo(s * 0.64, s * 0.56)
+      ..lineTo(s * 0.50, s * 0.74)
+      ..lineTo(s * 0.36, s * 0.56)
+      ..close();
+    canvas.drawPath(
+      tableFacet,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE0F7FA), Color(0xFF00E5FF), Color(0xFF0288D1)],
+        ).createShader(Rect.fromLTRB(s * 0.36, s * 0.34, s * 0.64, s * 0.74)),
+    );
+
+    // Crisp crystalline facet ridges
+    final ridgePaint = Paint()
+      ..color = const Color(0xFFE0F7FA).withValues(alpha: 0.78)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.6, 0.75 * scale)
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(tableFacet, ridgePaint);
+    canvas.drawLine(Offset(s * 0.50, s * 0.18), Offset(s * 0.50, s * 0.34), ridgePaint);
+    canvas.drawLine(Offset(s * 0.50, s * 0.74), Offset(s * 0.50, s * 0.86), ridgePaint);
+
+    // Bright specular crystal gleam on upper-left shoulder
+    canvas.drawCircle(
+      Offset(s * 0.39, s * 0.49),
+      s * 0.048,
+      Paint()..color = Colors.white.withValues(alpha: 0.94),
+    );
+    canvas.restore();
+    canvas.drawPath(innerDrop, thinOutline);
+
+    // 5. Front sweep of tilted golden arcane ring crossing the lower crystal
+    canvas.save();
+    canvas.translate(s * 0.50, s * 0.58);
+    canvas.rotate(-0.34);
+    canvas.drawArc(
+      ringRect,
+      0.08,
+      math.pi - 0.16,
+      false,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFFFFF8E1), Color(0xFFFFD54F), Color(0xFFFFB300)],
+        ).createShader(ringRect)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.3, 1.85 * scale)
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.restore();
+
+    // 6. Twin shimmering arcane cyan-white star motes flanking upper crest
+    void drawMote(Offset center, double r) {
+      final mote = Path()
+        ..moveTo(center.dx, center.dy - r)
+        ..lineTo(center.dx + r * 0.36, center.dy - r * 0.36)
+        ..lineTo(center.dx + r, center.dy)
+        ..lineTo(center.dx + r * 0.36, center.dy + r * 0.36)
+        ..lineTo(center.dx, center.dy + r)
+        ..lineTo(center.dx - r * 0.36, center.dy + r * 0.36)
+        ..lineTo(center.dx - r, center.dy)
+        ..lineTo(center.dx - r * 0.36, center.dy - r * 0.36)
+        ..close();
+      canvas.drawPath(mote, Paint()..color = const Color(0xFFE0F7FA));
+    }
+
+    drawMote(Offset(s * 0.21, s * 0.26), s * 0.095);
+    drawMote(Offset(s * 0.80, s * 0.22), s * 0.075);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BlessingOfManaPainter oldDelegate) => false;
 }
 
 

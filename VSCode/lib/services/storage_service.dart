@@ -493,10 +493,27 @@ class StorageService {
   static const String _adConsagrationsThisWeekKey =
       'ad_consagrations_this_week';
   static const String _pendingBattleBlessingKey = 'pending_battle_blessing';
+  static const String _pendingBattleBlessingsKey = 'pending_battle_blessings';
   static const String _activeBattleBlessingKey = 'active_battle_blessing';
+  static const String _activeBattleBlessingsKey = 'active_battle_blessings';
   static const String _battleBonusTempHpKey = 'battle_bonus_temp_hp';
+  static const String _battleBonusTempManaKey = 'battle_bonus_temp_mana';
   static const String _lastFreeDailyPrayerDateKey =
       'last_free_daily_prayer_date';
+
+  static List<String> _normalizeBlessingIdList(Iterable<String> rawIds) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final raw in rawIds) {
+      for (final token in raw.split(',')) {
+        final clean = token.trim();
+        if (clean.isNotEmpty && seen.add(clean)) {
+          out.add(clean);
+        }
+      }
+    }
+    return out;
+  }
 
   int get adConsagrationsThisWeek {
     final val = _prefs.getInt(_adConsagrationsThisWeekKey) ?? 0;
@@ -506,30 +523,80 @@ class StorageService {
   Future<void> setAdConsagrationsThisWeek(int val) =>
       _prefs.setInt(_adConsagrationsThisWeekKey, val < 0 ? 0 : val);
 
+  List<String> get pendingBattleBlessings {
+    final list = _prefs.getStringList(_pendingBattleBlessingsKey);
+    if (list != null) {
+      return _normalizeBlessingIdList(list);
+    }
+    final legacy = _prefs.getString(_pendingBattleBlessingKey);
+    if (legacy == null || legacy.trim().isEmpty) return const [];
+    return _normalizeBlessingIdList([legacy]);
+  }
+
+  Future<void> setPendingBattleBlessings(Iterable<String> ids) async {
+    final clean = _normalizeBlessingIdList(ids);
+    if (clean.isEmpty) {
+      await Future.wait([
+        _prefs.remove(_pendingBattleBlessingsKey),
+        _prefs.remove(_pendingBattleBlessingKey),
+      ]);
+      return;
+    }
+    await Future.wait([
+      _prefs.setStringList(_pendingBattleBlessingsKey, clean),
+      _prefs.setString(_pendingBattleBlessingKey, clean.join(',')),
+    ]);
+  }
+
   String? get pendingBattleBlessing {
-    final raw = _prefs.getString(_pendingBattleBlessingKey)?.trim();
-    return (raw == null || raw.isEmpty) ? null : raw;
+    final list = pendingBattleBlessings;
+    return list.isEmpty ? null : list.first;
   }
 
   Future<void> setPendingBattleBlessing(String? id) {
     final clean = id?.trim();
     if (clean == null || clean.isEmpty) {
-      return _prefs.remove(_pendingBattleBlessingKey);
+      return setPendingBattleBlessings(const []);
     }
-    return _prefs.setString(_pendingBattleBlessingKey, clean);
+    return setPendingBattleBlessings([clean]);
+  }
+
+  List<String> get activeBattleBlessings {
+    final list = _prefs.getStringList(_activeBattleBlessingsKey);
+    if (list != null) {
+      return _normalizeBlessingIdList(list);
+    }
+    final legacy = _prefs.getString(_activeBattleBlessingKey);
+    if (legacy == null || legacy.trim().isEmpty) return const [];
+    return _normalizeBlessingIdList([legacy]);
+  }
+
+  Future<void> setActiveBattleBlessings(Iterable<String> ids) async {
+    final clean = _normalizeBlessingIdList(ids);
+    if (clean.isEmpty) {
+      await Future.wait([
+        _prefs.remove(_activeBattleBlessingsKey),
+        _prefs.remove(_activeBattleBlessingKey),
+      ]);
+      return;
+    }
+    await Future.wait([
+      _prefs.setStringList(_activeBattleBlessingsKey, clean),
+      _prefs.setString(_activeBattleBlessingKey, clean.join(',')),
+    ]);
   }
 
   String? get activeBattleBlessing {
-    final raw = _prefs.getString(_activeBattleBlessingKey)?.trim();
-    return (raw == null || raw.isEmpty) ? null : raw;
+    final list = activeBattleBlessings;
+    return list.isEmpty ? null : list.first;
   }
 
   Future<void> setActiveBattleBlessing(String? id) {
     final clean = id?.trim();
     if (clean == null || clean.isEmpty) {
-      return _prefs.remove(_activeBattleBlessingKey);
+      return setActiveBattleBlessings(const []);
     }
-    return _prefs.setString(_activeBattleBlessingKey, clean);
+    return setActiveBattleBlessings([clean]);
   }
 
   int get battleBonusTempHp {
@@ -539,6 +606,14 @@ class StorageService {
 
   Future<void> setBattleBonusTempHp(int val) =>
       _prefs.setInt(_battleBonusTempHpKey, val < 0 ? 0 : val);
+
+  int get battleBonusTempMana {
+    final val = _prefs.getInt(_battleBonusTempManaKey) ?? 0;
+    return val < 0 ? 0 : val;
+  }
+
+  Future<void> setBattleBonusTempMana(int val) =>
+      _prefs.setInt(_battleBonusTempManaKey, val < 0 ? 0 : val);
 
   String? get lastFreeDailyPrayerDate {
     final raw = _prefs.getString(_lastFreeDailyPrayerDateKey)?.trim();
@@ -1639,9 +1714,10 @@ class StorageService {
       setIsTempleSiegeActive(false),
       setHasShownTempleSiegeIntro(false),
       setAdConsagrationsThisWeek(0),
-      setPendingBattleBlessing(null),
-      setActiveBattleBlessing(null),
+      setPendingBattleBlessings(const []),
+      setActiveBattleBlessings(const []),
       setBattleBonusTempHp(0),
+      setBattleBonusTempMana(0),
       setUnlockedReset(false),
       setUnlockedPredictability(false),
       setUnlockedRandom(false),

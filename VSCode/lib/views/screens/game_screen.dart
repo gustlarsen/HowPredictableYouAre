@@ -27,6 +27,7 @@ import '../widgets/rpg_teleport_portal_icon.dart';
 import '../widgets/adaptive_rewarded_ad_button.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/elemental_symbol_icon.dart';
+import '../widgets/temple_wing_icons.dart';
 import '../dialogs/inventory_dialog.dart';
 import '../dialogs/teleport_confirm_dialog.dart';
 import '../dialogs/temple_moral_choice_dialog.dart';
@@ -221,7 +222,7 @@ class _GameScreenState extends State<GameScreen>
     return controller.userHp <= 0 ||
         controller.computerHp <= 0 ||
         controller.isBossVictoryPending ||
-        controller.totalRounds >= controller.playerMaxMana ||
+        controller.totalRounds >= controller.effectivePlayerMaxMana ||
         _isDeathSequenceActive ||
         _isTempleSiegeInvasionDialogOpen ||
         _isBossVictoryDialogOpen;
@@ -236,7 +237,7 @@ class _GameScreenState extends State<GameScreen>
       return true;
     }
     if (controller.remainingMana <= 0 ||
-        controller.totalRounds >= controller.playerMaxMana ||
+        controller.totalRounds >= controller.effectivePlayerMaxMana ||
         controller.isDeathAlertPending ||
         controller.is100RoundsAlertPending) {
       return true;
@@ -1418,19 +1419,20 @@ class _GameScreenState extends State<GameScreen>
   ) {
     final loc = controller.localization;
     final palette = AppPalette.of(context);
-    final SacredBlessing? blessing;
-    final String label;
+    final entries = <({SacredBlessing blessing, String label})>[];
 
     if (controller.isVitalityBlessingActive) {
-      blessing = SacredBlessing.vitality;
-      label = loc
-          .t(
-            'temple_blessing_battle_vitality',
-            fallback: 'Vitality: +{hp} Temp HP',
-          )
-          .replaceAll('{hp}', '${controller.battleBonusTempHp}');
-    } else if (controller.isClairvoyanceActive) {
-      blessing = SacredBlessing.clairvoyance;
+      entries.add((
+        blessing: SacredBlessing.vitality,
+        label: loc
+            .t(
+              'temple_blessing_battle_vitality',
+              fallback: 'Vitality: +{hp} Temp HP',
+            )
+            .replaceAll('{hp}', '${controller.battleBonusTempHp}'),
+      ));
+    }
+    if (controller.isClairvoyanceActive) {
       final predictedMove = controller.crystalBallMoves
           .map(
             (m) => m.displayLabel(
@@ -1439,57 +1441,89 @@ class _GameScreenState extends State<GameScreen>
             ),
           )
           .join(' + ');
-      label = loc
-          .t(
-            'temple_blessing_battle_clairvoyance',
-            fallback: 'Clairvoyance ({left}/3): {move}',
-          )
-          .replaceAll('{left}', '${controller.clairvoyanceMovesRemaining}')
-          .replaceAll('{move}', predictedMove);
-    } else if (controller.isHarvestBlessingActive) {
-      blessing = SacredBlessing.harvest;
-      label = loc.t(
-        'temple_blessing_battle_harvest',
-        fallback: 'Harvest: 2x Orbs',
-      );
-    } else {
+      entries.add((
+        blessing: SacredBlessing.clairvoyance,
+        label: loc
+            .t(
+              'temple_blessing_battle_clairvoyance',
+              fallback: 'Clairvoyance ({left}/10): {move}',
+            )
+            .replaceAll('{left}', '${controller.clairvoyanceMovesRemaining}')
+            .replaceAll('{move}', predictedMove),
+      ));
+    }
+    if (controller.isHarvestBlessingActive) {
+      entries.add((
+        blessing: SacredBlessing.harvest,
+        label: loc.t(
+          'temple_blessing_battle_harvest',
+          fallback: 'Harvest: 5x Orbs',
+        ),
+      ));
+    }
+    if (controller.isManaBlessingActive) {
+      entries.add((
+        blessing: SacredBlessing.mana,
+        label: loc
+            .t(
+              'temple_blessing_battle_mana',
+              fallback: 'Mana: +{mana} Temp Mana',
+            )
+            .replaceAll('{mana}', '${controller.battleBonusTempMana}'),
+      ));
+    }
+
+    if (entries.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: Container(
-        key: ValueKey('battle_sacred_blessing_pill_${blessing.id}'),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(
-          color: palette.isDark
-              ? blessing.accentColor.withValues(alpha: 0.16)
-              : blessing.accentColor.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: blessing.accentColor.withValues(alpha: 0.72),
-            width: 1.1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(blessing.icon, size: 13, color: blessing.accentColor),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: palette.isDark ? Colors.white : palette.primaryText,
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        alignment: WrapAlignment.center,
+        children: [
+          for (final entry in entries)
+            Container(
+              key: ValueKey('battle_sacred_blessing_pill_${entry.blessing.id}'),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: palette.isDark
+                    ? entry.blessing.accentColor.withValues(alpha: 0.16)
+                    : entry.blessing.accentColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: entry.blessing.accentColor.withValues(alpha: 0.72),
+                  width: 1.1,
                 ),
               ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SacredBlessingBadgeIcon(
+                    blessing: entry.blessing,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      entry.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: palette.isDark
+                            ? Colors.white
+                            : palette.primaryText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -2424,8 +2458,11 @@ class _GameScreenState extends State<GameScreen>
                             controller.showNextMove ||
                             controller.showSuggestion ||
                             controller.showCrystalBall;
-                        final hasActiveBlessing =
-                            controller.activeBattleBlessing != null;
+                        final activeBlessingPillCount =
+                            (controller.isVitalityBlessingActive ? 1 : 0) +
+                            (controller.isClairvoyanceActive ? 1 : 0) +
+                            (controller.isHarvestBlessingActive ? 1 : 0) +
+                            (controller.isManaBlessingActive ? 1 : 0);
                         final isCompactHeight =
                             middleConstraints.maxHeight < 370.0;
 
@@ -2441,7 +2478,9 @@ class _GameScreenState extends State<GameScreen>
                             (visibleHintRows == 2
                                 ? 86.0
                                 : (visibleHintRows == 1 ? 46.0 : 0.0)) +
-                            (hasActiveBlessing ? 34.0 : 0.0) +
+                            (activeBlessingPillCount > 2
+                                ? 64.0
+                                : (activeBlessingPillCount > 0 ? 34.0 : 0.0)) +
                             54.0;
                         final markovMaxBodyHeight =
                             (upperScrollHeight - upperChromeHeight)
@@ -2589,7 +2628,7 @@ class _GameScreenState extends State<GameScreen>
                                     computerHp: controller.computerHp,
                                     computerMaxHp: controller.enemyMaxHp,
                                     remainingMana: controller.remainingMana,
-                                    maxMana: controller.playerMaxMana,
+                                    maxMana: controller.effectivePlayerMaxMana,
                                     elementalMode: controller.isElementalMode,
                                     userDamageAmount:
                                         controller.lastRoundUserDamage > 0
@@ -3265,8 +3304,8 @@ class _GameScreenState extends State<GameScreen>
                         fallback:
                             'Resetting will rewind time back to Turn 0, restoring Mana to {mana}, HP to {hp}, scores to 0, and clearing the Markov matrix.',
                       )
-                      .replaceAll('{mana}', '${controller.playerMaxMana}')
-                      .replaceAll('{hp}', '${controller.playerMaxHp}'),
+                      .replaceAll('{mana}', '${controller.effectivePlayerMaxMana}')
+                      .replaceAll('{hp}', '${controller.effectivePlayerMaxHp}'),
                   style: TextStyle(
                     fontSize: 13.5,
                     height: 1.4,
