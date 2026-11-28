@@ -684,6 +684,70 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
 
   Widget _buildOrbSummaryBar(BuildContext context) {
     final palette = AppPalette.of(context);
+    final showSecondaryElements = controller.includesEarthAndMetalInBonuses ||
+        controller.showNewHands ||
+        controller.earthOrbs > 0 ||
+        controller.metalOrbs > 0;
+
+    const primaryMoves = [
+      HandMove.rock,
+      HandMove.paper,
+      HandMove.scissors,
+    ];
+    const secondaryMoves = [
+      HandMove.lizard,
+      HandMove.spock,
+    ];
+    const double orbRowSpacing = 22.0;
+
+    Widget buildOrbChip(HandMove move) {
+      return Row(
+        key: ValueKey('shop_header_orb_${move.orbKey}'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          KeyedSubtree(
+            key: _headerOrbKeys[move],
+            child: ElementalEnergySphere(
+              key: ValueKey('shop_header_orb_sphere_${move.orbKey}'),
+              size: 17,
+              primaryColor: move.elementalPrimaryColor,
+              secondaryColor: move.elementalSecondaryColor,
+              isDark: palette.isDark,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${controller.orbsFor(move)}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: palette.isDark
+                  ? palette.elementalText(move)
+                  : palette.primaryText,
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildOrbRow(Key rowKey, List<HandMove> moves) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Row(
+          key: rowKey,
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (int i = 0; i < moves.length; i++) ...[
+              if (i > 0) const SizedBox(width: orbRowSpacing),
+              buildOrbChip(moves[i]),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       key: const ValueKey('shop_orb_summary_bar'),
       width: double.infinity,
@@ -697,40 +761,21 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           ),
         ),
       ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceEvenly,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 8,
-        runSpacing: 4,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (final move in HandMove.values)
-            Row(
-              key: ValueKey('shop_header_orb_${move.orbKey}'),
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                KeyedSubtree(
-                  key: _headerOrbKeys[move],
-                  child: ElementalEnergySphere(
-                    key: ValueKey('shop_header_orb_sphere_${move.orbKey}'),
-                    size: 17,
-                    primaryColor: move.elementalPrimaryColor,
-                    secondaryColor: move.elementalSecondaryColor,
-                    isDark: palette.isDark,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${controller.orbsFor(move)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: palette.isDark
-                        ? palette.elementalText(move)
-                        : palette.primaryText,
-                  ),
-                ),
-              ],
+          buildOrbRow(
+            const ValueKey('shop_orb_summary_primary_row'),
+            primaryMoves,
+          ),
+          if (showSecondaryElements) ...[
+            const SizedBox(height: 5),
+            buildOrbRow(
+              const ValueKey('shop_orb_summary_secondary_row'),
+              secondaryMoves,
             ),
+          ],
         ],
       ),
     );

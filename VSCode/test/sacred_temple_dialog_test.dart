@@ -2215,6 +2215,160 @@ void main() {
         }
       },
     );
+
+    testWidgets(
+      'Elemental orb balance header renders centered 3+2 pyramid when Earth & Metal are unlocked and single centered 3-orb row without extra gap when locked',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Phase 1 (Earth & Metal locked, 0 Earth/Metal orbs) -> only 3 primary orbs centered
+        final lockedHarness = await _createTempleHarness(
+          prefs: {
+            'current_week': 1,
+            'enemy_stage': 1,
+            'unlockedNewHands': false,
+            'orbs_fire': 15,
+            'orbs_water': 20,
+            'orbs_wood': 25,
+          },
+        );
+        final lockedCtrl = lockedHarness.controller;
+        addTearDown(() {
+          lockedCtrl.dispose();
+          lockedHarness.billingClient.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: SacredTempleDialog(
+                key: const ValueKey('temple_orb_bar_locked'),
+                controller: lockedCtrl,
+                fromTemple: true,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        final lockedBarFinder = find.byKey(const ValueKey('shop_orb_summary_bar'));
+        final lockedPrimaryRowFinder = find.byKey(
+          const ValueKey('shop_orb_summary_primary_row'),
+        );
+        expect(lockedBarFinder, findsOneWidget);
+        expect(lockedPrimaryRowFinder, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('shop_orb_summary_secondary_row')),
+          findsNothing,
+        );
+        expect(find.byKey(const ValueKey('shop_header_orb_fire')), findsOneWidget);
+        expect(find.byKey(const ValueKey('shop_header_orb_water')), findsOneWidget);
+        expect(find.byKey(const ValueKey('shop_header_orb_wood')), findsOneWidget);
+        expect(find.byKey(const ValueKey('shop_header_orb_earth')), findsNothing);
+        expect(find.byKey(const ValueKey('shop_header_orb_metal')), findsNothing);
+
+        final lockedBarRect = tester.getRect(lockedBarFinder);
+        final lockedPrimaryRect = tester.getRect(lockedPrimaryRowFinder);
+        expect(lockedPrimaryRect.center.dx, closeTo(lockedBarRect.center.dx, 0.5));
+        // Clean single-row height without empty vertical gap below
+        expect(lockedBarRect.height, closeTo(lockedPrimaryRect.height + 14.0, 2.0));
+
+        // 2. Phase 2 / Unlocked (all 5 elements) -> centered 3-top / 2-bottom pyramid
+        for (final isDark in [true, false]) {
+          final unlockedHarness = await _createTempleHarness(
+            prefs: {
+              'current_week': 12,
+              'unlockedNewHands': true,
+              'orbs_fire': 15,
+              'orbs_water': 20,
+              'orbs_wood': 25,
+              'orbs_earth': 12,
+              'orbs_metal': 18,
+            },
+          );
+          final unlockedCtrl = unlockedHarness.controller;
+          unlockedCtrl.darkMode = isDark;
+          addTearDown(() {
+            unlockedCtrl.dispose();
+            unlockedHarness.billingClient.dispose();
+          });
+
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData.light(useMaterial3: true),
+              darkTheme: ThemeData.dark(useMaterial3: true),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: Scaffold(
+                body: SacredTempleDialog(
+                  key: ValueKey('temple_orb_bar_unlocked_$isDark'),
+                  controller: unlockedCtrl,
+                  fromTemple: true,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          final barRect = tester.getRect(
+            find.byKey(const ValueKey('shop_orb_summary_bar')),
+          );
+          final primaryRowRect = tester.getRect(
+            find.byKey(const ValueKey('shop_orb_summary_primary_row')),
+          );
+          final secondaryRowRect = tester.getRect(
+            find.byKey(const ValueKey('shop_orb_summary_secondary_row')),
+          );
+
+          // Both rows centered symmetrically inside the balance box
+          expect(primaryRowRect.center.dx, closeTo(barRect.center.dx, 0.5));
+          expect(secondaryRowRect.center.dx, closeTo(barRect.center.dx, 0.5));
+          expect(secondaryRowRect.top, greaterThan(primaryRowRect.bottom));
+          expect(barRect.height, greaterThan(lockedBarRect.height));
+
+          // Top row: Fire, Water, Wood aligned horizontally left-to-right
+          final fireRect = tester.getRect(
+            find.byKey(const ValueKey('shop_header_orb_fire')),
+          );
+          final waterRect = tester.getRect(
+            find.byKey(const ValueKey('shop_header_orb_water')),
+          );
+          final woodRect = tester.getRect(
+            find.byKey(const ValueKey('shop_header_orb_wood')),
+          );
+          expect(fireRect.center.dy, closeTo(waterRect.center.dy, 0.5));
+          expect(waterRect.center.dy, closeTo(woodRect.center.dy, 0.5));
+          expect(fireRect.right, lessThan(waterRect.left));
+          expect(waterRect.right, lessThan(woodRect.left));
+
+          // Bottom row: Earth, Metal aligned horizontally left-to-right below top row
+          final earthRect = tester.getRect(
+            find.byKey(const ValueKey('shop_header_orb_earth')),
+          );
+          final metalRect = tester.getRect(
+            find.byKey(const ValueKey('shop_header_orb_metal')),
+          );
+          expect(earthRect.center.dy, closeTo(metalRect.center.dy, 0.5));
+          expect(earthRect.center.dy, greaterThan(fireRect.center.dy));
+          expect(earthRect.right, lessThan(metalRect.left));
+
+          // Horizontal spacing between chips matches across both rows
+          final topGap1 = waterRect.left - fireRect.right;
+          final topGap2 = woodRect.left - waterRect.right;
+          final bottomGap = metalRect.left - earthRect.right;
+          expect(topGap1, closeTo(topGap2, 0.5));
+          expect(bottomGap, closeTo(topGap1, 0.5));
+        }
+      },
+    );
   });
 }
+
 

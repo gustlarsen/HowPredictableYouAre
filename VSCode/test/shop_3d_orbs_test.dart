@@ -81,6 +81,7 @@ void main() {
         }
 
         // 2. Top Elemental Balance Header uses 5 3D ElementalEnergySpheres (~16-18px)
+        // organized in a centered 3-top (Fire, Water, Wood) + 2-bottom (Earth, Metal) layout
         for (final move in HandMove.values) {
           final headerSphereFinder = find.byKey(
             ValueKey('shop_header_orb_sphere_${move.orbKey}'),
@@ -94,6 +95,18 @@ void main() {
           expect(sphere.isDark, isDark);
           expect(sphere.size, inInclusiveRange(16.0, 18.0));
         }
+        final headerBarRect = tester.getRect(
+          find.byKey(const ValueKey('shop_orb_summary_bar')),
+        );
+        final primaryRowRect = tester.getRect(
+          find.byKey(const ValueKey('shop_orb_summary_primary_row')),
+        );
+        final secondaryRowRect = tester.getRect(
+          find.byKey(const ValueKey('shop_orb_summary_secondary_row')),
+        );
+        expect(primaryRowRect.center.dx, closeTo(headerBarRect.center.dx, 0.5));
+        expect(secondaryRowRect.center.dx, closeTo(headerBarRect.center.dx, 0.5));
+        expect(secondaryRowRect.top, greaterThan(primaryRowRect.bottom));
 
         // 3. Wing 1 (Consagration): Stat Upgrade Cost Pills (+1 Max HP, +1 Max Mana Pool)
         // use 3D spheres (~13-15px) on one row

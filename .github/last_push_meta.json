@@ -1,5 +1,5 @@
 {
-  "summary": "- Added bespoke RPG CustomPainter icon ConsecrationCenserIcon (golden sacred thurible with bronze chains, amber-ruby embers, and golden-cyan incense wisps) for the Consecration Rate card\n- Added bespoke RPG CustomPainter icon SanctuaryHourglassIcon (ornate golden-bronze royal arcane hourglass with translucent glass bulbs and glowing golden-cyan cosmic sand) for the Offline Cap card\n- Updated Sacred Offertory wing cards in SacredTempleDialog to render both icons inside matching 44px rounded badges (32px icon) aligned with OffertoryVaultIcon and TitheBlessingIcon across Dark & Light modes\n- Updated offertory_wing_test.dart to verify the new CustomPainter icons and matching badge dimensions",
+  "summary": "- Refactored Sacred Temple ShopDialog._buildOrbSummaryBar into a centered 3-top (Fire, Water, Wood) and 2-bottom (Earth, Metal) pyramid layout\n- Rendered only the centered 3-orb primary row without empty vertical gap when Earth & Metal are not yet unlocked\n- Added and updated widget tests in sacred_temple_dialog_test.dart and shop_3d_orbs_test.dart verifying 3+2 symmetry and locked 3-orb layout",
   "quota": "Quota status unavailable in this environment",
-  "updated_at_utc": "2026-11-28T11:09:11Z"
+  "updated_at_utc": "2026-11-28T11:43:08Z"
 }
