@@ -522,11 +522,7 @@ class CloudSaveData {
        offertoryRateLevel = (offertoryRateLevel ?? offertoryLevel ?? 0) < 0
            ? 0
            : (offertoryRateLevel ?? offertoryLevel ?? 0),
-       offertoryCapLevel = offertoryCapLevel < 0
-           ? 0
-           : (offertoryCapLevel > StorageService.maxOffertoryCapLevel
-                 ? StorageService.maxOffertoryCapLevel
-                 : offertoryCapLevel);
+       offertoryCapLevel = offertoryCapLevel < 0 ? 0 : offertoryCapLevel;
 
   /// Total sum of all 5 Elemental Orbs in this snapshot.
   int get totalOrbs =>
@@ -1764,9 +1760,7 @@ class CloudSaveData {
       offertoryRateLevel: _parseNonNegativeInt(
         map['offertoryRateLevel'] ?? map['offertoryLevel'],
       ),
-      offertoryCapLevel: _parseNonNegativeInt(
-        map['offertoryCapLevel'],
-      ).clamp(0, StorageService.maxOffertoryCapLevel),
+      offertoryCapLevel: _parseNonNegativeInt(map['offertoryCapLevel']),
       offertoryLastCollectedAt: (() {
         final raw = (map['offertoryLastCollectedAt'] as num?)?.toInt();
         return (raw != null && raw > 0) ? raw : null;
@@ -1781,9 +1775,6 @@ class CloudSaveData {
       offertoryBankedSeconds: (() {
         final raw = (map['offertoryBankedSeconds'] as num?)?.toDouble() ?? 0.0;
         if (raw.isNaN || raw.isInfinite || raw < 0.0) return 0.0;
-        if (raw > StorageService.maxOffertoryBankedSeconds) {
-          return StorageService.maxOffertoryBankedSeconds;
-        }
         return raw;
       })(),
       offertoryBoostExpiresAt: (() {

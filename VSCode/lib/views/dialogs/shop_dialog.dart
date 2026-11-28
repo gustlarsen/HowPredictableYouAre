@@ -135,6 +135,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
 
   // Offertory Wing state, 1-second live counter ticker, and parabolic flying 3D orbs VFX
   _OffertoryBatchOption _selectedOffertoryBatch = _OffertoryBatchOption.x1;
+  _OffertoryBatchOption _selectedOffertoryCapBatch = _OffertoryBatchOption.x1;
   Timer? _offertoryLiveTimer;
   final GlobalKey _dialogStackKey = GlobalKey();
   final GlobalKey _offertoryVaultAnchorKey = GlobalKey();
@@ -4679,30 +4680,76 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     );
   }
 
+  ({int levels, ElementalCost totalCost, bool isAffordable})
+      _resolveOffertoryCapUpgradePreview() {
+    final fixed = _selectedOffertoryCapBatch.fixedMultiplier;
+    if (fixed == null) {
+      final maxRes = controller.maxAffordableOffertoryCapUpgrade();
+      if (maxRes.levels > 0) {
+        return (
+          levels: maxRes.levels,
+          totalCost: maxRes.totalCost,
+          isAffordable: true,
+        );
+      }
+      return (
+        levels: 1,
+        totalCost: controller.nextOffertoryCapUpgradeCost,
+        isAffordable: false,
+      );
+    }
+    final cost = controller.offertoryCapCostForLevels(fixed);
+    return (
+      levels: fixed,
+      totalCost: cost,
+      isAffordable: controller.canAfford(cost),
+    );
+  }
+
   void _stepDownOffertoryBatchIfNeeded() {
     if (_selectedOffertoryBatch == _OffertoryBatchOption.x10 &&
         !controller.canAffordOffertoryLevels(10)) {
       _selectedOffertoryBatch = _OffertoryBatchOption.x1;
+    }
+    if (_selectedOffertoryCapBatch == _OffertoryBatchOption.x10 &&
+        !controller.canAffordOffertoryCapUpgrade(levels: 10)) {
+      _selectedOffertoryCapBatch = _OffertoryBatchOption.x1;
     }
   }
 
   Future<bool> _showOffertoryMaxConfirmDialog({
     required int levels,
     required ElementalCost totalCost,
+    bool isCapUpgrade = false,
   }) async {
     final loc = controller.localization;
     final palette = AppPalette.of(context);
-    final beforeLv = controller.offertoryLevel;
+    final beforeLv = isCapUpgrade
+        ? controller.offertoryCapLevel
+        : controller.offertoryRateLevel;
     final afterLv = beforeLv + levels;
-    final beforeRate = controller.offertoryHourlyRate(level: beforeLv);
-    final afterRate = controller.offertoryHourlyRate(level: afterLv);
     final activeMoves = controller.offertoryActiveElements;
 
     final levelsGainedText = loc
         .t('consagration_confirm_levels_gained', fallback: '+{count} Levels')
         .replaceAll('{count}', _formatGroupedInt(levels, loc));
+    final String statDeltaText;
+    if (isCapUpgrade) {
+      final beforeCap = GameController.formatOffertoryCapMinutes(
+        GameController.offertoryCapMinutesForLevel(beforeLv),
+      );
+      final afterCap = GameController.formatOffertoryCapMinutes(
+        GameController.offertoryCapMinutesForLevel(afterLv),
+      );
+      statDeltaText = '$beforeCap → $afterCap';
+    } else {
+      final beforeRate = controller.offertoryHourlyRate(level: beforeLv);
+      final afterRate = controller.offertoryHourlyRate(level: afterLv);
+      statDeltaText =
+          '+${_formatRateValue(beforeRate, loc)}/h → +${_formatRateValue(afterRate, loc)}/h';
+    }
     final summaryText =
-        '$levelsGainedText • Lv. ${_formatGroupedInt(beforeLv, loc)} → Lv. ${_formatGroupedInt(afterLv, loc)} • +${_formatRateValue(beforeRate, loc)}/h → +${_formatRateValue(afterRate, loc)}/h';
+        '$levelsGainedText • Lv. ${_formatGroupedInt(beforeLv, loc)} → Lv. ${_formatGroupedInt(afterLv, loc)} • $statDeltaText';
 
     Widget buildOrbRow(Key rowKey, List<(HandMove move, int amount)> items) {
       return Container(
@@ -4764,7 +4811,11 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        key: const ValueKey('offertory_max_confirm_dialog'),
+        key: ValueKey(
+          isCapUpgrade
+              ? 'offertory_cap_max_confirm_dialog'
+              : 'offertory_max_confirm_dialog',
+        ),
         backgroundColor: palette.dialogSurface,
         surfaceTintColor: palette.isDark ? null : Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -4780,10 +4831,15 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                loc.t(
-                  'offertory_confirm_title',
-                  fallback: 'Confirm Offertory Upgrade',
-                ),
+                isCapUpgrade
+                    ? loc.t(
+                        'offertory_cap_confirm_title',
+                        fallback: 'Confirm Offline Cap Upgrade',
+                      )
+                    : loc.t(
+                        'offertory_confirm_title',
+                        fallback: 'Confirm Offertory Upgrade',
+                      ),
                 style: TextStyle(
                   fontSize: 15.5,
                   fontWeight: FontWeight.bold,
@@ -4938,10 +4994,10 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     }
   }
 
-  void _handleOffertoryCapUpgradeTap() {
+  Future<void> _handleOffertoryCapUpgradeTap() async {
     final loc = controller.localization;
-    if (controller.isOffertoryCapMaxed) return;
-    if (!controller.canAffordOffertoryCapUpgrade()) {
+    final preview = _resolveOffertoryCapUpgradePreview();
+    if (!preview.isAffordable || preview.levels <= 0) {
       controller.audio.playVibrate();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -4957,7 +5013,17 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       return;
     }
 
-    final ok = controller.upgradeOffertoryCap();
+    if (_selectedOffertoryCapBatch == _OffertoryBatchOption.max &&
+        preview.levels >= 10) {
+      final confirmed = await _showOffertoryMaxConfirmDialog(
+        levels: preview.levels,
+        totalCost: preview.totalCost,
+        isCapUpgrade: true,
+      );
+      if (!mounted || !confirmed) return;
+    }
+
+    final ok = controller.upgradeOffertoryCap(levels: preview.levels);
     if (ok && mounted) {
       setState(() {
         _stepDownOffertoryBatchIfNeeded();
@@ -4965,9 +5031,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       final msg = loc
           .t(
             'offertory_cap_upgraded_msg',
-            fallback: 'Offline Cap expanded to {hours}h!',
+            fallback: 'Offline Cap expanded to {cap}!',
           )
-          .replaceAll('{hours}', '${controller.offertoryMaxCapHours}');
+          .replaceAll('{cap}', controller.offertoryMaxCapFormatted);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -5062,6 +5128,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     required AppPalette palette,
     required LocalizationService loc,
     required bool canAfford10x,
+    required _OffertoryBatchOption selectedOption,
+    required ValueChanged<_OffertoryBatchOption> onSelected,
+    String keyPrefix = 'offertory_batch',
   }) {
     final trackBg = palette.isDark
         ? const Color(0xFF14171F)
@@ -5081,8 +5150,19 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       }
     }
 
+    String optionKeyName(_OffertoryBatchOption option) {
+      switch (option) {
+        case _OffertoryBatchOption.x1:
+          return '${keyPrefix}_1x';
+        case _OffertoryBatchOption.x10:
+          return '${keyPrefix}_10x';
+        case _OffertoryBatchOption.max:
+          return '${keyPrefix}_max';
+      }
+    }
+
     return Container(
-      key: const ValueKey('offertory_batch_selector'),
+      key: ValueKey('${keyPrefix}_selector'),
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: trackBg,
@@ -5098,7 +5178,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               builder: (_) {
                 final option = _OffertoryBatchOption.values[i];
                 final enabled = isOptionEnabled(option);
-                final selected = _selectedOffertoryBatch == option;
+                final selected = selectedOption == option;
                 final Color bgColor;
                 final Color borderColor;
                 final Color textColor;
@@ -5132,11 +5212,11 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                 return Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    key: ValueKey(option.keyName),
+                    key: ValueKey(optionKeyName(option)),
                     onTap: enabled
                         ? () {
                             controller.audio.playTapVibrate();
-                            setState(() => _selectedOffertoryBatch = option);
+                            onSelected(option);
                           }
                         : null,
                     borderRadius: BorderRadius.circular(6.5),
@@ -5180,11 +5260,22 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
   ) {
     final lv = controller.offertoryRateLevel;
     final capLv = controller.offertoryCapLevel;
-    final maxCapHours = controller.offertoryMaxCapHours;
-    final nextCapHours = controller.offertoryNextCapHours;
-    final isCapMaxed = controller.isOffertoryCapMaxed;
-    final nextCapCost = controller.nextOffertoryCapUpgradeCost;
-    final canAffordCap = controller.canAffordOffertoryCapUpgrade();
+    final currentCapMinutes = controller.offertoryMaxCapMinutes;
+    final currentCapFormatted = GameController.formatOffertoryCapMinutes(
+      currentCapMinutes,
+    );
+    final canAffordCap10x = controller.canAffordOffertoryCapUpgrade(levels: 10);
+    final capPreview = _resolveOffertoryCapUpgradePreview();
+    final capPreviewTargetLv = capLv + capPreview.levels;
+    final capPreviewTargetMinutes = controller.offertoryCapMinutesAfterLevels(
+      capPreview.levels,
+    );
+    final capPreviewTargetFormatted = GameController.formatOffertoryCapMinutes(
+      capPreviewTargetMinutes,
+    );
+    final capDeltaFormatted = GameController.formatOffertoryCapDeltaMinutes(
+      capPreview.levels * GameController.offertoryCapMinutesPerLevel,
+    );
     final activeMoves = controller.offertoryActiveElements;
     final isPhase2Elements = controller.includesEarthAndMetalInBonuses;
     final isBoostActive = controller.isOffertoryBoostActive();
@@ -5223,11 +5314,8 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         : palette.dialogCardSurface;
 
     final currentCapLabel = loc
-        .t('offertory_cap_label', fallback: '{hours}h Cap')
-        .replaceAll('{hours}', '$maxCapHours');
-    final nextCapLabel = loc
-        .t('offertory_cap_label', fallback: '{hours}h Cap')
-        .replaceAll('{hours}', '$nextCapHours');
+        .t('offertory_cap_label', fallback: '{cap} Cap')
+        .replaceAll('{cap}', currentCapFormatted);
 
     final vaultHeaderTitle = lv == 0
         ? loc.t('offertory_unbuilt_title', fallback: 'Unbuilt — Lv. 0')
@@ -5571,9 +5659,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                               .t(
                                 'offertory_unbuilt_hint',
                                 fallback:
-                                    'Consecrate Elemental Orbs below to awaken permanent idle orb generation (up to {hours}h offline).',
+                                    'Consecrate Elemental Orbs below to awaken permanent idle orb generation (up to {cap} offline).',
                               )
-                              .replaceAll('{hours}', '$maxCapHours'),
+                              .replaceAll('{cap}', currentCapFormatted),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 11,
@@ -5653,11 +5741,11 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                                           loc
                                               .t(
                                                 'offertory_full_badge',
-                                                fallback: 'FULL ({hours}h Cap)',
+                                                fallback: 'FULL ({cap} Cap)',
                                               )
                                               .replaceAll(
-                                                '{hours}',
-                                                '$maxCapHours',
+                                                '{cap}',
+                                                currentCapFormatted,
                                               ),
                                           maxLines: 1,
                                           style: const TextStyle(
@@ -5935,6 +6023,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       palette: palette,
                       loc: loc,
                       canAfford10x: canAfford10x,
+                      selectedOption: _selectedOffertoryBatch,
+                      onSelected: (option) =>
+                          setState(() => _selectedOffertoryBatch = option),
                     ),
                   ],
                 ),
@@ -6150,7 +6241,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           ),
 
           // ===================================================================
-          // CARD 2B — MAX OFFLINE TIME CAP UPGRADE (+1h PER LEVEL UP TO 24h)
+          // CARD 2B — MAX OFFLINE TIME CAP UPGRADE (+30m PER LEVEL, UNCAPPED)
           // ===================================================================
           Container(
             key: const ValueKey('offertory_cap_upgrade_card'),
@@ -6160,13 +6251,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               color: cardBg,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isCapMaxed
-                    ? (palette.isDark
-                          ? const Color(0xFFFFD54F).withValues(alpha: 0.70)
-                          : const Color(0xFFC88A00).withValues(alpha: 0.75))
-                    : palette.amberBorder.withValues(
-                        alpha: palette.isDark ? 0.36 : 0.50,
-                      ),
+                color: palette.amberBorder.withValues(
+                  alpha: palette.isDark ? 0.36 : 0.50,
+                ),
               ),
             ),
             child: Column(
@@ -6209,48 +6296,24 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Container(
-                      key: const ValueKey('offertory_cap_level_badge'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCapMaxed
-                            ? _goldFill
-                            : palette.rewardedAdCardSurface,
-                        borderRadius: BorderRadius.circular(7),
-                        border: Border.all(
-                          color: isCapMaxed
-                              ? _goldFill
-                              : palette.amberBorder.withValues(alpha: 0.55),
-                        ),
-                      ),
-                      child: Text(
-                        isCapMaxed
-                            ? loc.t('offertory_cap_max_badge', fallback: 'MAX')
-                            : 'Lv. $capLv / ${GameController.offertoryCapMaxLevel}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: isCapMaxed ? _goldDarkInk : palette.amberText,
-                        ),
-                      ),
+                    _buildOffertoryBatchSelector(
+                      palette: palette,
+                      loc: loc,
+                      canAfford10x: canAffordCap10x,
+                      selectedOption: _selectedOffertoryCapBatch,
+                      onSelected: (option) =>
+                          setState(() => _selectedOffertoryCapBatch = option),
+                      keyPrefix: 'offertory_cap_batch',
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  loc
-                      .t(
-                        'offertory_cap_upgrade_desc',
-                        fallback:
-                            'Extends maximum offline orb storage (+1h per level, up to {maxHours}h).',
-                      )
-                      .replaceAll(
-                        '{maxHours}',
-                        '${GameController.offertoryMaxPossibleCapHours}',
-                      ),
+                  loc.t(
+                    'offertory_cap_upgrade_desc',
+                    fallback:
+                        'Extends maximum offline orb storage (+30m per level, no level cap).',
+                  ),
                   style: TextStyle(
                     fontSize: 10.5,
                     height: 1.25,
@@ -6266,9 +6329,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          isCapMaxed
-                              ? 'Lv. $capLv (${loc.t('offertory_cap_max_badge', fallback: 'MAX')})'
-                              : 'Lv. $capLv → Lv. ${capLv + 1}',
+                          'Lv. ${_formatGroupedInt(capLv, loc)} → Lv. ${_formatGroupedInt(capPreviewTargetLv, loc)}',
                           key: const ValueKey(
                             'offertory_cap_level_jump_preview',
                           ),
@@ -6287,15 +6348,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
                         child: Text(
-                          isCapMaxed
-                              ? '$currentCapLabel (${loc.t('offertory_cap_max_badge', fallback: 'MAX')})'
-                              : loc
-                                    .t(
-                                      'offertory_cap_preview',
-                                      fallback: '{current} → {next}',
-                                    )
-                                    .replaceAll('{current}', currentCapLabel)
-                                    .replaceAll('{next}', nextCapLabel),
+                          loc
+                              .t(
+                                'offertory_cap_preview',
+                                fallback: '{current} → {next}',
+                              )
+                              .replaceAll('{current}', currentCapFormatted)
+                              .replaceAll('{next}', capPreviewTargetFormatted),
                           key: const ValueKey('offertory_cap_jump_preview'),
                           maxLines: 1,
                           style: TextStyle(
@@ -6308,67 +6367,64 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     ),
                   ],
                 ),
-                if (!isCapMaxed) ...[
-                  const SizedBox(height: 7),
-                  Container(
-                    key: const ValueKey('offertory_cap_cost_box'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: palette.summaryBarSurface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: palette.amberBorder.withValues(alpha: 0.28),
-                      ),
-                    ),
-                    child: Wrap(
-                      alignment: WrapAlignment.spaceEvenly,
-                      spacing: 10,
-                      runSpacing: 5,
-                      children: [
-                        for (final move in activeMoves)
-                          Builder(
-                            builder: (_) {
-                              final req = costForMove(nextCapCost, move);
-                              final hasEnough = controller.orbsFor(move) >= req;
-                              return Row(
-                                key: ValueKey(
-                                  'offertory_cap_cost_${move.orbKey}',
-                                ),
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ElementalEnergySphere(
-                                    size: 17,
-                                    primaryColor: move.elementalPrimaryColor,
-                                    secondaryColor:
-                                        move.elementalSecondaryColor,
-                                    isDark: palette.isDark,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _formatGroupedInt(req, loc),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: hasEnough
-                                          ? palette.elementalText(move)
-                                          : palette.dangerText,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                      ],
+                const SizedBox(height: 7),
+                Container(
+                  key: const ValueKey('offertory_cap_cost_box'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.summaryBarSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: palette.amberBorder.withValues(alpha: 0.28),
                     ),
                   ),
-                ],
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 10,
+                    runSpacing: 5,
+                    children: [
+                      for (final move in activeMoves)
+                        Builder(
+                          builder: (_) {
+                            final req = costForMove(capPreview.totalCost, move);
+                            final hasEnough = controller.orbsFor(move) >= req;
+                            return Row(
+                              key: ValueKey(
+                                'offertory_cap_cost_${move.orbKey}',
+                              ),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ElementalEnergySphere(
+                                  size: 17,
+                                  primaryColor: move.elementalPrimaryColor,
+                                  secondaryColor: move.elementalSecondaryColor,
+                                  isDark: palette.isDark,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatGroupedInt(req, loc),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: hasEnough
+                                        ? palette.elementalText(move)
+                                        : palette.dangerText,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
                   key: const ValueKey('offertory_cap_upgrade_button'),
-                  onPressed: (!isCapMaxed && canAffordCap)
+                  onPressed: capPreview.isAffordable
                       ? _handleOffertoryCapUpgradeTap
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -6386,27 +6442,14 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  icon: Icon(
-                    isCapMaxed
-                        ? Icons.verified_rounded
-                        : Icons.more_time_rounded,
-                    size: 17,
-                  ),
+                  icon: const Icon(Icons.more_time_rounded, size: 17),
                   label: Text(
-                    isCapMaxed
-                        ? loc
-                              .t(
-                                'offertory_cap_maxed_btn',
-                                fallback: 'Max {hours}h Cap Reached',
-                              )
-                              .replaceAll(
-                                '{hours}',
-                                '${GameController.offertoryMaxPossibleCapHours}',
-                              )
-                        : loc.t(
-                            'offertory_cap_upgrade_btn',
-                            fallback: 'Expand Cap (+1h)',
-                          ),
+                    loc
+                        .t(
+                          'offertory_cap_upgrade_btn',
+                          fallback: 'Expand Cap (+{delta})',
+                        )
+                        .replaceAll('{delta}', capDeltaFormatted),
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,

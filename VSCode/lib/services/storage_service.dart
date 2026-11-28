@@ -554,8 +554,6 @@ class StorageService {
   }
 
   // Sacred Temple Offertory Permanent Idle Orb Generator (survives run resets; cleared only on account switch)
-  static const int maxOffertoryCapLevel = 16; // 8h base + 16h = 24h max cap
-  static const double maxOffertoryBankedSeconds = (8 + maxOffertoryCapLevel) * 3600.0;
   static const String offertoryLevelKey = 'offertory_level';
   static const String offertoryRateLevelKey = 'offertory_rate_level';
   static const String offertoryCapLevelKey = 'offertory_cap_level';
@@ -588,17 +586,11 @@ class StorageService {
 
   int get offertoryCapLevel {
     final val = _prefs.getInt(offertoryCapLevelKey) ?? 0;
-    if (val < 0) return 0;
-    if (val > maxOffertoryCapLevel) return maxOffertoryCapLevel;
-    return val;
+    return val < 0 ? 0 : val;
   }
 
-  Future<void> setOffertoryCapLevel(int val) {
-    final safe = val < 0
-        ? 0
-        : (val > maxOffertoryCapLevel ? maxOffertoryCapLevel : val);
-    return _prefs.setInt(offertoryCapLevelKey, safe);
-  }
+  Future<void> setOffertoryCapLevel(int val) =>
+      _prefs.setInt(offertoryCapLevelKey, val < 0 ? 0 : val);
 
   /// Legacy alias for [offertoryRateLevel] kept for backward compatibility.
   int get offertoryLevel => offertoryRateLevel;
@@ -643,14 +635,11 @@ class StorageService {
   double get offertoryBankedSeconds {
     final val = _prefs.getDouble(offertoryBankedSecondsKey) ?? 0.0;
     if (val.isNaN || val.isInfinite || val < 0.0) return 0.0;
-    if (val > maxOffertoryBankedSeconds) return maxOffertoryBankedSeconds;
     return val;
   }
 
   Future<void> setOffertoryBankedSeconds(double val) {
-    final safe = (val.isNaN || val.isInfinite || val < 0.0)
-        ? 0.0
-        : (val > maxOffertoryBankedSeconds ? maxOffertoryBankedSeconds : val);
+    final safe = (val.isNaN || val.isInfinite || val < 0.0) ? 0.0 : val;
     return _prefs.setDouble(offertoryBankedSecondsKey, safe);
   }
 
