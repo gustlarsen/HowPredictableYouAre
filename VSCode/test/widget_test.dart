@@ -1073,8 +1073,14 @@ void main() {
     await tester.tap(resetUnlockBtn);
     await tester.pumpAndSettle();
 
-    // Altar of Sacrifice & Blessing reveal modal should open immediately
+    // Pre-sacrifice Altar confirmation opens first without unlocking yet
     expect(find.byKey(const ValueKey('altar_sacrifice_dialog')), findsOneWidget);
+    expect(find.byKey(const ValueKey('altar_sacrifice_confirm_button')), findsOneWidget);
+    expect(controller.unlockedReset, isFalse);
+
+    // Confirm sacrifice -> unlocks item, plays ritual, and reveals emblem
+    await tester.tap(find.byKey(const ValueKey('altar_sacrifice_confirm_button')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('altar_reveal_item_emblem')), findsOneWidget);
     expect(storage.hasSeenStoryReset, isTrue);
 
@@ -1465,6 +1471,8 @@ void main() {
     await tester.ensureVisible(predUnlockBtn);
     await tester.pumpAndSettle();
     await tester.tap(predUnlockBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('altar_sacrifice_confirm_button')));
     await tester.pumpAndSettle();
     expect(controller.unlockedPredictability, isTrue);
     expect(controller.totalOrbs, 0);
@@ -1956,6 +1964,8 @@ void main() {
     final fireBeforePurchase = controller.fireOrbs;
     final earthBeforePurchase = controller.earthOrbs;
     await tester.tap(find.byKey(const ValueKey('diamond_unlock_New Skin')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('altar_sacrifice_confirm_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('altar_reveal_collect_button')));
     await tester.pumpAndSettle();
@@ -3681,8 +3691,10 @@ void main() {
       findsNWidgets(5),
     );
 
-    // 3. Purchase Gift Box in Shop -> deducts 500 of each element, starts disabled
+    // 3. Purchase Gift Box in Shop -> confirm sacrifice, deducts 500 of each element, starts disabled
     await tester.tap(find.text('Gift Box'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('altar_sacrifice_confirm_button')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('altar_reveal_emblem_image_gift_box')),

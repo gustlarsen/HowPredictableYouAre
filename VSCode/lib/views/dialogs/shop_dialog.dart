@@ -418,32 +418,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
     required String title,
     required String description,
     required ElementalCost sacrificedCost,
-    required bool success,
+    required bool Function() onConfirmUnlock,
+    bool canPurchase = true,
     String? badgeLabel,
-    String? snackBarMessage,
   }) {
     final loc = controller.localization;
-    if (success) {
-      controller.audio.playWinVibrate();
-      controller.consumePendingStory();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(snackBarMessage ?? '$title: Unlocked!'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      AltarSacrificeDialog.show(
-        context,
-        controller: controller,
-        artifact: artifact,
-        itemTitle: title,
-        itemDescription: description,
-        sacrificedCost: sacrificedCost,
-        badgeLabel: badgeLabel,
-      );
-    } else {
+    if (!canPurchase || !controller.canAfford(sacrificedCost)) {
+      controller.audio.playVibrate();
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -454,7 +435,29 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             duration: const Duration(seconds: 2),
           ),
         );
+      return;
     }
+
+    controller.audio.playTapVibrate();
+    AltarSacrificeDialog.show(
+      context,
+      controller: controller,
+      artifact: artifact,
+      itemTitle: title,
+      itemDescription: description,
+      sacrificedCost: sacrificedCost,
+      badgeLabel: badgeLabel,
+      onConfirmSacrifice: () {
+        final ok = onConfirmUnlock();
+        if (ok) {
+          controller.audio.playWinVibrate();
+          controller.consumePendingStory();
+        } else {
+          controller.audio.playVibrate();
+        }
+        return ok;
+      },
+    );
   }
 
   void _handleToggle(BuildContext context, String title, bool enabled) {
@@ -507,14 +510,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
       fallback:
           'Unlocks Earth & Metal elements for an expanded 5-element battle matrix',
     );
-    final ok = controller.unlockNewHands();
     _handleOfferingPurchase(
       context: context,
       artifact: ShopUpgradeArtifact.newHands,
       title: title,
       description: desc,
       sacrificedCost: GameController.costNewHands,
-      success: ok,
+      onConfirmUnlock: controller.unlockNewHands,
     );
   }
 
@@ -2421,7 +2423,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockPredictability();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.predictability,
@@ -2432,7 +2433,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Unlocks Match Scoreboard (Your Score, PC Score, Total) & Predictability Gauge %',
               ),
               sacrificedCost: GameController.costPredictability,
-              success: ok,
+              onConfirmUnlock: controller.unlockPredictability,
             );
           },
           onToggle: (val) {
@@ -2460,7 +2461,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockReset();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.reset,
@@ -2471,7 +2471,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Adds a Reset button to clear the current match and Markov matrix anytime',
               ),
               sacrificedCost: GameController.costReset,
-              success: ok,
+              onConfirmUnlock: controller.unlockReset,
             );
           },
           onToggle: (val) {
@@ -2517,7 +2517,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockRandom();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.random,
@@ -2528,7 +2527,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Adds a Random button to play unpredictable moves and outsmart the AI',
               ),
               sacrificedCost: GameController.costRandom,
-              success: ok,
+              onConfirmUnlock: controller.unlockRandom,
             );
           },
           onToggle: (val) {
@@ -2566,11 +2565,12 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             fallback: 'Fire Speed',
           ),
           onUnlockOrUpgrade: () {
+            final nextCost = controller.nextOverchargedStaffUpgradeCost;
+            if (nextCost == null) {
+              controller.audio.playVibrate();
+              return;
+            }
             final targetLv = controller.overchargedStaffLevel + 1;
-            final sacrificed =
-                controller.nextOverchargedStaffUpgradeCost ??
-                GameController.costOverchargedStaffLv1;
-            final ok = controller.unlockOrUpgradeOverchargedStaff();
             final staffTitle = loc.t(
               'overcharged_staff_title',
               fallback: 'Overcharged Staff',
@@ -2589,12 +2589,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
               artifact: ShopUpgradeArtifact.overchargedStaff,
               title: staffTitle,
               description: staffDesc,
-              sacrificedCost: sacrificed,
-              success: ok,
+              sacrificedCost: nextCost,
               badgeLabel: '$lvPrefix $targetLv',
-              snackBarMessage: targetLv == 1
-                  ? '$staffTitle: Unlocked!'
-                  : '$staffTitle ($lvPrefix $targetLv): Upgraded!',
+              onConfirmUnlock: controller.unlockOrUpgradeOverchargedStaff,
             );
           },
           onToggle: (val) {
@@ -2628,7 +2625,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockAlgorithm();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.algorithm,
@@ -2639,7 +2635,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Reveals the live Markov Transition Matrix tracking your move patterns',
               ),
               sacrificedCost: GameController.costAlgorithm,
-              success: ok,
+              onConfirmUnlock: controller.unlockAlgorithm,
             );
           },
           onToggle: (val) {
@@ -2666,7 +2662,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockYourPrediction();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.yourPrediction,
@@ -2677,7 +2672,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Displays the move(s) the AI predicts you will play next',
               ),
               sacrificedCost: GameController.costYourPrediction,
-              success: ok,
+              onConfirmUnlock: controller.unlockYourPrediction,
             );
           },
           onToggle: (val) {
@@ -2705,7 +2700,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockNextMove();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.nextMove,
@@ -2716,7 +2710,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Reveals the move(s) the AI is preparing to play against you',
               ),
               sacrificedCost: GameController.costNextMove,
-              success: ok,
+              onConfirmUnlock: controller.unlockNextMove,
             );
           },
           onToggle: (val) {
@@ -2740,14 +2734,13 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockGiftBox();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.giftBox,
               title: loc.t('gift_box', fallback: 'Gift Box'),
               description: controller.giftBoxDescription,
               sacrificedCost: GameController.costGiftBox,
-              success: ok,
+              onConfirmUnlock: controller.unlockGiftBox,
             );
           },
           onToggle: (val) {
@@ -2775,7 +2768,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockSuggestion();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.suggestion,
@@ -2786,7 +2778,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     "Recommends the optimal counter-move(s) to beat the AI's next play",
               ),
               sacrificedCost: GameController.costSuggestion,
-              success: ok,
+              onConfirmUnlock: controller.unlockSuggestion,
             );
           },
           onToggle: (val) {
@@ -2813,7 +2805,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockNewSkin();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.newSkin,
@@ -2823,7 +2814,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                 fallback: 'Hands Theme (Rock, Paper, Scissors)',
               ),
               sacrificedCost: GameController.costNewSkin,
-              success: ok,
+              onConfirmUnlock: controller.unlockNewSkin,
             );
           },
           onToggle: (val) {
@@ -2851,7 +2842,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
           enabledLabel: enabledStr,
           disabledLabel: disabledStr,
           onUnlock: () {
-            final ok = controller.unlockCrystalBall();
             _handleOfferingPurchase(
               context: context,
               artifact: ShopUpgradeArtifact.crystalBall,
@@ -2862,7 +2852,7 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                     'Reveals the exact next move the AI will play before you choose',
               ),
               sacrificedCost: GameController.costCrystalBall,
-              success: ok,
+              onConfirmUnlock: controller.unlockCrystalBall,
             );
           },
           onToggle: (val) {
@@ -2892,7 +2882,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             enabledLabel: enabledStr,
             disabledLabel: disabledStr,
             onUnlock: () {
-              final ok = controller.unlockCrystalBallPlus();
               _handleOfferingPurchase(
                 context: context,
                 artifact: ShopUpgradeArtifact.crystalBallPlus,
@@ -2903,7 +2892,8 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       'Upgrades Crystal Ball to guarantee 100% foresight on every single round',
                 ),
                 sacrificedCost: GameController.costCrystalBallPlus,
-                success: ok,
+                canPurchase: controller.unlockedCrystalBall,
+                onConfirmUnlock: controller.unlockCrystalBallPlus,
               );
             },
             onToggle: (val) {
@@ -2947,7 +2937,6 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
             enabledLabel: enabledStr,
             disabledLabel: disabledStr,
             onUnlock: () {
-              final ok = controller.unlockMarkovRecalibrator();
               _handleOfferingPurchase(
                 context: context,
                 artifact: ShopUpgradeArtifact.markovRecalibrator,
@@ -2961,7 +2950,8 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
                       'Reconfigures the Algorithm matrix and hints to expose the Robot Archmage\'s true 1-step short-term memory',
                 ),
                 sacrificedCost: GameController.costMarkovRecalibrator,
-                success: ok,
+                canPurchase: controller.isMarkovRecalibratorVisibleInShop,
+                onConfirmUnlock: controller.unlockMarkovRecalibrator,
               );
             },
             onToggle: (val) {

@@ -422,6 +422,10 @@ void main() {
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),
           );
           await tester.pumpAndSettle();
@@ -480,6 +484,10 @@ void main() {
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),
           );
           await tester.pumpAndSettle();
@@ -505,6 +513,10 @@ void main() {
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
           await tester.pumpAndSettle();
           await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),
@@ -533,6 +545,10 @@ void main() {
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),
           );
           await tester.pumpAndSettle();
@@ -552,6 +568,10 @@ void main() {
           await tester.tap(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),
           );
           await tester.pumpAndSettle();
@@ -569,6 +589,10 @@ void main() {
           await tester.ensureVisible(upgradeBtn);
           await tester.pumpAndSettle();
           await tester.tap(upgradeBtn);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
           await tester.pumpAndSettle();
           await tester.tap(
             find.byKey(const ValueKey('altar_reveal_collect_button')),

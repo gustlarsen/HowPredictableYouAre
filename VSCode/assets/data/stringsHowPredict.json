@@ -3382,7 +3382,27 @@
     "en_altar_collect_blessing": "Continue",
     "pt_altar_collect_blessing": "Continuar",
     "es_altar_collect_blessing": "Continuar",
-    "de_altar_collect_blessing": "Weiter"
+    "de_altar_collect_blessing": "Weiter",
+    "en_altar_sacrifice_phase_confirm": "Confirm Your Sacred Offering",
+    "pt_altar_sacrifice_phase_confirm": "Confirme Sua Oferenda Sagrada",
+    "es_altar_sacrifice_phase_confirm": "Confirma Tu Ofrenda Sagrada",
+    "de_altar_sacrifice_phase_confirm": "Bestätige dein heiliges Opfer",
+    "en_altar_sacrifice_confirm_prompt": "Sacrifice these Elemental Orbs on the altar to receive {item}?",
+    "pt_altar_sacrifice_confirm_prompt": "Deseja sacrificar estes Orbes Elementais no altar para receber {item}?",
+    "es_altar_sacrifice_confirm_prompt": "¿Sacrificar estos Orbes Elementales en el altar para recibir {item}?",
+    "de_altar_sacrifice_confirm_prompt": "Möchtest du diese Elementar-Orbs auf dem Altar opfern, um {item} zu erhalten?",
+    "en_altar_sacrifice_confirm_btn": "Confirm Sacrifice",
+    "pt_altar_sacrifice_confirm_btn": "Confirmar Sacrifício",
+    "es_altar_sacrifice_confirm_btn": "Confirmar Sacrificio",
+    "de_altar_sacrifice_confirm_btn": "Opfer bestätigen",
+    "en_altar_sacrifice_cancel_btn": "Cancel",
+    "pt_altar_sacrifice_cancel_btn": "Cancelar",
+    "es_altar_sacrifice_cancel_btn": "Cancelar",
+    "de_altar_sacrifice_cancel_btn": "Abbrechen",
+    "en_altar_offering_orbs_label": "Offering Elemental Orbs",
+    "pt_altar_offering_orbs_label": "Orbes Elementais da Oferenda",
+    "es_altar_offering_orbs_label": "Orbes Elementales de la Ofrenda",
+    "de_altar_offering_orbs_label": "Elementar-Orbs als Opfergabe"
 }
 
 

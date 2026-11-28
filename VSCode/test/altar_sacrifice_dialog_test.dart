@@ -43,7 +43,7 @@ Future<GameController> _buildTestController({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('AltarSacrificeDialog Proportional Orb Scaling (15 to 20,000)', () {
+  group('AltarSacrificeDialog Proportional Orb Scaling & 2x Pacing', () {
     test(
       'visualOrbCountForCost scales smoothly from ~3-5 at small costs (15-50) up to ~12-18 at 3,500-20,000',
       () {
@@ -73,6 +73,58 @@ void main() {
         expect(count1000, lessThan(count3500));
         expect(count3500, lessThanOrEqualTo(count5000));
         expect(count5000, lessThan(count20000));
+      },
+    );
+
+    test(
+      'totalDuration (~6.2s), skipUnlockDelay (~1.5s), and phaseForProgress match slower 2x ritual pacing',
+      () {
+        expect(
+          AltarSacrificeDialog.totalDuration.inMilliseconds,
+          inInclusiveRange(5600, 6800),
+        );
+        expect(
+          AltarSacrificeDialog.skipUnlockDelay.inMilliseconds,
+          inInclusiveRange(1400, 1600),
+        );
+
+        // Phase 1: 0.0s – 2.2s
+        expect(
+          AltarSacrificeDialog.phaseForProgress(0.0),
+          AltarRitualPhase.offeringAndFlame,
+        );
+        expect(
+          AltarSacrificeDialog.phaseForProgress(
+            1.8 / AltarSacrificeDialog.totalDurationSeconds,
+          ),
+          AltarRitualPhase.offeringAndFlame,
+        );
+
+        // Phase 2: 2.2s – 4.0s
+        expect(
+          AltarSacrificeDialog.phaseForProgress(
+            2.5 / AltarSacrificeDialog.totalDurationSeconds,
+          ),
+          AltarRitualPhase.descendingStarAndFlash,
+        );
+        expect(
+          AltarSacrificeDialog.phaseForProgress(
+            3.8 / AltarSacrificeDialog.totalDurationSeconds,
+          ),
+          AltarRitualPhase.descendingStarAndFlash,
+        );
+
+        // Phase 3: 4.0s – 6.2s
+        expect(
+          AltarSacrificeDialog.phaseForProgress(
+            4.2 / AltarSacrificeDialog.totalDurationSeconds,
+          ),
+          AltarRitualPhase.itemReveal,
+        );
+        expect(
+          AltarSacrificeDialog.phaseForProgress(1.0),
+          AltarRitualPhase.itemReveal,
+        );
       },
     );
 
@@ -110,7 +162,6 @@ void main() {
           }
         }
 
-        // Larger sacrifices produce visibly fuller piles on the altar basin
         final smallTotal = smallClusters.fold<int>(
           0,
           (sum, c) => sum + c.visualOrbCount,
@@ -122,12 +173,182 @@ void main() {
         expect(hugeTotal, greaterThan(smallTotal * 4));
       },
     );
+
+    test(
+      'Pre-sacrifice confirmation localization keys exist and are translated across en, pt, es, and de',
+      () async {
+        final localization = LocalizationService();
+        await localization.load();
+
+        const keys = [
+          'altar_sacrifice_phase_confirm',
+          'altar_sacrifice_confirm_prompt',
+          'altar_sacrifice_confirm_btn',
+          'altar_sacrifice_cancel_btn',
+          'altar_offering_orbs_label',
+        ];
+
+        final enValues = <String, String>{};
+        localization.setLanguage('en');
+        for (final k in keys) {
+          final v = localization.t(k);
+          expect(v, isNotEmpty);
+          expect(v, isNot(k));
+          enValues[k] = v;
+        }
+        expect(enValues['altar_sacrifice_confirm_prompt'], contains('{item}'));
+
+        for (final lang in ['pt', 'es', 'de']) {
+          localization.setLanguage(lang);
+          for (final k in keys) {
+            final v = localization.t(k);
+            expect(v, isNotEmpty, reason: 'Missing $lang $k');
+            expect(v, isNot(k), reason: 'Fallback key for $lang $k');
+            expect(v, isNot(enValues[k]), reason: 'Untranslated $lang $k');
+          }
+          expect(
+            localization.t('altar_sacrifice_confirm_prompt'),
+            contains('{item}'),
+          );
+        }
+      },
+    );
   });
 
-  group('AltarSacrificeDialog Multi-Phase Sequence & ShopDialog Integration', () {
+  group('AltarSacrificeDialog Pre-Sacrifice Confirmation & Slower 2x Sequence', () {
+    testWidgets(
+      'Tapping an Offerings item opens Altar in awaitingConfirmation without deducting orbs; Cancel leaves balances & unlock untouched',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final controller = await _buildTestController(
+          prefs: {
+            'orbs_fire': 100,
+            'orbs_water': 100,
+            'orbs_wood': 100,
+          },
+        );
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            home: Scaffold(
+              body: ShopDialog(
+                controller: controller,
+                initialWing: TempleWing.offerings,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final shopScrollable = find.descendant(
+          of: find.byKey(const ValueKey('temple_wing_offerings')),
+          matching: find.byType(Scrollable),
+        );
+        final resetUnlockBtn = find.byKey(
+          const ValueKey('diamond_unlock_${BillingService.productResetButton}'),
+        );
+        await tester.scrollUntilVisible(
+          resetUnlockBtn,
+          140,
+          scrollable: shopScrollable,
+        );
+        await tester.pumpAndSettle();
+
+        // Tap Reset Button (cost: 30 Fire, 30 Water, 30 Wood)
+        await tester.tap(resetUnlockBtn);
+        await tester.pumpAndSettle();
+
+        // Altar dialog opens in staging/confirmation mode BEFORE deducting any orbs
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_dialog')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('sacred_altar_artwork')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_confirm_prompt_text')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Reset Button'),
+          findsAtLeastNWidgets(1),
+        );
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_cancel_button')),
+          findsOneWidget,
+        );
+        // Skip button is not shown while awaiting confirmation
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_skip_button')),
+          findsNothing,
+        );
+
+        // Painter is strictly in staging mode (resting orbs, progress 0.0, no flames)
+        final paintWidget = tester.widget<CustomPaint>(
+          find.byKey(const ValueKey('altar_sacrifice_custom_paint')),
+        );
+        final painter = paintWidget.painter as AltarSacrificePainter;
+        expect(painter.isStaging, isTrue);
+        expect(painter.progress, 0.0);
+        expect(painter.clusters.length, 3);
+
+        // Exact numeric costs displayed on the altar confirmation card
+        for (final move in const [
+          HandMove.fire,
+          HandMove.water,
+          HandMove.wood,
+        ]) {
+          final pill = find.byKey(
+            ValueKey('altar_sacrifice_cost_${move.orbKey}'),
+          );
+          expect(pill, findsOneWidget);
+          expect(
+            find.descendant(of: pill, matching: find.text('30')),
+            findsOneWidget,
+          );
+        }
+
+        // Orbs & unlock flag MUST remain untouched before confirmation
+        expect(controller.unlockedReset, isFalse);
+        expect(controller.fireOrbs, 100);
+        expect(controller.waterOrbs, 100);
+        expect(controller.woodOrbs, 100);
+
+        // Tap Cancel -> closes Altar cleanly without deducting orbs or unlocking
+        await tester.tap(
+          find.byKey(const ValueKey('altar_sacrifice_cancel_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_dialog')),
+          findsNothing,
+        );
+        expect(controller.unlockedReset, isFalse);
+        expect(controller.fireOrbs, 100);
+        expect(controller.waterOrbs, 100);
+        expect(controller.woodOrbs, 100);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final isDark in [true, false]) {
       testWidgets(
-        'Purchasing Reset Button in Offerings runs Phase 1 (orbs & holocaust flame), Phase 2 (descending star & warm cream flash), and Phase 3 (emblem, title & description) in ${isDark ? "Dark" : "Light"} Mode',
+        'Confirming Reset Button deducts orbs and plays slower 6.2s Phase 1 (flame), Phase 2 (star & warm cream flash), and Phase 3 (emblem, title & description) in ${isDark ? "Dark" : "Light"} Mode',
         (WidgetTester tester) async {
           tester.view.physicalSize = const Size(360, 740);
           tester.view.devicePixelRatio = 1.0;
@@ -172,63 +393,64 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          // Tap to purchase Reset Button (30 Fire, 30 Water, 30 Wood)
+          // 1. Open Pre-Sacrifice Altar Confirmation
           await tester.tap(resetUnlockBtn);
-          await tester.pump();
-          // Advance past the 240ms dialog entrance transition into Phase 1 (~0.45s)
-          await tester.pump(const Duration(milliseconds: 450));
+          await tester.pumpAndSettle();
 
-          // Legacy comic StoryDialog must NOT appear
           expect(find.byType(StoryDialog), findsNothing);
-          expect(
-            find.byKey(const ValueKey('altar_sacrifice_dialog')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('sacred_altar_artwork')),
-            findsOneWidget,
-          );
+          expect(controller.unlockedReset, isFalse);
+          expect(controller.fireOrbs, 30000);
 
-          // Before 0.8s, Skip button is hidden
+          // 2. Tap Confirm Sacrifice -> deducts 30 Fire/Water/Wood and begins 6.2s ritual
+          await tester.tap(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+          );
+          await tester.pump();
+
+          expect(controller.unlockedReset, isTrue);
+          expect(controller.fireOrbs, 29970);
+          expect(controller.waterOrbs, 29970);
+          expect(controller.woodOrbs, 29970);
+
+          // Advance 1.0s into Phase 1 (0.0s – 2.2s): confirmation controls gone, Skip still locked (< 1.5s)
+          await tester.pump(const Duration(milliseconds: 1000));
+          expect(
+            find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+            findsNothing,
+          );
           expect(
             find.byKey(const ValueKey('altar_sacrifice_skip_button')),
             findsNothing,
           );
 
-          // Verify Phase 1 CustomPainter and exact 30 Fire / Water / Wood counters
-          final paintWidget = tester.widget<CustomPaint>(
+          final paintWidget1 = tester.widget<CustomPaint>(
             find.byKey(const ValueKey('altar_sacrifice_custom_paint')),
           );
-          final painter = paintWidget.painter as AltarSacrificePainter;
+          final painter1 = paintWidget1.painter as AltarSacrificePainter;
+          expect(painter1.isStaging, isFalse);
           expect(
-            AltarSacrificeDialog.phaseForProgress(painter.progress),
+            AltarSacrificeDialog.phaseForProgress(painter1.progress),
             AltarRitualPhase.offeringAndFlame,
           );
-          expect(painter.clusters.length, 3);
-          for (final move in const [
-            HandMove.fire,
-            HandMove.water,
-            HandMove.wood,
-          ]) {
-            final pill = find.byKey(
-              ValueKey('altar_sacrifice_cost_${move.orbKey}'),
-            );
-            expect(pill, findsOneWidget);
-            expect(
-              find.descendant(of: pill, matching: find.text('30')),
-              findsOneWidget,
-            );
-          }
 
-          // Advance past 0.8s (~0.95s total): Skip button unlocks
-          await tester.pump(const Duration(milliseconds: 500));
+          // Advance another 0.7s (1.7s total): still Phase 1, Skip button now unlocked (> 1.5s)
+          await tester.pump(const Duration(milliseconds: 700));
           expect(
             find.byKey(const ValueKey('altar_sacrifice_skip_button')),
             findsOneWidget,
           );
+          final paintWidget1b = tester.widget<CustomPaint>(
+            find.byKey(const ValueKey('altar_sacrifice_custom_paint')),
+          );
+          expect(
+            AltarSacrificeDialog.phaseForProgress(
+              (paintWidget1b.painter as AltarSacrificePainter).progress,
+            ),
+            AltarRitualPhase.offeringAndFlame,
+          );
 
-          // Advance into Phase 2 (~1.75s total): Descending Star & Warm Cream/Gold Flash
-          await tester.pump(const Duration(milliseconds: 800));
+          // Advance another 1.8s (3.5s total): Phase 2 Descending Star & Warm Cream/Gold Flash
+          await tester.pump(const Duration(milliseconds: 1800));
           expect(
             find.byKey(const ValueKey('altar_luminous_flash_overlay')),
             findsOneWidget,
@@ -246,8 +468,13 @@ void main() {
             gradient.colors[1].toARGB32() & 0x00FFFFFF,
             AltarSacrificeDialog.warmGoldFlash.toARGB32() & 0x00FFFFFF,
           );
+          // Still hasn't switched to reveal yet at 3.5s (swaps at 3.88s)
+          expect(
+            find.byKey(const ValueKey('altar_item_reveal_stage')),
+            findsNothing,
+          );
 
-          // Settle into Phase 3 (~3.0s): Acquired Item Reveal + Description + Continue
+          // Settle through the rest of the 6.2s ritual into Phase 3 Reveal
           await tester.pumpAndSettle();
           expect(
             find.byKey(const ValueKey('altar_item_reveal_stage')),
@@ -269,7 +496,10 @@ void main() {
             find.byKey(const ValueKey('altar_reveal_item_title')),
           );
           expect(titleText.data, 'Reset Button');
-          expect(titleText.style?.color, AppPalette(isDark: isDark).primaryText);
+          expect(
+            titleText.style?.color,
+            AppPalette(isDark: isDark).primaryText,
+          );
 
           final descText = tester.widget<Text>(
             find.byKey(const ValueKey('altar_reveal_item_description')),
@@ -294,7 +524,7 @@ void main() {
     }
 
     testWidgets(
-      'Tap-to-skip after ~0.8s fast-forwards directly to Phase 3 item reveal',
+      'Tap-to-skip stays locked before ~1.5s and fast-forwards directly to Phase 3 reveal after ~1.5s',
       (WidgetTester tester) async {
         final controller = await _buildTestController();
         addTearDown(controller.dispose);
@@ -319,20 +549,33 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 950));
+        await tester.pumpAndSettle();
 
-        // Still in Phase 1, Skip is available after 0.8s
-        expect(
-          find.byKey(const ValueKey('altar_sacrifice_stage')),
-          findsOneWidget,
+        // Confirm sacrifice to start animation
+        await tester.tap(
+          find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
         );
+        await tester.pump();
+
+        // At 1.0s (< 1.5s), tapping stage does NOT skip
+        await tester.pump(const Duration(milliseconds: 1000));
+        expect(
+          find.byKey(const ValueKey('altar_sacrifice_skip_button')),
+          findsNothing,
+        );
+        await tester.tap(find.byKey(const ValueKey('altar_sacrifice_stage')));
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('altar_item_reveal_stage')),
+          findsNothing,
+        );
+
+        // At 1.7s (> 1.5s), Skip unlocks and tapping stage fast-forwards to Phase 3
+        await tester.pump(const Duration(milliseconds: 700));
         expect(
           find.byKey(const ValueKey('altar_sacrifice_skip_button')),
           findsOneWidget,
         );
-
-        // Tap stage to fast-forward immediately to Phase 3 reveal
         await tester.tap(find.byKey(const ValueKey('altar_sacrifice_stage')));
         await tester.pump();
 
@@ -351,7 +594,7 @@ void main() {
     );
 
     testWidgets(
-      '20,000 5-element sacrifice renders signature Fire, Water, Wood, bronze-brown Earth, and silver Metal orbs with exact formatted counters and localized strings',
+      '20,000 5-element sacrifice confirmation & reveal renders Fire, Water, Wood, bronze-brown Earth, and silver Metal orbs cleanly across languages without overflow',
       (WidgetTester tester) async {
         tester.view.physicalSize = const Size(360, 740);
         tester.view.devicePixelRatio = 1.0;
@@ -370,6 +613,7 @@ void main() {
           earth: 20000,
           metal: 20000,
         );
+        bool confirmedCallbackCalled = false;
 
         await tester.pumpWidget(
           MaterialApp(
@@ -390,13 +634,19 @@ void main() {
                   ShopUpgradeArtifact.crystalBallPlus,
                 ),
                 fallbackIcon: ShopUpgradeArtifact.crystalBallPlus.icon,
+                onConfirmSacrifice: () {
+                  confirmedCallbackCalled = true;
+                  return true;
+                },
               ),
             ),
           ),
         );
-        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
 
-        // Verify all 5 elemental spheres & exact "20,000" numeric counters in Phase 1
+        expect(confirmedCallbackCalled, isFalse);
+
+        // Verify all 5 elemental spheres & exact "20,000" counters during pre-sacrifice confirmation
         final expectedColors = <HandMove, Color>{
           HandMove.fire: const Color(0xFFFF5722),
           HandMove.water: const Color(0xFF00B0FF),
@@ -421,21 +671,30 @@ void main() {
           );
         }
 
-        // Verify painter holds 5 clusters with 12-18 visual orbs each (zero UI freeze)
+        // Verify painter holds 5 staged clusters with 12-18 visual orbs each (zero UI freeze)
         final paintWidget = tester.widget<CustomPaint>(
           find.byKey(const ValueKey('altar_sacrifice_custom_paint')),
         );
         final painter = paintWidget.painter as AltarSacrificePainter;
+        expect(painter.isStaging, isTrue);
         expect(painter.clusters.length, 5);
         for (final cluster in painter.clusters) {
           expect(cluster.visualOrbCount, inInclusiveRange(12, 18));
         }
 
-        // Settle to Phase 3 and verify Portuguese grouping ("20.000") & Crystal Ball+ emblem
-        await tester.pumpAndSettle();
+        // Switch language to Portuguese during confirmation and verify localized button & grouping
         controller.setLanguage('pt');
         await tester.pump();
+        expect(find.text('Confirmar Sacrifício'), findsOneWidget);
+        expect(find.text('Cancelar'), findsOneWidget);
         expect(find.text('20.000'), findsNWidgets(5));
+
+        // Confirm sacrifice -> runs callback and settles to Phase 3 Crystal Ball+ reveal
+        await tester.tap(
+          find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(confirmedCallbackCalled, isTrue);
         expect(
           find.byKey(
             const ValueKey('altar_reveal_emblem_image_crystal_ball_plus'),

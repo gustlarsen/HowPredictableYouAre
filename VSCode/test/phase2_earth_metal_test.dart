@@ -408,6 +408,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(unlockBtn);
       await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('altar_sacrifice_confirm_button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('altar_reveal_collect_button')),
+      );
+      await tester.pumpAndSettle();
 
       // Verify purchase deducted 50 Earth + 50 Metal and boss takes uniform 1 HP damage when toggled ON
       expect(controller.unlockedNewHands, isTrue);

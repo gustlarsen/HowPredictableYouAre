@@ -8,18 +8,23 @@ import '../../theme/app_theme.dart';
 import '../widgets/elemental_energy_sphere.dart';
 import '../widgets/temple_wing_icons.dart';
 
-/// Animation phases of the Sacred Temple's Altar of Sacrifice & Divine Star Blessing.
+/// Animation and interaction phases of the Sacred Temple's Altar of Sacrifice
+/// & Divine Star Blessing flow.
 enum AltarRitualPhase {
-  /// `0.0s – 1.1s`: Elemental orbs settle on the altar basin and are consumed
-  /// by rising holocaust flames and ascending embers.
+  /// Pre-sacrifice staging state showing required orbs resting on the altar
+  /// basin and awaiting explicit player confirmation before deducting orbs.
+  awaitingConfirmation,
+
+  /// `0.0s – 2.2s`: Elemental orbs glow over the altar basin as solemn
+  /// holocaust flames and rising embers build and consume the offering.
   offeringAndFlame,
 
-  /// `1.1s – 2.0s`: A radiant celestial star and divine beam descend onto the
-  /// altar, blossoming into a buffered warm cream/gold wash.
+  /// `2.2s – 4.0s`: A radiant celestial star and divine beam descend onto the
+  /// altar, blossoming into a buffered warm cream/gold luminous wash.
   descendingStarAndFlash,
 
-  /// `2.0s+`: Acquired item emblem, localized title, clear gameplay description,
-  /// and Continue action button.
+  /// `4.0s – 6.2s+`: Acquired item emblem, localized title, clear gameplay
+  /// description, and Continue action button.
   itemReveal,
 }
 
@@ -57,14 +62,20 @@ class SacrificeOrbCluster {
   });
 }
 
-/// Dramatic 3-phase **Altar of Sacrifice / Holocaust & Divine Star Blessing**
-/// overlay shown whenever the player unlocks or upgrades an item in the Sacred
-/// Temple's **Offerings** (`Altar of Offerings`) wing.
+/// Dramatic **Altar of Sacrifice / Holocaust & Divine Star Blessing** overlay
+/// shown whenever the player selects an affordable item in the Sacred Temple's
+/// **Offerings** (`Altar of Offerings`) wing.
+///
+/// Opens in [AltarRitualPhase.awaitingConfirmation] when [onConfirmSacrifice]
+/// is supplied (previewing the exact scaled orbs on the altar before deducting
+/// anything), then plays a majestic ~6.2s 3-phase sacrifice & blessing ritual
+/// upon confirmation.
 class AltarSacrificeDialog extends StatefulWidget {
   static const String altarAssetPath = 'assets/images/sacred_altar.webp';
   static const Size altarImageIntrinsicSize = Size(764.0, 1024.0);
-  static const Duration totalDuration = Duration(milliseconds: 3000);
-  static const Duration skipUnlockDelay = Duration(milliseconds: 800);
+  static const Duration totalDuration = Duration(milliseconds: 6200);
+  static const double totalDurationSeconds = 6.2;
+  static const Duration skipUnlockDelay = Duration(milliseconds: 1500);
 
   static const Color warmCreamFlash = Color(0xFFFFFDF5);
   static const Color warmGoldFlash = Color(0xFFFFE082);
@@ -80,6 +91,12 @@ class AltarSacrificeDialog extends StatefulWidget {
   final String? emblemAssetPath;
   final IconData fallbackIcon;
 
+  /// Optional confirmation callback executed only when the player taps
+  /// **Confirm Sacrifice**. When non-null, the dialog opens in the
+  /// [AltarRitualPhase.awaitingConfirmation] staging state without deducting
+  /// orbs until confirmed.
+  final bool Function()? onConfirmSacrifice;
+
   const AltarSacrificeDialog({
     super.key,
     required this.controller,
@@ -90,6 +107,7 @@ class AltarSacrificeDialog extends StatefulWidget {
     this.badgeLabel,
     this.emblemAssetPath,
     required this.fallbackIcon,
+    this.onConfirmSacrifice,
   });
 
   /// Maps a canonical [ShopUpgradeArtifact] to its illustrated RPG emblem WebP asset.
@@ -144,13 +162,14 @@ class AltarSacrificeDialog extends StatefulWidget {
     return (3.0 + normalized * 13.5).round().clamp(3, 18);
   }
 
-  /// Resolves the active [AltarRitualPhase] for normalized controller progress [p] (`0.0..1.0`).
+  /// Resolves the active post-confirmation [AltarRitualPhase] for normalized
+  /// controller progress [p] (`0.0..1.0` across [totalDurationSeconds] = `6.2s`).
   static AltarRitualPhase phaseForProgress(double p) {
-    final seconds = p.clamp(0.0, 1.0) * (totalDuration.inMilliseconds / 1000.0);
-    if (seconds < 1.10) {
+    final seconds = p.clamp(0.0, 1.0) * totalDurationSeconds;
+    if (seconds < 2.20) {
       return AltarRitualPhase.offeringAndFlame;
     }
-    if (seconds < 2.00) {
+    if (seconds < 4.00) {
       return AltarRitualPhase.descendingStarAndFlash;
     }
     return AltarRitualPhase.itemReveal;
@@ -294,8 +313,11 @@ class AltarSacrificeDialog extends StatefulWidget {
     required ElementalCost sacrificedCost,
     String? badgeLabel,
     String? emblemAssetPath,
+    bool Function()? onConfirmSacrifice,
   }) {
-    controller.audio.playStoryChime();
+    if (onConfirmSacrifice == null) {
+      controller.audio.playStoryChime();
+    }
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
 
     return showGeneralDialog<void>(
@@ -317,6 +339,7 @@ class AltarSacrificeDialog extends StatefulWidget {
           emblemAssetPath:
               emblemAssetPath ?? emblemAssetForArtifact(artifact),
           fallbackIcon: artifact.icon,
+          onConfirmSacrifice: onConfirmSacrifice,
         );
       },
       transitionBuilder: (ctx, anim1, anim2, child) {
@@ -345,6 +368,8 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late List<SacrificeOrbCluster> _clusters;
+  late bool _hasConfirmed;
+  late bool _openedInStaging;
 
   @override
   void initState() {
@@ -352,10 +377,15 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
     _clusters = AltarSacrificeDialog.buildVisualOrbClusters(
       widget.sacrificedCost,
     );
+    _openedInStaging = widget.onConfirmSacrifice != null;
+    _hasConfirmed = !_openedInStaging;
     _controller = AnimationController(
       vsync: this,
       duration: AltarSacrificeDialog.totalDuration,
-    )..forward();
+    );
+    if (_hasConfirmed) {
+      _controller.forward();
+    }
   }
 
   @override
@@ -375,17 +405,52 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
   }
 
   double get _elapsedSeconds =>
-      _controller.value *
-      (AltarSacrificeDialog.totalDuration.inMilliseconds / 1000.0);
+      _controller.value * AltarSacrificeDialog.totalDurationSeconds;
 
   bool get _canFastForward {
+    if (!_hasConfirmed) return false;
     final minSeconds =
         AltarSacrificeDialog.skipUnlockDelay.inMilliseconds / 1000.0;
     return _elapsedSeconds >= minSeconds && _controller.value < 0.98;
   }
 
+  void _handleConfirmSacrifice() {
+    if (_hasConfirmed) return;
+    final ok = widget.onConfirmSacrifice?.call() ?? true;
+    if (!ok) {
+      final loc = widget.controller.localization;
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              loc.t('string79', fallback: 'Not enough Elemental Orbs'),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    widget.controller.audio.playStoryChime();
+    setState(() {
+      _hasConfirmed = true;
+    });
+    _controller.forward(from: 0.0);
+  }
+
+  void _handleCancelSacrifice() {
+    widget.controller.audio.playTapVibrate();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   void _fastForwardToReveal() {
-    if (_controller.value >= 0.98) return;
+    if (!_hasConfirmed || _controller.value >= 0.98) return;
     widget.controller.audio.playTapVibrate();
     _controller.value = 1.0;
   }
@@ -404,15 +469,16 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
   }
 
   /// Smooth bell-curve opacity (`0.0 .. 0.94`) for the buffered luminous
-  /// cream/golden flash between `1.50s` and `2.30s` (peak around `1.88s`).
+  /// cream/golden flash between `3.05s` and `4.78s` (peak around `3.88s`).
   double _computeWarmFlashAlpha(double p) {
-    final sec = p * 3.0;
-    if (sec <= 1.50 || sec >= 2.32) return 0.0;
-    if (sec < 1.88) {
-      final up = ((sec - 1.50) / (1.88 - 1.50)).clamp(0.0, 1.0);
+    if (!_hasConfirmed) return 0.0;
+    final sec = p * AltarSacrificeDialog.totalDurationSeconds;
+    if (sec <= 3.05 || sec >= 4.78) return 0.0;
+    if (sec < 3.88) {
+      final up = ((sec - 3.05) / (3.88 - 3.05)).clamp(0.0, 1.0);
       return 0.94 * Curves.easeInOutCubic.transform(up);
     }
-    final down = ((2.32 - sec) / (2.32 - 1.88)).clamp(0.0, 1.0);
+    final down = ((4.78 - sec) / (4.78 - 3.88)).clamp(0.0, 1.0);
     return 0.94 * Curves.easeOutCubic.transform(down);
   }
 
@@ -424,9 +490,13 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
         final loc = widget.controller.localization;
         final palette = AppPalette.of(context);
         final p = _controller.value.clamp(0.0, 1.0);
-        final phase = AltarSacrificeDialog.phaseForProgress(p);
-        // Swap underlying stage beneath the peak of the warm golden-cream wash (~1.88s).
-        final showRevealStage = p >= (1.88 / 3.0);
+        final phase = _hasConfirmed
+            ? AltarSacrificeDialog.phaseForProgress(p)
+            : AltarRitualPhase.awaitingConfirmation;
+        // Swap underlying stage beneath the peak of the warm golden-cream wash (~3.88s).
+        final showRevealStage =
+            _hasConfirmed &&
+            p >= (3.88 / AltarSacrificeDialog.totalDurationSeconds);
         final flashAlpha = _computeWarmFlashAlpha(p);
 
         final headerTitle = showRevealStage
@@ -438,6 +508,11 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
 
         final String headerSubtitle;
         switch (phase) {
+          case AltarRitualPhase.awaitingConfirmation:
+            headerSubtitle = loc.t(
+              'altar_sacrifice_phase_confirm',
+              fallback: 'Confirm Your Sacred Offering',
+            );
           case AltarRitualPhase.offeringAndFlame:
             headerSubtitle = loc.t(
               'altar_sacrifice_phase_flame',
@@ -484,7 +559,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 1. Sanctuary Ritual Header + Subtle Skip Button (after 0.8s)
+                        // 1. Sanctuary Ritual Header + Subtle Skip Button (after 1.5s)
                         Row(
                           children: [
                             Container(
@@ -579,7 +654,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
                         ),
                         const SizedBox(height: 10),
 
-                        // 2. Main Animated Altar Stage OR Acquired Item Reveal View
+                        // 2. Main Pre-Sacrifice Confirmation, Animated Altar Stage, or Item Reveal View
                         Flexible(
                           child: showRevealStage
                               ? _buildItemRevealStage(
@@ -593,6 +668,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
                                   palette: palette,
                                   loc: loc,
                                   progress: p,
+                                  isStaging: !_hasConfirmed,
                                 ),
                         ),
                       ],
@@ -640,11 +716,24 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
     required AppPalette palette,
     required LocalizationService loc,
     required double progress,
+    required bool isStaging,
   }) {
+    final displayItemName =
+        widget.badgeLabel != null && widget.badgeLabel!.trim().isNotEmpty
+            ? '${widget.itemTitle} (${widget.badgeLabel})'
+            : widget.itemTitle;
+    final confirmPrompt = loc
+        .t(
+          'altar_sacrifice_confirm_prompt',
+          fallback:
+              'Sacrifice these Elemental Orbs on the altar to receive {item}?',
+        )
+        .replaceAll('{item}', displayItemName);
+
     return GestureDetector(
       key: const ValueKey('altar_sacrifice_stage'),
       behavior: HitTestBehavior.opaque,
-      onTap: _handleStageTap,
+      onTap: isStaging ? null : _handleStageTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -652,7 +741,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
           Flexible(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 430),
+                constraints: BoxConstraints(maxHeight: isStaging ? 350 : 430),
                 child: AspectRatio(
                   aspectRatio:
                       AltarSacrificeDialog.altarImageIntrinsicSize.width /
@@ -690,7 +779,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
                             },
                           ),
 
-                          // CustomPainter: Proportional Orbs, Holocaust Flames, Embers & Descending Star
+                          // CustomPainter: Staged Orbs OR Holocaust Flames, Embers & Descending Star
                           RepaintBoundary(
                             child: CustomPaint(
                               key: const ValueKey(
@@ -699,6 +788,8 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
                               painter: AltarSacrificePainter(
                                 progress: progress,
                                 clusters: _clusters,
+                                isStaging: isStaging,
+                                startedFromStaging: _openedInStaging,
                               ),
                               size: Size.infinite,
                             ),
@@ -712,12 +803,122 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
             ),
           ),
           const SizedBox(height: 10),
-          // Exact Numeric Sacrificed Orb Quantities Bar
+
+          if (isStaging) ...[
+            // Pre-Sacrifice Confirmation Prompt Box
+            Container(
+              key: const ValueKey('altar_sacrifice_confirm_prompt_card'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: palette.dialogCardSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: palette.amberBorder.withValues(
+                    alpha: palette.isDark ? 0.36 : 0.55,
+                  ),
+                ),
+              ),
+              child: Text(
+                confirmPrompt,
+                key: const ValueKey('altar_sacrifice_confirm_prompt_text'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.32,
+                  fontWeight: FontWeight.w600,
+                  color: palette.primaryText,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Exact Numeric Required / Sacrificed Orb Quantities Bar
           _buildSacrificedCostBar(
             palette: palette,
             loc: loc,
             containerKey: const ValueKey('altar_sacrifice_cost_bar'),
+            isStaging: isStaging,
           ),
+
+          if (isStaging) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton(
+                    key: const ValueKey('altar_sacrifice_cancel_button'),
+                    onPressed: _handleCancelSacrifice,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: palette.secondaryText,
+                      side: BorderSide(
+                        color: palette.amberBorder.withValues(
+                          alpha: palette.isDark ? 0.38 : 0.55,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 11,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        loc.t('altar_sacrifice_cancel_btn', fallback: 'Cancel'),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('altar_sacrifice_confirm_button'),
+                    onPressed: _handleConfirmSacrifice,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AltarSacrificeDialog._goldFill,
+                      foregroundColor: AltarSacrificeDialog._goldDarkInk,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 11,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    icon: const Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 18,
+                    ),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        loc.t(
+                          'altar_sacrifice_confirm_btn',
+                          fallback: 'Confirm Sacrifice',
+                        ),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -729,13 +930,13 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
     required LocalizationService loc,
     required double progress,
   }) {
-    // Entrance progress from t = 1.88s -> 2.55s
-    final sec = progress * 3.0;
-    final entranceT = ((sec - 1.88) / (2.55 - 1.88)).clamp(0.0, 1.0);
+    // Entrance progress from t = 3.88s -> 5.25s (gentle 2x-paced reveal)
+    final sec = progress * AltarSacrificeDialog.totalDurationSeconds;
+    final entranceT = ((sec - 3.88) / (5.25 - 3.88)).clamp(0.0, 1.0);
     final emblemScale =
         0.74 + 0.26 * Curves.easeOutBack.transform(entranceT);
     final contentOpacity = Curves.easeOutCubic.transform(
-      ((sec - 1.92) / 0.45).clamp(0.0, 1.0),
+      ((sec - 3.94) / 0.85).clamp(0.0, 1.0),
     );
 
     return Column(
@@ -1118,6 +1319,7 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
     required AppPalette palette,
     required LocalizationService loc,
     required Key containerKey,
+    bool isStaging = false,
   }) {
     final entries = widget.sacrificedCost.nonZeroEntries;
     if (entries.isEmpty) {
@@ -1140,10 +1342,15 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            loc.t(
-              'altar_sacrificed_orbs_label',
-              fallback: 'Sacrificed Elemental Orbs',
-            ),
+            isStaging
+                ? loc.t(
+                    'altar_offering_orbs_label',
+                    fallback: 'Offering Elemental Orbs',
+                  )
+                : loc.t(
+                    'altar_sacrificed_orbs_label',
+                    fallback: 'Sacrificed Elemental Orbs',
+                  ),
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
@@ -1193,19 +1400,25 @@ class _AltarSacrificeDialogState extends State<AltarSacrificeDialog>
   }
 }
 
-/// CustomPainter rendering the 3-stage sacred offering sequence directly over
-/// `sacred_altar.webp`:
-/// 1. Proportional 3D elemental orb piles settling onto the octagonal marble basin.
-/// 2. Solemn cyan-gold altar rune glow + roaring holocaust flames & rising embers
-///    that heat and dissolve the sacrificed orbs into ascending sparks.
-/// 3. Descending radiant 8-pointed star & divine beam from the cathedral heavens.
+/// CustomPainter rendering the pre-sacrifice staged orb piles and the slower
+/// 6.2s 3-phase sacred offering sequence directly over `sacred_altar.webp`:
+/// 0. Staging (`isStaging == true`): Proportional 3D elemental orb piles rest
+///    calmly on the octagonal marble basin with a gentle prayer glow.
+/// 1. Phase 1 (`0.0s – 2.2s`): Cyan-gold altar rune glow intensifies as roaring
+///    holocaust flames & rising embers engulf and dissolve the sacrificed orbs.
+/// 2. Phase 2 (`2.2s – 4.0s`): Descending radiant 8-pointed star & divine beam
+///    from the cathedral heavens culminating in the warm cream/gold flash.
 class AltarSacrificePainter extends CustomPainter {
   final double progress;
   final List<SacrificeOrbCluster> clusters;
+  final bool isStaging;
+  final bool startedFromStaging;
 
   const AltarSacrificePainter({
     required this.progress,
     required this.clusters,
+    this.isStaging = false,
+    this.startedFromStaging = false,
   });
 
   int get totalVisualOrbs =>
@@ -1230,20 +1443,42 @@ class AltarSacrificePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
     final imageRect = _resolveImageRect(size);
-    final sec = progress.clamp(0.0, 1.0) * 3.0;
 
     final basinCenter = Offset(
       imageRect.left + imageRect.width * 0.50,
       imageRect.top + imageRect.height * 0.525,
     );
 
-    // 1. Solemn Prayer & Cyan-Gold Basin Rune Glow (0.0s -> 1.45s)
-    if (sec < 1.55) {
+    if (isStaging) {
+      // Pre-sacrifice staging preview: serene rune glow + steady resting orbs (no flames)
+      _paintBasinPrayerGlow(
+        canvas,
+        imageRect,
+        basinCenter,
+        0.0,
+        stagingOverride: true,
+      );
+      if (clusters.isNotEmpty) {
+        _paintSacrificedOrbs(
+          canvas,
+          imageRect,
+          0.0,
+          stagingOverride: true,
+        );
+      }
+      return;
+    }
+
+    final sec =
+        progress.clamp(0.0, 1.0) * AltarSacrificeDialog.totalDurationSeconds;
+
+    // 1. Solemn Prayer & Cyan-Gold Basin Rune Glow (0.0s -> 2.95s)
+    if (sec < 2.98) {
       _paintBasinPrayerGlow(canvas, imageRect, basinCenter, sec);
     }
 
-    // 2. Back Layer of Holocaust Flame Aura (0.20s -> 1.42s)
-    if (sec >= 0.20 && sec < 1.45) {
+    // 2. Back Layer of Holocaust Flame Aura (0.30s -> 2.88s)
+    if (sec >= 0.30 && sec < 2.90) {
       _paintHolocaustFlames(
         canvas: canvas,
         imageRect: imageRect,
@@ -1253,13 +1488,13 @@ class AltarSacrificePainter extends CustomPainter {
       );
     }
 
-    // 3. Proportional Elemental Orb Piles Settling & Dissolving in Fire (0.0s -> 1.12s)
-    if (sec < 1.14 && clusters.isNotEmpty) {
+    // 3. Proportional Elemental Orb Piles Glowing & Dissolving in Fire (0.0s -> 2.28s)
+    if (sec < 2.30 && clusters.isNotEmpty) {
       _paintSacrificedOrbs(canvas, imageRect, sec);
     }
 
-    // 4. Foreground Holocaust Flames, Rising Elemental Sparks & Embers (0.22s -> 1.50s)
-    if (sec >= 0.22 && sec < 1.55) {
+    // 4. Foreground Holocaust Flames, Rising Elemental Sparks & Embers (0.34s -> 2.95s)
+    if (sec >= 0.34 && sec < 2.98) {
       _paintHolocaustFlames(
         canvas: canvas,
         imageRect: imageRect,
@@ -1270,8 +1505,8 @@ class AltarSacrificePainter extends CustomPainter {
       _paintRisingEmbersAndSparks(canvas, imageRect, basinCenter, sec);
     }
 
-    // 5. Phase 2: Descending Bright Star & Divine Sanctuary Beam (1.10s -> 2.00s)
-    if (sec >= 1.08 && sec <= 2.05) {
+    // 5. Phase 2: Descending Bright Star & Divine Sanctuary Beam (2.16s -> 4.08s)
+    if (sec >= 2.16 && sec <= 4.10) {
       _paintDescendingDivineStar(canvas, imageRect, basinCenter, sec);
     }
   }
@@ -1280,11 +1515,19 @@ class AltarSacrificePainter extends CustomPainter {
     Canvas canvas,
     Rect imageRect,
     Offset basinCenter,
-    double sec,
-  ) {
-    final fadeIn = (sec / 0.25).clamp(0.0, 1.0);
-    final fadeOut = ((1.55 - sec) / 0.35).clamp(0.0, 1.0);
-    final intensity = fadeIn * fadeOut;
+    double sec, {
+    bool stagingOverride = false,
+  }) {
+    final double intensity;
+    if (stagingOverride) {
+      intensity = 0.62;
+    } else {
+      final baseFloor = startedFromStaging ? 0.62 : 0.0;
+      final ramp = (sec / 0.55).clamp(0.0, 1.0);
+      final fadeIn = baseFloor + (1.0 - baseFloor) * ramp;
+      final fadeOut = ((2.95 - sec) / 0.70).clamp(0.0, 1.0);
+      intensity = fadeIn * fadeOut;
+    }
     if (intensity <= 0.0) return;
 
     final rx = imageRect.width * 0.25;
@@ -1327,7 +1570,12 @@ class AltarSacrificePainter extends CustomPainter {
     );
   }
 
-  void _paintSacrificedOrbs(Canvas canvas, Rect imageRect, double sec) {
+  void _paintSacrificedOrbs(
+    Canvas canvas,
+    Rect imageRect,
+    double sec, {
+    bool stagingOverride = false,
+  }) {
     // Flatten and sort back-to-front by Y / layerIndex so pyramid overlap is crisp.
     final allNodes = <SacrificeVisualOrbNode>[
       for (final cluster in clusters) ...cluster.orbs,
@@ -1339,25 +1587,50 @@ class AltarSacrificePainter extends CustomPainter {
 
     for (int i = 0; i < allNodes.length; i++) {
       final node = allNodes[i];
-      final settleT = ((sec - node.stagger * 0.30) / 0.26).clamp(0.0, 1.0);
-      if (settleT <= 0.0) continue;
 
-      final settleCurve = Curves.easeOutBack.transform(settleT);
-      final dropOffset = (1.0 - settleCurve) * (imageRect.height * 0.045);
+      final double settleT;
+      final double dropOffset;
+      final double burnT;
+      final double dissolveScale;
+      final double heat;
+      final double riseDrift;
+      final double shimmerX;
 
-      // Dissolve window: 0.44s -> 1.06s with per-orb stagger
-      final burnStart = 0.42 + node.stagger * 0.42;
-      final burnT = ((sec - burnStart) / 0.44).clamp(0.0, 1.0);
-      if (burnT >= 1.0) continue;
+      if (stagingOverride) {
+        settleT = 1.0;
+        dropOffset = 0.0;
+        burnT = 0.0;
+        dissolveScale = 1.0;
+        heat = 0.0;
+        riseDrift = 0.0;
+        shimmerX = 0.0;
+      } else {
+        if (startedFromStaging) {
+          // Orbs were already resting on the altar during the confirmation step
+          settleT = 1.0;
+          dropOffset = 0.0;
+        } else {
+          settleT = ((sec - node.stagger * 0.55) / 0.50).clamp(0.0, 1.0);
+          if (settleT <= 0.0) continue;
+          final settleCurve = Curves.easeOutBack.transform(settleT);
+          dropOffset = (1.0 - settleCurve) * (imageRect.height * 0.045);
+        }
 
-      final dissolveScale = 1.0 - Curves.easeInBack.transform(burnT).clamp(0.0, 1.0);
-      if (dissolveScale <= 0.04) continue;
+        // Slower dissolve window: 0.80s -> 2.18s with per-orb stagger
+        final burnStart = 0.80 + node.stagger * 0.85;
+        burnT = ((sec - burnStart) / 0.90).clamp(0.0, 1.0);
+        if (burnT >= 1.0) continue;
 
-      // Heat glow: orbs turn incandescent white-gold as holocaust fire consumes them
-      final heat = ((sec - 0.30) / 0.55).clamp(0.0, 1.0);
-      final riseDrift = burnT * burnT * (imageRect.height * 0.028);
-      final shimmerX =
-          heat * math.sin(sec * 28.0 + i * 1.7) * (imageRect.width * 0.0025);
+        dissolveScale =
+            1.0 - Curves.easeInBack.transform(burnT).clamp(0.0, 1.0);
+        if (dissolveScale <= 0.04) continue;
+
+        // Heat glow: orbs turn incandescent white-gold as holocaust fire consumes them
+        heat = ((sec - 0.50) / 1.15).clamp(0.0, 1.0);
+        riseDrift = burnT * burnT * (imageRect.height * 0.030);
+        shimmerX =
+            heat * math.sin(sec * 18.0 + i * 1.7) * (imageRect.width * 0.0025);
+      }
 
       final center = Offset(
         imageRect.left + node.normalizedAltarPos.dx * imageRect.width + shimmerX,
@@ -1429,9 +1702,9 @@ class AltarSacrificePainter extends CustomPainter {
     required double sec,
     required bool foregroundPass,
   }) {
-    // Flame envelope: ignites at 0.20s, peaks 0.55s..0.98s, subsides smoothly by 1.42s
-    final ignite = ((sec - 0.20) / 0.34).clamp(0.0, 1.0);
-    final subside = ((1.44 - sec) / 0.42).clamp(0.0, 1.0);
+    // Flame envelope: ignites gradually 0.30s -> 1.05s, peaks 1.05s..2.00s, subsides smoothly by 2.88s
+    final ignite = ((sec - 0.30) / 0.75).clamp(0.0, 1.0);
+    final subside = ((2.88 - sec) / 0.88).clamp(0.0, 1.0);
     final flamePower =
         Curves.easeOutCubic.transform(ignite) *
         Curves.easeInOutCubic.transform(subside);
@@ -1470,8 +1743,8 @@ class AltarSacrificePainter extends CustomPainter {
       final baseX = basinCenter.dx + centered * (basinWidth * 0.44);
       final baseY = basinCenter.dy + imageRect.height * 0.010;
 
-      final waveA = math.sin(sec * 11.5 + i * 1.35);
-      final waveB = math.cos(sec * 16.0 + i * 2.10);
+      final waveA = math.sin(sec * 7.8 + i * 1.35);
+      final waveB = math.cos(sec * 10.6 + i * 2.10);
 
       final tongueHeight =
           maxFlameHeight *
@@ -1552,10 +1825,10 @@ class AltarSacrificePainter extends CustomPainter {
         ? [for (final c in clusters) c.move.elementalPrimaryColor]
         : const [Color(0xFFFFB300), Color(0xFFFF7043)];
 
-    const int sparkCount = 34;
+    const int sparkCount = 42;
     for (int i = 0; i < sparkCount; i++) {
-      final birth = 0.28 + (i % 12) * 0.055;
-      final life = ((sec - birth) / 0.78).clamp(0.0, 1.0);
+      final birth = 0.50 + (i % 14) * 0.11;
+      final life = ((sec - birth) / 1.48).clamp(0.0, 1.0);
       if (life <= 0.0 || life >= 1.0) continue;
 
       final spreadSeed = ((i * 37) % 100) / 100.0 - 0.5; // -0.5..0.5
@@ -1564,7 +1837,7 @@ class AltarSacrificePainter extends CustomPainter {
           basinCenter.dx + spreadSeed * (imageRect.width * 0.38) + sway;
       final y =
           basinCenter.dy -
-          Curves.easeOutQuad.transform(life) * (imageRect.height * 0.36);
+          Curves.easeOutQuad.transform(life) * (imageRect.height * 0.38);
 
       final sparkAlpha =
           (math.sin(life * math.pi) * 0.95).clamp(0.0, 1.0);
@@ -1597,10 +1870,10 @@ class AltarSacrificePainter extends CustomPainter {
     Offset basinCenter,
     double sec,
   ) {
-    // Descends from cathedral ceiling (1.10s) to altar basin (1.60s), then expands (1.60s..2.00s)
-    final descendT = ((sec - 1.10) / (1.60 - 1.10)).clamp(0.0, 1.0);
-    final impactT = ((sec - 1.56) / (1.96 - 1.56)).clamp(0.0, 1.0);
-    final beamVisibility = ((sec - 1.08) / 0.18).clamp(0.0, 1.0);
+    // Descends gracefully from cathedral ceiling (2.20s) to altar basin (3.25s), then expands (3.16s..4.02s)
+    final descendT = ((sec - 2.20) / (3.25 - 2.20)).clamp(0.0, 1.0);
+    final impactT = ((sec - 3.16) / (4.02 - 3.16)).clamp(0.0, 1.0);
+    final beamVisibility = ((sec - 2.16) / 0.36).clamp(0.0, 1.0);
 
     final startY = imageRect.top - imageRect.height * 0.04;
     final targetY = basinCenter.dy - imageRect.height * 0.012;
@@ -1689,7 +1962,7 @@ class AltarSacrificePainter extends CustomPainter {
 
     canvas.save();
     canvas.translate(starCenter.dx, starCenter.dy);
-    canvas.rotate(sec * 0.45);
+    canvas.rotate(sec * 0.28);
 
     // 4 Cardinal Long Rays + 4 Diagonal Rays
     for (int ray = 0; ray < 8; ray++) {
@@ -1726,7 +1999,10 @@ class AltarSacrificePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant AltarSacrificePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.clusters != clusters;
+    return oldDelegate.progress != progress ||
+        oldDelegate.clusters != clusters ||
+        oldDelegate.isStaging != isStaging ||
+        oldDelegate.startedFromStaging != startedFromStaging;
   }
 }
 
