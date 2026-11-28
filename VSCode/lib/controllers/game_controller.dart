@@ -951,6 +951,8 @@ class GameController extends ChangeNotifier {
   bool _hasEvaluatedInitialOfflineReturn = false;
   bool _hasLoadedState = false;
   bool _isAppBackgrounded = false;
+  Timer? _foregroundOffertoryFullGuardTimer;
+  bool _pendingOpenSacredTempleOffertory = false;
 
   /// Legacy alias for [offertoryRateLevel] kept for backward compatibility.
   int get offertoryLevel => offertoryRateLevel;
@@ -972,6 +974,7 @@ class GameController extends ChangeNotifier {
     this.billingService = billingService ?? BillingService();
     this.updateService = updateService ?? UpdateService();
     this.notificationService = notificationService ?? NotificationService();
+    this.notificationService.onNotificationTapped = _handleNotificationTapped;
     this.playGames.onCloudDataRestored = _handleCloudDataRestored;
     this.playGames.onQaBonusGranted = _handleQaBonusGranted;
     this.playGames.addListener(_handlePlayGamesUpdate);
@@ -1183,15 +1186,76 @@ class GameController extends ChangeNotifier {
     await syncOffertoryFullNotification();
   }
 
+  void _cancelForegroundOffertoryGuardTimer() {
+    _foregroundOffertoryFullGuardTimer?.cancel();
+    _foregroundOffertoryFullGuardTimer = null;
+  }
+
+  /// Arms an in-app foreground guard timer while [WorldMapScreen] is mounted
+  /// and the app is in [AppLifecycleState.resumed] so that if the Offertory
+  /// hits 100% capacity while the player is actively in the app, the OS
+  /// status-bar notification is suppressed and the in-app red badge updates
+  /// immediately.
+  void _syncForegroundOffertoryGuardTimer({DateTime? now}) {
+    _cancelForegroundOffertoryGuardTimer();
+    if (!isWorldMapAttached || _isAppBackgrounded || offertoryLevel <= 0) {
+      return;
+    }
+    final nowUtc = _nowUtc(now);
+    final remainingMs =
+        ((offertoryMaxCapSeconds - offertoryElapsedSeconds(nowUtc)) * 1000.0)
+            .ceil();
+    if (remainingMs <= 0) {
+      return;
+    }
+
+    final preCancelDelayMs = remainingMs > 500
+        ? math.max(1, remainingMs - 500)
+        : remainingMs;
+    _foregroundOffertoryFullGuardTimer = Timer(
+      Duration(milliseconds: preCancelDelayMs),
+      () {
+        _foregroundOffertoryFullGuardTimer = null;
+        if (_isAppBackgrounded || !isWorldMapAttached || offertoryLevel <= 0) {
+          return;
+        }
+        final checkMs =
+            ((offertoryMaxCapSeconds - offertoryElapsedSeconds()) * 1000.0)
+                .ceil();
+        if (checkMs <= 1000) {
+          unawaited(notificationService.cancelOffertoryFullNotification());
+          if (checkMs <= 0) {
+            notifyListeners();
+          } else {
+            _foregroundOffertoryFullGuardTimer = Timer(
+              Duration(milliseconds: checkMs),
+              () {
+                _foregroundOffertoryFullGuardTimer = null;
+                if (_isAppBackgrounded || !isWorldMapAttached) return;
+                unawaited(
+                  notificationService.cancelOffertoryFullNotification(),
+                );
+                notifyListeners();
+              },
+            );
+          }
+        } else {
+          _syncForegroundOffertoryGuardTimer();
+        }
+      },
+    );
+  }
+
   /// Schedules or cancels the local Offertory 100%-full notification (`ID 1001`)
   /// based on [offertoryLevel], [offertoryNotificationsEnabled], and remaining
-  /// time until the 8-hour storage cap.
+  /// time until the dynamic Max Offline Time Cap.
   Future<void> syncOffertoryFullNotification({DateTime? now}) async {
+    final nowUtc = _nowUtc(now);
+    _syncForegroundOffertoryGuardTimer(now: nowUtc);
     if (!offertoryNotificationsEnabled || offertoryLevel <= 0) {
       await notificationService.cancelOffertoryFullNotification();
       return;
     }
-    final nowUtc = _nowUtc(now);
     final remaining = offertoryTimeUntilFull(nowUtc);
     if (remaining.inSeconds <= NotificationService.minScheduleLeadSeconds) {
       await notificationService.cancelOffertoryFullNotification();
@@ -1199,12 +1263,12 @@ class GameController extends ChangeNotifier {
     }
     final title = localization.t(
       'offertory_notif_full_title',
-      fallback: 'Offertory Vault Full!',
+      fallback: 'Sacred Offertory is Full!',
     );
     final body = localization.t(
       'offertory_notif_full_body',
       fallback:
-          'Your Sacred Temple Offertory reached 100% capacity and stopped collecting. Tap to harvest your Elemental Orbs!',
+          'Your Offertory has reached 100% capacity. Open the Sacred Temple to collect your idle orbs!',
     );
     await notificationService.scheduleOffertoryFullNotification(
       remainingUntilFull: remaining,
@@ -1217,8 +1281,61 @@ class GameController extends ChangeNotifier {
   Future<void> _requestPermissionAndSyncOffertoryNotification({
     DateTime? now,
   }) async {
-    await notificationService.requestPermission();
+    storage.setHasPromptedOffertoryNotifPermission(true);
+    final granted = await notificationService.requestPermission();
+    if (!granted && notificationService.wasLastPermissionDenied) {
+      offertoryNotificationsEnabled = false;
+      storage.setOffertoryNotificationsEnabled(false);
+      await notificationService.cancelOffertoryFullNotification();
+      notifyListeners();
+      return;
+    }
     await syncOffertoryFullNotification(now: now);
+  }
+
+  /// Requests `POST_NOTIFICATIONS` contextually the first time the player opens
+  /// or interacts with the Sacred Temple's Offertory wing (never abruptly on
+  /// first app launch).
+  void onOffertoryWingInteracted({DateTime? now}) {
+    if (!storage.hasPromptedOffertoryNotifPermission &&
+        offertoryNotificationsEnabled) {
+      unawaited(_requestPermissionAndSyncOffertoryNotification(now: now));
+    }
+  }
+
+  bool get shouldOpenSacredTempleOffertory =>
+      _pendingOpenSacredTempleOffertory;
+
+  bool consumePendingOpenSacredTempleOffertory() {
+    if (!_pendingOpenSacredTempleOffertory) return false;
+    _pendingOpenSacredTempleOffertory = false;
+    return true;
+  }
+
+  void _handleNotificationTapped(String? payload) {
+    if (payload != null &&
+        payload.isNotEmpty &&
+        payload != NotificationService.offertoryFullPayload) {
+      return;
+    }
+    handleOffertoryNotificationTapped();
+  }
+
+  /// Handles tapping the OS Offertory-full notification: clears the status-bar
+  /// alert and either surfaces the Welcome-Back harvest modal or opens the
+  /// Sacred Temple directly on the Offertory tab.
+  void handleOffertoryNotificationTapped({DateTime? now}) {
+    final nowUtc = _nowUtc(now);
+    unawaited(notificationService.cancelOffertoryFullNotification());
+    _offlineOffertoryDismissedThisSession = false;
+    if (offertoryLevel >= 1 && offertoryStoredOrbs(nowUtc) >= 1) {
+      if (!shouldShowOfflineOffertoryDialog) {
+        _pendingOpenSacredTempleOffertory = true;
+      }
+    } else {
+      _pendingOpenSacredTempleOffertory = true;
+    }
+    notifyListeners();
   }
 
   /// True when the Welcome Back / Offline Offertory Harvest modal should be
@@ -1265,6 +1382,7 @@ class GameController extends ChangeNotifier {
 
   void _recordAppPaused({DateTime? now}) {
     _isAppBackgrounded = true;
+    _cancelForegroundOffertoryGuardTimer();
     lastAppPausedAt = _nowUtc(now).millisecondsSinceEpoch;
     storage.setLastAppPausedAt(lastAppPausedAt);
     unawaited(syncOffertoryFullNotification(now: now));
@@ -1272,7 +1390,10 @@ class GameController extends ChangeNotifier {
 
   void _handleAppResumedOfflineCheck({DateTime? now}) {
     _isAppBackgrounded = false;
+    unawaited(syncOffertoryFullNotification(now: now));
     if (evaluateOfflineOffertoryReturn(now: now)) {
+      notifyListeners();
+    } else if (isOffertoryFullAt(now)) {
       notifyListeners();
     }
   }
@@ -1299,10 +1420,14 @@ class GameController extends ChangeNotifier {
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       updateService.setAppForeground(false);
-      _recordAppPaused();
+      if (!_isAppBackgrounded) {
+        _recordAppPaused();
+      }
     } else if (state == AppLifecycleState.resumed) {
       updateService.setAppForeground(true);
-      _handleAppResumedOfflineCheck();
+      if (_isAppBackgrounded) {
+        _handleAppResumedOfflineCheck();
+      }
     }
 
     unawaited(audio.handleAppLifecycleState(state));
@@ -4340,11 +4465,15 @@ class GameController extends ChangeNotifier {
 
   void attachWorldMap() {
     _attachedWorldMapCount++;
+    _syncForegroundOffertoryGuardTimer();
   }
 
   void detachWorldMap() {
     if (_attachedWorldMapCount > 0) {
       _attachedWorldMapCount--;
+    }
+    if (_attachedWorldMapCount == 0) {
+      _cancelForegroundOffertoryGuardTimer();
     }
   }
 
@@ -5312,7 +5441,9 @@ class GameController extends ChangeNotifier {
     offertoryRateLevel += levels;
     _persistAllOrbsAndTurn0();
     _persistOffertoryState();
-    if (wasUnbuilt && offertoryNotificationsEnabled) {
+    if (wasUnbuilt &&
+        offertoryNotificationsEnabled &&
+        !storage.hasPromptedOffertoryNotifPermission) {
       unawaited(_requestPermissionAndSyncOffertoryNotification(now: nowUtc));
     } else {
       unawaited(syncOffertoryFullNotification(now: nowUtc));
@@ -5409,6 +5540,7 @@ class GameController extends ChangeNotifier {
     offertoryPendingFraction = (totalFloat - whole).clamp(0.0, 0.999999);
     offertoryLastCollectedAt = nowUtc.millisecondsSinceEpoch;
     pendingOfflineOffertoryDuration = null;
+    _pendingOpenSacredTempleOffertory = false;
     _offlineOffertoryDismissedThisSession = false;
     lastAppPausedAt = nowUtc.millisecondsSinceEpoch;
 
@@ -6394,6 +6526,7 @@ class GameController extends ChangeNotifier {
   }
 
   void cancelPendingTimers() {
+    _cancelForegroundOffertoryGuardTimer();
     _giftTimer?.cancel();
     _giftTimer = null;
     _giftCooldownUntil = null;

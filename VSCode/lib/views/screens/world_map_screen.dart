@@ -56,6 +56,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
   bool _isWeek10ArchmageDialogOpen = false;
   bool _isOfflineOffertoryDialogOpen = false;
   bool _isOpeningPendingWatchTower = false;
+  bool _isOpeningPendingOffertoryWing = false;
   bool _isLaunchingTempleSiege = false;
   bool _metricsRebuildScheduled = false;
 
@@ -76,6 +77,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
       }
       _checkPendingOpenWatchTower(context, controller);
       _checkOfflineOffertoryDialog(context, controller);
+      _checkPendingOpenSacredTempleOffertory(context, controller);
     });
   }
 
@@ -122,6 +124,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     controller.onWorldMapLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _checkOfflineOffertoryDialog(context, controller);
+      _checkPendingOpenSacredTempleOffertory(context, controller);
     }
   }
 
@@ -376,6 +379,42 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     });
   }
 
+  void _checkPendingOpenSacredTempleOffertory(
+    BuildContext context,
+    GameController controller,
+  ) {
+    if (!controller.shouldOpenSacredTempleOffertory ||
+        _isOpeningPendingOffertoryWing ||
+        _isOfflineOffertoryDialogOpen ||
+        _isOpeningPendingWatchTower ||
+        _isLaunchingTempleSiege ||
+        _isWeek0ScreamDialogOpen ||
+        _isWeek10ArchmageDialogOpen ||
+        _isInventoryDialogOpen ||
+        controller.shouldShowOfflineOffertoryDialog ||
+        controller.isTempleSiegeActive ||
+        controller.currentWeek > GameController.maxCampaignWeeks ||
+        controller.shouldOpenWatchTower ||
+        controller.shouldShowWeek0ScreamWarning ||
+        controller.shouldShowWeek10ArchmageWarning ||
+        controller.pendingStoryChapter != null) {
+      return;
+    }
+    _isOpeningPendingOffertoryWing = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isOpeningPendingOffertoryWing = false;
+      if (!mounted || !context.mounted) return;
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+      if (!isCurrent) return;
+      if (!controller.consumePendingOpenSacredTempleOffertory()) return;
+      _openSacredTemple(
+        context,
+        controller,
+        initialWing: TempleWing.offertory,
+      );
+    });
+  }
+
   void _checkOfflineOffertoryDialog(
     BuildContext context,
     GameController controller,
@@ -463,11 +502,19 @@ class _WorldMapScreenState extends State<WorldMapScreen>
     );
   }
 
-  void _openSacredTemple(BuildContext context, GameController controller) {
+  void _openSacredTemple(
+    BuildContext context,
+    GameController controller, {
+    TempleWing? initialWing,
+  }) {
     controller.audio.playTapVibrate();
     showDialog(
       context: context,
-      builder: (_) => ShopDialog(controller: controller, fromTemple: true),
+      builder: (_) => ShopDialog(
+        controller: controller,
+        fromTemple: true,
+        initialWing: initialWing,
+      ),
     );
   }
 
@@ -486,6 +533,7 @@ class _WorldMapScreenState extends State<WorldMapScreen>
       _checkWeek0ScreamWarning(context, controller);
       _checkWeek10ArchmageWarning(context, controller);
       _checkOfflineOffertoryDialog(context, controller);
+      _checkPendingOpenSacredTempleOffertory(context, controller);
     }
 
     return Scaffold(

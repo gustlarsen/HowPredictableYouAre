@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -12,6 +13,7 @@ import 'package:how_predictable/services/play_games_service.dart';
 import 'package:how_predictable/services/storage_service.dart';
 import 'package:how_predictable/views/dialogs/offline_offertory_dialog.dart';
 import 'package:how_predictable/views/dialogs/settings_dialog.dart';
+import 'package:how_predictable/views/dialogs/shop_dialog.dart';
 import 'package:how_predictable/views/screens/world_map_screen.dart';
 import 'package:how_predictable/views/widgets/elemental_energy_sphere.dart';
 import 'package:how_predictable/views/widgets/temple_wing_icons.dart';
@@ -36,8 +38,10 @@ class _MockScheduledNotification {
 
 class _MockLocalNotificationsClient implements LocalNotificationsClient {
   bool exactAlarmsAllowed;
+  bool permissionGranted = true;
   int initializeCalls = 0;
   int permissionRequestCalls = 0;
+  void Function(String? payload)? _onNotificationTapped;
   final List<int> cancelledIds = [];
   final List<_MockScheduledNotification> scheduledHistory = [];
   final Map<int, _MockScheduledNotification> activeScheduled = {};
@@ -46,16 +50,23 @@ class _MockLocalNotificationsClient implements LocalNotificationsClient {
     this.exactAlarmsAllowed = false,
   });
 
+  void simulateTap([String? payload = NotificationService.offertoryFullPayload]) {
+    _onNotificationTapped?.call(payload);
+  }
+
   @override
-  Future<bool> initialize() async {
+  Future<bool> initialize({
+    void Function(String? payload)? onNotificationTapped,
+  }) async {
     initializeCalls++;
+    _onNotificationTapped = onNotificationTapped;
     return true;
   }
 
   @override
   Future<bool> requestNotificationsPermission() async {
     permissionRequestCalls++;
-    return true;
+    return permissionGranted;
   }
 
   @override
@@ -418,7 +429,13 @@ void main() {
           scheduled!.scheduledAtUtc.difference(now),
           equals(const Duration(hours: 2)),
         );
-        expect(scheduled.title, equals('Offertory Vault Full!'));
+        expect(scheduled.title, equals('Sacred Offertory is Full!'));
+        expect(
+          scheduled.body,
+          equals(
+            'Your Offertory has reached 100% capacity. Open the Sacred Temple to collect your idle orbs!',
+          ),
+        );
         expect(scheduled.useExactAlarm, isFalse);
       },
     );
@@ -839,13 +856,23 @@ void main() {
           NotificationService.offertoryFullNotificationId
         ];
         expect(ptNotif, isNotNull);
-        expect(ptNotif!.title, equals('Gazofilácio Cheio!'));
-        expect(ptNotif.body, contains('Gazofilácio do Templo'));
+        expect(ptNotif!.title, equals('O Gazofilácio está Cheio!'));
+        expect(
+          ptNotif.body,
+          equals(
+            'Seu Gazofilácio atingiu 100% da capacidade. Abra o Templo Sagrado para resgatar suas esferas!',
+          ),
+        );
 
-        // Advance 2 hours (100% full, remaining == 0s <= 60s) -> cancels notification rather than scheduling in past
+        // Advance 2 hours (100% full, remaining == 0s) -> cancels notification rather than scheduling in past
         fakeNow = fakeNow.add(const Duration(hours: 2));
+        final historyCountBeforeFullSync = h.notifClient.scheduledHistory.length;
         await c.syncOffertoryFullNotification();
         expect(h.notifClient.activeScheduled, isEmpty);
+        expect(
+          h.notifClient.scheduledHistory.length,
+          equals(historyCountBeforeFullSync),
+        );
       },
     );
 
@@ -1066,6 +1093,168 @@ void main() {
               ?.scheduledAtUtc,
           equals(fakeNow.add(const Duration(hours: 24, minutes: 30))),
         );
+      },
+    );
+
+    test(
+      'Watch Ad (2x Collect), background lifecycle (< 60s remaining), startup already-full cancellation, and OS permission denial work reliably',
+      () async {
+        final t0 = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        DateTime fakeNow = t0.add(const Duration(hours: 2, minutes: 30));
+
+        // 1. Startup when already 100% FULL (> 2h cap): cancels pending notification without scheduling a past-due alert
+        final h = await _createHarness(
+          prefs: {
+            'offertory_rate_level': 1,
+            'offertory_cap_level': 0, // 2h 00m cap
+            'offertory_last_collected_at': t0.millisecondsSinceEpoch,
+            'last_app_paused_at': t0.millisecondsSinceEpoch,
+          },
+          clock: () => fakeNow,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+
+        await c.initializeNotifications();
+        expect(c.isOffertoryFull, isTrue);
+        expect(h.notifClient.activeScheduled, isEmpty);
+        expect(h.notifClient.scheduledHistory, isEmpty);
+        expect(
+          h.notifClient.cancelledIds,
+          contains(NotificationService.offertoryFullNotificationId),
+        );
+
+        // 2. Watch Ad (2x Collect) resets elapsed time to 0 and schedules notification for full capDuration (now + 2h)
+        final granted2x = await c.watchAdToDoubleCollectOffertory();
+        expect(granted2x, equals(48)); // 24 * 2
+        await Future<void>.delayed(Duration.zero);
+        final after2x = h.notifClient.activeScheduled[
+          NotificationService.offertoryFullNotificationId
+        ];
+        expect(after2x, isNotNull);
+        expect(
+          after2x!.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(hours: 2))),
+        );
+
+        // 3. Advance 1h 59m 45s (only 15s remaining until full) and transition to background -> still schedules for now + 15s!
+        fakeNow = fakeNow.add(
+          const Duration(hours: 1, minutes: 59, seconds: 45),
+        );
+        c.didChangeAppLifecycleState(AppLifecycleState.paused);
+        await Future<void>.delayed(Duration.zero);
+        final shortLead = h.notifClient.activeScheduled[
+          NotificationService.offertoryFullNotificationId
+        ];
+        expect(shortLead, isNotNull);
+        expect(
+          shortLead!.scheduledAtUtc,
+          equals(fakeNow.add(const Duration(seconds: 15))),
+        );
+
+        // 4. Explicit OS permission denial turns Offertory Full Notification toggle OFF cleanly
+        h.notifClient.permissionGranted = false;
+        c.setOffertoryNotificationsEnabled(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(c.offertoryNotificationsEnabled, isFalse);
+        expect(h.storage.offertoryNotificationsEnabled, isFalse);
+        expect(h.notifClient.activeScheduled, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'Suppresses system status-bar notification when app stays active in foreground (AppLifecycleState.resumed) at 100% capacity, and tapping notification opens Sacred Temple -> Offertory tab',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        DateTime fakeNow = DateTime.utc(2026, 11, 24, 12, 0, 0);
+        final h = await _createHarness(
+          prefs: {
+            'offertory_rate_level': 1,
+            'offertory_cap_level': 0, // 2h 00m = 7200s cap
+            'offertory_last_collected_at': fakeNow.millisecondsSinceEpoch,
+            'last_app_paused_at': fakeNow.millisecondsSinceEpoch,
+          },
+          clock: () => fakeNow,
+        );
+        addTearDown(h.controller.dispose);
+        final c = h.controller;
+        await c.initializeNotifications();
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider.value(
+            value: c,
+            child: const MaterialApp(home: WorldMapScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Scheduled initially for t + 2h while Offertory is filling
+        expect(
+          h.notifClient.activeScheduled[
+            NotificationService.offertoryFullNotificationId
+          ],
+          isNotNull,
+        );
+        expect(c.hasSacredTempleNotification, isFalse);
+
+        // Player stays active in foreground (AppLifecycleState.resumed) across the 2h mark:
+        // foreground guard cancels OS notification right before/at 100% and illuminates in-app badge!
+        fakeNow = fakeNow.add(const Duration(hours: 2));
+        await tester.pump(const Duration(hours: 2));
+        await tester.pumpAndSettle();
+
+        expect(c.isOffertoryFull, isTrue);
+        expect(c.hasSacredTempleNotification, isTrue);
+        expect(h.notifClient.activeScheduled, isEmpty);
+
+        // Simulate tapping the local notification when no Welcome-Back dialog is open ->
+        // opens Sacred Temple directly on the Offertory tab!
+        h.notifClient.simulateTap(NotificationService.offertoryFullPayload);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ShopDialog), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('offertory_vault_card')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('offertory_collect_button')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    test(
+      'AndroidManifest.xml declares POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED, SCHEDULE_EXACT_ALARM (without restricted USE_EXACT_ALARM) and scheduled notification receivers',
+      () {
+        final manifestFile = File('android/app/src/main/AndroidManifest.xml');
+        expect(manifestFile.existsSync(), isTrue);
+        final xml = manifestFile.readAsStringSync();
+
+        expect(xml, contains('android.permission.POST_NOTIFICATIONS'));
+        expect(xml, contains('android.permission.RECEIVE_BOOT_COMPLETED'));
+        expect(xml, contains('android.permission.SCHEDULE_EXACT_ALARM'));
+        expect(xml, isNot(contains('android.permission.USE_EXACT_ALARM')));
+        expect(
+          xml,
+          contains(
+            'com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver',
+          ),
+        );
+        expect(
+          xml,
+          contains(
+            'com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver',
+          ),
+        );
+        expect(xml, contains('android.intent.action.BOOT_COMPLETED'));
+        expect(xml, contains('android.intent.action.MY_PACKAGE_REPLACED'));
       },
     );
   });

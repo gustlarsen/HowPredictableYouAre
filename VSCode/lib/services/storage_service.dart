@@ -756,6 +756,13 @@ class StorageService {
   Future<void> setOffertoryNotificationsEnabled(bool val) =>
       _prefs.setBool(offertoryNotificationsEnabledKey, val);
 
+  static const String offertoryNotifPermissionPromptedKey =
+      'offertory_notif_permission_prompted';
+  bool get hasPromptedOffertoryNotifPermission =>
+      _prefs.getBool(offertoryNotifPermissionPromptedKey) ?? false;
+  Future<void> setHasPromptedOffertoryNotifPermission(bool val) =>
+      _prefs.setBool(offertoryNotifPermissionPromptedKey, val);
+
   // Unlocks (Purchased in shop)
   bool get unlockedReset => _prefs.getBool('unlockedReset') ?? false;
   Future<void> setUnlockedReset(bool val) =>

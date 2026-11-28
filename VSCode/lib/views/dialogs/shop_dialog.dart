@@ -198,6 +198,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         }
       });
     _syncOffertoryLiveTimer();
+    if (_selectedWing == TempleWing.offertory) {
+      controller.onOffertoryWingInteracted();
+    }
     controller.billingService.addEventListener(_onBillingEvent);
   }
 
@@ -251,6 +254,9 @@ class _ShopDialogState extends State<ShopDialog> with TickerProviderStateMixin {
         }
       });
       _syncOffertoryLiveTimer();
+      if (wing == TempleWing.offertory) {
+        controller.onOffertoryWingInteracted();
+      }
     }
   }
 
